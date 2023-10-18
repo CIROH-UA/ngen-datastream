@@ -332,8 +332,6 @@ def write_data(
     t_buff    = 0
     t_put     = 0
 
-    compression = 'gzip'
-
     tar = './tmp_' + str(id) + '.tar.gz'
 
     t00 = time.perf_counter()
@@ -362,12 +360,12 @@ def write_data(
                 del df_bucket            
 
             buf = BytesIO()
+            filename = f"cat-{cat_id}." + output_file_type
+
             if output_file_type == "parquet":
-                filename = f"cat-{cat_id}.parquet"
-                df.to_parquet(buf, index=False,compression=compression)                
+                df.to_parquet(buf, index=False)                
             elif output_file_type == "csv":
-                filename = f"cat-{cat_id}.csv"
-                df.to_csv(buf, index=False,compression=compression)                 
+                df.to_csv(buf, index=False)                 
 
             t_buff += time.perf_counter() - t0
             t0 = time.perf_counter()
@@ -378,9 +376,9 @@ def write_data(
 
             buf = BytesIO()
             if output_file_type == "parquet":
-                df.to_parquet(buf, index=False,compression=compression)                
+                df.to_parquet(buf, index=False)                
             elif output_file_type == "csv":
-                df.to_csv(buf, index=False,compression=compression)     
+                df.to_csv(buf, index=False)     
             buf.seek(0)
             tarinfo = tarfile.TarInfo(filename)
             tarinfo.size = len(buf.getvalue())
