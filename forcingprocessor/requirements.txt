@@ -46,7 +46,7 @@ numbagg==0.2.2
 numcodecs==0.11.0
 numpy==1.24.4
 numpy-groupies==0.9.22
-nwmurl==0.0.5
+nwmurl==0.0.8
 packaging==23.1
 pandas==2.0.3
 partd==1.4.0

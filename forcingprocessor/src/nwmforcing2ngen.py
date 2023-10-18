@@ -596,11 +596,8 @@ def prep_ngen_data(conf):
                 Bucket=output_bucket,
                 Key=f"{output_bucket_path}/forcing_metadata/conf.json"
             )
-        
-    sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput)
 
-    # 
-    # sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+    sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
 
     nwm_forcing_files = []
     with open('./filenamelist.txt','r') as fp:
