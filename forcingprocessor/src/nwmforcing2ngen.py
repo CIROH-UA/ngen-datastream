@@ -201,7 +201,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list
     if ii_verbose: print(f'{id} comleted data extraction, returning data to primary process')
     return [data_list, t_list]
 
-def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,output_file_type,out_path,vars,ii_append,key_id,key):
+def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,output_file_type,out_path,vars,ii_append):
     """
     Sets up the thread pool for write_data
     
@@ -226,8 +226,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
     append_list           = []
     print_list            = []
     bucket_list           = []
-    key_list              = []
-    key_id_list           = []
     nthread_list          = []
     worker_time_list      = []
     worker_data_list      = []
@@ -255,8 +253,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
             var_list.append(vars)
             append_list.append(ii_append)
             print_list.append(ii_print)
-            key_list.append(key)
-            key_id_list.append(key_id)
             worker_time_list.append(t_ax)
             nthread_list.append(nprocs)
             bucket_list.append(output_bucket)
@@ -281,8 +277,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
         var_list,
         append_list,  
         print_list,      
-        key_id_list,
-        key_list,
         nthread_list
         ):
             hashes.append(results[0])
@@ -308,14 +302,9 @@ def write_data(
         vars,
         ii_append,
         ii_print,
-        key_id,
-        key,
         nthreads        
 ):
-    s3_client = boto3.session.Session().client("s3",
-                        aws_access_key_id=key_id,
-                        aws_secret_access_key=key 
-                        )   
+    s3_client = boto3.session.Session().client("s3")   
 
     if storage_type.lower() != 's3': raise NotImplementedError
 
@@ -424,28 +413,6 @@ def start_end_interval(start_date,end_date,lead_time):
 
     return formatted_start, formatted_end, output_interval
 
-def get_secret(
-        secret_name : str,
-        region_name : str,
-):
-
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager',
-        region_name=region_name
-    )
-
-    try:
-        get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name
-        )
-    except ClientError as e:
-        raise e
-
-    secret = get_secret_value_response['SecretString']
-
-    return json.loads(secret)
-
 def prep_ngen_data(conf):
     """
     Primary function to retrieve forcing and hydrofabric data and convert it into files that can be ingested into ngen.
@@ -514,8 +481,6 @@ def prep_ngen_data(conf):
     ii_verbose = conf["run"].get("verbose",False) 
     ii_check_files = conf["run"].get("check_files",False)   
     ii_collect_stats = conf["run"].get("collect_stats",True)
-    secret_name = conf["run"]["secret_name"]
-    region_name = conf["run"]["region_name"]
     proc_threads = conf["run"]["proc_threads"]
     write_threads = conf["run"]["write_threads"]
     nfile_chunk = conf["run"]["nfile_chunk"]
@@ -573,20 +538,12 @@ def prep_ngen_data(conf):
     elif storage_type == "S3":
         cache_dir = cache_bucket
 
-        secret = get_secret(secret_name,region_name)
-
-        key_id = secret['aws_access_key_id']
-        key = secret['aws_secret_access_key']
-
         fs_s3 = s3fs.S3FileSystem(
             anon=True,
             client_kwargs={'region_name': 'us-east-1'}
             )
 
-        s3 = boto3.client("s3",
-                        aws_access_key_id=key_id,
-                        aws_secret_access_key=key 
-                        )                
+        s3 = boto3.client("s3")          
                 
         wgt_file = s3.get_object(Bucket=cache_bucket, Key=weight_file)           
     
@@ -640,9 +597,9 @@ def prep_ngen_data(conf):
         if ii_verbose: print(f'Data extract threads: {proc_threads:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None)
 
         t0 = time.perf_counter()
-        out_path = output_bucket_path + '/forcing/'
+        out_path = output_bucket_path + '/forcings/'
         if ii_verbose: print(f'Writing catchment forcings to {output_bucket} at {out_path}!', end=None)  
-        forcing_hashes, forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append,key_id,key)      
+        forcing_hashes, forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append)      
 
         ii_append = True
         write_time += time.perf_counter() - t0    
@@ -690,7 +647,7 @@ def prep_ngen_data(conf):
             # Check forcing size
             if j > 10: break
             csvname = f"cat-{jcatch}.csv"
-            key_name = f"{output_bucket_path}/forcing/{csvname}"
+            key_name = f"{output_bucket_path}/forcings/{csvname}"
             response = s3.head_object(
                 Bucket=output_bucket,
                 Key=key_name
@@ -846,6 +803,7 @@ def prep_ngen_data(conf):
 
     if storage_type == 'S3':
         with open(combined_tar_filename, 'rb') as combined_tar:
+            s3 = boto3.client("s3")   
             s3.upload_fileobj(combined_tar,output_bucket,out_path + combined_tar_filename)   
         
     print(f"\n\n--------SUMMARY-------")

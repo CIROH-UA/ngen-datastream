@@ -28,8 +28,6 @@
         "verbose"       : true,
         "check_files"   : true,
         "collect_stats" : true,
-        "secret_name"   : "jlaser_creds",
-        "region_name"   : "us-west-2",
         "proc_threads"  : 54,
         "write_threads" : 96,
         "nfile_chunk"   : 720
