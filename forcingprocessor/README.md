@@ -2,6 +2,12 @@
 
 This python tool converts National Water Model (NWM) forcing data into Next Generation National Water Model (ngen) forcing data. The motivation for this tool is NWM data is gridded and stored within netCDFs for each forecast hour. Ngen inputs this same forcing data, but in the format of per-catchment csv files that hold time series data. This tool is driven by a configuration file that is explained, with an example, in detail below.
 
+## Runing the script
+```
+
+```
+
+
 ## Run Notes
 This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_threads` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best.
 
@@ -74,7 +80,7 @@ The "run" section contains parameters related to the execution of the applicatio
 
     },
 
-    "storage":{
+    "storage" : {
         "storage_type"       : "S3",
         "output_bucket"      : "ngenforcingdev",
         "output_bucket_path" : "AWI_18hr",
