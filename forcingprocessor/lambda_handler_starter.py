@@ -62,5 +62,8 @@ def lambda_handler(event, context):
     )
     wait_for_command_response(response,instance_id)
     print(f'{instance_id} is launched and processing forcings')
-
-    return response
+    
+    output = {}
+    output['command_id']  = response['Command']['CommandId']
+    output['instance_id'] = instance_id
+    return output
