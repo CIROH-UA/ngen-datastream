@@ -1,7 +1,7 @@
 # Data Access
 Running ngen requires building a standard run directory complete with the necessary files. Below is an explanation of the standard and an example that can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run) Reference for discussion of the standard [here](https://github.com/CIROH-UA/NGIAB-CloudInfra/pull/17). 
 
-An ngen run directory `data_dir` is composed of three necessary subfolders `config, forcings, outputs` and an optional fourth subfolder `forcing_metadata`. `data_dir` may have any name, but the subfolders must follow this naming convention. 
+An ngen run directory `data_dir` is composed of three necessary subfolders `config, forcings, outputs` and an optional fourth subfolder `metadata`. `data_dir` may have any name, but the subfolders must follow this naming convention. 
 
 ```
 data_dir/
@@ -10,7 +10,7 @@ data_dir/
 │
 ├── forcings/
 |
-├── forcings_metadata/
+├── metadata/
 │
 ├── outputs/
 ```
@@ -19,12 +19,12 @@ The `data_dir` directory contains the following subfolders:
 
 - `config`:  model configuration files and hydrofabric configuration files. A deeper explanation [here]()
 - `forcings`: catchment-level forcing timeseries files. These can be generated with the [forcingprocessor](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor). Forcing files contain variables like wind speed, temperature, precipitation, and solar radiation.
-- `forcing_metadata` is an optional subfolder. This is programmatically generated in the forcingprocessor and it used within to ngen. Do not edit this folder.
+- `metadata` is an optional subfolder. This is programmatically generated and it used within to ngen. Do not edit this folder.
 - `outputs`: This is where ngen will place the output files.
  
 ### Configuration directory 
 `data_dir/config/`
-
+.
 `realization.json` :
 The realization file serves as the primary model configuration for the ngen framework. An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/realization.json). This file specifies which models/modules to run and with which parameters, run parameters like date and time, and hydrofabric specifications.
 
