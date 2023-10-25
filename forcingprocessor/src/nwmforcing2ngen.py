@@ -462,7 +462,7 @@ def prep_ngen_data(conf):
     fcst_cycle = conf["forcing"].get("fcst_cycle",None)
     lead_time = conf["forcing"].get("lead_time",None)
     weight_file = conf['forcing'].get("weight_file",None)
-    nwm_file = conf['forcing'].get("nwm_file",None)
+    nwm_file = conf['forcing'].get("nwm_file","")
 
     start_time, end_time, output_interval = start_end_interval(start_date,end_date,lead_time)
     conf['time']                    = {}
@@ -554,10 +554,12 @@ def prep_ngen_data(conf):
                 Key=f"{output_bucket_path}/forcing_metadata/conf.json"
             )
 
-    sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+    if len(nwm_file) == 0:
+        sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+        nwm_file = './filenamelist.txt'
 
     nwm_forcing_files = []
-    with open('./filenamelist.txt','r') as fp:
+    with open(nwm_file,'r') as fp:
         for jline in fp.readlines():
             nwm_forcing_files.append(jline[:-1])
 
@@ -790,9 +792,11 @@ def prep_ngen_data(conf):
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
+        print(os.listdir(os.getcwd()))
+
         for root, dirs, files in os.walk('.'):
             for file in files:
-                if file.endswith('.tar.gz') and file.find('tmp') == 0:
+                if file.endswith('.tar.gz') and file.find('tmp_') == 0:
                     tar_path = os.path.join(root, file)
                     with tarfile.open(tar_path, 'r') as input_tar:
                         for member in input_tar.getmembers():
@@ -805,6 +809,7 @@ def prep_ngen_data(conf):
         with open(combined_tar_filename, 'rb') as combined_tar:
             s3 = boto3.client("s3")   
             s3.upload_fileobj(combined_tar,output_bucket,out_path + combined_tar_filename)   
+        os.remove(combined_tar_filename)
         
     print(f"\n\n--------SUMMARY-------")
     if storage_type == "local": msg = f"\nData has been written locally to {bucket_path}"
