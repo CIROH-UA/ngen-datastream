@@ -201,7 +201,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list
     if ii_verbose: print(f'{id} comleted data extraction, returning data to primary process')
     return [data_list, t_list]
 
-def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,output_file_type,out_path,vars,ii_append,key_id,key):
+def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,output_file_type,out_path,vars,ii_append):
     """
     Sets up the thread pool for write_data
     
@@ -226,8 +226,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
     append_list           = []
     print_list            = []
     bucket_list           = []
-    key_list              = []
-    key_id_list           = []
     nthread_list          = []
     worker_time_list      = []
     worker_data_list      = []
@@ -255,8 +253,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
             var_list.append(vars)
             append_list.append(ii_append)
             print_list.append(ii_print)
-            key_list.append(key)
-            key_id_list.append(key_id)
             worker_time_list.append(t_ax)
             nthread_list.append(nprocs)
             bucket_list.append(output_bucket)
@@ -281,8 +277,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
         var_list,
         append_list,  
         print_list,      
-        key_id_list,
-        key_list,
         nthread_list
         ):
             hashes.append(results[0])
@@ -308,14 +302,9 @@ def write_data(
         vars,
         ii_append,
         ii_print,
-        key_id,
-        key,
         nthreads        
 ):
-    s3_client = boto3.session.Session().client("s3",
-                        aws_access_key_id=key_id,
-                        aws_secret_access_key=key 
-                        )   
+    s3_client = boto3.session.Session().client("s3")   
 
     if storage_type.lower() != 's3': raise NotImplementedError
 
@@ -331,8 +320,6 @@ def write_data(
     t_hash    = 0
     t_buff    = 0
     t_put     = 0
-
-    compression = 'gzip'
 
     tar = './tmp_' + str(id) + '.tar.gz'
 
@@ -362,12 +349,12 @@ def write_data(
                 del df_bucket            
 
             buf = BytesIO()
+            filename = f"cat-{cat_id}." + output_file_type
+
             if output_file_type == "parquet":
-                filename = f"cat-{cat_id}.parquet"
-                df.to_parquet(buf, index=False,compression=compression)                
+                df.to_parquet(buf, index=False)                
             elif output_file_type == "csv":
-                filename = f"cat-{cat_id}.csv"
-                df.to_csv(buf, index=False,compression=compression)                 
+                df.to_csv(buf, index=False)                 
 
             t_buff += time.perf_counter() - t0
             t0 = time.perf_counter()
@@ -378,9 +365,9 @@ def write_data(
 
             buf = BytesIO()
             if output_file_type == "parquet":
-                df.to_parquet(buf, index=False,compression=compression)                
+                df.to_parquet(buf, index=False)                
             elif output_file_type == "csv":
-                df.to_csv(buf, index=False,compression=compression)     
+                df.to_csv(buf, index=False)     
             buf.seek(0)
             tarinfo = tarfile.TarInfo(filename)
             tarinfo.size = len(buf.getvalue())
@@ -425,28 +412,6 @@ def start_end_interval(start_date,end_date,lead_time):
     else: output_interval = 3600
 
     return formatted_start, formatted_end, output_interval
-
-def get_secret(
-        secret_name : str,
-        region_name : str,
-):
-
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager',
-        region_name=region_name
-    )
-
-    try:
-        get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name
-        )
-    except ClientError as e:
-        raise e
-
-    secret = get_secret_value_response['SecretString']
-
-    return json.loads(secret)
 
 def prep_ngen_data(conf):
     """
@@ -497,7 +462,7 @@ def prep_ngen_data(conf):
     fcst_cycle = conf["forcing"].get("fcst_cycle",None)
     lead_time = conf["forcing"].get("lead_time",None)
     weight_file = conf['forcing'].get("weight_file",None)
-    nwm_file = conf['forcing'].get("nwm_file",None)
+    nwm_file = conf['forcing'].get("nwm_file","")
 
     start_time, end_time, output_interval = start_end_interval(start_date,end_date,lead_time)
     conf['time']                    = {}
@@ -516,8 +481,6 @@ def prep_ngen_data(conf):
     ii_verbose = conf["run"].get("verbose",False) 
     ii_check_files = conf["run"].get("check_files",False)   
     ii_collect_stats = conf["run"].get("collect_stats",True)
-    secret_name = conf["run"]["secret_name"]
-    region_name = conf["run"]["region_name"]
     proc_threads = conf["run"]["proc_threads"]
     write_threads = conf["run"]["write_threads"]
     nfile_chunk = conf["run"]["nfile_chunk"]
@@ -554,7 +517,7 @@ def prep_ngen_data(conf):
         top_dir = Path(os.path.dirname(__file__)).parent
         bucket_path = Path(top_dir, output_bucket_path, output_bucket)
         forcing_path = Path(bucket_path, 'forcing')  
-        meta_path = Path(forcing_path, 'forcing_metadata')        
+        meta_path = Path(forcing_path, 'forcings_metadata')        
         if not os.path.exists(bucket_path):
             os.system(f"mkdir {bucket_path}")
             os.system(f"mkdir {bucket_path}")            
@@ -575,20 +538,12 @@ def prep_ngen_data(conf):
     elif storage_type == "S3":
         cache_dir = cache_bucket
 
-        secret = get_secret(secret_name,region_name)
-
-        key_id = secret['aws_access_key_id']
-        key = secret['aws_secret_access_key']
-
         fs_s3 = s3fs.S3FileSystem(
             anon=True,
             client_kwargs={'region_name': 'us-east-1'}
             )
 
-        s3 = boto3.client("s3",
-                        aws_access_key_id=key_id,
-                        aws_secret_access_key=key 
-                        )                
+        s3 = boto3.client("s3")          
                 
         wgt_file = s3.get_object(Bucket=cache_bucket, Key=weight_file)           
     
@@ -596,16 +551,15 @@ def prep_ngen_data(conf):
         s3.put_object(
                 Body=json.dumps(conf),
                 Bucket=output_bucket,
-                Key=f"{output_bucket_path}/forcing_metadata/conf.json"
+                Key=f"{output_bucket_path}/forcings_metadata/conf.json"
             )
-        
-    sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput)
 
-    # 
-    # sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+    if len(nwm_file) == 0:
+        sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+        nwm_file = './filenamelist.txt'
 
     nwm_forcing_files = []
-    with open('./filenamelist.txt','r') as fp:
+    with open(nwm_file,'r') as fp:
         for jline in fp.readlines():
             nwm_forcing_files.append(jline[:-1])
 
@@ -645,9 +599,9 @@ def prep_ngen_data(conf):
         if ii_verbose: print(f'Data extract threads: {proc_threads:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None)
 
         t0 = time.perf_counter()
-        out_path = output_bucket_path + '/forcing/'
+        out_path = output_bucket_path + '/forcings/'
         if ii_verbose: print(f'Writing catchment forcings to {output_bucket} at {out_path}!', end=None)  
-        forcing_hashes, forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append,key_id,key)      
+        forcing_hashes, forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append)      
 
         ii_append = True
         write_time += time.perf_counter() - t0    
@@ -695,7 +649,7 @@ def prep_ngen_data(conf):
             # Check forcing size
             if j > 10: break
             csvname = f"cat-{jcatch}.csv"
-            key_name = f"{output_bucket_path}/forcing/{csvname}"
+            key_name = f"{output_bucket_path}/forcings/{csvname}"
             response = s3.head_object(
                 Bucket=output_bucket,
                 Key=key_name
@@ -709,7 +663,7 @@ def prep_ngen_data(conf):
             df = pd.DataFrame(data_array[:,:,j])
             with gzip.GzipFile(mode='w', fileobj=buf) as zipped_file:
                 df.to_csv(TextIOWrapper(zipped_file, 'utf8'), index=False)
-            key_name = f"{output_bucket_path}/forcing_metadata/zipped_forcing/{zipname}"
+            key_name = f"{output_bucket_path}/forcings_metadata/zipped_forcing/{zipname}"
             s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())    
             buf.close()
 
@@ -760,7 +714,7 @@ def prep_ngen_data(conf):
         if storage_type == 'S3':
             
             # Write files to s3 bucket
-            meta_path = f"{output_bucket_path}/forcing_metadata/"
+            meta_path = f"{output_bucket_path}/forcings_metadata/"
             buf = BytesIO()
             filename = f"hashes." + output_file_type
             if output_file_type == "csv": hash_df.to_csv(buf, index=False)
@@ -813,34 +767,36 @@ def prep_ngen_data(conf):
             filename = f"hashes." + output_file_type
             hash_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
             filename = f"metadata." + output_file_type
             metadata_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
             filename = f"catchments_avg." + output_file_type
             avg_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
             filename = f"catchments_median." + output_file_type
             med_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
+        print(os.listdir(os.getcwd()))
+
         for root, dirs, files in os.walk('.'):
             for file in files:
-                if file.endswith('.tar.gz') and file.find('tmp') == 0:
+                if file.endswith('.tar.gz') and file.find('tmp_') == 0:
                     tar_path = os.path.join(root, file)
                     with tarfile.open(tar_path, 'r') as input_tar:
                         for member in input_tar.getmembers():
@@ -851,7 +807,9 @@ def prep_ngen_data(conf):
 
     if storage_type == 'S3':
         with open(combined_tar_filename, 'rb') as combined_tar:
+            s3 = boto3.client("s3")   
             s3.upload_fileobj(combined_tar,output_bucket,out_path + combined_tar_filename)   
+        os.remove(combined_tar_filename)
         
     print(f"\n\n--------SUMMARY-------")
     if storage_type == "local": msg = f"\nData has been written locally to {bucket_path}"

@@ -17,9 +17,9 @@
 
     "storage":{
         "storage_type"       : "S3",
-        "output_bucket"      : "ngenforcingdev",
-        "output_bucket_path" : "AWI_18hr",
-        "cache_bucket"       : "ngenresourcesdev",
+        "output_bucket"      : "",
+        "output_bucket_path" : "",
+        "cache_bucket"       : "",
         "cache_bucket_path"  : "",
         "output_file_type"   : "csv"
     },    
@@ -28,8 +28,6 @@
         "verbose"       : true,
         "check_files"   : true,
         "collect_stats" : true,
-        "secret_name"   : "jlaser_creds",
-        "region_name"   : "us-west-2",
         "proc_threads"  : 54,
         "write_threads" : 96,
         "nfile_chunk"   : 720
