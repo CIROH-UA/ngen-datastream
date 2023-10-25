@@ -21,8 +21,6 @@ The `data_dir` directory contains the following subfolders:
 
 - `outputs`: All the output files and results of the system are saved in the `outputs` directory.
 
-
-
 ## Versioning
 The ngen framework uses a merkel tree hashing algorithm to version each ngen run. This means that the changes a user makes to any input files in `data_dir` will be tracked. While an explaination of how awesome this is can be found elsewhere, the important thing to know is the user must prepare a clean input directory (`data_dir`) for each run they want to make. 
 
