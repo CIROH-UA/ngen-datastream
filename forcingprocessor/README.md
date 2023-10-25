@@ -11,7 +11,7 @@ python nwmforcing2ngen.py conf.json
 This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_threads` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best.
 
 ## Weight file
-In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a geopackage https://noaa-owp.github.io/hydrofabric/articles/data_access.html. Also, tools are available to help with this in the TEEHR repo https://github.com/RTIInternational/teehr/tree/main .
+In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a geopackage https://noaa-owp.github.io/hydrofabric/articles/data_access.html. Also, tools are available to help with this in the TEEHR repo https://github.com/RTIInternational/teehr/tree/main . An example weight file has been provided [here](https://github.com/CIROH-UA/ngen-datastream/tree/forcingprocessor/forcingprocessor/data/weights).
 
 ## Configuration Sections
 
@@ -44,8 +44,8 @@ The "storage" section contains parameters related to storage configuration.
 | storage_type      | Type of storage (local or s3)     |
 | output_bucket     | Output bucket for results         |
 | output_bucket_path| Path within the output bucket (prefix)    |
-| cache_bucket      | Cache bucket for resources        |
-| cache_bucket_path | Path within the cache bucket  (prefix)    |
+| cache_bucket      | Cache bucket for weight file       |
+| cache_bucket_path | Path within the cache bucket to weight file (prefix)    |
 | output_file_type  | Output file type (e.g., csv, parquet)      |
 
 ### 3. Run
@@ -57,8 +57,6 @@ The "run" section contains parameters related to the execution of the applicatio
 | verbose           | Verbosity of the run           |
 | check_files       | Confirm nwm files exist        |
 | collect_stats     | Collect forcing metadata       |
-| secret_name       | Name of the AWS secret (SM)    |
-| region_name       | AWS region name                |
 | proc_threads      | Number of data processing processes |
 | write_threads     | Number of writing threads      |
 | nfile_chunk       | Number of file to process each write,<br> set to greater than the number of nwm files unless memory constraints are reached |
