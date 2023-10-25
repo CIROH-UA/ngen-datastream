@@ -517,7 +517,7 @@ def prep_ngen_data(conf):
         top_dir = Path(os.path.dirname(__file__)).parent
         bucket_path = Path(top_dir, output_bucket_path, output_bucket)
         forcing_path = Path(bucket_path, 'forcing')  
-        meta_path = Path(forcing_path, 'forcing_metadata')        
+        meta_path = Path(forcing_path, 'forcings_metadata')        
         if not os.path.exists(bucket_path):
             os.system(f"mkdir {bucket_path}")
             os.system(f"mkdir {bucket_path}")            
@@ -551,7 +551,7 @@ def prep_ngen_data(conf):
         s3.put_object(
                 Body=json.dumps(conf),
                 Bucket=output_bucket,
-                Key=f"{output_bucket_path}/forcing_metadata/conf.json"
+                Key=f"{output_bucket_path}/forcings_metadata/conf.json"
             )
 
     if len(nwm_file) == 0:
@@ -663,7 +663,7 @@ def prep_ngen_data(conf):
             df = pd.DataFrame(data_array[:,:,j])
             with gzip.GzipFile(mode='w', fileobj=buf) as zipped_file:
                 df.to_csv(TextIOWrapper(zipped_file, 'utf8'), index=False)
-            key_name = f"{output_bucket_path}/forcing_metadata/zipped_forcing/{zipname}"
+            key_name = f"{output_bucket_path}/forcings_metadata/zipped_forcing/{zipname}"
             s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())    
             buf.close()
 
@@ -714,7 +714,7 @@ def prep_ngen_data(conf):
         if storage_type == 'S3':
             
             # Write files to s3 bucket
-            meta_path = f"{output_bucket_path}/forcing_metadata/"
+            meta_path = f"{output_bucket_path}/forcings_metadata/"
             buf = BytesIO()
             filename = f"hashes." + output_file_type
             if output_file_type == "csv": hash_df.to_csv(buf, index=False)
@@ -767,28 +767,28 @@ def prep_ngen_data(conf):
             filename = f"hashes." + output_file_type
             hash_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
             filename = f"metadata." + output_file_type
             metadata_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
             filename = f"catchments_avg." + output_file_type
             avg_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
             filename = f"catchments_median." + output_file_type
             med_df.to_csv(buf, index=False)
             buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/forcing_metadata/" + filename)
+            tarinfo = tarfile.TarInfo(name="/forcings_metadata/" + filename)
             tarinfo.size = len(buf.getvalue())
             combined_tar.addfile(tarinfo, fileobj=buf)    
 
