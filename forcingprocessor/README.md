@@ -4,12 +4,14 @@ This python tool converts National Water Model (NWM) forcing data into Next Gene
 
 ## Runing the script
 ```
-
+python nwmforcing2ngen.py conf.json
 ```
-
 
 ## Run Notes
 This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_threads` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best.
+
+## Weight file
+In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a geopackage https://noaa-owp.github.io/hydrofabric/articles/data_access.html. Also, tools are available to help with this in the TEEHR repo https://github.com/RTIInternational/teehr/tree/main .
 
 ## Configuration Sections
 
@@ -22,7 +24,7 @@ Note! the *input options are the same associated with https://github.com/CIROH-U
 | forcing_type      | <l><li>operational_archive</li><li>retrospective</li><li>from_file</li></il>          |
 | start_date        | Start date of the run (YYYYMMDDHHMM)   |
 | end_date          | End date of the run (YYYYMMDDHHMM)    |
-| nwm_file          | Path to a text file containing nwm file names. One filename per line. Set this only if forcing_type is set to 'from_file'. Note that nwmurl will generate this file upon execution. |
+| nwm_file          | Path to a text file containing nwm file names. One filename per line. Any *input options will be ignored and this file will be used. |
 | runinput | <ol><li>short_range</li><li>medium_range</li><li>medium_range_no_da</li><li>long_range</li><li>analysis_assim</li><li>analysis_assim_extend</li><li>analysis_assim_extend_no_da</li><li>analysis_assim_long</li><li>analysis_assim_long_no_da</li><li>analysis_assim_no_da</li><li>short_range_no_da</li></ol> |
 | varinput | <ol><li>channel_rt</li><li>land</li><li>reservoir</li><li>terrain_rt terrain</li><li>forcing</li></ol> |
 | geoinput | <ol><li>conus</li><li>hawaii</li><li>puertorico</li></ol> |
@@ -82,8 +84,8 @@ The "run" section contains parameters related to the execution of the applicatio
 
     "storage" : {
         "storage_type"       : "S3",
-        "output_bucket"      : "ngenforcingdev",
-        "output_bucket_path" : "AWI_18hr",
+        "output_bucket"      : "",
+        "output_bucket_path" : "",
         "cache_bucket"       : "ngenresourcesdev",
         "cache_bucket_path"  : "",
         "output_file_type"   : "csv"
@@ -92,8 +94,6 @@ The "run" section contains parameters related to the execution of the applicatio
     "run" : {
         "verbose"       : false,
         "collect_stats" : true,
-        "secret_name"   : "my_super_secret_creds",
-        "region_name"   : "us-west-2",
         "proc_threads"  : 8,
         "write_threads" : 16,
         "nfile_chunk"   : 1000
