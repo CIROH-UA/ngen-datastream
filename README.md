@@ -17,7 +17,7 @@ data_dir/
 
 The `data_dir` directory contains the following subfolders:
 
-- `config`:  model configuration files and hydrofabric configuration files. A deeper explanation [here]()
+- `config`:  model configuration files and hydrofabric configuration files. A deeper explanation [here](#Configuration-directory)
 - `forcings`: catchment-level forcing timeseries files. These can be generated with the [forcingprocessor](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor). Forcing files contain variables like wind speed, temperature, precipitation, and solar radiation.
 - `forcing_metadata` is an optional subfolder. This is programmatically generated in the forcingprocessor and it used within to ngen. Do not edit this folder.
 - `outputs`: This is where ngen will place the output files.
@@ -29,7 +29,7 @@ The `data_dir` directory contains the following subfolders:
 The realization file serves as the primary model configuration for the ngen framework. An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/realization.json). This file specifies which models/modules to run and with which parameters, run parameters like date and time, and hydrofabric specifications.
 
 `catchments.geojson`, `nexus.geojson`,`crosswalk.json`, `flowpaths` ,`flowpath_edit_list.json` :
-These files contain the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/catchments.json). Tools to create these files can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/subsetting).
+These files contain the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/catchments.geojson). Tools to create these files can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/subsetting).
 
 Other files may be placed in this subdirectory that relate to internal-ngen-models/modules. It is common to define variables like soil parameters in these files for ngen modules to use.
 
