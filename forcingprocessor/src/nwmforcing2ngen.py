@@ -384,7 +384,7 @@ def write_data(
                     msg += f"Bandwidth (all threads)    {bandwidth_Mbps:.2f} Mbps"
                     print(msg)
 
-            if j == 10: break
+            # if j == 10: break
 
     return forcing_cat_ids
 
@@ -566,6 +566,12 @@ def prep_ngen_data(conf):
     crosswalk_dict = get_weights_dict(wgt_file)
     ncatchments = len(crosswalk_dict)
 
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.tar.gz') and file.find('tmp_') == 0:
+                tar_path = os.path.join(root, file)
+                os.remove(tar_path)
+
     if ii_verbose: print(f'Entering primary cycle\n')
     nfiles_tot = min(nfile_chunk,nfiles)
     if ii_verbose: print(f'Time loop chunk number: {nfiles_tot}\n')
@@ -690,9 +696,7 @@ def prep_ngen_data(conf):
             
             # Write files to s3 bucket
             meta_path = f"{output_bucket_path}/metadata/forcings_metadata/"
-            buf = BytesIO()
-            key_name = meta_path + filename
-            s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())            
+            buf = BytesIO()   
             filename = f"metadata." + output_file_type
             if output_file_type == "csv": metadata_df.to_csv(buf, index=False)
             else: metadata_df.to_parquet(buf, index=False)
