@@ -22,7 +22,7 @@ def lambda_handler(event, context):
 
     date = datetime.datetime.now()
     date = date.strftime('%Y%m%d')
-    new_tar_name = 'dailyrun_{date}.tar.gz'
+    new_tar_name = f'dailyrun_{date}.tar.gz'
     new_tar = f'/tmp/{new_tar_name}'  
     new_tar_key = forcing_prefix + '/' + new_tar_name
 
