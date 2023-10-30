@@ -11,7 +11,6 @@ from io import BytesIO, TextIOWrapper
 import concurrent.futures as cf
 from datetime import datetime
 import psutil
-import hashlib
 import gzip
 import tarfile
 import nwmurl 
@@ -262,7 +261,6 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
             ii_print = False
             i += 1
 
-    hashes = []
     ids = []
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
         for results in pool.map(
@@ -279,17 +277,14 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
         print_list,      
         nthread_list
         ):
-            hashes.append(results[0])
-            ids.append(results[1])
+            ids.append(results)
 
-    if len(hashes) > 1:
-        flat_hash = [item for sublist in hashes for item in sublist]
+    if len(ids) > 1:
         flat_ids  = [item for sublist in ids for item in sublist]
     else:
-        flat_hash = hashes[0]
-        flat_ids  = ids[0]
+        flat_ids  = ids
 
-    return flat_hash, flat_ids
+    return flat_ids
 
 def write_data(
         data,
@@ -309,15 +304,12 @@ def write_data(
     if storage_type.lower() != 's3': raise NotImplementedError
 
     nfiles = len(catchments)
-    # thread = current_thread()
     id = os.getpid()
     if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None)
 
     forcing_cat_ids = []
-    forcing_hashes  = []
     write_int = 200
     t_df      = 0
-    t_hash    = 0
     t_buff    = 0
     t_put     = 0
 
@@ -333,12 +325,8 @@ def write_data(
             df.insert(0,"time",t_ax)
             t_df += time.perf_counter() - t0
             
-            t0 = time.perf_counter()
             cat_id = jcatch.split("-")[1]
             forcing_cat_ids.append(cat_id)
-            sha256_hash = hashlib.sha256(df.to_json().encode()).hexdigest()
-            forcing_hashes.append(sha256_hash)
-            t_hash += time.perf_counter() - t0
 
             t0 = time.perf_counter()
             
@@ -389,7 +377,6 @@ def write_data(
                     msg = f"\n{j+1} files written out of {nfiles}\n"
                     msg += f"rate             {rate:.2f} files/s\n"
                     msg += f"df conversion    {t_df:.2f}s\n"
-                    msg += f"hash             {t_hash:.2f}s\n"
                     msg += f"buff             {t_buff:.2f}s\n"
                     msg += f"put              {t_put:.2f}s\n"                
                     msg += f"estimated total write time {estimate_total_time:.2f}s\n"
@@ -397,9 +384,9 @@ def write_data(
                     msg += f"Bandwidth (all threads)    {bandwidth_Mbps:.2f} Mbps"
                     print(msg)
 
-            # if j == 10: break
+            if j == 10: break
 
-    return forcing_hashes, forcing_cat_ids
+    return forcing_cat_ids
 
 def start_end_interval(start_date,end_date,lead_time):
     start_obj = datetime.strptime(start_date, "%Y%m%d%H%M")
@@ -601,7 +588,7 @@ def prep_ngen_data(conf):
         t0 = time.perf_counter()
         out_path = output_bucket_path + '/forcings/'
         if ii_verbose: print(f'Writing catchment forcings to {output_bucket} at {out_path}!', end=None)  
-        forcing_hashes, forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append)      
+        forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append)      
 
         ii_append = True
         write_time += time.perf_counter() - t0    
@@ -617,18 +604,6 @@ def prep_ngen_data(conf):
     if ii_collect_stats:
         t000 = time.perf_counter()
         if ii_verbose: print(f'Data processing and writing is complete, now collecting metadata...')
-
-        # Forcing hashes
-        full_str = ''
-        for x in forcing_hashes: full_str = full_str + x
-        root_hash = hashlib.sha256(full_str.encode()).hexdigest()
-
-        hash_dict = {"root_hash":root_hash,
-                     "cat_ids":forcing_cat_ids,
-                     "hash":forcing_hashes,                    
-                     }
-        
-        hash_df = pd.DataFrame(dict([(key, pd.Series(value)) for key, value in hash_dict.items()]))
 
         # Write out a csv with script runtime stats
         nwm_file_sizes = []
@@ -716,10 +691,6 @@ def prep_ngen_data(conf):
             # Write files to s3 bucket
             meta_path = f"{output_bucket_path}/metadata/forcings_metadata/"
             buf = BytesIO()
-            filename = f"hashes." + output_file_type
-            if output_file_type == "csv": hash_df.to_csv(buf, index=False)
-            else: hash_df.to_parquet(buf, index=False)
-            buf.seek(0)
             key_name = meta_path + filename
             s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())            
             filename = f"metadata." + output_file_type
@@ -743,9 +714,6 @@ def prep_ngen_data(conf):
             buf.close()
         else:
             # Write files locally
-            filename = Path(forcing_path, f"hashes." + output_file_type)
-            if output_file_type == "csv": hash_df.to_csv(filename, index=False)
-            else: hash_df.to_parquet(buf, index=False)
             filename = Path(forcing_path, f"metadata." + output_file_type)
             if output_file_type == "csv": metadata_df.to_csv(filename, index=False)
             else: metadata_df.to_parquet(buf, index=False)
@@ -762,14 +730,7 @@ def prep_ngen_data(conf):
     combined_tar_filename = 'forcings.tar.gz'
     with tarfile.open(combined_tar_filename, 'w:gz') as combined_tar:        
         if ii_collect_stats:
-            buf = BytesIO()
-
-            filename = f"hashes." + output_file_type
-            hash_df.to_csv(buf, index=False)
-            buf.seek(0)
-            tarinfo = tarfile.TarInfo(name="/metadata/forcings_metadata/" + filename)
-            tarinfo.size = len(buf.getvalue())
-            combined_tar.addfile(tarinfo, fileobj=buf)    
+            buf = BytesIO() 
 
             filename = f"metadata." + output_file_type
             metadata_df.to_csv(buf, index=False)
@@ -830,8 +791,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Extract configurations
-    conf = json.load(open(args.infile))
+    if args.infile == 'dailyrun':
+        bucket = 'ngenresourcesdev'
+        print(f'Executing the daily run! Grabbing configuration file from {bucket}')
+        s3 = boto3.client("s3")          
+        conf_obj = s3.get_object(Bucket=bucket, Key='dailyrun.json')  
+        conf = json.loads(conf_obj["Body"].read().decode())
+    else:
+        conf = json.load(open(args.infile))
+
     prep_ngen_data(conf)
 
 
