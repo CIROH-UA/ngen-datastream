@@ -30,10 +30,8 @@ def lambda_handler(event, context):
     
     """
 
-    command_id  = event['command_id']
-    instance_id = event['instance_id']
-    bucket      = event['bucket']
-    prefix      = event['prefix']
+    command_id  = event['curent_run']['command_id']
+    instance_id = event['curent_run']['instance_id']
     output = get_command_result(command_id,instance_id)
 
     if output['Status'] == 'Success':
@@ -44,7 +42,6 @@ def lambda_handler(event, context):
         raise Exception('Forcing processor failed!!!')
     
     output = {}
-    output['bucket']  = bucket
-    output['prefix']  = prefix
+    output['curent_run'] = event['curent_run']
     return output
     

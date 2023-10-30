@@ -7,8 +7,8 @@ client_s3  = boto3.client('s3')
 
 def lambda_handler(event, context):
 
-    forcings_bucket  = event['bucket']
-    forcing_prefix   = event['prefix']
+    forcings_bucket  = event['current_run']['bucket']
+    forcing_prefix   = event['current_run']['prefix']
     forcings_key     = event['tar_key']
     forcing_filename = 'forcings.tar.gz'
     forcing_tar_path = f'/tmp/{forcing_filename}'
@@ -51,5 +51,7 @@ def lambda_handler(event, context):
 
     client_s3.upload_file(new_tar, forcings_bucket, new_tar_key)   
 
-    output = {"complete_tarball_key":new_tar_key,"bucket":forcings_bucket}
+    output = {}
+    output['current_run']          = event['current_run']
+    output["complete_tarball_key"] = new_tar_key
     return output   
