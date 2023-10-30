@@ -25,17 +25,16 @@ def lambda_handler(event, context):
     
     """
     
-    bucket  = event['bucket']
-    prefix  = event['prefix']
+    bucket  = event['curent_run']['bucket']
+    prefix  = event['curent_run']['prefix']
     tar_key = prefix + '/forcings/forcings.tar.gz'    
     wait_for_object_existence(bucket, tar_key)
     
     print(f'forcing.tar.gz exists! Success! Exiting state machine')
 
     output = {}
-    output['bucket']  = bucket
-    output['prefix']  = prefix
-    output['tar_key'] = tar_key
+    output['curent_run'] = event['curent_run']
+    output['tar_key']    = tar_key
 
     return output
     

@@ -94,10 +94,14 @@ def lambda_handler(event, context):
     )
     wait_for_command_response(response,instance_id)
     print(f'{instance_id} is launched and processing forcings')
+
+    current_run = {}
+    current_run['command_id']  = response['Command']['CommandId']
+    current_run['instance_id'] = instance_id
+    current_run['bucket']      = bucket
+    current_run['prefix']      = prefix
     
     output = {}
-    output['command_id']  = response['Command']['CommandId']
-    output['instance_id'] = instance_id
-    output['bucket']      = bucket
-    output['prefix']      = prefix
+    output['curent_run'] = current_run
+
     return output
