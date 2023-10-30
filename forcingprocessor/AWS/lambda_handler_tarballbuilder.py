@@ -1,20 +1,18 @@
 import boto3
 import tarfile
 import os
+import datetime
 
 client_s3  = boto3.client('s3')
 
 def lambda_handler(event, context):
 
-    # Get these from event
-    date = '000000'
-    runlength = 17
-
     forcings_bucket  = event['bucket']
-    forcings_key     = event['key']
-    forcing_prefix   = forcings_key[:forcings_key.find('forcings.tar.gz')]
+    forcing_prefix   = event['prefix']
+    forcings_key     = event['tar_key']
     forcing_filename = 'forcings.tar.gz'
     forcing_tar_path = f'/tmp/{forcing_filename}'
+    print(f'{forcings_bucket} {forcings_key} {forcing_tar_path}')
     client_s3.download_file(forcings_bucket, forcings_key, forcing_tar_path)
 
     AWI_canonical_bucket   = "ngenforcingdev"
@@ -22,8 +20,11 @@ def lambda_handler(event, context):
     AWI_canonical_tar_path = f'/tmp/{AWI_canonical_key}'
     client_s3.download_file(AWI_canonical_bucket, AWI_canonical_key, AWI_canonical_tar_path)
 
-    new_tar = f'/tmp/AWI_{date}_{runlength}hr.tar.gz'  
-    new_tar_key = forcing_prefix + new_tar.split('/')[-1]
+    date = datetime.datetime.now()
+    date = date.strftime('%Y%m%d')
+    new_tar_name = 'dailyrun_{date}.tar.gz'
+    new_tar = f'/tmp/{new_tar_name}'  
+    new_tar_key = forcing_prefix + '/' + new_tar_name
 
     os.system(f'touch {new_tar}')
     

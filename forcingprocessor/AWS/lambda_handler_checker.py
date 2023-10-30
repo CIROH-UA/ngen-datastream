@@ -11,6 +11,7 @@ def wait_for_object_existence(bucket_name,object_key):
         try:
             client_s3.head_object(Bucket=bucket_name, Key=object_key)
             print(f"Key: '{object_key}' found!")
+            break
         except:
             time.sleep(1)
             iters += 1
@@ -24,13 +25,17 @@ def lambda_handler(event, context):
     
     """
     
-    bucket_name = 'ngenforcingdev'
-    object_key  = 'automation_test/forcings/forcing.tar.gz'    
-    wait_for_object_existence(bucket_name,object_key)
+    bucket  = event['bucket']
+    prefix  = event['prefix']
+    tar_key = prefix + '/forcings/forcings.tar.gz'    
+    wait_for_object_existence(bucket, tar_key)
     
     print(f'forcing.tar.gz exists! Success! Exiting state machine')
 
-    output = {"bucket":bucket_name,"key":object_key}
+    output = {}
+    output['bucket']  = bucket
+    output['prefix']  = prefix
+    output['tar_key'] = tar_key
 
     return output
     
