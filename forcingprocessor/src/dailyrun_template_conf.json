@@ -28,8 +28,8 @@
         "verbose"       : true,
         "check_files"   : true,
         "collect_stats" : true,
-        "proc_threads"  : 54,
-        "write_threads" : 96,
+        "proc_threads"  : 48,
+        "write_threads" : 48,
         "nfile_chunk"   : 720
     }
 }
