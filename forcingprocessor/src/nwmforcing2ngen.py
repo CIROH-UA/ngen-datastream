@@ -445,6 +445,8 @@ def prep_ngen_data(conf):
     varinput = conf["forcing"].get("varinput",None)
     geoinput = conf["forcing"].get("geoinput",None)
     meminput = conf["forcing"].get("meminput",None)
+    object_type = conf["forcing"].get("object_type",None)
+    selected_var_types = conf["forcing"].get("selected_var_types",None)
     urlbaseinput = conf["forcing"].get("urlbaseinput",None)
     fcst_cycle = conf["forcing"].get("fcst_cycle",None)
     lead_time = conf["forcing"].get("lead_time",None)
@@ -542,7 +544,10 @@ def prep_ngen_data(conf):
             )
 
     if len(nwm_file) == 0:
-        sepehr_magic = nwmurl.generate_urls(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+        if forcing_type == 'operational_archive':
+            sepehr_magic = nwmurl.generate_urls_operational(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput)
+        elif forcing_type == 'retrospective':
+            sepehr_magic = nwmurl.generate_urls_retro(start_date, end_date, urlbaseinput, object_type, selected_var_types, True)
         nwm_file = './filenamelist.txt'
 
     nwm_forcing_files = []
