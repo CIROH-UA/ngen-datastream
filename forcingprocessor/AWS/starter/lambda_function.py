@@ -100,8 +100,9 @@ def lambda_handler(event, context):
     current_run['instance_id'] = instance_id
     current_run['bucket']      = bucket
     current_run['prefix']      = prefix
+    current_run['shutdown']    = False
     
     output = {}
-    output['curent_run'] = current_run
+    output['current_run'] = current_run
 
     return output
