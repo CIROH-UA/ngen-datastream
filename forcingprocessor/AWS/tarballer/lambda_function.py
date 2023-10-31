@@ -15,8 +15,8 @@ def lambda_handler(event, context):
     print(f'{forcings_bucket} {forcings_key} {forcing_tar_path}')
     client_s3.download_file(forcings_bucket, forcings_key, forcing_tar_path)
 
-    AWI_canonical_bucket   = "ngenforcingdev"
-    AWI_canonical_key      = "AWI_03W_001.tar.gz"
+    AWI_canonical_bucket   = "ngenresourcesdev"
+    AWI_canonical_key      = "dailyrun.tar.gz"
     AWI_canonical_tar_path = f'/tmp/{AWI_canonical_key}'
     client_s3.download_file(AWI_canonical_bucket, AWI_canonical_key, AWI_canonical_tar_path)
 
@@ -28,7 +28,7 @@ def lambda_handler(event, context):
 
     os.system(f'touch {new_tar}')
     
-    with tarfile.open(new_tar,'w') as nw_tar:
+    with tarfile.open(new_tar,'w:gz') as nw_tar:
 
         with tarfile.open(AWI_canonical_tar_path,'r:gz') as conf_tar:
             confs = [

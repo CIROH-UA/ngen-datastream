@@ -26,22 +26,26 @@ def get_command_result(command_id,instance_id):
 
 def lambda_handler(event, context):
     """
-    Handler function to poll the NWM 2 NGEN forcingprocessor
-    
+    Generic Poller funcion    
     """
 
-    command_id  = event['curent_run']['command_id']
-    instance_id = event['curent_run']['instance_id']
+    command_id  = event['current_run']['command_id']
+    instance_id = event['current_run']['instance_id']
+    ii_shutdown = event['current_run']['shutdown']
     output = get_command_result(command_id,instance_id)
 
     if output['Status'] == 'Success':
-        print(f'Forcings have been processed! Shutting down processor {instance_id}')
-        client_ec2.stop_instances(InstanceIds=[instance_id])
+        print(f'Command has succeded!')
+        if ii_shutdown: 
+            print(f'Shutting down processor {instance_id}')
+            client_ec2.stop_instances(InstanceIds=[instance_id])
+        else:
+            print(f'{instance_id} remains running!')
         print(f'Goodbye')
     else:
-        raise Exception('Forcing processor failed!!!')
+        raise Exception(f'Command has failed!!!\n{command_id}')
     
     output = {}
-    output['curent_run'] = event['curent_run']
+    output['current_run'] = event['current_run']
     return output
     
