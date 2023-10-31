@@ -26,7 +26,6 @@
 
     "run" : {
         "verbose"       : true,
-        "check_files"   : true,
         "collect_stats" : true,
         "proc_threads"  : 54,
         "write_threads" : 96,
