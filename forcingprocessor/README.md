@@ -2,7 +2,7 @@
 
 Forcingprocessor converts National Water Model (NWM) forcing data into Next Generation National Water Model (ngen) forcing data. The motivation for this tool is NWM data is gridded and stored within netCDFs for each forecast hour. Ngen inputs this same forcing data, but in the format of per-catchment csv files that hold time series data. Forcingprocessor is driven by a configuration file that is explained, with an example, in detail below.
 
-## Runing the script
+## Runing the forcingprocessor
 ```
 python nwmforcing2ngen.py conf.json
 ```
@@ -11,10 +11,12 @@ python nwmforcing2ngen.py conf.json
 This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_threads` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best.
 
 ## Weight file
-In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a geopackage https://noaa-owp.github.io/hydrofabric/articles/data_access.html with the [weight generator](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/weight_generator.py). Also, tools are available to help with this in the TEEHR repo https://github.com/RTIInternational/teehr/tree/main. An example weight file has been provided [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/data/weights).
+In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a geopackage https://noaa-owp.github.io/hydrofabric/articles/data_access.html with the [weight generator](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/weight_generator.py). Also, tools are available to help with this in the TEEHR repo https://github.com/RTIInternational/teehr/tree/main. An example weight file has been provided [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/data/weights). An example nwm forcing file can be found within the this [NOAA AWS bucket](https://noaa-nwm-pds.s3.amazonaws.com/index.html). forcing_short_range was used during development.
 
-Run the generator with:
- `python weight_generator.py <path to geopackage> <path to output weights to> <path to example NWM forcing file>`
+
+ ```
+ python weight_generator.py <path to geopackage> <path to output weights to> <path to example NWM forcing file>
+ ```
 
 The weight generator will input an example NWM forcing netcdf to reference the NWM grid, a geopackage that contains all of the catchments the user wants weights for, and a file name for the weight file. Subsetted geopackages can be made with [subsetting](https://github.com/CIROH-UA/ngen-datastream/tree/main/subsetting)
 
