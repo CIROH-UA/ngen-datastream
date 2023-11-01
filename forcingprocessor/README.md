@@ -39,7 +39,7 @@ Note! the *input options are the same associated with https://github.com/CIROH-U
 | urlbaseinput | 0: "",<br>1: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/prod/",<br>2: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/",<br>3: "https://storage.googleapis.com/national-water-model/",<br>4: "https://storage.cloud.google.com/national-water-model/",<br>5: "gs://national-water-model/",<br>6: "gcs://national-water-model/",<br>7: "https://noaa-nwm-pds.s3.amazonaws.com/",<br>8: "s3://noaa-nwm-pds/",<br>9: "https://ciroh-nwm-zarr-copy.s3.amazonaws.com/national-water-model/" |
 | fcst_cycle        | List of forecast cycles in UTC. If empty, will use all available cycles           |
 | lead_time         | List of lead times in hours. If empty, will use all available lead times          |
-| weight_file       | Weight file for the run  |
+| weight_file       | Weight file for the run. Accepts local absolute path, s3 URI or URL  |
 
 
 ### 2. Storage
@@ -49,10 +49,8 @@ The "storage" section contains parameters related to storage configuration.
 | Field             | Description                       |
 |-------------------|-----------------------------------|
 | storage_type      | Type of storage (local or s3)     |
-| output_bucket     | Output bucket for results         |
-| output_bucket_path| Path within the output bucket (prefix)    |
-| cache_bucket      | Cache bucket for weight file       |
-| cache_bucket_path | Path within the cache bucket to weight file (prefix)    |
+| output_bucket     | If storage_type = s3: output bucket for output, If storage_type = local: appened to output_path |
+| output_path       | If storage_type = s3: prefix for output, If storage_type = local: absolute path for output, will default to cwd/date if left blank |
 | output_file_type  | Output file type (e.g., csv, parquet)      |
 
 ### 3. Run
@@ -69,12 +67,11 @@ The "run" section contains parameters related to the execution of the applicatio
 | nfile_chunk       | Number of file to process each write,<br> set to greater than the number of nwm files unless memory constraints are reached |
 
 ## Example Configuration
-
-    {
+{
     "forcing"  : {
         "forcing_type" : "operational_archive",
-        "start_date"   : "202310030000",
-        "end_date"     : "202310030000",
+        "start_date"   : "202310300000",
+        "end_date"     : "202310300000",
         "nwm_file"     : "",
         "runinput"     : 1,
         "varinput"     : 5,
@@ -82,26 +79,23 @@ The "run" section contains parameters related to the execution of the applicatio
         "meminput"     : 0,
         "urlbaseinput" : 7,
         "fcst_cycle"   : [0],
-        "lead_time"    : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
-        "weight_file"  : "weights_conus.json"
+        "lead_time"    : [1],
+        "weight_file"  : "https://ngenresourcesdev.s3.us-east-2.amazonaws.com/small_weights.json"
 
     },
 
-    "storage" : {
-        "storage_type"       : "S3",
-        "output_bucket"      : "",
-        "output_bucket_path" : "",
-        "cache_bucket"       : "ngenresourcesdev",
-        "cache_bucket_path"  : "",
-        "output_file_type"   : "csv"
+    "storage":{
+        "storage_type"     : "local",
+        "output_bucket"    : "",
+        "output_path"      : "",
+        "output_file_type" : "csv"
     },    
 
     "run" : {
-        "verbose"       : false,
+        "verbose"       : true,
         "collect_stats" : true,
-        "proc_threads"  : 8,
-        "write_threads" : 16,
-        "nfile_chunk"   : 1000
+        "proc_threads"  : 1,
+        "write_threads" : 2,
+        "nfile_chunk"   : 720
     }
-    }
-
+}

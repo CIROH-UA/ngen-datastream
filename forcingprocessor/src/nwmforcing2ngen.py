@@ -67,16 +67,6 @@ def report_usage():
     if ii_verbose: print(f'\nCurrent RAM usage (GB): {usage_ram:.2f}, {percent_ram:.2f}%\nCurrent CPU usage : {percent_cpu:.2f}%')
     return
 
-def get_weights_dict(weights_file):
-    # Open weights dict from pickle
-    # The if statement is here to decide how to read the weight file based on local or bucket
-    if type(weights_file) is dict:
-        crosswalk_dict = json.loads(weights_file["Body"].read().decode())
-    else:
-        with open(weights_file, "r") as f:
-            crosswalk_dict = json.load(f)
-    return crosswalk_dict
-
 def multiprocess_data_extract(files,nprocs,crosswalk_dict,vars,s3):
     """
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time
@@ -460,10 +450,10 @@ def prep_ngen_data(conf):
     conf['time']['output_interval'] = output_interval
 
     storage_type = conf["storage"]["storage_type"]
-    output_bucket = conf["storage"]["output_bucket"]
-    output_bucket_path = conf["storage"]["output_bucket_path"]    
-    cache_bucket = conf["storage"]["cache_bucket"]
-    cache_bucket_path = conf["storage"]["cache_bucket_path"]
+
+    output_bucket = conf["storage"].get("output_bucket","")
+    output_path = conf["storage"].get("output_path","")
+
     output_file_type = conf["storage"]["output_file_type"]
 
     global ii_verbose
@@ -496,47 +486,56 @@ def prep_ngen_data(conf):
         storage_type.lower() in bucket_types
     ), f"{storage_type} for storage_type is not accepted! Accepted: {bucket_types}"
 
-    if output_bucket_path == "":
-        output_bucket_path = os.path.join(os.getcwd(),datentime)
-
     if storage_type == "local":
 
-        # Prep output directory
-        top_dir = Path(os.path.dirname(__file__)).parent
-        bucket_path = Path(top_dir, output_bucket_path, output_bucket)
-        forcing_path = Path(bucket_path, 'forcings')  
-        meta_path = Path(bucket_path, 'metadata') 
-        metaf_path = Path(bucket_path, 'metadata','forcings_metadata')        
-        if not os.path.exists(bucket_path):
-            os.system(f"mkdir {bucket_path}")
-            os.system(f"mkdir {forcing_path}")
-            os.system(f"mkdir {meta_path}")
-            os.system(f"mkdir {metaf_path}")
-            if not os.path.exists(bucket_path):
-                raise Exception(f"Creating {bucket_path} failed!")
-             
-        # Prep cache directory
-        cache_dir = Path(Path(os.path.dirname(__file__)).parent,cache_bucket_path)
-        if not os.path.exists(cache_dir):
-            os.system(f"mkdir {cache_dir}")
-            if not os.path.exists(cache_dir):
-                raise Exception(f"Creating {cache_dir} failed!")   
+        if output_path == "":
+            output_path = os.path.join(os.getcwd(),datentime)        
 
-        wgt_file = os.path.join(cache_dir, weight_file)
+        # Prep output directory
+        top_dir      = Path(os.path.dirname(__file__)).parent
+        bucket_path  = Path(top_dir, output_path, output_bucket)
+        forcing_path = Path(bucket_path, 'forcings')  
+        meta_path    = Path(bucket_path, 'metadata') 
+        metaf_path   = Path(bucket_path, 'metadata','forcings_metadata')        
+        if not os.path.exists(bucket_path): os.system(f"mkdir {bucket_path}")
+        if not os.path.exists(forcing_path):os.system(f"mkdir {forcing_path}")
+        if not os.path.exists(meta_path):os.system(f"mkdir {meta_path}")
+        if not os.path.exists(metaf_path):os.system(f"mkdir {metaf_path}")
+
+        with open(f"{output_path}/metadata/forcings_metadata/conf.json", 'w') as f:
+            json.dump(conf, f)
 
     elif storage_type == "S3":
-        cache_dir = cache_bucket
 
         s3 = boto3.client("s3")          
-                
-        wgt_file = s3.get_object(Bucket=cache_bucket, Key=weight_file)           
     
         # Save config to metadata
         s3.put_object(
                 Body=json.dumps(conf),
                 Bucket=output_bucket,
-                Key=f"{output_bucket_path}/metadata/forcings_metadata/conf.json"
+                Key=f"{output_path}/metadata/forcings_metadata/conf.json"
             )
+        
+    if ii_verbose: print(f'Opening weight file...\n')        
+    ii_weights_in_bucket = weight_file.find('//') >= 0
+    if ii_weights_in_bucket:
+        s3 = boto3.client("s3")    
+        weight_file_bucket = weight_file.split('/')[2]
+        ii_uri = weight_file.find('s3://') >= 0
+        
+        if ii_uri:
+            weight_file_key = weight_file[weight_file.find(weight_file_bucket)+len(weight_file_bucket)+1:]
+        else:
+            weight_file_bucket = weight_file_bucket.split('.')[0]
+            weight_file_key    = weight_file.split('amazonaws.com/')[-1]
+                
+        weight_file_obj = s3.get_object(Bucket=weight_file_bucket, Key=weight_file_key)    
+        crosswalk_dict = json.loads(weight_file_obj["Body"].read().decode())
+    else:
+        with open(weight_file, "r") as f:
+            crosswalk_dict = json.load(f)
+
+    ncatchments = len(crosswalk_dict)
 
     if len(nwm_file) == 0:
         if forcing_type == 'operational_archive':
@@ -566,10 +565,6 @@ def prep_ngen_data(conf):
         for jfile in nwm_forcing_files:
             print(f"{jfile}")
 
-    if ii_verbose: print(f'Opening weight file...\n')
-    crosswalk_dict = get_weights_dict(wgt_file)
-    ncatchments = len(crosswalk_dict)
-
     for root, dirs, files in os.walk('.'):
         for file in files:
             if file.endswith('.tar.gz') and file.find('tmp_') == 0:
@@ -596,7 +591,7 @@ def prep_ngen_data(conf):
         if ii_verbose: print(f'Data extract threads: {proc_threads:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None)
 
         t0 = time.perf_counter()
-        out_path = output_bucket_path + '/forcings/'
+        out_path = output_path + '/forcings/'
         if ii_verbose: print(f'Writing catchment forcings to {output_bucket} at {out_path}!', end=None)  
         forcing_cat_ids = threaded_write_fun(data_array,t_ax,crosswalk_dict.keys(),write_threads,storage_type,output_file_type,output_bucket,out_path,var_list_out,ii_append)      
 
@@ -633,7 +628,7 @@ def prep_ngen_data(conf):
         for j, jcatch in enumerate(forcing_cat_ids):   
             # Check forcing size
             if j > 10: break
-            filename = f"{output_bucket_path}/forcings/" + f"cat-{jcatch}." + output_file_type
+            filename = f"{output_path}/forcings/" + f"cat-{jcatch}." + output_file_type
             if storage_type.lower() == 's3':                
                 response = s3.head_object(
                     Bucket=output_bucket,
@@ -647,7 +642,7 @@ def prep_ngen_data(conf):
 
             # get zipped size            
             zipname  = f"cat-{jcatch}." + 'zip'
-            zip_dir = f"{output_bucket_path}/metadata/forcings_metadata/zipped_forcing/"
+            zip_dir = f"{output_path}/metadata/forcings_metadata/zipped_forcing/"
             key_name = zip_dir + zipname
             if storage_type.lower() == 's3':  
                 buf = BytesIO()
@@ -711,7 +706,7 @@ def prep_ngen_data(conf):
         if storage_type == 'S3':
             
             # Write files to s3 bucket
-            meta_path = f"{output_bucket_path}/metadata/forcings_metadata/"
+            meta_path = f"{output_path}/metadata/forcings_metadata/"
             buf = BytesIO()   
             filename = f"metadata." + output_file_type
             if output_file_type == "csv": metadata_df.to_csv(buf, index=False)
@@ -798,7 +793,7 @@ def prep_ngen_data(conf):
         
     print(f"\n\n--------SUMMARY-------")
     if storage_type == "local": msg = f"\nData has been written locally to {bucket_path}"
-    else: msg = f"\nData has been written to S3 bucket {output_bucket} at /{output_bucket_path}/forcing"
+    else: msg = f"\nData has been written to S3 bucket {output_bucket} at /{output_path}/forcing"
     msg += f"\nProcess data  : {t_extract:.2f}s"
     msg += f"\nWrite data    : {write_time:.2f}s"
     if ii_collect_stats: 
