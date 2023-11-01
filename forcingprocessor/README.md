@@ -67,6 +67,7 @@ The "run" section contains parameters related to the execution of the applicatio
 | nfile_chunk       | Number of file to process each write,<br> set to greater than the number of nwm files unless memory constraints are reached |
 
 ## Example Configuration
+```
 {
     "forcing"  : {
         "forcing_type" : "operational_archive",
