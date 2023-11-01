@@ -1,8 +1,8 @@
 {
     "forcing"  : {
         "forcing_type" : "operational_archive",
-        "start_date"   : "",
-        "end_date"     : "",
+        "start_date"   : "202310300000",
+        "end_date"     : "202310300000",
         "nwm_file"     : "",
         "runinput"     : 1,
         "varinput"     : 5,
@@ -10,25 +10,23 @@
         "meminput"     : 0,
         "urlbaseinput" : 7,
         "fcst_cycle"   : [0],
-        "lead_time"    : [1, 2, 3, 4, 5, 6],
-        "weight_file"  : "01_weights.json"
+        "lead_time"    : [1],
+        "weight_file"  : ""
 
     },
 
     "storage":{
-        "storage_type"       : "S3",
-        "output_bucket"      : "ngenforcingdev",
-        "output_bucket_path" : "",
-        "cache_bucket"       : "ngenresourcesdev",
-        "cache_bucket_path"  : "",
-        "output_file_type"   : "csv"
+        "storage_type"     : "local",
+        "output_bucket"    : "",
+        "output_path"      : "",
+        "output_file_type" : "csv"
     },    
 
     "run" : {
         "verbose"       : true,
         "collect_stats" : true,
-        "proc_threads"  : 54,
-        "write_threads" : 96,
+        "proc_threads"  : 1,
+        "write_threads" : 2,
         "nfile_chunk"   : 720
     }
 }
