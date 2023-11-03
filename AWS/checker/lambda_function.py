@@ -20,21 +20,12 @@ def wait_for_object_existence(bucket_name,object_key):
                 break
         
 def lambda_handler(event, context):
-    """
-    Handler function to kick off the NWM 2 NGEN forcingprocessor
     
-    """
+    bucket  = event['bucket']
+    prefix  = event['prefix']
+    obj_key = event['obj_key']
+    wait_for_object_existence(bucket, prefix + obj_key)
     
-    bucket  = event['current_run']['bucket']
-    prefix  = event['current_run']['prefix']
-    tar_key = prefix + '/forcings/forcings.tar.gz'    
-    wait_for_object_existence(bucket, tar_key)
-    
-    print(f'forcing.tar.gz exists! Success! Exiting state machine')
-
-    output = {}
-    output['current_run'] = event['current_run']
-    output['tar_key']    = tar_key
-
-    return output
+    print(f'{obj_key} exists! Success!')
+    return event
     

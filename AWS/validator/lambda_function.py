@@ -1,8 +1,6 @@
 import boto3
-import os, sys, time
-from pathlib import Path
+import time
 
-client_s3  = boto3.client('s3')
 client_ssm = boto3.client('ssm')
 
 def wait_for_command_response(response,instance_id):
@@ -27,8 +25,8 @@ def wait_for_command_response(response,instance_id):
 
 def lambda_handler(event, context):
 
-    instance_id         = event['current_run']['instance_id']
-    ngen_input_bucket   = event['current_run']['bucket']
+    instance_id         = event['instance_id']
+    ngen_input_bucket   = event['bucket']
     ngen_input_key      = event['complete_tarball_key']
 
     command = f'source /home/ec2-user/ngen-cal-venv/bin/activate && python /home/ec2-user/ngen-cal/python/conf_validation.py --bucket {ngen_input_bucket} --key {ngen_input_key}' 
@@ -39,9 +37,6 @@ def lambda_handler(event, context):
     )
     wait_for_command_response(response,instance_id)
 
-    event['current_run']['shutdown'] = True
+    event['command_id'] = response['Command']['CommandId']
 
-    output = {}
-    output['current_run'] = event['current_run']
-
-    return output   
+    return event   
