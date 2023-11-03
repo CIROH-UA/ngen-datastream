@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Daily Run Folder</title>
+</head>
+<body>
+  <h1>Daily Run Folder Contents</h1>
+  <ul id="fileList"></ul>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aws-amplify@latest/dist/aws-amplify.min.js"></script>
+
+  <script>
+    Amplify.configure({
+      Auth: {
+        // Your authentication settings here, if needed
+      },
+      Storage: {
+        AWSS3: {
+          bucket: 'ngenforcingdev', 
+          region: 'us-east-1',      
+        }
+      }
+    });
+
+    // Specify the S3 bucket and folder
+    var folderName = 'dailyrun/';
+
+    // List objects in the specified folder
+    Storage.list(folderName)
+      .then(data => {
+        var objects = data;
+
+        // Populate the list with links to the objects
+        var fileList = document.getElementById('fileList');
+        objects.forEach(object => {
+          var objectKey = object.key;
+          console.log('Object Key: ' + objectKey); // Log the object key
+
+          // Create list item and anchor element
+          var listItem = document.createElement('li');
+          var link = document.createElement('a');
+          link.href = objectKey;
+          link.textContent = objectKey.replace(folderName, ''); // Display the file name
+
+          // Append the link to the list item and the list item to the list
+          listItem.appendChild(link);
+          fileList.appendChild(listItem);
+        });
+      })
+      .catch(err => {
+        console.error('Error listing objects:', err);
+      });
+  </script>
+</body>
+</html>
