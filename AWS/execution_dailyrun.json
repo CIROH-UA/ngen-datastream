@@ -1,0 +1,16 @@
+{
+  "instance_parameters" :
+  {
+    "ImageId"            : "ami-08cba41c585e4a2e2",
+    "InstanceType"       : "c5n.18xlarge",
+    "KeyName"            : "Processor",
+    "Count"              : 1,
+    "IamInstanceProfile" : {
+      "Name" : "Processor"
+  },
+
+  "config_bucket"   : "ngenresourcesdev",
+  "run_type"        : "dailyrun",
+  "obj_key"         : "/forcings/forcings.tar.gz"
+}
+}
