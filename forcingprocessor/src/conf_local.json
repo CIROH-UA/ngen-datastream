@@ -1,0 +1,19 @@
+{
+    "forcing"  : {
+        "nwm_file"     : "/home/jlaser/code/CIROH/ngen-datastream/forcingprocessor/filenamelist.txt",
+        "weight_file"  : "/home/jlaser/code/CIROH/ngen-datastream/forcingprocessor/data/weights/small_weights.json"
+    },
+
+    "storage":{
+        "storage_type"     : "local",
+        "output_bucket"    : "",
+        "output_path"      : "/home/jlaser/code/CIROH/ngen-datastream/data/local_test",
+        "output_file_type" : "csv"
+    },    
+
+    "run" : {
+        "verbose"       : true,
+        "collect_stats" : true
+    }
+}
+
