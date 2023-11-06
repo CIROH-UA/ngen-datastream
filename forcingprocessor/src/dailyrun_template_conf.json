@@ -11,7 +11,7 @@
         "urlbaseinput" : 7,
         "fcst_cycle"   : [0],
         "lead_time"    : [1, 2, 3, 4, 5, 6],
-        "weight_file"  : "01_weights.json"
+        "weight_file"  : "https://ngenresourcesdev.s3.us-east-2.amazonaws.com/01_weights.json"
 
     },
 
