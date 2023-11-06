@@ -10,7 +10,11 @@ python nwmforcing2ngen.py conf.json
 ## Run Notes
 This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_threads` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best.
 
-## Weight file
+
+## nwm_file
+A text file given to forcingprocessor that contains each nwm forcing file name. These can be URLs or local paths. This file can be generated with the [nwmurl tool](https://github.com/CIROH-UA/nwmurl) and a [generator script](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/nwm_filenames_generator.py) that has been provided within this repo. 
+
+## weight_file
 In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a geopackage https://noaa-owp.github.io/hydrofabric/articles/data_access.html with the [weight generator](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/weight_generator.py). Also, tools are available to help with this in the TEEHR repo https://github.com/RTIInternational/teehr/tree/main. An example weight file has been provided [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/data/weights). An example nwm forcing file can be found within the this [NOAA AWS bucket](https://noaa-nwm-pds.s3.amazonaws.com/index.html). forcing_short_range was used during development.
 
 
@@ -28,19 +32,10 @@ Note! the *input options are the same associated with https://github.com/CIROH-U
 
 | Field             | Description              |
 |-------------------|--------------------------|
-| forcing_type      | <l><li>operational_archive</li><li>retrospective</li><li>from_file</li></il>          |
-| start_date        | Start date of the run (YYYYMMDDHHMM)   |
-| end_date          | End date of the run (YYYYMMDDHHMM)    |
-| nwm_file          | Path to a text file containing nwm file names. One filename per line. Any *input options will be ignored and this file will be used. |
-| runinput | <ol><li>short_range</li><li>medium_range</li><li>medium_range_no_da</li><li>long_range</li><li>analysis_assim</li><li>analysis_assim_extend</li><li>analysis_assim_extend_no_da</li><li>analysis_assim_long</li><li>analysis_assim_long_no_da</li><li>analysis_assim_no_da</li><li>short_range_no_da</li></ol> |
-| varinput | <ol><li>channel_rt</li><li>land</li><li>reservoir</li><li>terrain_rt terrain</li><li>forcing</li></ol> |
-| geoinput | <ol><li>conus</li><li>hawaii</li><li>puertorico</li></ol> |
-| meminput | <ol><li>mem_1</li><li>mem_2</li><li>mem_3</li><li>mem_4</li><li>mem_5</li><li>mem_6</li><li>mem_7</li></ol> |
-| urlbaseinput | 0: "",<br>1: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/prod/",<br>2: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/",<br>3: "https://storage.googleapis.com/national-water-model/",<br>4: "https://storage.cloud.google.com/national-water-model/",<br>5: "gs://national-water-model/",<br>6: "gcs://national-water-model/",<br>7: "https://noaa-nwm-pds.s3.amazonaws.com/",<br>8: "s3://noaa-nwm-pds/",<br>9: "https://ciroh-nwm-zarr-copy.s3.amazonaws.com/national-water-model/" |
-| fcst_cycle        | List of forecast cycles in UTC. If empty, will use all available cycles           |
-| lead_time         | List of lead times in hours. If empty, will use all available lead times          |
+| start_time        | Datetime of first nwm file (YYYYMMDDHHMM) |
+| end_time          | Datetime of last nwm file  (YYYYMMDDHHMM) |
+| nwm_file          | Path to a text file containing nwm file names. One filename per line. Any *input options |
 | weight_file       | Weight file for the run. Accepts local absolute path, s3 URI or URL  |
-
 
 ### 2. Storage
 
@@ -54,35 +49,24 @@ The "storage" section contains parameters related to storage configuration.
 | output_file_type  | Output file type (e.g., csv, parquet)      |
 
 ### 3. Run
-
 The "run" section contains parameters related to the execution of the application.
 
 | Field             | Description                    |
 |-------------------|--------------------------------|
 | verbose           | Verbosity of the run           |
-| check_files       | Confirm nwm files exist        |
 | collect_stats     | Collect forcing metadata       |
-| proc_threads      | Number of data processing processes |
-| write_threads     | Number of writing threads      |
-| nfile_chunk       | Number of file to process each write,<br> set to greater than the number of nwm files unless memory constraints are reached |
+| proc_threads      | Number of data processing threads, defaults to 80% available cores |
+| write_threads     | Number of writing threads, defaults to 100% available cores      |
+| nfile_chunk       | Number of files to process each write,<br> set to greater than the number of nwm files unless memory constraints are reached, defaults to 1000000. Only set this if experiencing memory constraints due to large number of nwm forcing files |
 
 ## Example Configuration
 ```
 {
     "forcing"  : {
-        "forcing_type" : "operational_archive",
-        "start_date"   : "202310300000",
-        "end_date"     : "202310300000",
+        "start_date     : "",
+        "end_date"     : "",
         "nwm_file"     : "",
-        "runinput"     : 1,
-        "varinput"     : 5,
-        "geoinput"     : 1,
-        "meminput"     : 0,
-        "urlbaseinput" : 7,
-        "fcst_cycle"   : [0],
-        "lead_time"    : [1],
-        "weight_file"  : "https://ngenresourcesdev.s3.us-east-2.amazonaws.com/small_weights.json"
-
+        "weight_file"  : ""
     },
 
     "storage":{
@@ -95,8 +79,5 @@ The "run" section contains parameters related to the execution of the applicatio
     "run" : {
         "verbose"       : true,
         "collect_stats" : true,
-        "proc_threads"  : 1,
-        "write_threads" : 2,
-        "nfile_chunk"   : 720
     }
 }

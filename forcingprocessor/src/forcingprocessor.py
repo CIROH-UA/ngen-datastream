@@ -12,7 +12,6 @@ from datetime import datetime
 import psutil
 import gzip
 import tarfile
-import nwmurl 
 
 def distribute_work(items,nprocs):
     """
@@ -427,23 +426,12 @@ def prep_ngen_data(conf):
         "DSWRF_surface",
     ]    
 
-    forcing_type = conf["forcing"]["forcing_type"]
-
     start_date = conf["forcing"].get("start_date",None)
     end_date = conf["forcing"].get("end_date",None)
-    runinput = conf["forcing"].get("runinput",None)
-    varinput = conf["forcing"].get("varinput",None)
-    geoinput = conf["forcing"].get("geoinput",None)
-    meminput = conf["forcing"].get("meminput",None)
-    object_type = conf["forcing"].get("object_type",None)
-    selected_var_types = conf["forcing"].get("selected_var_types",None)
-    urlbaseinput = conf["forcing"].get("urlbaseinput",None)
-    fcst_cycle = conf["forcing"].get("fcst_cycle",None)
-    lead_time = conf["forcing"].get("lead_time",None)
     weight_file = conf['forcing'].get("weight_file",None)
     nwm_file = conf['forcing'].get("nwm_file","")
 
-    start_time, end_time, output_interval = start_end_interval(start_date,end_date,lead_time)
+    start_time, end_time, output_interval = start_end_interval(start_date,end_date,[])
     conf['time']                    = {}
     conf['time']['start_time']      = start_time
     conf['time']['end_time']        = end_time
@@ -459,9 +447,13 @@ def prep_ngen_data(conf):
     global ii_verbose
     ii_verbose = conf["run"].get("verbose",False) 
     ii_collect_stats = conf["run"].get("collect_stats",True)
-    proc_threads = conf["run"]["proc_threads"]
-    write_threads = conf["run"]["write_threads"]
-    nfile_chunk = conf["run"]["nfile_chunk"]
+    proc_threads = conf["run"].get("proc_threads",None)
+    write_threads = conf["run"].get("write_threads",None)
+    nfile_chunk = conf["run"].get("nfile_chunk",None)
+
+    if proc_threads is None: proc_threads   = int(os.cpu_count() * 0.8)
+    if write_threads is None: write_threads = os.cpu_count()
+    if nfile_chunk is None: nfile_chunk     = 100000
 
     msg = f"\nForcingProcessor has awoken. Let's do this."
     for x in msg:
@@ -474,9 +466,6 @@ def prep_ngen_data(conf):
     write_time = 0
 
     # configuration validation
-    accepted = ['operational_archive','retrospective','from_file']
-    msg = f'{forcing_type} is not a valid input for \"forcing_type\"\nAccepted inputs: {accepted}'
-    assert forcing_type in accepted, msg
     file_types = ["csv", "parquet"]
     assert (
         output_file_type in file_types
@@ -497,10 +486,10 @@ def prep_ngen_data(conf):
         forcing_path = Path(bucket_path, 'forcings')  
         meta_path    = Path(bucket_path, 'metadata') 
         metaf_path   = Path(bucket_path, 'metadata','forcings_metadata')        
-        if not os.path.exists(bucket_path): os.system(f"mkdir {bucket_path}")
-        if not os.path.exists(forcing_path):os.system(f"mkdir {forcing_path}")
-        if not os.path.exists(meta_path):os.system(f"mkdir {meta_path}")
-        if not os.path.exists(metaf_path):os.system(f"mkdir {metaf_path}")
+        if not os.path.exists(bucket_path):  os.system(f"mkdir {bucket_path}")
+        if not os.path.exists(forcing_path): os.system(f"mkdir {forcing_path}")
+        if not os.path.exists(meta_path):    os.system(f"mkdir {meta_path}")
+        if not os.path.exists(metaf_path):   os.system(f"mkdir {metaf_path}")
 
         with open(f"{output_path}/metadata/forcings_metadata/conf.json", 'w') as f:
             json.dump(conf, f)
@@ -509,7 +498,6 @@ def prep_ngen_data(conf):
 
         s3 = boto3.client("s3")          
     
-        # Save config to metadata
         s3.put_object(
                 Body=json.dumps(conf),
                 Bucket=output_bucket,
@@ -536,14 +524,6 @@ def prep_ngen_data(conf):
             crosswalk_dict = json.load(f)
 
     ncatchments = len(crosswalk_dict)
-
-    if len(nwm_file) == 0:
-        if forcing_type == 'operational_archive':
-            sepehr_magic = nwmurl.generate_urls_operational(start_date, end_date, fcst_cycle, lead_time, varinput, geoinput, runinput, urlbaseinput, meminput,True)
-        elif forcing_type == 'retrospective':
-            sepehr_magic = nwmurl.generate_urls_retro(start_date, end_date, urlbaseinput, object_type, selected_var_types, True)
-        file_path = os.getcwd()
-        nwm_file  = os.path.join(file_path,'filenamelist.txt')
 
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
