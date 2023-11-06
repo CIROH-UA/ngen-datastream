@@ -1,4 +1,4 @@
-import json
+import json, os
 import nwmurl 
 import argparse
 
@@ -27,5 +27,10 @@ if __name__ == "__main__":
         dest="infile", type=str, help="A json containing user inputs to run nwmurl"
     )
     args = parser.parse_args()
-    conf = json.load(open(args.infile))
+    if 's3' in args.infile:
+        os.system(f'wget {args.infile}')
+        filename = args.infile.split('/')[-1]
+        conf = json.load(open(filename))
+    else:
+        conf = json.load(open(args.infile))
     generate_nwmfiles(conf)
