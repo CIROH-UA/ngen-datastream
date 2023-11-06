@@ -790,12 +790,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.infile == 'dailyrun':
-        bucket = 'ngenresourcesdev'
-        print(f'Executing the daily run! Grabbing configuration file from {bucket}')
-        s3 = boto3.client("s3")          
-        conf_obj = s3.get_object(Bucket=bucket, Key='dailyrun.json')  
-        conf = json.loads(conf_obj["Body"].read().decode())
+    if 's3' in args.infile:
+        os.system(f'wget {args.infile}')
+        filename = args.infile.split('/')[-1]
+        conf = json.load(open(filename))
     else:
         conf = json.load(open(args.infile))
 
