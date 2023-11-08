@@ -1,0 +1,21 @@
+{
+    "forcing"  : {
+        "start_date"   : "202311060000",
+        "end_date"     : "202311060000",
+        "nwm_file"     : "/mounted_dir/forcingprocessor/filenamelist.txt",
+        "weight_file"  : "/mounted_dir/forcingprocessor/data/weights/small_weights.json"
+    },
+
+    "storage":{
+        "storage_type"     : "local",
+        "output_bucket"    : "",
+        "output_path"      : "/mounted_dir",
+        "output_file_type" : "csv"
+    },    
+
+    "run" : {
+        "verbose"       : true,
+        "collect_stats" : true
+    }
+}
+
