@@ -27,7 +27,7 @@ def lambda_handler(event, context):
     """
 
     command_id  = event['command_id']
-    instance_id = event['instance_id']
+    instance_id = event['instance_parameters']['InstanceId']
     output = get_command_result(command_id,instance_id)
 
     if output['Status'] == 'Success':

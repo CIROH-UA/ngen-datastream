@@ -59,16 +59,16 @@ def lambda_handler(event, context):
     
     """
 
-    instance_id = event['instance_id']
+    instance_id = event['instance_parameters']['InstanceId']
     run_type    = event['run_type']
     bucket      = event['config_bucket']
+    command     = event['command']
 
     output_bucket, prefix = update_conf(
         bucket,
         run_type
         )
 
-    command = f'source /home/ec2-user/venv/bin/activate && python /home/ec2-user/ngen-datastream/forcingprocessor/src/nwmforcing2ngen.py {run_type}' 
     response = client_ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName='AWS-RunShellScript',

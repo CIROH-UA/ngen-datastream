@@ -1,5 +1,5 @@
 # Define custom function directory
-ARG FUNCTION_DIR="/ngen-datastream/forcingprocessor"
+ARG FUNCTION_DIR="/ngen-datastream"
 
 FROM python:3.9 as build-image
 
@@ -7,7 +7,7 @@ FROM python:3.9 as build-image
 ARG FUNCTION_DIR
 
 # Get code
-RUN git clone --depth 1 -b forcingprocessor https://github.com/CIROH-UA/ngen-datastream.git
+RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
 
 # Use a slim version of the base Python image to reduce the final image size
 FROM python:3.9-slim
@@ -23,5 +23,3 @@ COPY --from=build-image ${FUNCTION_DIR} ${FUNCTION_DIR}
 
 RUN pip3 install --upgrade pip
 RUN pip3 install --no-cache-dir -r "${FUNCTION_DIR}/requirements.txt"
-
-CMD ["python","nwmforcing2ngen.py","conf.json"]
