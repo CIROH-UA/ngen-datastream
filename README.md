@@ -29,7 +29,7 @@ The `data_dir` directory contains the following subfolders:
 The realization file serves as the primary model configuration for the ngen framework. An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/realization.json). This file specifies which models/modules to run and with which parameters, run parameters like date and time, and hydrofabric specifications.
 
 `catchments.geojson`, `nexus.geojson`,`crosswalk.json`, `flowpaths` ,`flowpath_edit_list.json` :
-These files contain the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/catchments.geojson). Tools to create these files can be found [here](https://github.com/LynkerIntel/hfsubset/tree/main).
+These files contain the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example can be found [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/data/standard_run/config/catchments.geojson). Tools to create these files can be found at [LynkerIntel's hfsubset](https://github.com/LynkerIntel/hfsubset).
 
 Other files may be placed in this subdirectory that relate to internal-ngen-models/modules. It is common to define variables like soil parameters in these files for ngen modules to use.
 
