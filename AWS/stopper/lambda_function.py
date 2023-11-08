@@ -7,7 +7,7 @@ def lambda_handler(event, context):
     Generic Poller funcion    
     """
 
-    instance_id = event['instance_id']
+    instance_id = event['instance_parameters']['InstanceId']
 
     print(f'Shutting down processor {instance_id}')
     client_ec2.stop_instances(InstanceIds=[instance_id])
