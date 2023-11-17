@@ -1,18 +1,9 @@
 {
-    "forcing"  : {
-        "forcing_type" : "operational_archive",
-        "start_date"   : "202310300000",
+    "forcing"  : 
+    {   "start_date"   : "202310300000",
         "end_date"     : "202310300000",
         "nwm_file"     : "",
-        "runinput"     : 1,
-        "varinput"     : 5,
-        "geoinput"     : 1,
-        "meminput"     : 0,
-        "urlbaseinput" : 7,
-        "fcst_cycle"   : [0],
-        "lead_time"    : [1],
         "weight_file"  : ""
-
     },
 
     "storage":{
@@ -25,9 +16,8 @@
     "run" : {
         "verbose"       : true,
         "collect_stats" : true,
-        "proc_threads"  : 1,
-        "write_threads" : 2,
-        "nfile_chunk"   : 720
+	    "proc_threads"  : 1,
+	    "write_threads" : 1
     }
 }
 

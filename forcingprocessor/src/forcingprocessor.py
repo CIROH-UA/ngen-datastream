@@ -262,7 +262,7 @@ def threaded_write_fun(data,t_ax,catchments,nprocs,storage_type,output_bucket,ou
     if len(ids) > 1:
         flat_ids  = [item for sublist in ids for item in sublist]
     else:
-        flat_ids  = ids
+        flat_ids  = ids[0]
 
     return flat_ids
 
