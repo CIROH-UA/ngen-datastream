@@ -1,0 +1,21 @@
+{
+    "forcing"  : {
+        "start_date"   : "202311060000",
+        "end_date"     : "202311060000",
+        "nwm_file"     : "./filenamelist.txt",
+        "weight_file"  : "./weights_01.json"
+    },
+
+    "storage":{
+        "storage_type"     : "local",
+        "output_bucket"    : "",
+        "output_path"      : "./data",
+        "output_file_type" : "csv"
+    },    
+
+    "run" : {
+        "verbose"       : true,
+        "collect_stats" : true,
+        "proc_threads"  : 3
+    }
+}

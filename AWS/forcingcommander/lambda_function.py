@@ -26,32 +26,50 @@ def wait_for_command_response(response,instance_id):
                 print(f'FAILED')
                 break
             
-def update_conf(bucket, run_type):
-
+def get_conf(bucket_path,out_path):   
     conf_path = '/tmp/conf.json'
-    client_s3.download_file(bucket, f'{run_type}_template_conf.json', conf_path)
+    client_s3.download_file(bucket_path, out_path, conf_path)
     with open(conf_path,'r') as fp:
-        data = json.load(fp)
-        
+        data = json.load(fp)   
+    return data
+
+def fix_time(data):
     date = datetime.datetime.now()
     date = date.strftime('%Y%m%d')
 
     hourminute = '0000'
     
-    data['forcing']['start_date'] = date + hourminute
-    data['forcing']['end_date']   = date + hourminute
+    data['start_date'] = date + hourminute
+    data['end_date']   = date + hourminute
+
+    return data, date
+
+def update_confs(bucket, run_type):
+
+    conf_data     = get_conf(bucket,f'conf_{run_type}_template.json')
+    conf_nwm_data = get_conf(bucket,f'conf_{run_type}_template_nwmfilenames.json')
+        
+    conf_data['forcing'], date = fix_time(conf_data['forcing'])
+    conf_nwm_data, _           = fix_time(conf_nwm_data)
     
     prefix = f"{run_type}/{date}"
-    data['storage']['output_bucket_path'] = prefix
+    conf_data['storage']['output_bucket_path'] = prefix
+
+    conf_data['forcing']['nwm_file'] = f"https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template_nwmfilenames.json"
     
     conf_run = f'{run_type}.json'
     with open('/tmp/' + conf_run,'w') as fp:
-        json.dump(data,fp)
+        json.dump(conf_data,fp)
+    client_s3.upload_file('/tmp/' + conf_run, bucket, conf_run)
+
+    conf_run = f'{run_type}_nwmfilenames.json'
+    with open('/tmp/' + conf_run,'w') as fp:
+        json.dump(conf_nwm_data,fp)
     client_s3.upload_file('/tmp/' + conf_run, bucket, conf_run)
     
-    print(f'The {run_type} config has been updated to date: {date + hourminute}\nand output_bucket_path to {prefix}')
+    print(f'The {run_type} config has been updated to date: {date}\nand output_bucket_path to {prefix}')
 
-    return data['storage']['output_bucket'], prefix
+    return conf_data['storage']['output_bucket'], prefix  
 
 def lambda_handler(event, context):
     """
@@ -62,9 +80,13 @@ def lambda_handler(event, context):
     instance_id = event['instance_parameters']['InstanceId']
     run_type    = event['run_type']
     bucket      = event['config_bucket']
-    command     = event['command']
 
-    output_bucket, prefix = update_conf(
+    command = \
+        f"source /home/ec2-user/venv-datastream/bin/activate && " + \
+        f"python /home/ec2-user/ngen-datastream/forcingprocessor/src/nwm_filenames_generator.py https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template_nwmfilenames.json &&  " + \
+        f"python /home/ec2-user/ngen-datastream/forcingprocessor/src/forcingprocessor.py https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template.json",
+
+    output_bucket, prefix = update_confs(
         bucket,
         run_type
         )

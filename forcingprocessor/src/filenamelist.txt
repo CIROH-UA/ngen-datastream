@@ -1,0 +1,6 @@
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20231030/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20231030/forcing_short_range/nwm.t00z.short_range.forcing.f002.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20231030/forcing_short_range/nwm.t00z.short_range.forcing.f003.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20231030/forcing_short_range/nwm.t00z.short_range.forcing.f004.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20231030/forcing_short_range/nwm.t00z.short_range.forcing.f005.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20231030/forcing_short_range/nwm.t00z.short_range.forcing.f006.conus.nc

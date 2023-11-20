@@ -1,0 +1,53 @@
+{
+    "globals" : {
+        "start_date"   : "202310300000",
+        "end_date"     : "202310300000"
+    },
+
+    "hydrofabric":{
+        "geopackage" : "",
+        "subset_id"  : ""
+    },
+
+    "nwmurl" : {
+        "forcing_type" : "operational_archive",
+        "start_date"   : "globals.start_date",
+        "end_date"     : "globals.end_date",
+        "runinput"     : 1,
+        "varinput"     : 5,
+        "geoinput"     : 1,
+        "meminput"     : 0,
+        "urlbaseinput" : 7,
+        "fcst_cycle"   : [0],
+        "lead_time"    : [1,2,3,4,5,6]
+    },
+
+    "forcingprocessor" : {
+        "forcing"  : {
+            "start_date"   : "globals.start_date",
+            "end_date"     : "globals.end_date",
+            "nwm_file"     : "/mounted_dir/forcingprocessor/filenamelist.txt",
+            "weight_file"  : "/mounted_dir/forcingprocessor/data/weights/small_weights.json"
+        },
+    
+        "storage":{
+            "storage_type"     : "local",
+            "output_bucket"    : "",
+            "output_path"      : "/mounted_dir",
+            "output_file_type" : "csv"
+        },    
+    
+        "run" : {
+            "verbose"       : true,
+            "collect_stats" : true
+        }
+    },
+
+    "validator" : {
+        
+     },
+
+    "hashing" : {
+
+     }
+}

@@ -1,0 +1,20 @@
+{
+    "forcing"  : {
+        "start_date"   : "202311060000",
+        "end_date"     : "202311060000",
+        "nwm_file"     : "",
+        "weight_file"  : "https://ngenresourcesdev.s3.us-east-2.amazonaws.com/01_weights.json"
+    },
+
+    "storage":{
+        "storage_type"      : "S3",
+        "output_bucket"     : "ngenforcingdev",
+        "output_path"       : "dailyrun/20231106",
+        "output_file_type"  : "csv"
+    },    
+
+    "run" : {
+        "verbose"       : true,
+        "collect_stats" : true
+    }
+}
