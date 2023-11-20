@@ -40,7 +40,8 @@ The ngen framework uses a merkel tree hashing algorithm to version each ngen run
 
 # Python virtual enviornment
 cd in ngen-datastream
-`python3.9 -m venv ./venv-ngen-datastream`
-`source venv-ngen-datastream/bin/activate`
-`pip install -r requirements.txt`
+```
+python3.9 -m venv ./venv-ngen-datastream
+source venv-ngen-datastream/bin/activate
+pip install -r requirements.txt
 
