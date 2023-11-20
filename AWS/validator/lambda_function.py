@@ -25,11 +25,11 @@ def wait_for_command_response(response,instance_id):
 
 def lambda_handler(event, context):
 
-    instance_id         = event['instance_id']
+    instance_id         = event['instance_parameters']['InstanceId']
     ngen_input_bucket   = event['bucket']
     ngen_input_key      = event['complete_tarball_key']
 
-    command = f'source /home/ec2-user/ngen-cal-venv/bin/activate && python /home/ec2-user/ngen-cal/python/conf_validation.py --bucket {ngen_input_bucket} --key {ngen_input_key}' 
+    command = f'source /home/ec2-user/ngen-cal-venv/bin/activate && python /home/ec2-user/ngen-cal/python/conf_validation.py --tarball' 
     response = client_ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName='AWS-RunShellScript',
