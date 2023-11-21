@@ -22,4 +22,4 @@ WORKDIR ${FUNCTION_DIR}
 COPY --from=build-image ${FUNCTION_DIR} ${FUNCTION_DIR}
 
 RUN pip3 install --upgrade pip
-RUN pip3 install -e "${FUNCTION_DIR}/forcingprocessor"
+RUN pip3 install -e "${FUNCTION_DIR}/subsetting"
