@@ -43,7 +43,7 @@ pip3 install -r ./ngen-datastream/requirements.txt
 deactivate
 
 python3 -m venv ./venv-ngen-cal
-git clone --branch realization_validation https://github.com/JordanLaserGit/ngen-cal.git
+git clone --branch run_folder_validation https://github.com/JordanLaserGit/ngen-cal.git
 source ./venv-ngen-cal/bin/activate && pip3 install --upgrade pip
 pip3 install -r ./ngen-cal/requirements.txt
 pip3 install -e ./ngen-cal/python/ngen_conf
