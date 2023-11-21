@@ -54,8 +54,6 @@ def update_confs(bucket, run_type):
     
     prefix = f"{run_type}/{date}"
     conf_data['storage']['output_bucket_path'] = prefix
-
-    conf_data['forcing']['nwm_file'] = f"https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template_nwmfilenames.json"
     
     conf_run = f'{run_type}.json'
     with open('/tmp/' + conf_run,'w') as fp:
@@ -83,8 +81,8 @@ def lambda_handler(event, context):
 
     command = \
         f"source /home/ec2-user/venv-datastream/bin/activate && " + \
-        f"python /home/ec2-user/ngen-datastream/forcingprocessor/src/nwm_filenames_generator.py https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template_nwmfilenames.json &&  " + \
-        f"python /home/ec2-user/ngen-datastream/forcingprocessor/src/forcingprocessor.py https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template.json",
+        f"python /home/ec2-user/ngen-datastream/forcingprocessor/src/nwm_filenames_generator.py https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template_nwmfilenames.json && " + \
+        f"python /home/ec2-user/ngen-datastream/forcingprocessor/src/forcingprocessor.py https://{bucket}.s3.us-east-2.amazonaws.com/conf_{run_type}_template.json"
 
     output_bucket, prefix = update_confs(
         bucket,
