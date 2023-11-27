@@ -10,7 +10,7 @@ docker run -it --rm -v /path/to/your-directory:/mounted_dir hfsubsetter ./hfsubs
 # ForcingProcessor
 ```
 docker build /ngen-datastream/docker/forcingprocessor -t forcingprocessor --no-cache
- docker run -it --rm -v /ngen-datastream:/mounted_dir forcingprocessor python /ngen-datastream/forcingprocessor/src/forcingprocessor/forcingprocessor.py /mounted_dir/forcingprocessor/configs/conf_docker.json
+docker run -it --rm -v /ngen-datastream:/mounted_dir forcingprocessor python /ngen-datastream/forcingprocessor/src/forcingprocessor/forcingprocessor.py /mounted_dir/forcingprocessor/configs/conf_docker.json
 ```
 Note that both the filenamelist.txt and weights.json file must be generated first and paths properly set in the config. 
 
