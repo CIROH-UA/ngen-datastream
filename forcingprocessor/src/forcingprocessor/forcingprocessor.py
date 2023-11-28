@@ -411,6 +411,7 @@ def prep_ngen_data(conf):
         "RAINRATE",
         "RAINRATE",
         "T2D",
+        "Q2D",
         "PSFC",
         "SWDOWN",
     ]
@@ -421,8 +422,9 @@ def prep_ngen_data(conf):
         "DLWRF_surface",
         "APCP_surface",
         "precip_rate",  # BROKEN (Identical to APCP!)
-        "TMP_2maboveground",
+        "TMP_2maboveground",        
         "SPFH_2maboveground",
+        "PRES_surface",
         "DSWRF_surface",
     ]    
 
