@@ -598,10 +598,11 @@ def prep_ngen_data(conf):
             if j > 10: break
             _nc_file_parts = jfile.split('/')
             bucket_key     = "noaa-nwm-pds/" + _nc_file_parts[-3] + '/' + _nc_file_parts[-2] + '/' + _nc_file_parts[-1]    
-            if fs_s3 is None:
-                nwm_file_sizes = os.path.getsize(filename)
-            else:
+            if fs_s3:
                 response       = fs_s3.open(bucket_key, mode='rb')
+            else:
+                nwm_file_sizes = os.path.getsize(jfile)
+                
             nwm_file_sizes.append(response.details['size'])
 
         nwm_file_size_avg = np.average(nwm_file_sizes)
