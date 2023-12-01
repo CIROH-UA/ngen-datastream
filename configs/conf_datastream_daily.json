@@ -1,18 +1,18 @@
 {
     "globals" : {
-        "start_date"   : "202310300000",
-        "end_date"     : "202310300000"
+        "start_date"     : "DAILY",
+        "end_date"       : "",
+        "data_directory" : "/data/ngen-datastream-test",
+        "relative_to"    : "/home/jlaser/code/CIROH/ngen-datastream"
     },
 
     "hydrofabric":{
-        "geopackage" : "",
-        "subset_id"  : ""
+        "geopackage" : "/forcingprocessor/data/geopackages/nextgen_01.gpkg",
+        "subset_id"  : "cat-2975"
     },
 
     "nwmurl" : {
         "forcing_type" : "operational_archive",
-        "start_date"   : "globals.start_date",
-        "end_date"     : "globals.end_date",
         "runinput"     : 1,
         "varinput"     : 5,
         "geoinput"     : 1,
@@ -24,8 +24,6 @@
 
     "forcingprocessor" : {
         "forcing"  : {
-            "start_date"   : "globals.start_date",
-            "end_date"     : "globals.end_date",
             "nwm_file"     : "/mounted_dir/forcingprocessor/filenamelist.txt",
             "weight_file"  : "/mounted_dir/forcingprocessor/data/weights/small_weights.json"
         },
@@ -41,6 +39,11 @@
             "verbose"       : true,
             "collect_stats" : true
         }
+    },
+
+    "tarballer":
+    {
+
     },
 
     "validator" : {
