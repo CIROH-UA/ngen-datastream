@@ -796,12 +796,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if 's3' in args.infile:
-        os.system(f'wget {args.infile}')
-        filename = args.infile.split('/')[-1]
-        conf = json.load(open(filename))
+    if args.infile[0] == '{':
+        conf = json.loads(args.infile)
     else:
-        conf = json.load(open(args.infile))
+        if 's3' in args.infile:
+            os.system(f'wget {args.infile}')
+            filename = args.infile.split('/')[-1]
+            conf = json.load(open(filename))
+        else:
+            conf = json.load(open(args.infile))
 
     prep_ngen_data(conf)
 
