@@ -14,8 +14,18 @@ def create_nwmurl_conf(conf, out_dir):
 
 def create_fp_conf(conf, out_dir):
     fp_conf = conf['forcingprocessor']
-    fp_conf['forcing']['start_date'] = conf['globals']['start_date']
-    fp_conf['forcing']['end_date']   = conf['globals']['end_date']
+    fp_conf['forcing'] = {}
+    fp_conf['forcing']['start_date']   = conf['globals']['start_date']
+    fp_conf['forcing']['end_date']     = conf['globals']['end_date']
+    fp_conf['forcing']['nwm_file']     = "/mounted_dir/datastream-resources/filenamelist.txt"
+    fp_conf['forcing']['weight_file']  = "/mounted_dir/datastream-resources/weights.json"
+    fp_conf['storage']['storage_type'] = "local"
+    fp_conf['storage'] = {}
+    fp_conf['storage']['output_bucket']    = "/mounted_dir/ngen-run"
+    fp_conf['storage']['output_path']      = "/mounted_dir/ngen-run"
+    fp_conf['storage']['output_file_type'] = "csv"
+    fp_conf['run'] = {}
+    fp_conf['run']['verbose'] = False
     conf_name = 'conf_fp.json'
     conf_path = Path(out_dir,conf_name)
     with open(conf_path,'w') as fp:
@@ -26,13 +36,13 @@ def create_fp_conf(conf, out_dir):
 def create_confs(conf):
     if conf['globals']['start_date'] == "DAILY":
         date = datetime.datetime.now()
-        date_tomorrow = date + datetime.timedelta(days=1)
         date = date.strftime('%Y%m%d')
-        date_tomorrow = date_tomorrow.strftime('%Y%m%d')
         hourminute = '0000'
         
         conf['globals']['start_date'] = date + hourminute
-        conf['globals']['end_date']   = date_tomorrow + hourminute
+        conf['globals']['end_date']   = date + hourminute
+
+        # conf['nwmurl']['lead_time'] = [x+1 for x in range(24)]
 
     if "relative_to" in conf['globals'].keys():
         out_dir = Path(conf['globals']['relative_to'],conf['globals']['data_dir'])

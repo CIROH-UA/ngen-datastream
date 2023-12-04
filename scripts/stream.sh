@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # set -x
 
 if [ $# -ne 1 ]; then
@@ -13,36 +14,43 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 config=$(cat "$CONFIG_FILE")
 
+START_DATE=$(echo "$config" | jq -r '.globals.start_date')
+END_DATE=$(echo "$config" | jq -r '.globals.end_date')
+DATA_PATH=$(echo "$config" | jq -r '.globals.data_dir')
+RESOURCE_PATH=$(echo "$config" | jq -r '.globals.resource_dir')
+RELATIVE_TO=$(echo "$config" | jq -r '.globals.relative_to')
 GEOPACKAGE=$(echo "$config" | jq -r '.hydrofabric.geopackage')
 SUBSET_ID=$(echo "$config" | jq -r '.hydrofabric.subset_id')
-DATA_PATH=$(echo "$config" | jq -r '.globals.data_directory')
-RELATIVE_TO=$(echo "$config" | jq -r '.globals.relative_to')
 
 if [ -n "$RELATIVE_TO" ] && [ -n "$DATA_PATH" ]; then
     echo "Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
-    DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH#/}"
-    GEOPACKAGE="${RELATIVE_TO%/}/${GEOPACKAGE#/}"
-    echo $DATA_PATH
+    DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
+    RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
+    GEOPACKAGE_FILE=$GEOPACKAGE
+    GEOPACKAGE="${RESOURCE_PATH%/}/${GEOPACKAGE%/}"
+    # echo $GEOPACKAGE
 fi
 
 if [ -e "$DATA_PATH" ]; then
     echo "The path $DATA_PATH exists. Please delete it or set a different path."
     # exit 1
-else
-    NGEN_CONFIG_PATH="${DATA_PATH%/}/ngen-run/config"
-    DATASTREAM_MISC_PATH="${DATA_PATH%/}/misc"
-    DATASTREAM_CONF_PATH="${DATA_PATH%/}/data-stream-configs"
-    mkdir -p $DATA_PATH
-    mkdir -p $NGEN_CONFIG_PATH
-    mkdir -p $DATASTREAM_MISC_PATH
-    mkdir -p $DATASTREAM_CONF_PATH
 fi
 
-
+NGEN_CONFIG_PATH="${DATA_PATH%/}/ngen-run/config"
+DATASTREAM_CONF_PATH="${DATA_PATH%/}/datastream-configs"
+DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
+mkdir -p $DATA_PATH
+mkdir -p $NGEN_CONFIG_PATH
+mkdir -p $DATASTREAM_CONF_PATH
+cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
+NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
+cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-
-echo "The script is located in: $SCRIPT_DIR\n"
+DOCKER_MOUNT="/mounted_dir"
+DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
+DOCKER_CONFIGS="${DOCKER_MOUNT%/}/datastream-configs"
+DOCKER_FP="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
 # Subset
 ## hfsubset
@@ -53,7 +61,6 @@ if [ -n "$SUBSET_ID" ]; then
     DOCKER_TAG="subsetter"
     SUBSET_DOCKER="$(dirname "$SCRIPT_DIR")/docker/subsetting"
 
-    # Check if the Docker container exists
     if docker inspect "$DOCKER_TAG" &>/dev/null; then
         echo "The Docker container '$DOCKER_TAG' exists. Not building"
     else
@@ -64,28 +71,80 @@ if [ -n "$SUBSET_ID" ]; then
     GEOPACKAGE_DIR=$(dirname ${GEOPACKAGE})
     GEOPACKAGE_NAME=$(basename "$GEOPACKAGE")
 
-    docker run -it --rm -v $GEOPACKAGE_DIR:/mounted_dir -w /mounted_dir subsetter python /ngen-datastream/subsetting/src/subsetting/subset.py /mounted_dir/$GEOPACKAGE_NAME $SUBSET_ID
+    docker run -it --rm -v "$GEOPACKAGE_DIR":"$DOCKER_MOUNT" -w "$DOCKER_MOUNT" subsetter python "/ngen-datastream/subsetting/src/subsetting/subset.py "$DOCKER_MOUNT"/$GEOPACKAGE_NAME" "$SUBSET_ID"
 
-    GEOPACKAGE_SUBSETTED=$SUBSET_ID"_upstream_subset.gpkg"
-    GEOPACKAGE="${GEOPACKAGE_DIR%/}/${GEOPACKAGE_SUBSETTED#/}"
+    GEOPACKAGE_FILE=$SUBSET_ID"_upstream_subset.gpkg"
+    GEOPACKAGE="${GEOPACKAGE_DIR%/}/${GEOPACKAGE_FILE#/}"
 
     mv $GEOPACKAGE $NGEN_CONFIG_PATH
 
     files=("catchments.geojson" "crosswalk.json" "flowpath_edge_list.json" "flowpaths.geojson" "nexus.geojson")
     for file in "${files[@]}"; do
-        mv "${GEOPACKAGE_DIR%/}/${file#/}" $DATASTREAM_MISC_PATH
+        mv "${GEOPACKAGE_DIR%/}/${file#/}" $DATASTREAM_RESOURCES
     done
 
+else
+
+    if [ -e "$GEOPACKAGE" ]; then
+        echo "No subset_id provided, using provided geopackage" $GEOPACKAGE
+        cp $GEOPACKAGE $NGEN_CONFIG_PATH
+    else
+        echo "Provided geopackage does not exist!" $GEOPACKAGE
+        exit 1
+    fi
+
 fi
+
 # forcingprocessor
-# docker build /ngen-datastream/docker/forcingprocessor -t forcingprocessor --no-cache
-# docker run -it --rm -v /ngen-datastream:/mounted_dir forcingprocessor python /ngen-datastream/forcingprocessor/src/forcingprocessor/forcingprocessor.py /mounted_dir/forcingprocessor/configs/conf_docker.json
+DOCKER_TAG="forcingprocessor"
+FP_DOCKER="$(dirname "$SCRIPT_DIR")/docker/forcingprocessor"
+
+if docker inspect "$DOCKER_TAG" &>/dev/null; then
+    echo "The Docker container '$DOCKER_TAG' exists. Not building"
+else
+    echo "Building subsetting container..."
+    docker build $FP_DOCKER -t forcingprocessor --no-cache
+fi
+
+WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
+if [ -e "$WEIGHTS_FILENAME" ]; then
+    echo "Using weights found in resources directory" "$WEIGHTS_FILENAME"
+    mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
+else
+    echo "Weights file not found. Creating from" $GEOPACKAGE_FILE
+    NWM_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm*")
+    NWM_FILENAME=$(basename $NWM_FILE)
+
+    GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/$GEOPACKAGE_FILE"
+    WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
+    NWM_DOCKER=""$DOCKER_RESOURCES"/$NWM_FILENAME"
+    if [ -e "$NWM_FILE" ]; then
+        echo "Found $NWM_FILE"
+    else
+        echo "Missing nwm example grid file!"
+        exit 1
+    fi
+    docker run -it -v "$DATA_PATH:"$DOCKER_MOUNT"" forcingprocessor python "$DOCKER_FP"weight_generator.py $GEO_PATH_DOCKER $WEIGHTS_DOCKER $NWM_DOCKER
+    WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE_FILE#/}"
+fi
+
+CONF_GENERATOR="$(dirname "$SCRIPT_DIR")/python/configure-datastream.py"
+python $CONF_GENERATOR $CONFIG_FILE
+
+echo "Creating nwm files"
+docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" -w "$DOCKER_RESOURCES" forcingprocessor python "$DOCKER_FP"nwm_filenames_generator.py "$DOCKER_MOUNT"/datastream-configs/conf_nwmurl.json
+
+echo "Creating forcing files"
+docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" forcingprocessor python "$DOCKER_FP"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
 # tarballer
 
 # validation
 # docker build /ngen-datastream/docker/validator -t validator --no-cache
-# docker run -it --rm -v /ngen-datastream:/mounted_dir validator python /ngen-cal/python/run_validator.py --data_dir /mounted_dir/data/standard_run
+# docker run -it --rm -v /ngen-datastream:"$DOCKER_MOUNT" validator python /ngen-cal/python/run_validator.py --data_dir "$DOCKER_MOUNT"/data/standard_run
 
 # hashing
 
+# ngen
+
+# manage outputs
