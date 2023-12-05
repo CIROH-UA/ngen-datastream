@@ -2,6 +2,18 @@
 set -e
 # set -x
 
+build_docker_container() {
+    local DOCKER_TAG="$1"
+    local DOCKER_IMAGE="$2"
+
+    if docker inspect "$DOCKER_TAG" &>/dev/null; then
+        echo "The Docker container '$DOCKER_TAG' exists. Not building."
+    else
+        echo "Building $DOCKER_TAG container..."
+        docker build "$DOCKER_IMAGE" -t "$DOCKER_TAG" --no-cache
+    fi
+}
+
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <datastream-config.json>"
     exit 1
@@ -36,21 +48,27 @@ if [ -e "$DATA_PATH" ]; then
     # exit 1
 fi
 
-NGEN_CONFIG_PATH="${DATA_PATH%/}/ngen-run/config"
+mkdir -p $DATA_PATH
+NGEN_RUN_PATH="${DATA_PATH%/}/ngen-run"
 DATASTREAM_CONF_PATH="${DATA_PATH%/}/datastream-configs"
 DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
-mkdir -p $DATA_PATH
-mkdir -p $NGEN_CONFIG_PATH
 mkdir -p $DATASTREAM_CONF_PATH
 cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
+
+NGEN_CONFIG_PATH="${NGEN_RUN_PATH%/}/config"
+NGEN_OUTPUT_PATH="${NGEN_RUN_PATH%/}/outputs"
+mkdir -p $NGEN_CONFIG_PATH
+mkdir -p $NGEN_OUTPUT_PATH
+
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
+DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
 DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
 DOCKER_CONFIGS="${DOCKER_MOUNT%/}/datastream-configs"
-DOCKER_FP="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
+DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
 # Subset
 ## hfsubset
@@ -59,19 +77,16 @@ DOCKER_FP="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 ## subsetting
 if [ -n "$SUBSET_ID" ]; then
     DOCKER_TAG="subsetter"
-    SUBSET_DOCKER="$(dirname "$SCRIPT_DIR")/docker/subsetting"
-
-    if docker inspect "$DOCKER_TAG" &>/dev/null; then
-        echo "The Docker container '$DOCKER_TAG' exists. Not building"
-    else
-        echo "Building subsetting container..."
-        docker build $SUBSET_DOCKER -t subsetter --no-cache
-    fi
+    SUBSET_DOCKER="${DOCKER_DIR%/}/subsetting"
+    build_docker_container "$DOCKER_TAG" "$SUBSET_DOCKER"
 
     GEOPACKAGE_DIR=$(dirname ${GEOPACKAGE})
     GEOPACKAGE_NAME=$(basename "$GEOPACKAGE")
 
-    docker run -it --rm -v "$GEOPACKAGE_DIR":"$DOCKER_MOUNT" -w "$DOCKER_MOUNT" subsetter python "/ngen-datastream/subsetting/src/subsetting/subset.py "$DOCKER_MOUNT"/$GEOPACKAGE_NAME" "$SUBSET_ID"
+    docker run -it --rm -v "$GEOPACKAGE_DIR":"$DOCKER_MOUNT" \
+        -u $(id -u):$(id -g) -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+        python "/ngen-datastream/subsetting/src/subsetting/subset.py \
+        "$DOCKER_MOUNT"/$GEOPACKAGE_NAME" "$SUBSET_ID"
 
     GEOPACKAGE_FILE=$SUBSET_ID"_upstream_subset.gpkg"
     GEOPACKAGE="${GEOPACKAGE_DIR%/}/${GEOPACKAGE_FILE#/}"
@@ -97,14 +112,8 @@ fi
 
 # forcingprocessor
 DOCKER_TAG="forcingprocessor"
-FP_DOCKER="$(dirname "$SCRIPT_DIR")/docker/forcingprocessor"
-
-if docker inspect "$DOCKER_TAG" &>/dev/null; then
-    echo "The Docker container '$DOCKER_TAG' exists. Not building"
-else
-    echo "Building subsetting container..."
-    docker build $FP_DOCKER -t forcingprocessor --no-cache
-fi
+FP_DOCKER="${DOCKER_DIR%/}/forcingprocessor"
+build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 
 WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 if [ -e "$WEIGHTS_FILENAME" ]; then
@@ -124,7 +133,13 @@ else
         echo "Missing nwm example grid file!"
         exit 1
     fi
-    docker run -it -v "$DATA_PATH:"$DOCKER_MOUNT"" forcingprocessor python "$DOCKER_FP"weight_generator.py $GEO_PATH_DOCKER $WEIGHTS_DOCKER $NWM_DOCKER
+
+    docker run -it -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+        -u $(id -u):$(id -g) \
+        -w "$DOCKER_MOUNT" forcingprocessor \
+        python "$DOCKER_FP_PATH"weight_generator.py \
+        $GEO_PATH_DOCKER $WEIGHTS_DOCKER $NWM_DOCKER
+
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE_FILE#/}"
 fi
 
@@ -132,16 +147,30 @@ CONF_GENERATOR="$(dirname "$SCRIPT_DIR")/python/configure-datastream.py"
 python $CONF_GENERATOR $CONFIG_FILE
 
 echo "Creating nwm files"
-docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" -w "$DOCKER_RESOURCES" forcingprocessor python "$DOCKER_FP"nwm_filenames_generator.py "$DOCKER_MOUNT"/datastream-configs/conf_nwmurl.json
+docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+    -u $(id -u):$(id -g) \
+    -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+    python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
+    "$DOCKER_MOUNT"/datastream-configs/conf_nwmurl.json
 
 echo "Creating forcing files"
-docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" forcingprocessor python "$DOCKER_FP"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
+docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+    -u $(id -u):$(id -g) \
+    -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+    python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
-# tarballer
+TAR_NAME="ngen-run.tar.gz"
+TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
+tar -czf  $TAR_PATH -C $NGEN_RUN_PATH .
 
-# validation
-# docker build /ngen-datastream/docker/validator -t validator --no-cache
-# docker run -it --rm -v /ngen-datastream:"$DOCKER_MOUNT" validator python /ngen-cal/python/run_validator.py --data_dir "$DOCKER_MOUNT"/data/standard_run
+DOCKER_TAG="validator"
+VAL_DOCKER="${DOCKER_DIR%/}/validator"
+build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
+
+TARBALL_DOCKER="${DOCKER_MOUNT%/}""$TAR_NAME"
+docker run -it --rm -v "$DATA_PATH":"$DOCKER_MOUNT" \
+    validator python /ngen-cal/python/run_validator.py \
+    --tarball $TARBALL_DOCKER
 
 # hashing
 
