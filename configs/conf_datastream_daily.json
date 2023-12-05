@@ -12,22 +12,6 @@
         "subset_id"  : ""
     },
 
-    "nwmurl" : {
-        "forcing_type" : "operational_archive",
-        "runinput"     : 1,
-        "varinput"     : 5,
-        "geoinput"     : 1,
-        "meminput"     : 0,
-        "urlbaseinput" : 7,
-        "fcst_cycle"   : [0],
-        "lead_time"    : [1]
-    },
-
-    "tarballer":
-    {
-
-    },
-
     "validator" : {
         
      },

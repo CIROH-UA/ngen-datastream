@@ -1,48 +1,60 @@
 import argparse, json, os, datetime
 from pathlib import Path
 
-def create_nwmurl_conf(conf, out_dir):
-    nwm_conf = conf['nwmurl']
-    nwm_conf['start_date'] = conf['globals']['start_date']
-    nwm_conf['end_date']   = conf['globals']['end_date']
-    conf_name = 'conf_nwmurl.json'
-    conf_path = Path(out_dir,conf_name)
+def write_conf(conf, out_dir, name):
+    conf_path = Path(out_dir,name)
     with open(conf_path,'w') as fp:
-        json.dump(nwm_conf, fp)
-
+        json.dump(conf, fp)
     return conf_path
 
-def create_fp_conf(conf, out_dir):
-    fp_conf = conf['forcingprocessor']
-    fp_conf['forcing'] = {}
-    fp_conf['forcing']['start_date']   = conf['globals']['start_date']
-    fp_conf['forcing']['end_date']     = conf['globals']['end_date']
-    fp_conf['forcing']['nwm_file']     = "/mounted_dir/datastream-resources/filenamelist.txt"
-    fp_conf['forcing']['weight_file']  = "/mounted_dir/datastream-resources/weights.json"
-    fp_conf['storage']['storage_type'] = "local"
-    fp_conf['storage'] = {}
-    fp_conf['storage']['output_bucket']    = "/mounted_dir/ngen-run"
-    fp_conf['storage']['output_path']      = "/mounted_dir/ngen-run"
-    fp_conf['storage']['output_file_type'] = "csv"
-    fp_conf['run'] = {}
-    fp_conf['run']['verbose'] = False
-    conf_name = 'conf_fp.json'
-    conf_path = Path(out_dir,conf_name)
-    with open(conf_path,'w') as fp:
-        json.dump(fp_conf, fp)
+def create_confs_daily(conf):
+    date = datetime.datetime.now()
+    date = date.strftime('%Y%m%d')
+    hourminute = '0000'
+    
+    conf['globals']['start_date'] = date + hourminute
+    conf['globals']['end_date']   = date + hourminute
 
-    return conf_path
+    fp_conf = {
+        "forcing" : {
+            "start_date"   : conf['globals']['start_date'],
+            "end_date"     : conf['globals']['end_date'],
+            "nwm_file"     : "/mounted_dir/datastream-resources/filenamelist.txt",
+            "weight_file"  : "/mounted_dir/datastream-resources/weights.json",
+        },
+        "storage" : {
+            "storage_type"     : "local",
+            "output_bucket"    : "",
+            "output_path"      : "/mounted_dir/ngen-run",
+            "output_file_type" : "csv",
+        },
+        "run" : {
+            "verbose" : False,
+            "collect_stats" : True
+        }
+    }
+
+    nwm_conf = {
+        "forcing_type" : "operational_archive",
+        "start_date"   : conf['globals']['start_date'],
+        "end_date"     : conf['globals']['end_date'],
+        "runinput"     : 1,
+        "varinput"     : 5,
+        "geoinput"     : 1,
+        "meminput"     : 0,
+        "urlbaseinput" : 7,
+        "fcst_cycle"   : [0],
+        "lead_time"    : [x+1 for x in range(24)]
+    }
+
+    conf['forcingprcoessor'] = fp_conf
+    conf['nwmurl'] = nwm_conf
+
+    return conf, fp_conf, nwm_conf
 
 def create_confs(conf):
     if conf['globals']['start_date'] == "DAILY":
-        date = datetime.datetime.now()
-        date = date.strftime('%Y%m%d')
-        hourminute = '0000'
-        
-        conf['globals']['start_date'] = date + hourminute
-        conf['globals']['end_date']   = date + hourminute
-
-        # conf['nwmurl']['lead_time'] = [x+1 for x in range(24)]
+        ds_conf, fp_conf, nwm_conf = create_confs_daily(conf)
 
     if "relative_to" in conf['globals'].keys():
         out_dir = Path(conf['globals']['relative_to'],conf['globals']['data_dir'])
@@ -50,18 +62,13 @@ def create_confs(conf):
         out_dir = conf['globals']['data_dir']
     out_dir = Path(out_dir,'datastream-configs')
 
-    create_nwmurl_conf(conf,out_dir)
-    create_fp_conf(conf,out_dir)
-
-    conf_name = 'conf_datastream.json'
-    conf_path = Path(out_dir,conf_name)
-    with open(conf_path,'w') as fp:
-        json.dump(conf, fp)
+    write_conf(nwm_conf,out_dir,'conf_fp.json')
+    write_conf(fp_conf,out_dir,'conf_fp.json')
+    write_conf(ds_conf,out_dir,'conf_datastream.json')
 
     print(f'\ndatastream configs have been generated and placed here\n{out_dir}\n')
 
 if __name__ == "__main__":
-    # Take in user config
     parser = argparse.ArgumentParser()
     parser.add_argument(
         dest="infile", type=str, help="A json containing user inputs to run ngen-datastream"
