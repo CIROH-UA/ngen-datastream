@@ -155,8 +155,12 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list
             t0 = time.perf_counter()
             shp = nwm_data["U2D"].shape
             data_allvars = np.zeros(shape=(len(var_list), shp[1], shp[2]), dtype=np.float32)            
-            for var_dx, jvar in enumerate(var_list):
-                data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar].values)   
+            for var_dx, jvar in enumerate(var_list):                
+                if jvar == 'RAINRATE': # HACK CONVERSION
+                    data_allvars[var_dx, :, :] = 3600 * np.squeeze(nwm_data[jvar].values)
+                else:
+                    data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar].values)   
+
             time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
             t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
