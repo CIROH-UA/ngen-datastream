@@ -13,6 +13,15 @@ import psutil
 import gzip
 import tarfile
 
+def convert_url2key_s3(nwm_file):
+    bucket_key = ""
+    _nc_file_parts = nwm_file.split('/')
+    layers = _nc_file_parts[3:]
+    for jlay in layers:
+        bucket_key += "/" + jlay 
+    bucket_key = _nc_file_parts[2][:-17] + bucket_key
+    return bucket_key
+
 def distribute_work(items,nprocs):
     """
     Distribute items evenly between processes, round robin
@@ -141,10 +150,8 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list
         t0 = time.perf_counter()        
         eng    = "h5netcdf"
         if s3 is not None:
-            _nc_file_parts = nwm_file.split('/')
-            bucket_key     = _nc_file_parts[2][:-17] + '/' + _nc_file_parts[-3] + '/' + _nc_file_parts[-2] + '/' + _nc_file_parts[-1]    
-            file_obj    = s3.open(bucket_key, mode='rb')
-            
+            bucket_key = convert_url2key_s3(nwm_file)
+            file_obj   = s3.open(bucket_key, mode='rb')
         else:
             file_obj = nwm_file
 
@@ -601,14 +608,12 @@ def prep_ngen_data(conf):
         nwm_file_sizes = []
         for j, jfile in enumerate(nwm_forcing_files):
             if j > 10: break
-            _nc_file_parts = jfile.split('/')
-            bucket_key     = "noaa-nwm-pds/" + _nc_file_parts[-3] + '/' + _nc_file_parts[-2] + '/' + _nc_file_parts[-1]    
             if fs_s3:
-                response       = fs_s3.open(bucket_key, mode='rb')
+                bucket_key  = convert_url2key_s3(jfile) 
+                response = fs_s3.open(bucket_key, mode='rb')
+                nwm_file_sizes.append(response.details['size'])
             else:
-                nwm_file_sizes = os.path.getsize(jfile)
-                
-            nwm_file_sizes.append(response.details['size'])
+                nwm_file_sizes = os.path.getsize(jfile)                            
 
         nwm_file_size_avg = np.average(nwm_file_sizes)
         nwm_file_size_med = np.median(nwm_file_sizes)
