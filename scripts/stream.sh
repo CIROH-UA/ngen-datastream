@@ -40,12 +40,11 @@ if [ -n "$RELATIVE_TO" ] && [ -n "$DATA_PATH" ]; then
     RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
     GEOPACKAGE_FILE=$GEOPACKAGE
     GEOPACKAGE="${RESOURCE_PATH%/}/${GEOPACKAGE%/}"
-    # echo $GEOPACKAGE
 fi
 
 if [ -e "$DATA_PATH" ]; then
     echo "The path $DATA_PATH exists. Please delete it or set a different path."
-    # exit 1
+    exit 1
 fi
 
 mkdir -p $DATA_PATH
@@ -167,7 +166,7 @@ DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
 
-TARBALL_DOCKER="${DOCKER_MOUNT%/}""$TAR_NAME"
+TARBALL_DOCKER="${DOCKER_MOUNT%/}""/$TAR_NAME"
 docker run -it --rm -v "$DATA_PATH":"$DOCKER_MOUNT" \
     validator python /ngen-cal/python/run_validator.py \
     --tarball $TARBALL_DOCKER
