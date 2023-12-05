@@ -29,8 +29,9 @@ def create_confs_daily(conf):
             "output_file_type" : "csv",
         },
         "run" : {
-            "verbose" : False,
-            "collect_stats" : True
+            "verbose"       : False,
+            "collect_stats" : True,
+            "proc_threads"  : 2
         }
     }
 
@@ -44,8 +45,9 @@ def create_confs_daily(conf):
         "meminput"     : 0,
         "urlbaseinput" : 7,
         "fcst_cycle"   : [0],
-        "lead_time"    : [x+1 for x in range(24)]
+        "lead_time"    : [1],
     }
+    # "lead_time"    : [x+1 for x in range(24)]
 
     conf['forcingprcoessor'] = fp_conf
     conf['nwmurl'] = nwm_conf
@@ -62,7 +64,7 @@ def create_confs(conf):
         out_dir = conf['globals']['data_dir']
     out_dir = Path(out_dir,'datastream-configs')
 
-    write_conf(nwm_conf,out_dir,'conf_fp.json')
+    write_conf(nwm_conf,out_dir,'conf_nwmurl.json')
     write_conf(fp_conf,out_dir,'conf_fp.json')
     write_conf(ds_conf,out_dir,'conf_datastream.json')
 
