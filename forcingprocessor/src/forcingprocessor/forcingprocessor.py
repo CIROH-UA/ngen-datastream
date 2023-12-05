@@ -457,12 +457,13 @@ def prep_ngen_data(conf):
     if write_threads is None: write_threads = os.cpu_count()
     if nfile_chunk is None: nfile_chunk     = 100000
 
-    msg = f"\nForcingProcessor has awoken. Let's do this."
-    for x in msg:
-        print(x, end='')
-        sys.stdout.flush()
-        time.sleep(0.1)
-    print('\n')
+    if ii_verbose:
+        msg = f"\nForcingProcessor has awoken. Let's do this."
+        for x in msg:
+            print(x, end='')
+            sys.stdout.flush()
+            time.sleep(0.1)
+        print('\n')
     
     t_extract  = 0
     write_time = 0
@@ -776,17 +777,18 @@ def prep_ngen_data(conf):
             s3 = boto3.client("s3")   
             s3.upload_fileobj(combined_tar,output_bucket,out_path + combined_tar_filename)   
         os.remove(combined_tar_filename)
-        
-    print(f"\n\n--------SUMMARY-------")
-    if storage_type == "local": msg = f"\nData has been written locally to {bucket_path}"
-    else: msg = f"\nData has been written to S3 bucket {output_bucket} at /{output_path}/forcing"
-    msg += f"\nProcess data  : {t_extract:.2f}s"
-    msg += f"\nWrite data    : {write_time:.2f}s"
-    if ii_collect_stats: 
-        runtime += meta_time
-        msg += f"\nCollect stats : {meta_time:.2f}s"
-    msg += f"\nRuntime       : {runtime:.2f}s\n"
-    print(msg)
+
+    if ii_verbose:
+        print(f"\n\n--------SUMMARY-------")
+        if storage_type == "local": msg = f"\nData has been written locally to {bucket_path}"
+        else: msg = f"\nData has been written to S3 bucket {output_bucket} at /{output_path}/forcing"
+        msg += f"\nProcess data  : {t_extract:.2f}s"
+        msg += f"\nWrite data    : {write_time:.2f}s"
+        if ii_collect_stats: 
+            runtime += meta_time
+            msg += f"\nCollect stats : {meta_time:.2f}s"
+        msg += f"\nRuntime       : {runtime:.2f}s\n"
+        print(msg)
 
 if __name__ == "__main__":
     # Take in user config
