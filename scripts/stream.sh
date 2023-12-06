@@ -171,9 +171,10 @@ docker run -it --rm -v "$DATA_PATH":"$DOCKER_MOUNT" \
     validator python /ngen-cal/python/run_validator.py \
     --tarball $TARBALL_DOCKER
 
+# ngen run
+
 # hashing
 # docker run --rm -it -v "$DATA_PATH":/data zwills/ht ./ht --fmt=tree /data
-# ngen
 
 # manage outputs
 # aws s3 sync $DATA_PATH $SOME_BUCKET_NAME
