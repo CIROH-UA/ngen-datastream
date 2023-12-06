@@ -172,7 +172,8 @@ docker run -it --rm -v "$DATA_PATH":"$DOCKER_MOUNT" \
     --tarball $TARBALL_DOCKER
 
 # hashing
-
+# docker run --rm -it -v "$DATA_PATH":/data zwills/ht ./ht --fmt=tree /data
 # ngen
 
 # manage outputs
+# aws s3 sync $DATA_PATH $SOME_BUCKET_NAME
