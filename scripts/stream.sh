@@ -34,6 +34,20 @@ RELATIVE_TO=$(echo "$config" | jq -r '.globals.relative_to')
 GEOPACKAGE=$(echo "$config" | jq -r '.hydrofabric.geopackage')
 SUBSET_ID=$(echo "$config" | jq -r '.hydrofabric.subset_id')
 
+if [ ! -n "$RESOURCE_PATH" ]; then
+    echo "Generating datastream resources with defaults"
+    if [ -n "$SUBSET_ID" ]; then
+        echo "Subsetting with $SUBSET_ID"
+    else
+        echo "If no resource_path is provided, user must supply subset_id (Set to CONUS if desired)"
+        exit 1
+    fi
+    echo "Not implemented, need to make your own for now."
+    #wget nwm_example_grid_file.nc
+    #wget geopackage (probably using hfsubset)
+    #wget ngen-configs (pull from s3 for now, generate these dynamically in the future.) 
+fi
+
 if [ -n "$RELATIVE_TO" ] && [ -n "$DATA_PATH" ]; then
     echo "Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
     DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
@@ -158,23 +172,22 @@ docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
-TAR_NAME="ngen-run.tar.gz"
-TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
-tar -czf  $TAR_PATH -C $NGEN_RUN_PATH .
-
 DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
 
-TARBALL_DOCKER="${DOCKER_MOUNT%/}""/$TAR_NAME"
-docker run -it --rm -v "$DATA_PATH":"$DOCKER_MOUNT" \
+docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python /ngen-cal/python/run_validator.py \
-    --tarball $TARBALL_DOCKER
+    --data_dir $DOCKER_MOUNT
 
 # ngen run
 
 # hashing
-# docker run --rm -it -v "$DATA_PATH":/data zwills/ht ./ht --fmt=tree /data
+# docker run --rm -it -v "$NGEN_RUN_PATH":/data zwills/ht ./ht --fmt=tree /data
+
+TAR_NAME="ngen-run.tar.gz"
+TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
+tar -czf  $TAR_PATH -C $NGEN_RUN_PATH .
 
 # manage outputs
 # aws s3 sync $DATA_PATH $SOME_BUCKET_NAME
