@@ -454,8 +454,7 @@ def prep_ngen_data(conf):
 
     output_bucket = conf["storage"].get("output_bucket","")
     output_path = conf["storage"].get("output_path","")
-
-    output_file_type = conf["storage"]["output_file_type"]
+    output_file_type = conf["storage"].get("output_file_type","csv") 
 
     global ii_verbose
     ii_verbose = conf["run"].get("verbose",False) 
