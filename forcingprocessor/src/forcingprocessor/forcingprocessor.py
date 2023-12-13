@@ -541,7 +541,7 @@ def prep_ngen_data(conf):
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
         for jline in fp.readlines():
-            nwm_forcing_files.append(jline[:-1])
+            nwm_forcing_files.append(jline.strip())
 
     nfiles = len(nwm_forcing_files)
 
