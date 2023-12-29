@@ -1,6 +1,8 @@
 import pandas as pd
 import argparse, os, json, sys
+import fsspec
 import s3fs
+import gcsfs
 from pathlib import Path
 import numpy as np
 import xarray as xr
@@ -13,13 +15,18 @@ import psutil
 import gzip
 import tarfile
 
-def convert_url2key_s3(nwm_file):
+def convert_url2key(nwm_file,fs_type):
     bucket_key = ""
     _nc_file_parts = nwm_file.split('/')
     layers = _nc_file_parts[3:]
     for jlay in layers:
         bucket_key += "/" + jlay 
-    bucket_key = _nc_file_parts[2][:-17] + bucket_key
+
+    if fs_type == 's3':
+        bucket_key = _nc_file_parts[2][:-17] + bucket_key
+    elif fs_type == 'google':
+        bucket_key = "gs:/" + bucket_key
+
     return bucket_key
 
 def distribute_work(items,nprocs):
@@ -75,7 +82,7 @@ def report_usage():
     if ii_verbose: print(f'\nCurrent RAM usage (GB): {usage_ram:.2f}, {percent_ram:.2f}%\nCurrent CPU usage : {percent_cpu:.2f}%')
     return
 
-def multiprocess_data_extract(files,nprocs,crosswalk_dict,vars,s3):
+def multiprocess_data_extract(files,nprocs,crosswalk_dict,vars,fs):
     """
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time
     
@@ -92,13 +99,13 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,vars,s3):
     crosswalk_dict_list = []
     files_list          = []
     var_list            = []
-    s3_list             = []
+    fs_list             = []
     for i in range(nprocs):
         end = min(start + files_per_proc[i],nfiles)
         crosswalk_dict_list.append(crosswalk_dict)
         files_list.append(files[start:end])
         var_list.append(vars)
-        s3_list.append(s3)
+        fs_list.append(fs)
         start = end
 
     data_ax = []
@@ -109,7 +116,7 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,vars,s3):
         crosswalk_dict_list,
         files_list,
         var_list,
-        s3_list
+        fs_list
         ):
             data_ax.append(results[0])
             t_ax_local.append(results[1])
@@ -122,7 +129,7 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,vars,s3):
   
     return data_array, t_ax_local
 
-def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list, s3=None):
+def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list, fs=None):
     """
     General function to read either remote or local nwm forcing files.
 
@@ -144,14 +151,19 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list
     data_list = []
     t_list = []
     nfiles = len(nwm_files)
+    if nwm_files[0].find('googleapis')  >= 0: 
+        fs = gcsfs.GCSFileSystem() 
+        fs_type = 'google' 
+    elif nwm_files[0].find('s3.amazon') >= 0: 
+        fs_type = 's3'
     id = os.getpid()
     if ii_verbose: print(f'{id} extracting data from {nfiles} files',end=None,flush=True)
     for j, nwm_file in enumerate(nwm_files):
         t0 = time.perf_counter()        
         eng    = "h5netcdf"
-        if s3 is not None:
-            bucket_key = convert_url2key_s3(nwm_file)
-            file_obj   = s3.open(bucket_key, mode='rb')
+        if fs is not None:
+            bucket_key = convert_url2key(nwm_file,fs_type)
+            file_obj   = fs.open(bucket_key, mode='rb')
         else:
             file_obj = nwm_file
 
@@ -185,7 +197,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, var_list: list
         data_list.append(data_array)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
-        if ii_verbose: print(f'\nTime for s3 open file: {topen:.2f}\nTime for xarray open dataset: {txrds:.2f}\nTime to fill array: {tfill:.2f}\nTime to calculate catchment values: {tdata:.2f}\nAverage time per file {ttotal/(j+1)}', end=None,flush=True)
+        if ii_verbose: print(f'\nTime for fs open file: {topen:.2f}\nTime for xarray open dataset: {txrds:.2f}\nTime to fill array: {tfill:.2f}\nTime to calculate catchment values: {tdata:.2f}\nAverage time per file {ttotal/(j+1)}', end=None,flush=True)
         report_usage()
 
     if ii_verbose: print(f'{id} completed data extraction, returning data to primary process')
@@ -546,12 +558,16 @@ def prep_ngen_data(conf):
     nfiles = len(nwm_forcing_files)
 
     if nwm_forcing_files[0].find('s3.amazonaws') >= 0:
-        fs_s3 = s3fs.S3FileSystem(
+        fs = s3fs.S3FileSystem(
             anon=True,
             client_kwargs={'region_name': 'us-east-1'}
             )
+        fs_type = 's3'
+    elif nwm_forcing_files[0].find('storage.googleapis') >= 0:
+        fs = "google"
+        fs_type = 'google'
     else:
-        fs_s3 = None
+        fs = None
 
     if ii_verbose:
         print(f"NWM file names:")
@@ -577,7 +593,7 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n')
-        data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_threads,crosswalk_dict,var_list,fs_s3)
+        data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_threads,crosswalk_dict,var_list,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
         score = complexity / t_extract
@@ -607,9 +623,10 @@ def prep_ngen_data(conf):
         nwm_file_sizes = []
         for j, jfile in enumerate(nwm_forcing_files):
             if j > 10: break
-            if fs_s3:
-                bucket_key  = convert_url2key_s3(jfile) 
-                response = fs_s3.open(bucket_key, mode='rb')
+            if fs:
+                bucket_key  = convert_url2key(jfile, fs_type) 
+                if fs_type == 'google': fs = gcsfs.GCSFileSystem() 
+                response = fs.open(bucket_key, mode='rb')
                 nwm_file_sizes.append(response.details['size'])
             else:
                 nwm_file_sizes = os.path.getsize(jfile)                            
