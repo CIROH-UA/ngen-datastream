@@ -6,7 +6,7 @@ If you'd like to just run the stream, clone this repo. The stream will handle in
 
 ## Run it
 ```
-/ngen-datastream/scripts/stream.sh /ngen-datastream/configs/conf_datastream.json
+/ngen-datastream/scripts/stream.sh /ngen-datastream/configs/conf_datastream_daily.json
 ```
 Note: requires jq
 
