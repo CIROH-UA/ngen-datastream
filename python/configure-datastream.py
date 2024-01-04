@@ -27,9 +27,8 @@ def create_ds_confs_daily(conf, today, tomorrow):
             "output_file_type" : "csv",
         },
         "run" : {
-            "verbose"       : False,
-            "collect_stats" : True,
-            "proc_threads"  : 2
+            "verbose"       : True,
+            "collect_stats" : True
         }
     }
 
