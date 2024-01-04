@@ -69,9 +69,14 @@ mkdir -p $NGEN_CONFIG_PATH
 mkdir -p $NGEN_OUTPUT_PATH
 
 if [ -e "$RESOURCE_PATH" ]; then
-    # if a resource path is supplied, copy that into the datastream directory
-    cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
-
+    if [[ $RESOURCE_PATH == *"https://"* ]]; then
+        wget -O $DATASTREAM_RESOURCES $RESOURCE_PATH
+        if [[ $RESOURCE_PATH == *".tar."* ]]; then
+            tar -xzvf $(basename $RESOURCE_PATH)
+        fi
+    else
+        cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
+    fi 
     GEOPACKAGE_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
     GEOPACKAGE=$(basename $GEOPACKAGE_PATH)
     
@@ -90,11 +95,15 @@ else
     GEOPACKAGE="conus.gpkg"
     GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
     GEOPACKAGE_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
+    # Talk to Mike about having hfsubset generate this
+    WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus.json"
+    WEIGHTS_PATH="${DATASTREAM_RESOURCES%/}/weights_conus.json"
 
     wget -O $GEOPACKAGE_PATH $GEOPACKAGE_DEFAULT
     wget -O $GRID_FILE_PATH $GRID_FILE_DEFAULT
     wget -O $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
     wget -O $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
+    wget -O $WEIGHTS_PATH $WEIGHTS_DEFAULT
 
 fi
 
