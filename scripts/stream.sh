@@ -1,5 +1,9 @@
 #!/bin/bash
 set -e
+set -x
+
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 
 build_docker_container() {
     local DOCKER_TAG="$1"
@@ -35,10 +39,17 @@ SUBSET_ID_TYPE=$(echo "$config" | jq -r '.subset.id_type')
 SUBSET_ID=$(echo "$config" | jq -r '.subset.id')
 HYDROFABRIC_VERSION=$(echo "$config" | jq -r '.subset.version')
 
-if [ -n "$RELATIVE_TO" ] && [ -n "$DATA_PATH" ]; then
+if [ $START_DATE == "DAILY" ]; then
+    DATA_PATH="${PACAKGE_DIR%/}/data/$(date +'%Y%m%d')"
+fi
+
+if [ ${#RELATIVE_TO} -gt 0 ] ; then
     echo "Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
     DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
-    RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
+    if [ -n "$RESOURCE_PATH" ]; then
+        echo "Prepending ${RELATIVE_TO} to ${RESOURCE_PATH#/}"
+        RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
+    fi
 fi
 
 if [ -e "$DATA_PATH" ]; then
@@ -61,8 +72,9 @@ if [ -e "$RESOURCE_PATH" ]; then
     # if a resource path is supplied, copy that into the datastream directory
     cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
 
-    GEOPACKAGE=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-
+    GEOPACKAGE_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+    GEOPACKAGE=$(basename $GEOPACKAGE_PATH)
+    
 else
     # if a resource path is not supplied, generate one with defaults
     echo "Generating datastream resources with defaults"
@@ -70,26 +82,26 @@ else
     mkdir -p $DATASTREAM_RESOURCES
     mkdir -p $DATASTREAM_RESOURCES_CONFIGS
     GRID_FILE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nwm.t00z.short_range.forcing.f001.conus.nc"
-    GRID_FILE_OUT="${DATASTREAM_RESOURCES%/}/nwm_example_grid_file.nc"
+    GRID_FILE_PATH="${DATASTREAM_RESOURCES%/}/nwm_example_grid_file.nc"
     NGEN_CONF_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/config.ini"
-    NGEN_CONF_OUT="${DATASTREAM_RESOURCES_CONFIGS%/}/config.ini"
+    NGEN_CONF_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/config.ini"
     NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/realization.json"
-    NGEN_REAL_OUT="${DATASTREAM_RESOURCES_CONFIGS%/}/realization.json"
+    NGEN_REAL_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/realization.json"
     GEOPACKAGE="conus.gpkg"
     GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
-    GEOPACKAGE_OUT="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
+    GEOPACKAGE_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
 
-    wget -O $GEOPACKAGE_OUT $GEOPACKAGE_DEFAULT
-    wget -O $GRID_FILE_OUT $GRID_FILE_DEFAULT
-    wget -O $NGEN_CONF_OUT $NGEN_CONF_DEFAULT
-    wget -O $NGEN_REAL_OUT $NGEN_REAL_DEFAULT
+    wget -O $GEOPACKAGE_PATH $GEOPACKAGE_DEFAULT
+    wget -O $GRID_FILE_PATH $GRID_FILE_DEFAULT
+    wget -O $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
+    wget -O $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
 
 fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
+
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
 DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
@@ -97,12 +109,13 @@ DOCKER_CONFIGS="${DOCKER_MOUNT%/}/datastream-configs"
 DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
 ## subsetting
-if [ -z $SUBSET_ID ]; then
-    if [ -e "$GEOPACKAGE" ]; then
+echo $SUBSET_ID
+if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
+    if [ -e $GEOPACKAGE_PATH ]; then
         echo "No subset_id provided, using provided geopackage" $GEOPACKAGE
-        cp $GEOPACKAGE $NGEN_CONFIG_PATH
+        cp $GEOPACKAGE_PATH $NGEN_CONFIG_PATH
     else
-        echo "Provided geopackage does not exist!" $GEOPACKAGE
+        echo "Geopackage does not exist!" $GEOPACKAGE
         exit 1
     fi
 
