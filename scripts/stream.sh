@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-# set -x
 
 build_docker_container() {
     local DOCKER_TAG="$1"
@@ -31,29 +30,15 @@ END_DATE=$(echo "$config" | jq -r '.globals.end_date')
 DATA_PATH=$(echo "$config" | jq -r '.globals.data_dir')
 RESOURCE_PATH=$(echo "$config" | jq -r '.globals.resource_dir')
 RELATIVE_TO=$(echo "$config" | jq -r '.globals.relative_to')
-GEOPACKAGE=$(echo "$config" | jq -r '.hydrofabric.geopackage')
-SUBSET_ID=$(echo "$config" | jq -r '.hydrofabric.subset_id')
 
-if [ ! -n "$RESOURCE_PATH" ]; then
-    echo "Generating datastream resources with defaults"
-    if [ -n "$SUBSET_ID" ]; then
-        echo "Subsetting with $SUBSET_ID"
-    else
-        echo "If no resource_path is provided, user must supply subset_id (Set to CONUS if desired)"
-        exit 1
-    fi
-    echo "Not implemented, need to make your own for now."
-    #wget nwm_example_grid_file.nc
-    #wget geopackage (probably using hfsubset)
-    #wget ngen-configs (pull from s3 for now, generate these dynamically in the future.) 
-fi
+SUBSET_ID_TYPE=$(echo "$config" | jq -r '.subset.id_type')
+SUBSET_ID=$(echo "$config" | jq -r '.subset.id')
+HYDROFABRIC_VERSION=$(echo "$config" | jq -r '.subset.version')
 
 if [ -n "$RELATIVE_TO" ] && [ -n "$DATA_PATH" ]; then
     echo "Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
     DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
     RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
-    GEOPACKAGE_FILE=$GEOPACKAGE
-    GEOPACKAGE="${RESOURCE_PATH%/}/${GEOPACKAGE%/}"
 fi
 
 if [ -e "$DATA_PATH" ]; then
@@ -66,12 +51,40 @@ NGEN_RUN_PATH="${DATA_PATH%/}/ngen-run"
 DATASTREAM_CONF_PATH="${DATA_PATH%/}/datastream-configs"
 DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
 mkdir -p $DATASTREAM_CONF_PATH
-cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
 
 NGEN_CONFIG_PATH="${NGEN_RUN_PATH%/}/config"
 NGEN_OUTPUT_PATH="${NGEN_RUN_PATH%/}/outputs"
 mkdir -p $NGEN_CONFIG_PATH
 mkdir -p $NGEN_OUTPUT_PATH
+
+if [ -e "$RESOURCE_PATH" ]; then
+    # if a resource path is supplied, copy that into the datastream directory
+    cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
+
+    GEOPACKAGE=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+
+else
+    # if a resource path is not supplied, generate one with defaults
+    echo "Generating datastream resources with defaults"
+    DATASTREAM_RESOURCES_CONFIGS=${DATASTREAM_RESOURCES%/}/ngen-configs
+    mkdir -p $DATASTREAM_RESOURCES
+    mkdir -p $DATASTREAM_RESOURCES_CONFIGS
+    GRID_FILE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nwm.t00z.short_range.forcing.f001.conus.nc"
+    GRID_FILE_OUT="${DATASTREAM_RESOURCES%/}/nwm_example_grid_file.nc"
+    NGEN_CONF_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/config.ini"
+    NGEN_CONF_OUT="${DATASTREAM_RESOURCES_CONFIGS%/}/config.ini"
+    NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/realization.json"
+    NGEN_REAL_OUT="${DATASTREAM_RESOURCES_CONFIGS%/}/realization.json"
+    GEOPACKAGE="conus.gpkg"
+    GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
+    GEOPACKAGE_OUT="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
+
+    wget -O $GEOPACKAGE_OUT $GEOPACKAGE_DEFAULT
+    wget -O $GRID_FILE_OUT $GRID_FILE_DEFAULT
+    wget -O $NGEN_CONF_OUT $NGEN_CONF_DEFAULT
+    wget -O $NGEN_REAL_OUT $NGEN_REAL_DEFAULT
+
+fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
@@ -83,36 +96,8 @@ DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
 DOCKER_CONFIGS="${DOCKER_MOUNT%/}/datastream-configs"
 DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
-# Subset
-## hfsubset
-# docker build /ngen-datastream/docker/hfsubset -t hfsubsetter –no-cache
-# docker run -it --rm -v /path/to/your-directory:/mounted_dir hfsubsetter ./hfsubset -o ./mounted_dir/catchment-101subset.gpkg -r "v20" -t comid "101"
 ## subsetting
-if [ -n "$SUBSET_ID" ]; then
-    DOCKER_TAG="subsetter"
-    SUBSET_DOCKER="${DOCKER_DIR%/}/subsetting"
-    build_docker_container "$DOCKER_TAG" "$SUBSET_DOCKER"
-
-    GEOPACKAGE_DIR=$(dirname ${GEOPACKAGE})
-    GEOPACKAGE_NAME=$(basename "$GEOPACKAGE")
-
-    docker run -it --rm -v "$GEOPACKAGE_DIR":"$DOCKER_MOUNT" \
-        -u $(id -u):$(id -g) -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-        python "/ngen-datastream/subsetting/src/subsetting/subset.py \
-        "$DOCKER_MOUNT"/$GEOPACKAGE_NAME" "$SUBSET_ID"
-
-    GEOPACKAGE_FILE=$SUBSET_ID"_upstream_subset.gpkg"
-    GEOPACKAGE="${GEOPACKAGE_DIR%/}/${GEOPACKAGE_FILE#/}"
-
-    mv $GEOPACKAGE $NGEN_CONFIG_PATH
-
-    files=("catchments.geojson" "crosswalk.json" "flowpath_edge_list.json" "flowpaths.geojson" "nexus.geojson")
-    for file in "${files[@]}"; do
-        mv "${GEOPACKAGE_DIR%/}/${file#/}" $DATASTREAM_RESOURCES
-    done
-
-else
-
+if [ -z $SUBSET_ID ]; then
     if [ -e "$GEOPACKAGE" ]; then
         echo "No subset_id provided, using provided geopackage" $GEOPACKAGE
         cp $GEOPACKAGE $NGEN_CONFIG_PATH
@@ -120,6 +105,23 @@ else
         echo "Provided geopackage does not exist!" $GEOPACKAGE
         exit 1
     fi
+
+else
+
+    GEOPACKAGE="$SUBSET_ID.gpkg"
+    GEOPACKAGE_PATH="${DATASTREAM_CONF_PATH%/}/$GEOPACKAGE"
+
+    if command -v "hfsubset" &>/dev/null; then
+        echo "hfsubset is installed and available in the system's PATH."
+    else
+        wget -O "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz" https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
+        tar -xzvf "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz"
+    fi
+
+    hfsubset -o $GEOPACKAGE_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
+
+    cp $GEOPACKAGE_PATH "${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
+    cp $GEOPACKAGE_PATH "${NGEN_CONFIG_PATH%/}/$GEOPACKAGE"
 
 fi
 
@@ -133,11 +135,11 @@ if [ -e "$WEIGHTS_FILENAME" ]; then
     echo "Using weights found in resources directory" "$WEIGHTS_FILENAME"
     mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
 else
-    echo "Weights file not found. Creating from" $GEOPACKAGE_FILE
+    echo "Weights file not found. Creating from" $GEOPACKAGE
     NWM_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm*")
     NWM_FILENAME=$(basename $NWM_FILE)
 
-    GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/$GEOPACKAGE_FILE"
+    GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/$GEOPACKAGE"
     WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
     NWM_DOCKER=""$DOCKER_RESOURCES"/$NWM_FILENAME"
     if [ -e "$NWM_FILE" ]; then
@@ -153,7 +155,7 @@ else
         python "$DOCKER_FP_PATH"weight_generator.py \
         $GEO_PATH_DOCKER $WEIGHTS_DOCKER $NWM_DOCKER
 
-    WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE_FILE#/}"
+    WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
 fi
 
 CONF_GENERATOR="$(dirname "$SCRIPT_DIR")/python/configure-datastream.py"

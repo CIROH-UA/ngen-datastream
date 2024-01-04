@@ -5,6 +5,12 @@
         "data_dir"     : "",
         "relative_to"  : "",
         "resource_dir" : ""
+    },
+
+    "subset":{
+        "id_type"  : "hl_uri",
+        "id"       : "Gages-04185000",
+        "version"  : "v20" 
     }
 
 }
