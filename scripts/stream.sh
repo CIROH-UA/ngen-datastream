@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
