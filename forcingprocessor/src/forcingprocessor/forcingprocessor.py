@@ -308,6 +308,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     else:
         flat_ids  = ids
         dfs = dfs
+        flat_filenames = filenames
 
     return flat_ids, flat_dfs, flat_filenames
 
@@ -789,9 +790,8 @@ def prep_ngen_data(conf):
                         
                         combined_tar.add(tmpfile.name, arcname=jfilename)
         else:
-            del dfs, filenames, forcing_cat_ids
             path = str(metaf_path)
-            meta_rel_forcings = forcing_path / ".." / "/metadata/forcings_metadata/"
+            meta_rel_forcings = "../metadata/forcings_metadata/"
             combined_tar_filename = str(forcing_path) + '/forcings.tar.gz'
             tar_cmd = f'tar -czf {combined_tar_filename} -C {forcing_path} .'
             if ii_collect_stats: tar_cmd += f' -C {meta_rel_forcings} .'
