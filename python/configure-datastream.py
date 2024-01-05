@@ -1,6 +1,7 @@
 import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
+import pytz as tz
 
 def write_json(conf, out_dir, name):
     conf_path = Path(out_dir,name)
@@ -53,7 +54,7 @@ def create_ds_confs_daily(conf, today, tomorrow):
 def create_confs(conf):
     
     if conf['globals']['start_date'] == "DAILY":
-        now = datetime.now()
+        now = datetime.now(tz.timezone('US/Eastern'))
         today = now.replace(hour=0, minute=0, second=0, microsecond=0)
         tomorrow = today + timedelta(days=1)
         
