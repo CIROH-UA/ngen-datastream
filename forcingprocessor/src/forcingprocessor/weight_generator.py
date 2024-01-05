@@ -30,10 +30,8 @@ PARAMETER["standard_parallel_2",60.0],PARAMETER["latitude_of_origin",40.0],UNIT[
             fill=0, 
             dtype="uint8",
         )
-        if "id":
-            crosswalk_dict[row["id"]] = np.where(geom_rasterize == 1)
-        else:
-            crosswalk_dict[index] = np.where(geom_rasterize == 1)
+        crosswalk_dict[row["divide_id"]] = np.where(geom_rasterize == 1)
+
 
         if i % 100 == 0:
             perc = i / len(gdf_proj) * 100
