@@ -7,9 +7,9 @@ from forcingprocessor.forcingprocessor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 from forcingprocessor.weight_generator import generate_weights_file
 
-geopkg_filename = "ncatch-50.gpkg"
+geopkg_filename = "Gages-04185000.gpkg"
 grid_filename   = "nwm.t00z.short_range.forcing.f001.conus.nc"
-weight_name     = "50catch-weights.json"
+weight_name     = "Gages-04185000-weights.json"
 
 geopkg_file     = f"https://ngenresourcesdev.s3.us-east-2.amazonaws.com/{geopkg_filename}"
 grid_file       = f"https://storage.googleapis.com/national-water-model/nwm.20180923/forcing_short_range/{grid_filename}"
