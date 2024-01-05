@@ -39,7 +39,7 @@ SUBSET_ID=$(echo "$config" | jq -r '.subset.id')
 HYDROFABRIC_VERSION=$(echo "$config" | jq -r '.subset.version')
 
 if [ $START_DATE == "DAILY" ]; then
-    DATA_PATH="${PACAKGE_DIR%/}/data/$(date +'%Y%m%d')"
+    DATA_PATH="${PACAKGE_DIR%/}/data/$(env TZ=US/Eastern date +'%Y%m%d')"
 fi
 
 if [ ${#RELATIVE_TO} -gt 0 ] ; then
