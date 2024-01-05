@@ -109,42 +109,38 @@ fi
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
+if [ -e $GEOPACKAGE_PATH ]; then
+    echo "Using geopackage" $GEOPACKAGE
+    cp $GEOPACKAGE_PATH $NGEN_CONFIG_PATH
+else
+    if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
+        echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
+        exit 1
+    else
+
+        GEOPACKAGE="$SUBSET_ID.gpkg"
+        GEOPACKAGE_PATH="${DATASTREAM_CONF_PATH%/}/$GEOPACKAGE"
+
+        if command -v "hfsubset" &>/dev/null; then
+            echo "hfsubset is installed and available in the system's PATH. Subsetting, now!"
+        else
+            wget -O "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz" https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
+            tar -xzvf "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz"
+        fi
+
+        hfsubset -o $GEOPACKAGE_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
+
+        cp $GEOPACKAGE_PATH "${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
+        cp $GEOPACKAGE_PATH "${NGEN_CONFIG_PATH%/}/$GEOPACKAGE"
+
+    fi        
+fi
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
 DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
 DOCKER_CONFIGS="${DOCKER_MOUNT%/}/datastream-configs"
 DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
-
-## subsetting
-echo $SUBSET_ID
-if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
-    if [ -e $GEOPACKAGE_PATH ]; then
-        echo "No subset_id provided, using provided geopackage" $GEOPACKAGE
-        cp $GEOPACKAGE_PATH $NGEN_CONFIG_PATH
-    else
-        echo "Geopackage does not exist!" $GEOPACKAGE
-        exit 1
-    fi
-
-else
-
-    GEOPACKAGE="$SUBSET_ID.gpkg"
-    GEOPACKAGE_PATH="${DATASTREAM_CONF_PATH%/}/$GEOPACKAGE"
-
-    if command -v "hfsubset" &>/dev/null; then
-        echo "hfsubset is installed and available in the system's PATH."
-    else
-        wget -O "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz" https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
-        tar -xzvf "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz"
-    fi
-
-    hfsubset -o $GEOPACKAGE_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
-
-    cp $GEOPACKAGE_PATH "${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
-    cp $GEOPACKAGE_PATH "${NGEN_CONFIG_PATH%/}/$GEOPACKAGE"
-
-fi
 
 # forcingprocessor
 DOCKER_TAG="forcingprocessor"
@@ -199,6 +195,7 @@ DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
 
+echo "Validating " $NGEN_RUN_PATH
 docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python /ngen-cal/python/run_validator.py \
     --data_dir $DOCKER_MOUNT
