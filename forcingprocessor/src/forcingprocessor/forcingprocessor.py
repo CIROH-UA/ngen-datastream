@@ -89,6 +89,7 @@ def load_balance(items_per_proc,launch_delay,single_ex, exec_count):
         completion_time = [single_ex * x / exec_count + launch_delay*j for j, x in enumerate(items_per_proc)]
 
     completion_time = [single_ex * x / exec_count + 2*j for j, x in enumerate(items_per_proc)]
+    global ntasked
     ntasked = len(np.nonzero(items_per_proc)[0])
     if nprocs > ntasked: 
         if ii_verbose: print(f'Not enough work for {nprocs} requested processes, downsizing to {ntasked}')
@@ -248,7 +249,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     append_list           = []
     print_list            = []
     bucket_list           = []
-    nprocess_list          = []
+    nprocess_list         = []
     worker_time_list      = []
     worker_data_list      = []
     worker_catchment_list = []
@@ -258,11 +259,13 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     count = 0
     start = 0
     end   = 0
-    ii_print = True
+    ii_print = False
     for j, jcatch in enumerate(catchments):
         worker_catchments[jcatch] = jcatch      
         count +=1     
         if count == catchments_per_proc[i] or j == ncatchments - 1:
+            if len(worker_catchment_list) == ntasked - 1 : ii_print = True
+
             end = min(start + catchments_per_proc[i],ncatchments)
             worker_data = data[:,:,start:end]
             worker_data_list.append(worker_data)
@@ -278,7 +281,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
 
             worker_catchments = {}
             count = 0
-            ii_print = False
+            
             i += 1
 
     ids = []
@@ -300,7 +303,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
             dfs.append(results[1])
             filenames.append(results[2])
 
-    print(f'Gathering data from write processes...')
+    print(f'\n\nGathering data from write processes...')
 
     if len(ids) > 1:
         flat_ids  = [item for sublist in ids for item in sublist]
@@ -361,7 +364,7 @@ def write_data(
             filename = f"cat-{cat_id}." + output_file_type
 
             dfs.append(df)
-            filenames.append(str(Path(filename).name)) 
+            filenames.append(str(Path(filename).name))  
 
             if output_file_type == "parquet":
                 df.to_parquet(buf, index=False)                
@@ -373,14 +376,14 @@ def write_data(
 
             buf.seek(0)            
             s3_client.put_object(Bucket=bucket, Key=out_path + filename, Body=buf.getvalue()) 
-            t_put += time.perf_counter() - t0
+            t_put += time.perf_counter() - t0            
 
         elif storage_type == 'local':
             filename = str((out_path/Path(f"cat-{cat_id}." + output_file_type)).resolve())
             if output_file_type == "parquet":
                 df.to_parquet(filename, index=False)                
             elif output_file_type == "csv":
-                df.to_csv(filename, index=False)                          
+                df.to_csv(filename, index=False)                                         
 
         if j == 0:
             if storage_type.lower() == 's3':
@@ -397,14 +400,14 @@ def write_data(
                 bandwidth_Mbps = rate * file_size_MB *nprocesss * bytes2bits
                 estimate_total_time = nfiles / rate
                 report_usage()
-                msg = f"\n{j+1} files written out of {nfiles}\n"
+                msg = f"\n{(j+1)*ntasked} files written out of {nfiles*ntasked}\n"
                 msg += f"rate             {rate:.2f} files/s\n"
                 msg += f"df conversion    {t_df:.2f}s\n"
                 if storage_type.lower() == "s3": msg += f"buff             {t_buff:.2f}s\n"
                 if storage_type.lower() == "s3": msg += f"put              {t_put:.2f}s\n"                
                 msg += f"estimated total write time {estimate_total_time:.2f}s\n"
                 msg += f"progress                   {(j+1)/nfiles*100:.2f}%\n"
-                msg += f"Bandwidth (all processs)    {bandwidth_Mbps:.2f} Mbps"
+                msg += f"Bandwidth (all processs)   {bandwidth_Mbps:.2f} Mbps"
                 print(msg)
 
     return forcing_cat_ids, dfs, filenames
