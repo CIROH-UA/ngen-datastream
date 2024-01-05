@@ -242,14 +242,12 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     ntasked = len(np.nonzero(catchments_per_proc)[0])
     if nprocs > ntasked: 
         if ii_verbose: print(f'Not enough work for {nprocs} requested processes, downsizing to {ntasked}')
-        nprocs = ntasked    
     
     ncatchments           = len(catchments)
     out_path_list         = []
     append_list           = []
     print_list            = []
     bucket_list           = []
-    nprocess_list         = []
     worker_time_list      = []
     worker_data_list      = []
     worker_catchment_list = []
@@ -276,7 +274,6 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
             append_list.append(ii_append)
             print_list.append(ii_print)
             worker_time_list.append(t_ax)
-            nprocess_list.append(nprocs)
             bucket_list.append(output_bucket)
 
             worker_catchments = {}
@@ -297,7 +294,6 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
         out_path_list,
         append_list,  
         print_list,      
-        nprocess_list
         ):
             ids.append(results[0])
             dfs.append(results[1])
@@ -322,8 +318,8 @@ def write_data(
         bucket,
         out_path,
         ii_append,
-        ii_print,
-        nprocesss        
+        ii_print
+                
 ):
     s3_client = boto3.session.Session().client("s3")   
 
@@ -395,9 +391,9 @@ def write_data(
         if ii_print and ii_verbose:
             if (j + 1) % write_int == 0 or j == nfiles - 1:
                 t_accum = time.perf_counter() - t00
-                rate = ((j+1)/t_accum)
+                rate = ((j+1)*ntasked/t_accum)
                 bytes2bits = 8
-                bandwidth_Mbps = rate * file_size_MB *nprocesss * bytes2bits
+                bandwidth_Mbps = rate * file_size_MB * ntasked * bytes2bits
                 estimate_total_time = nfiles / rate
                 report_usage()
                 msg = f"\n{(j+1)*ntasked} files written out of {nfiles*ntasked}\n"
