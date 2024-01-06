@@ -201,9 +201,11 @@ docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     --data_dir $DOCKER_MOUNT
 
 # ngen run
-
+echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
+docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-x86 "$DOCKER_MOUNT" auto
+ 
 # hashing
-# docker run --rm -it -v "$NGEN_RUN_PATH":/data zwills/ht ./ht --fmt=tree /data
+# docker run --rm -it -v "${NGEN_RUN_PATH%/}/outputs":/outputs zwills/ht ./ht --fmt=tree /outputs
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
