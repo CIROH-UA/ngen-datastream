@@ -792,10 +792,12 @@ def prep_ngen_data(conf):
         else:
             path = str(metaf_path)
             meta_rel_forcings = "../metadata/forcings_metadata/"
+            combined_tar_filename_pre = str(bucket_path) + '/forcings.tar.gz'
             combined_tar_filename = str(forcing_path) + '/forcings.tar.gz'
-            tar_cmd = f'tar -czf {combined_tar_filename} -C {forcing_path} .'
+            tar_cmd = f'tar -czf {combined_tar_filename_pre} -C {forcing_path} .'
             if ii_collect_stats: tar_cmd += f' -C {meta_rel_forcings} .'
             os.system(tar_cmd)
+            os.system(f'cp {combined_tar_filename_pre} {combined_tar_filename}')
 
     tar_time = time.perf_counter() - t0000
 
