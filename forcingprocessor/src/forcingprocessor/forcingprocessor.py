@@ -176,7 +176,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
     nfiles = len(nwm_files)
     if fs_type == 'google' : fs = gcsfs.GCSFileSystem() 
     id = os.getpid()
-    if ii_verbose: print(f'{id} extracting data from {nfiles} files',end=None,flush=True)
+    if ii_verbose: print(f'Process #{id} extracting data from {nfiles} files',end=None,flush=True)
     for j, nwm_file in enumerate(nwm_files):
         t0 = time.perf_counter()        
         eng    = "h5netcdf"
@@ -224,7 +224,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
         if ii_verbose: print(f'\nTime for fs open file: {topen:.2f}\nTime for xarray open dataset: {txrds:.2f}\nTime to fill array: {tfill:.2f}\nTime to calculate catchment values: {tdata:.2f}\nAverage time per file {ttotal/(j+1):.2f} s', end=None,flush=True)
         report_usage()
 
-    if ii_verbose: print(f'{id} completed data extraction, returning data to primary process')
+    if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process')
     return [data_list, t_list]
 
 def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_append):
@@ -331,7 +331,7 @@ def write_data(
     forcing_cat_ids = []
     dfs = []
     filenames = []
-    write_int = 200
+    write_int = 400
     t_df      = 0
     t_buff    = 0
     t_put     = 0
@@ -797,7 +797,7 @@ def prep_ngen_data(conf):
             tar_cmd = f'tar -czf {combined_tar_filename_pre} -C {forcing_path} .'
             if ii_collect_stats: tar_cmd += f' -C {meta_rel_forcings} .'
             os.system(tar_cmd)
-            os.system(f'cp {combined_tar_filename_pre} {combined_tar_filename}')
+            os.system(f'mv {combined_tar_filename_pre} {combined_tar_filename}')
 
     tar_time = time.perf_counter() - t0000
 
