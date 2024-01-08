@@ -91,18 +91,26 @@ else
     NGEN_CONF_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/config.ini"
     NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/realization.json"
     NGEN_REAL_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/realization.json"
-    GEOPACKAGE="conus.gpkg"
-    GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
-    GEOPACKAGE_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
+    # GEOPACKAGE="conus.gpkg"
+    # GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
+    # GEOPACKAGE_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
     # Talk to Mike about having hfsubset generate this
     WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"
     WEIGHTS_PATH="${DATASTREAM_RESOURCES%/}/weights_conus.json"
 
-    wget -O $GEOPACKAGE_PATH $GEOPACKAGE_DEFAULT
+    # wget -O $GEOPACKAGE_PATH $GEOPACKAGE_DEFAULT
     wget -O $GRID_FILE_PATH $GRID_FILE_DEFAULT
     wget -O $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
     wget -O $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
     wget -O $WEIGHTS_PATH $WEIGHTS_DEFAULT
+
+    # Remove when ngen image can handle geopackage
+    CATCHMENTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/catchments_conus_v21.geojson"
+    CATCHMENTS_PATH="${DATASTREAM_RESOURCES%/}/catchments.geojson"
+    NEXUS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nexus_conus_v21.geojson"
+    NEXUS_PATH="${DATASTREAM_RESOURCES%/}/nexus.geojson"   
+    wget -O $CATCHMENTS_PATH $CATCHMENTS_DEFAULT
+    wget -O $NEXUS_PATH $NEXUS_DEFAULT   
 
 fi
 
@@ -111,7 +119,10 @@ cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
 if [ -e $GEOPACKAGE_PATH ]; then
     echo "Using geopackage" $GEOPACKAGE
-    cp $GEOPACKAGE_PATH $NGEN_CONFIG_PATH
+    # Fix then ngen image can handle geopackage
+    # cp $GEOPACKAGE_PATH $NGEN_CONFIG_PATH
+    cp $CATCHMENTS_PATH $NGEN_CONFIG_PATH
+    cp $NEXUS_PATH $NGEN_CONFIG_PATH
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
         echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
@@ -175,11 +186,12 @@ else
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
 fi
 
+python3 -m pip install --upgrade pip
 pip3 install -r $PACAKGE_DIR/requirements.txt --no-cache
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
-python $CONF_GENERATOR $CONFIG_FILE
+python3 $CONF_GENERATOR $CONFIG_FILE
 
-echo "Creating nwm files"
+echo "Creating nwm filenames file"
 docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
@@ -191,7 +203,6 @@ docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
-
 
 VALIDATOR="/ngen-datastream/python/run_validator.py"
 DOCKER_TAG="validator"
