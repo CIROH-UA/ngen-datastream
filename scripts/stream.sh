@@ -95,7 +95,7 @@ else
     GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
     GEOPACKAGE_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
     # Talk to Mike about having hfsubset generate this
-    WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus.json"
+    WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"
     WEIGHTS_PATH="${DATASTREAM_RESOURCES%/}/weights_conus.json"
 
     wget -O $GEOPACKAGE_PATH $GEOPACKAGE_DEFAULT
@@ -191,14 +191,17 @@ docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
-DOCKER_TAG="validator"
-VAL_DOCKER="${DOCKER_DIR%/}/validator"
-build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
+VALIDATOR="$(dirname "$SCRIPT_DIR")/python/run_validator.py"
+python $VALIDATOR --data_dir $NGEN_RUN_PATH
 
-echo "Validating " $NGEN_RUN_PATH
-docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
-    validator python /ngen-cal/python/run_validator.py \
-    --data_dir $DOCKER_MOUNT
+# DOCKER_TAG="validator"
+# VAL_DOCKER="${DOCKER_DIR%/}/validator"
+# build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
+
+# echo "Validating " $NGEN_RUN_PATH
+# docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
+#     validator python /ngen-cal/python/run_validator.py \
+#     --data_dir $DOCKER_MOUNT
 
 # ngen run
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
