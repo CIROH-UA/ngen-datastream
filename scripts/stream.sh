@@ -175,7 +175,8 @@ else
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
 fi
 
-CONF_GENERATOR="$(dirname "$SCRIPT_DIR")/python/configure-datastream.py"
+pip3 install -r $PACAKGE_DIR/requirements.txt --no-cache
+CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
 python $CONF_GENERATOR $CONFIG_FILE
 
 echo "Creating nwm files"
@@ -192,7 +193,7 @@ docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
 
-VALIDATOR="$(dirname "$SCRIPT_DIR")/python/run_validator.py"
+VALIDATOR="/ngen-datastream/python/run_validator.py"
 DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
@@ -201,6 +202,7 @@ echo "Validating " $NGEN_RUN_PATH
 docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
+
 
 # ngen run
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
