@@ -1,0 +1,3 @@
+[submodule "ngen-cal"]
+	path = ngen-cal
+	url = https://github.com/JordanLaserGit/ngen-cal.git
