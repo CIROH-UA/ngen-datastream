@@ -1,8 +1,8 @@
 import os, argparse
 from ngen.config.realization import NgenRealization
-from ngen.config.hydrofabric import CatchmentGeoJSON , NexusGeoJSON 
+# from ngen.config.hydrofabric import CatchmentGeoJSON , NexusGeoJSON 
 from ngen.config.validate import validate_paths
-import re
+import re, json
 import geopandas
 
 def validate(catchments,realization_file=None):
@@ -84,16 +84,23 @@ def validate_data_dir(data_dir):
         catchment_list = list(catchments['divide_id'])
         # Nexus validation?
     else:
-        print(f'Validating {catchment_file}')
-        serialized_catchments = CatchmentGeoJSON.parse_file(catchment_file)
+        print(f'Validating {catchment_file} {nexus_file}')
+        catchment_data = json.load(open(catchment_file))
         catchment_list = []
-        for jfeat in serialized_catchments.features:
-            id   = jfeat.id
-            if id is None: id = jfeat.properties.id # discrepancy between geopandas and pydantic
-            catchment_list.append(id)
+        for jfeat in catchment_data['features']:            
+            catchment_list.append(jfeat['properties']['divide_id'])
 
-        print(f'Done\nValidating {nexus_file}')
-        NexusGeoJSON.parse_file(nexus_file)         
+        nexus_list = json.load(open(nexus_file))
+        # The pydantic based models take too long to validate
+        # serialized_catchments = CatchmentGeoJSON.parse_file(catchment_file)
+        # catchment_list = []
+        # for jfeat in serialized_catchments.features:
+        #     id   = jfeat.id
+        #     if id is None: id = jfeat.properties.id # discrepancy between geopandas and pydantic
+        #     catchment_list.append(id)
+
+        # print(f'Done\nValidating {nexus_file}')
+        # NexusGeoJSON.parse_file(nexus_file)         
     
     validate(catchment_list,realization_file)
 
