@@ -59,8 +59,8 @@ See the docker README for example run commands from the container.
 |-------------------|--------------------------------|----------|
 | verbose           | Get print statements, defaults to false           |  :white_check_mark: |
 | collect_stats     | Collect forcing metadata, defaults to true       |  :white_check_mark: |
-| proc_threads      | Number of data processing threads, defaults to 80% available cores |   |
-| write_threads     | Number of writing threads, defaults to 100% available cores      |   |
+| proc_process      | Number of data processing threads, defaults to 80% available cores |   |
+| write_process     | Number of writing threads, defaults to 100% available cores      |   |
 | nfile_chunk       | Number of files to process each write, defaults to 1000000. Only set this if experiencing memory constraints due to large number of nwm forcing files |   |
 
 ## nwm_file
