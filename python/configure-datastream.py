@@ -45,8 +45,7 @@ def create_ds_confs_daily(conf, today, tomorrow):
         "meminput"     : 0,
         "urlbaseinput" : 7,
         "fcst_cycle"   : [0],
-        'lead_time'    : [1]
-        # "lead_time"    : [x+1 for x in range(24)]
+        "lead_time"    : [x+1 for x in range(24)]
     }
 
     conf['forcingprcoessor'] = fp_conf
