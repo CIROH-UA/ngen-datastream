@@ -40,7 +40,7 @@ requires `jq` and `wget`
 | relative_path     | Absolute path to be prepended to any other path given in configuration file |  |
 | id_type         | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
 | id         | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
-| version  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  | hydrofabric version |   |
+| version   |  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  | hydrofabric version |
 
 ## NextGen Datastream Directory Stucture
 ```
