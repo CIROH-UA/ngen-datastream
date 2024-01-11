@@ -59,8 +59,8 @@ See the docker README for example run commands from the container.
 |-------------------|--------------------------------|----------|
 | verbose           | Get print statements, defaults to false           |  :white_check_mark: |
 | collect_stats     | Collect forcing metadata, defaults to true       |  :white_check_mark: |
-| proc_process      | Number of data processing threads, defaults to 80% available cores |   |
-| write_process     | Number of writing threads, defaults to 100% available cores      |   |
+| proc_process      | Number of data processing processes, defaults to 50% available cores |   |
+| write_process     | Number of writing processes, defaults to 100% available cores      |   |
 | nfile_chunk       | Number of files to process each write, defaults to 1000000. Only set this if experiencing memory constraints due to large number of nwm forcing files |   |
 
 ## nwm_file
@@ -91,7 +91,7 @@ In order to retrieve forcing data from a NWM grid for a given catchment, the ind
  python weight_generator.py <path to geopackage> <path to output weights to> <path to example NWM forcing file>
  ```
 
-The weight generator will input an example NWM forcing netcdf to reference the NWM grid, a geopackage that contains all of the catchments the user wants weights for, and a file name for the weight file. Subsetted geopackages can be made with [hfsubset](https://github.com/LynkerIntel/hfsubset). Python based subsetting tools are available [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/subsetting), but plans exist to deprecate this as functionality is built out in hfsubset.
+The weight generator will input an example NWM forcing netcdf to reference the NWM grid, a geopackage that contains all of the catchments the user wants weights for, and a file name for the weight file. Subsetted geopackages can be made with [hfsubset](https://github.com/LynkerIntel/hfsubset). 
 
 ## Run Notes
-This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_threads` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best. These options default to 80% and 100% available cores respectively.
+This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_process` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best. These options default to 50% and 100% available cores respectively.

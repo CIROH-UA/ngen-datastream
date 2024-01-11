@@ -461,7 +461,7 @@ def prep_ngen_data(conf):
     write_process = conf["run"].get("write_process",None)
     nfile_chunk = conf["run"].get("nfile_chunk",None)
 
-    if proc_process is None: proc_process   = int(os.cpu_count() * 0.8)
+    if proc_process is None: proc_process   = int(os.cpu_count() * 0.5)
     if write_process is None: write_process = os.cpu_count()
     if nfile_chunk is None: nfile_chunk     = 100000
 

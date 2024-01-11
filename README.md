@@ -2,14 +2,13 @@
 The datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. In it's current implementation, the datastream is a shell script that orchestrates each step in the process. 
 
 ## Install
-If you'd like to just run the stream, clone this repo. The stream will handle initialization and installation of the datastream tools. To utilize the individual tools in the stream, see their respective readme's for installation instructions.
+If you'd like to run the stream, clone this repo and execute the command below. The stream will handle initialization and installation of the datastream tools. To utilize the individual tools in the stream, see their respective readme's for installation instructions.
 
 ## Run it
 ```
 /ngen-datastream/scripts/stream.sh /ngen-datastream/configs/conf_datastream_daily.json
 ```
 requires `jq` and `wget`
-also requires `pip install pytz`
 
 ### Example `conf_datastream.json`
 ```
@@ -20,7 +19,12 @@ also requires `pip install pytz`
         "data_dir"     : "ngen-datastream-test",
         "resource_dir" : "datastream-resources-dev",
         "relative_to"  : "/ngen-datastream/data"
-        "subset_id"    : ""
+    },
+
+    "subset" :{
+        "id_type" : "",
+        "id"      : "",
+        "version" : "",
     }
 }
 ```
@@ -32,9 +36,11 @@ also requires `pip install pytz`
 | start_time        | Start simulation time (YYYYMMDDHHMM) | :white_check_mark: |
 | end_time          | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | data_dir          | Name used in constructing the parent directory of the datastream. Must not exist prior to datastream run | :white_check_mark: |
-| resource_dir      | Folder name that contains the datastream resources. If not provided, datastream will create this folder with default options |  |
+| resource_dir      | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#datastream-resources-defaults) |  |
 | relative_path     | Absolute path to be prepended to any other path given in configuration file |  |
-| subset_id         | catchment id to subset. If not provided, the geopackage in the resource_dir will define the spatial domain in entirety |   |
+| id_type         | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
+| id         | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
+| version  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  | hydrofabric version |   |
 
 ## NextGen Datastream Directory Stucture
 ```
@@ -61,7 +67,7 @@ datastream-configs/
 ├── conf_nwmurl.json
 ```
 ### `datastream-resources/` 
-Copied into `data_dir` if user supplied, generated if not. Holds the data files required to perform computations required by the datastream. The user can supply this directory by pointing the configuration file to `resource_dir`. If not given by the user, datastream will generate this folder with these [defaults](#resource_dir). If the user executes the stream in this way, there is no control over the spatial domain. This option is intended for demonstration purposes only.
+Copied into `data_dir` if user supplied, generated with defaults if not. Holds the data files required to perform computations required by the datastream. The user can supply this directory by pointing the configuration file to `resource_dir`. If not given by the user, datastream will generate this folder with these [defaults](#resource_dir). If the user executes the stream in this way, there is no control over the spatial domain. 
 ```
 datastream-resources/
 │
@@ -71,14 +77,15 @@ datastream-resources/
 |
 ├── <nwm-example-grid-file>.nc
 ```
-`ngen-configs/` holds all non-hydrofabric configuration files for NextGen (`realizion.json`,`config.ini`)
+#### `ngen-configs/` holds all non-hydrofabric configuration files for NextGen (`realizion.json`,`config.ini`)
 
-`datastream-resources/` Defaults
+#### `datastream-resources/` Defaults
 ```
 GRID_FILE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nwm.t00z.short_range.forcing.f001.conus.nc"
 NGEN_CONF_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/config.ini"
 NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/realization.json"
-GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg"
+WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"https://lynker-spatial.s3.amazonaws.com/v20.1/conus.gpkg
+
 ```
 
 ### Useful Hacks
