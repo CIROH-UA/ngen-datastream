@@ -22,7 +22,7 @@ entrypoints==0.4
 fasteners==0.18
 Fiona==1.9.4.post1
 flox==0.7.2
-fonttools==4.41.0
+fonttools==4.43.0
 fsspec==2023.6.0
 geopandas==0.13.2
 h5netcdf==1.2.0
