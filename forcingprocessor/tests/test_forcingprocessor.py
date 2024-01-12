@@ -2,17 +2,23 @@ import pytest, os
 from pathlib import Path
 from datetime import datetime
 import requests
+from datetime import datetime
 
 from forcingprocessor.forcingprocessor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 from forcingprocessor.weight_generator import generate_weights_file
 
+grid_filename   = "nwm.t00z.medium_range.forcing.f001.conus.nc"
 geopkg_filename = "Gages-04185000.gpkg"
-grid_filename   = "nwm.t00z.short_range.forcing.f001.conus.nc"
 weight_name     = "Gages-04185000-weights.json"
 
 geopkg_file     = f"https://ngenresourcesdev.s3.us-east-2.amazonaws.com/{geopkg_filename}"
-grid_file       = f"https://storage.googleapis.com/national-water-model/nwm.20180923/forcing_short_range/{grid_filename}"
+
+@pytest.fixture()
+def get_time():
+    date = datetime.now()
+    pytest.date = date.strftime('%Y%m%d')
+    pytest.hourminute  = '0000'
 
 @pytest.fixture()
 def get_paths():
@@ -30,12 +36,6 @@ def get_paths():
     pytest.full_weight = full_weight
 
     pytest.filenamelist = (pwd/"filenamelist.txt").resolve()
-
-@pytest.fixture()
-def get_time():
-    date = datetime.now()
-    pytest.date = date.strftime('%Y%m%d')
-    pytest.hourminute  = '0000'
 
 def test_generate_filenames(get_paths, get_time):
     conf = {
@@ -63,6 +63,7 @@ def test_generate_weights(get_paths):
     if not geopkg_local.exists(): 
         os.system(f'wget {geopkg_file} -P {pytest.data_dir}')
 
+    grid_file    = f"https://noaa-nwm-pds.s3.amazonaws.com/nwm.{pytest.date}/forcing_medium_range/{grid_filename}"
     grid_local = (pytest.data_dir/grid_filename).resolve()
     if not grid_local.exists(): 
         os.system(f'wget {grid_file} -P {pytest.data_dir}')

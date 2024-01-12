@@ -37,14 +37,18 @@ def generate_weights_file(geopackage,grid_file,weights_filepath):
     try:
         ds = xr.open_dataset(grid_file,engine='h5netcdf')
         grid = ds['RAINRATE']
+        try:
+            projection = ds.crs.esri_pe_string
+        except:
+            try:
+                projection = ds.ProjectionCoordinateSystem.esri_pe_string
+            except:
+                raise Exception(f'\n\nCan\'t find projection!\n')
     except:
         raise Exception(f'\n\nThere\'s a problem with {example_grid_filepath}!\n')
 
     g_df = gpd.read_file(geopackage, layer='divides')
-    gdf_proj = g_df.to_crs('PROJCS["Lambert_Conformal_Conic",GEOGCS["GCS_Sphere",DATUM["D_Sphere",SPHEROID["Sphere",6370000.0,0.0]], \
-PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Lambert_Conformal_Conic_2SP"],PARAMETER["false_easting",0.0],\
-PARAMETER["false_northing",0.0],PARAMETER["central_meridian",-97.0],PARAMETER["standard_parallel_1",30.0],\
-PARAMETER["standard_parallel_2",60.0],PARAMETER["latitude_of_origin",40.0],UNIT["Meter",1.0]]')
+    gdf_proj = g_df.to_crs(projection)
 
     crosswalk_dict = {}
     start_time = datetime.datetime.now()
