@@ -395,7 +395,7 @@ def write_data(
                 rate = ((j+1)*ntasked/t_accum)
                 bytes2bits = 8
                 bandwidth_Mbps = rate * file_size_MB * ntasked * bytes2bits
-                estimate_total_time = nfiles / rate
+                estimate_total_time = nfiles * ntasked / rate
                 report_usage()
                 msg = f"\n{(j+1)*ntasked} files written out of {nfiles*ntasked}\n"
                 msg += f"rate             {rate:.2f} files/s\n"
