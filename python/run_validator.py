@@ -42,7 +42,7 @@ def validate(catchments,realization_file=None):
             df = pd.read_csv(full_path)
             forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
             forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
-            dt_forcings_s = (forcings_end - forcings_start).total_seconds() / len(df['time'])
+            dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (len(df['time']) - 1)
             assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
             assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
             assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
