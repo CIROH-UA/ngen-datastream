@@ -23,8 +23,8 @@ def validate(catchments,realization_file=None):
     ncatchments = len(catchments)
     catchments = sorted(catchments)
     write_int = 1000    
-    for j, jcatch in enumerate(catchments):        
-        if j + 1 % write_int == 0: 
+    for j, jcatch in enumerate(catchments):    
+        if (j + 1) % write_int == 0: 
             print(f'{j/ncatchments}%')
         jid         = re.findall(r'\d+', jcatch)[0]
         pattern     = serialized_realization.global_config.forcing.file_pattern
