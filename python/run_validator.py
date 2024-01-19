@@ -1,9 +1,10 @@
 import os, argparse
 from ngen.config.realization import NgenRealization
-# from ngen.config.hydrofabric import CatchmentGeoJSON , NexusGeoJSON 
 from ngen.config.validate import validate_paths
-import re, json
+import re
 import geopandas
+import pandas as pd
+from datetime import datetime
 
 def validate(catchments,realization_file=None):
 
@@ -31,7 +32,20 @@ def validate(catchments,realization_file=None):
         compiled       = re.compile(jcatch_pattern)      
 
         jfile = forcing_files[j]     
-        assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"          
+        assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"            
+
+        if j == 0:
+            start_time = serialized_realization.time.start_time
+            end_time   = serialized_realization.time.end_time
+            dt_s = serialized_realization.time.output_interval
+            full_path = os.path.join(foring_dir,forcing_files[0])
+            df = pd.read_csv(full_path)
+            forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
+            forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
+            dt_forcings_s = (forcings_end - forcings_start).total_seconds() / len(df['time'][0])
+            assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
+            assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
+            assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
 
     print(f'\nNGen run folder is valid\n')
 
@@ -79,28 +93,8 @@ def validate_data_dir(data_dir):
 
     print(f'Configurations found! Retrieving catchment data...')
 
-    if geopackage_file:
-        catchments     = geopandas.read_file(geopackage_file, layer='divides')
-        catchment_list = list(catchments['divide_id'])
-        # Nexus validation?
-    else:
-        print(f'Validating {catchment_file} {nexus_file}')
-        catchment_data = json.load(open(catchment_file))
-        catchment_list = []
-        for jfeat in catchment_data['features']:            
-            catchment_list.append(jfeat['properties']['divide_id'])
-
-        nexus_list = json.load(open(nexus_file))
-        # The pydantic based models take too long to validate
-        # serialized_catchments = CatchmentGeoJSON.parse_file(catchment_file)
-        # catchment_list = []
-        # for jfeat in serialized_catchments.features:
-        #     id   = jfeat.id
-        #     if id is None: id = jfeat.properties.id # discrepancy between geopandas and pydantic
-        #     catchment_list.append(id)
-
-        # print(f'Done\nValidating {nexus_file}')
-        # NexusGeoJSON.parse_file(nexus_file)         
+    catchments     = geopandas.read_file(geopackage_file, layer='divides')
+    catchment_list = list(catchments['divide_id'])
     
     validate(catchment_list,realization_file)
 
