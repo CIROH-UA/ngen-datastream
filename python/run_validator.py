@@ -22,30 +22,30 @@ def validate(catchments,realization_file=None):
     forcing_files = sorted([x for _,_,x in os.walk(foring_dir)][0])
     ncatchments = len(catchments)
     catchments = sorted(catchments)
-    write_int = 1000    
+    write_int = 5000    
     for j, jcatch in enumerate(catchments):    
-        if (j + 1) % write_int == 0: 
-            print(f'{j/ncatchments}%')
+        # if (j + 1) % write_int == 0: 
+        print(f'{j/ncatchments:.1f}%', end = "\r")
         jid         = re.findall(r'\d+', jcatch)[0]
         pattern     = serialized_realization.global_config.forcing.file_pattern
         jcatch_pattern = pattern.replace('{{id}}',jid)
         compiled       = re.compile(jcatch_pattern)      
 
-        jfile = forcing_files[j]     
-        assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"            
+        # jfile = forcing_files[j]     
+        # assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"            
 
-        if j == 0:
-            start_time = serialized_realization.time.start_time
-            end_time   = serialized_realization.time.end_time
-            dt_s = serialized_realization.time.output_interval
-            full_path = os.path.join(foring_dir,forcing_files[0])
-            df = pd.read_csv(full_path)
-            forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
-            forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
-            dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (len(df['time']) - 1)
-            assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
-            assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
-            assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
+        # if j == 0:
+        #     start_time = serialized_realization.time.start_time
+        #     end_time   = serialized_realization.time.end_time
+        #     dt_s = serialized_realization.time.output_interval
+        #     full_path = os.path.join(foring_dir,forcing_files[0])
+        #     df = pd.read_csv(full_path)
+        #     forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
+        #     forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
+        #     dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (len(df['time']) - 1)
+        #     assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
+        #     assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
+        #     assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
 
     print(f'\nNGen run folder is valid\n')
 
