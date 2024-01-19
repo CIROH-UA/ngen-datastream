@@ -67,6 +67,9 @@ NGEN_OUTPUT_PATH="${NGEN_RUN_PATH%/}/outputs"
 mkdir -p $NGEN_CONFIG_PATH
 mkdir -p $NGEN_OUTPUT_PATH
 
+GEOPACKGE_NGENRUN="datastream.gpkg"
+GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
+
 if [ -e "$RESOURCE_PATH" ]; then
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
         wget -O $DATASTREAM_RESOURCES $RESOURCE_PATH
@@ -76,8 +79,8 @@ if [ -e "$RESOURCE_PATH" ]; then
     else
         cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
     fi 
-    GEOPACKAGE_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-    GEOPACKAGE=$(basename $GEOPACKAGE_PATH)
+    GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+    GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
     
 else
     # if a resource path is not supplied, generate one with defaults
@@ -100,31 +103,18 @@ else
     wget -O $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
     wget -O $WEIGHTS_PATH $WEIGHTS_DEFAULT
 
-    # GEOPACKAGE="conus.gpkg"
-    # GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
-    # GEOPACKAGE_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"    
-    # wget -O $GEOPACKAGE_PATH $GEOPACKAGE_DEFAULT
-    # Remove when ngen image can handle geopackage
-    CATCHMENTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/catchments_conus_v21.geojson"
-    CATCHMENTS_PATH="${DATASTREAM_RESOURCES%/}/catchments.geojson"
-    NEXUS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nexus_conus_v21.geojson"
-    NEXUS_PATH="${DATASTREAM_RESOURCES%/}/nexus.geojson"   
-    wget -O $CATCHMENTS_PATH $CATCHMENTS_DEFAULT
-    wget -O $NEXUS_PATH $NEXUS_DEFAULT   
-    
+    GEOPACKAGE="conus.gpkg"
+    GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
+    GEOPACKAGE_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"    
+    wget -O $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT
 
 fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
-if [ -e $GEOPACKAGE_PATH ]; then
-    # Fix when ngen image can handle geopackage
-    # echo "Using geopackage" $GEOPACKAGE
-    # cp $GEOPACKAGE_PATH $NGEN_CONFIG_PATH
-    echo "Using geojsons" $CATCHMENTS_PATH $NEXUS_PATH
-    cp $CATCHMENTS_PATH $NGEN_CONFIG_PATH
-    cp $NEXUS_PATH $NGEN_CONFIG_PATH
+if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
+    cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
         echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
@@ -132,7 +122,7 @@ else
     else
 
         GEOPACKAGE="$SUBSET_ID.gpkg"
-        GEOPACKAGE_PATH="${DATASTREAM_CONF_PATH%/}/$GEOPACKAGE"
+        GEOPACKAGE_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
 
         if command -v "hfsubset" &>/dev/null; then
             echo "hfsubset is installed and available in the system's PATH. Subsetting, now!"
@@ -141,13 +131,15 @@ else
             tar -xzvf "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz"
         fi
 
-        hfsubset -o $GEOPACKAGE_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
+        hfsubset -o $GEOPACKAGE_RESOURCES_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
 
-        cp $GEOPACKAGE_PATH "${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
-        cp $GEOPACKAGE_PATH "${NGEN_CONFIG_PATH%/}/$GEOPACKAGE"
+        cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_RESOURCES_PATH
+        cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH        
 
     fi        
 fi
+
+echo "Using geopackage" $GEOPACKAGE, "Named $GEOPACKGE_NGENRUN for ngen_run"
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
@@ -219,7 +211,7 @@ docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
 
 # ngen run
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
-docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-x86 "$DOCKER_MOUNT" auto
+docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
  
 # hashing
 # docker run --rm -it -v "${NGEN_RUN_PATH%/}/outputs":/outputs zwills/ht ./ht --fmt=tree /outputs
