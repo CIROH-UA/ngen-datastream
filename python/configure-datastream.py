@@ -3,6 +3,23 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import pytz as tz
 
+def generate_config(args):
+    config = {
+        "globals": {
+            "start_date": args.start_date,
+            "end_date": args.end_date,
+            "data_dir": args.data_dir,
+            "relative_to": args.relative_to,
+            "resource_dir": args.resource_dir
+        },
+        "subset": {
+            "id_type": args.subset_id_type,
+            "id": args.subset_id,
+            "version": args.hydrofabric_version
+        }
+    }
+    return config
+
 def write_json(conf, out_dir, name):
     conf_path = Path(out_dir,name)
     with open(conf_path,'w') as fp:
@@ -38,7 +55,7 @@ def create_ds_confs_daily(conf, today, tomorrow):
     nwm_conf = {
         "forcing_type" : "operational_archive",
         "start_date"   : today,
-        "end_date"     : today, # If we specify this as tomorrow, we will get 2 days worth of data, just how nwmurl works
+        "end_date"     : today,
         "runinput"     : 2,
         "varinput"     : 5,
         "geoinput"     : 1,
@@ -57,8 +74,8 @@ def create_confs(conf):
     
     if conf['globals']['start_date'] == "DAILY":
         now = datetime.now(tz.timezone('US/Eastern'))
-        today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        tomorrow = today + timedelta(days=1)
+        today = now.replace(hour=1, minute=0, second=0, microsecond=0)
+        tomorrow = today + timedelta(hours=23)
         
         today_ds_confs = today.strftime('%Y%m%d%H%M')
         tomorrow_ds_confs = tomorrow.strftime('%Y%m%d%H%M')
@@ -93,10 +110,6 @@ def create_confs(conf):
         with open(realization_file,'r') as fp:
             data = json.load(fp)
 
-        template_realization = Path(resources_config_dir,"realization.json")
-        template_realization_rename = Path(resources_config_dir,"realization_template.json")
-        os.system(f'mv {template_realization} {template_realization_rename}')
-
         data['time']['start_time'] = today_realization
         data['time']['end_time']   = tomorrow_realization
         write_json(data,ngen_config_dir,'realization.json')
@@ -117,19 +130,21 @@ def create_confs(conf):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        dest="infile", type=str, help="A json containing user inputs to run ngen-datastream"
-    )
+    parser.add_argument("--conf", type=str, help="A json containing user inputs to run ngen-datastream")
+    parser.add_argument("--start-date", help="Set the start date")
+    parser.add_argument("--end-date", help="Set the end date")
+    parser.add_argument("--data-dir", help="Set the data directory")
+    parser.add_argument("--relative-to", help="Set the relative directory")
+    parser.add_argument("--resource-dir", help="Set the resource directory")
+    parser.add_argument("--subset-id-type", help="Set the subset ID type")
+    parser.add_argument("--subset-id", help="Set the subset ID")
+    parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
+
     args = parser.parse_args()
 
-    if args.infile[0] == '{':
-        conf = json.loads(args.infile)
+    if not args.conf:        
+        conf = generate_config(args)
     else:
-        if 's3' in args.infile:
-            os.system(f'wget {args.infile}')
-            filename = args.infile.split('/')[-1]
-            conf = json.load(open(filename))
-        else:
-            conf = json.load(open(args.infile))
+        conf = args.conf
 
     create_confs(conf)

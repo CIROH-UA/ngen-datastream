@@ -9,34 +9,67 @@ build_docker_container() {
     local DOCKER_IMAGE="$2"
 
     if docker inspect "$DOCKER_TAG" &>/dev/null; then
-        echo "The Docker container '$DOCKER_TAG' exists. Not building."
+        echo "The Docker container "$DOCKER_TAG" exists. Not building."
     else
         echo "Building $DOCKER_TAG container..."
-        docker build "$DOCKER_IMAGE" -t "$DOCKER_TAG" --no-cache
+        docker build $DOCKER_IMAGE -t $DOCKER_TAG --no-cache
     fi
 }
 
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 <datastream-config.json>"
+usage() {
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  -s, --start-date <start_date>         "
+    echo "  -e, --end-date <end_date>             "
+    echo "  -d, --data-path <data_path>           "
+    echo "  -r, --resource-path <resource_path>   "
+    echo "  -t, --relative-to <relative_to>       "
+    echo "  -i, --id-type <id_type>               "
+    echo "  -I, --id <id>                         "
+    echo "  -v, --version <version>               "
+    echo "  -c, --conf-file <conf_file>           "
     exit 1
+}
+
+START_DATE=""
+END_DATE=""
+DATA_PATH=""
+RESOURCE_PATH=""
+RELATIVE_TO=""
+SUBSET_ID_TYPE=""
+SUBSET_ID=""
+HYDROFABRIC_VERSION=""
+CONF_FILE=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -s|--start-date) START_DATE="$2"; shift 2;;
+        -e|--end-date) END_DATE="$2"; shift 2;;
+        -d|--data-path) DATA_PATH="$2"; shift 2;;
+        -r|--resource-path) RESOURCE_PATH="$2"; shift 2;;
+        -t|--relative-to) RELATIVE_TO="$2"; shift 2;;
+        -i|--id-type) SUBSET_ID_TYPE="$2"; shift 2;;
+        -I|--id) SUBSET_ID="$2"; shift 2;;
+        -v|--version) HYDROFABRIC_VERSION="$2"; shift 2;;
+        -c|--conf-file) CONF_FILE="$2"; shift 2;;
+        *) usage;;
+    esac
+done
+
+if [ -n "$CONF_FILE" ]; then
+    echo "Configuration option provided" $CONF_FILE
+    if [ -e "$CONF_FILE" ]; then
+        echo "Any variables defined in "$CONF_FILE" will override cli args"
+        echo "Using options:"
+        cat $CONF_FILE
+        source "$CONF_FILE"
+    else
+        echo $CONF_FILE" not found!!"
+        exit 1
+    fi
+else
+    echo "No configuration file detected, using cli args"
 fi
-
-CONFIG_FILE="$1"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "File not found: $CONFIG_FILE"
-    exit 1
-fi
-config=$(cat "$CONFIG_FILE")
-
-START_DATE=$(echo "$config" | jq -r '.globals.start_date')
-END_DATE=$(echo "$config" | jq -r '.globals.end_date')
-DATA_PATH=$(echo "$config" | jq -r '.globals.data_dir')
-RESOURCE_PATH=$(echo "$config" | jq -r '.globals.resource_dir')
-RELATIVE_TO=$(echo "$config" | jq -r '.globals.relative_to')
-
-SUBSET_ID_TYPE=$(echo "$config" | jq -r '.subset.id_type')
-SUBSET_ID=$(echo "$config" | jq -r '.subset.id')
-HYDROFABRIC_VERSION=$(echo "$config" | jq -r '.subset.version')
 
 if [ $START_DATE == "DAILY" ]; then
     DATA_PATH="${PACAKGE_DIR%/}/data/$(env TZ=US/Eastern date +'%Y%m%d')"
@@ -58,6 +91,14 @@ fi
 
 mkdir -p $DATA_PATH
 NGEN_RUN_PATH="${DATA_PATH%/}/ngen-run"
+
+if [ -e "$DATA_PATH" ]; then
+    :
+else
+    echo "$DATA_PATH doesn't not exist!"
+    exit 1
+fi
+
 DATASTREAM_CONF_PATH="${DATA_PATH%/}/datastream-configs"
 DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
 mkdir -p $DATASTREAM_CONF_PATH
@@ -70,22 +111,27 @@ mkdir -p $NGEN_OUTPUT_PATH
 GEOPACKGE_NGENRUN="datastream.gpkg"
 GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
 
-if [ -e "$RESOURCE_PATH" ]; then
+if [ -n "$RESOURCE_PATH" ]; then
+    echo "Resource path option provided" $RESOURCE_PATH
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
-        echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
-        curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
-        if [[ $RESOURCE_PATH == *".tar."* ]]; then
-            tar -xzvf $(basename $RESOURCE_PATH)
-        fi
+            echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
+            curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
+            if [[ $RESOURCE_PATH == *".tar."* ]]; then
+                tar -xzvf $(basename $RESOURCE_PATH)
+            fi
     else
-        cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
-    fi 
-    GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-    GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-    
+        if [ -e "$RESOURCE_PATH" ]; then
+            echo "Copying into current data path "$DATA_PATH
+            cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
+            GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+            GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
+        else
+            echo $RESOURCE_PATH " provided doesn't exist!"
+        fi
+    fi
 else
     # if a resource path is not supplied, generate one with defaults
-    echo "Generating datastream resources with defaults"
+    echo "No resouce path provided. Generating datastream resources with defaults"
     DATASTREAM_RESOURCES_CONFIGS=${DATASTREAM_RESOURCES%/}/ngen-configs
     mkdir -p $DATASTREAM_RESOURCES
     mkdir -p $DATASTREAM_RESOURCES_CONFIGS
@@ -145,7 +191,7 @@ else
     fi        
 fi
 
-echo "Using geopackage" $GEOPACKAGE, "Named $GEOPACKGE_NGENRUN for ngen_run"
+echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
@@ -160,7 +206,7 @@ build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 
 WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 if [ -e "$WEIGHTS_FILENAME" ]; then
-    echo "Using weights found in resources directory" "$WEIGHTS_FILENAME"
+    echo "Using weights found in resources directory $WEIGHTS_FILENAME"
     mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
 else
     echo "Weights file not found. Creating from" $GEOPACKAGE
@@ -189,7 +235,15 @@ fi
 python3 -m pip install --upgrade pip
 pip3 install -r $PACAKGE_DIR/requirements.txt --no-cache
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
-python3 $CONF_GENERATOR $CONFIG_FILE
+python3 $CONF_GENERATOR \
+    --start-date "$START_DATE" \
+    --end-date "$END_DATE" \
+    --data-dir "$DATA_PATH" \
+    --relative-to "$RELATIVE_TO" \
+    --resource-dir "$RESOURCE_PATH" \
+    --subset-id-type "$SUBSET_ID_TYPE" \
+    --subset-id "$SUBSET_ID" \
+    --hydrofabric-version "$HYDROFABRIC_VERSION"
 
 echo "Creating nwm filenames file"
 docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
