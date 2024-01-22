@@ -4,42 +4,36 @@ The datastream automates the process of collecting and formatting input data for
 ## Install
 If you'd like to run the stream, clone this repo and execute the command below. The stream will handle initialization and installation of the datastream tools. To utilize the individual tools in the stream, see their respective readme's for installation instructions.
 
-## Run it
+## Run it with config file
 ```
-/ngen-datastream/scripts/stream.sh /ngen-datastream/configs/conf_datastream_daily.json
+/ngen-datastream/scripts/stream.sh --conf-file /ngen-datastream/configs/conf_datastream_daily.sh
+```
+See [config  directory](#datastream-configs) for examples
+
+## Run it with cli args
+```
+/ngen-datastream/scripts/stream.sh /ngen-datastream/configs/conf_datastream_daily.sh \
+  --start-date "" \
+  --end-date "" \
+  --data-path "" \
+  --resource-path"" \
+  --relative-to "" \
+  --id-type "" \
+  --id "" \
+  --version ""
 ```
 
-### Example `conf_datastream.json`
-```
-{
-    "globals" : {
-        "start_date"   : "",
-        "end_date"     : "",
-        "data_dir"     : "ngen-datastream-test",
-        "resource_dir" : "datastream-resources-dev",
-        "relative_to"  : "/ngen-datastream/data"
-    },
-
-    "subset" :{
-        "id_type" : "",
-        "id"      : "",
-        "version" : "",
-    }
-}
-```
-
-## Formatting `conf_datastream.json`
-### globals
-| Field             | Description              | Required |
-|-------------------|--------------------------|------|
-| start_time        | Start simulation time (YYYYMMDDHHMM) | :white_check_mark: |
-| end_time          | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
-| data_dir          | Name used in constructing the parent directory of the datastream. Must not exist prior to datastream run | :white_check_mark: |
-| resource_dir      | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#datastream-resources-defaults) |  |
-| relative_path     | Absolute path to be prepended to any other path given in configuration file |  |
-| id_type         | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
-| id         | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
-| version   |  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  | hydrofabric version |
+## Explanation of cli args or variables in  `conf_datastream.sh`
+| Field               | Description              | Required |
+|---------------------|--------------------------|------|
+| START_DATE          | Start simulation time (YYYYMMDDHHMM) | :white_check_mark: |
+| END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
+| DATA_PATH           | Name used in constructing the parent directory of the datastream. Must not exist prior to datastream run | :white_check_mark: |
+| RESOURCE_PATH       | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#datastream-resources-defaults) |  |
+| RELATIVE_TO         | Absolute path to be prepended to any other path given in configuration file |  |
+| SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
+| SUBSET_ID           | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
+| HYDROFABRIC_VERSION |  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  | hydrofabric version |
 
 ## NextGen Datastream Directory Stucture
 ```
