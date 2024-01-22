@@ -72,7 +72,8 @@ GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
 
 if [ -e "$RESOURCE_PATH" ]; then
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
-        wget -O $DATASTREAM_RESOURCES $RESOURCE_PATH
+        echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
+        curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
         if [[ $RESOURCE_PATH == *".tar."* ]]; then
             tar -xzvf $(basename $RESOURCE_PATH)
         fi
@@ -98,15 +99,20 @@ else
     WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"
     WEIGHTS_PATH="${DATASTREAM_RESOURCES%/}/weights_conus.json"
 
-    wget -O $GRID_FILE_PATH $GRID_FILE_DEFAULT
-    wget -O $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
-    wget -O $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
-    wget -O $WEIGHTS_PATH $WEIGHTS_DEFAULT
+    echo "curl'ing $GRID_FILE_PATH $GRID_FILE_DEFAULT"
+    curl -L -o $GRID_FILE_PATH $GRID_FILE_DEFAULT 
+    echo "curl'ing $NGEN_CONF_PATH $NGEN_CONF_DEFAULT"
+    curl -L -o $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
+    echo "curl'ing $NGEN_REAL_PATH $NGEN_REAL_DEFAULT"
+    curl -L -o $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
+    echo "curl'ing $WEIGHTS_PATH $WEIGHTS_DEFAULT"
+    curl -L -o $WEIGHTS_PATH $WEIGHTS_DEFAULT
 
     GEOPACKAGE="conus.gpkg"
     GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
     GEOPACKAGE_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"    
-    wget -O $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT
+    echo "curl'ing $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT"
+    curl -L -o $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT
 
 fi
 
@@ -127,7 +133,7 @@ else
         if command -v "hfsubset" &>/dev/null; then
             echo "hfsubset is installed and available in the system's PATH. Subsetting, now!"
         else
-            wget -O "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz" https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
+            curl -L -o "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz" https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
             tar -xzvf "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz"
         fi
 
