@@ -111,7 +111,7 @@ mkdir -p $NGEN_OUTPUT_PATH
 GEOPACKGE_NGENRUN="datastream.gpkg"
 GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
 
-if [ -n "$RESOURCE_PATH" ]; then
+if [ -e "$RESOURCE_PATH" ]; then
     echo "Resource path option provided" $RESOURCE_PATH
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
             echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
@@ -207,7 +207,9 @@ build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 if [ -e "$WEIGHTS_FILENAME" ]; then
     echo "Using weights found in resources directory $WEIGHTS_FILENAME"
-    mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
+    if [["$WEIGHTS_FILENAME" != "weights.json"]]; then
+        mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
+    fi
 else
     echo "Weights file not found. Creating from" $GEOPACKAGE
     NWM_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm*")
