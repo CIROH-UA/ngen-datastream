@@ -1,6 +1,7 @@
 import os, argparse
 from ngen.config.realization import NgenRealization
 from ngen.config.validate import validate_paths
+from ngen.config.configurations import Routing
 import re
 import geopandas
 import pandas as pd
@@ -19,8 +20,12 @@ def validate_realization(realization_file):
     serialized_realization = NgenRealization.parse_file(realization_file)
     serialized_realization.resolve_paths(relative_to=relative_dir)
     val = validate_paths(serialized_realization)
-    if len(val) > 0:
-        raise Exception(f'{val[0].value} does not exist!')
+    for jval in val:
+        model = jval.model
+        if isinstance(model,Routing): # Allow config path for routing to not exist
+            pass
+        else:
+            raise Exception(f'{val[0].value} does not exist!')
     
     return serialized_realization, relative_dir
 
@@ -35,7 +40,7 @@ def validate_forcings(forcing_files, catchments):
     ncatchments = len(catchments)    
     write_int = 5000    
     for j, jcatch in enumerate(catchments):    
-        if (j + 1) % write_int == 0: 
+        if (j + 1) % write_int or j == ncatchments - 1: 
             print(f'{100*j/ncatchments:.1f}%', end = "\r")
         jid         = re.findall(r'\d+', jcatch)[0]
         pattern     = serialized_realization.global_config.forcing.file_pattern
