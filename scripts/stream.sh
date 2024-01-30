@@ -71,8 +71,9 @@ else
     echo "No configuration file detected, using cli args"
 fi
 
+DATE=$(env TZ=US/Eastern date +'%Y%m%d')
 if [ $START_DATE == "DAILY" ]; then
-    DATA_PATH="${PACAKGE_DIR%/}/data/$(env TZ=US/Eastern date +'%Y%m%d')"
+    DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
 fi
 
 if [ ${#RELATIVE_TO} -gt 0 ] ; then
@@ -160,6 +161,14 @@ else
     echo "curl'ing $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT"
     curl -L -o $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT
 
+    PARTITON="partitions_$(grep -c ^processor /proc/cpuinfo).json"
+    PARTITION_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/"$PARTITON
+    PARTITION_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$PARTITON"
+    PARTITION_NGENRUN_PATH="${NGEN_RUN_PATH%/}/$PARTITON"
+    echo "curl'ing $PARTITION_RESOURCES_PATH $PARTITION_DEFAULT, copying into $PARTITION_NGENRUN_PATH"
+    curl -L -o $PARTITION_RESOURCES_PATH $PARTITION_DEFAULT
+    cp $PARTITION_RESOURCES_PATH $PARTITION_NGENRUN_PATH
+
 fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
@@ -207,7 +216,7 @@ build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 if [ -e "$WEIGHTS_FILENAME" ]; then
     echo "Using weights found in resources directory $WEIGHTS_FILENAME"
-    if [["$WEIGHTS_FILENAME" != "weights.json"]]; then
+    if [[ "$WEIGHTS_FILENAME" != "*/weights.json" ]]; then
         mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
     fi
 else
@@ -270,17 +279,16 @@ docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
 
-
 # ngen run
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
  
 # hashing
-# docker run --rm -it -v "${NGEN_RUN_PATH%/}/outputs":/outputs zwills/ht ./ht --fmt=tree /outputs
+docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
-tar -czf  $TAR_PATH -C $NGEN_RUN_PATH .
+tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
 # manage outputs
-# aws s3 sync $DATA_PATH $SOME_BUCKET_NAME
+aws s3 sync $DATA_PATH s3://ngen-datastream/daily/$DATE
