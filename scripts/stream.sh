@@ -216,7 +216,7 @@ build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 if [ -e "$WEIGHTS_FILENAME" ]; then
     echo "Using weights found in resources directory $WEIGHTS_FILENAME"
-    if [[ "$WEIGHTS_FILENAME" != "*/weights.json" ]]; then
+    if [[ $(basename $WEIGHTS_FILENAME) != "weights.json" ]]; then
         mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
     fi
 else
