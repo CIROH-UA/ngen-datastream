@@ -111,7 +111,8 @@ mkdir -p $NGEN_OUTPUT_PATH
 
 GEOPACKGE_NGENRUN="datastream.gpkg"
 GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
-
+GEOPACKAGE_RESOURCES_PATH="NULL"
+WEIGHTS_FILENAME="NULL"
 if [ -e "$RESOURCE_PATH" ]; then
     echo "Resource path option provided" $RESOURCE_PATH
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
@@ -124,8 +125,13 @@ if [ -e "$RESOURCE_PATH" ]; then
         if [ -e "$RESOURCE_PATH" ]; then
             echo "Copying into current data path "$DATA_PATH
             cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
-            GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-            GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
+            if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
+                GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+                GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
+                WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
+            else
+                echo "Resource directory provided, but subsetting option overrides."
+            fi
         else
             echo $RESOURCE_PATH " provided doesn't exist!"
         fi
@@ -142,6 +148,8 @@ else
     NGEN_CONF_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/config.ini"
     NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/daily_run_realization.json"
     NGEN_REAL_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/realization.json"
+    NGEN_TROUTE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen.yaml"
+    NGEN_TROUTE_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/ngen.yaml"
 
     WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"
     WEIGHTS_PATH="${DATASTREAM_RESOURCES%/}/weights_conus.json"
@@ -152,6 +160,8 @@ else
     curl -L -o $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
     echo "curl'ing $NGEN_REAL_PATH $NGEN_REAL_DEFAULT"
     curl -L -o $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
+    echo "curl'ing $NGEN_TROUTE_PATH $NGEN_TROUTE_DEFAULT"
+    curl -L -o $NGEN_TROUTE_PATH $NGEN_TROUTE_DEFAULT    
     echo "curl'ing $WEIGHTS_PATH $WEIGHTS_DEFAULT"
     curl -L -o $WEIGHTS_PATH $WEIGHTS_DEFAULT
 
@@ -175,6 +185,7 @@ NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 
 if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
+    echo $GEOPACKAGE_RESOURCES_PATH
     cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
@@ -194,7 +205,6 @@ else
 
         hfsubset -o $GEOPACKAGE_RESOURCES_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
 
-        cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_RESOURCES_PATH
         cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH        
 
     fi        
@@ -213,7 +223,6 @@ DOCKER_TAG="forcingprocessor"
 FP_DOCKER="${DOCKER_DIR%/}/forcingprocessor"
 build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 
-WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 if [ -e "$WEIGHTS_FILENAME" ]; then
     echo "Using weights found in resources directory $WEIGHTS_FILENAME"
     if [[ $(basename $WEIGHTS_FILENAME) != "weights.json" ]]; then
@@ -283,6 +292,8 @@ docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
  
+mv $NGEN_RUN_PATH/*.csv $NGEN_OUTPUT_PATH
+
 # hashing
 docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
