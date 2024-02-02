@@ -111,78 +111,55 @@ mkdir -p $NGEN_OUTPUT_PATH
 
 GEOPACKGE_NGENRUN="datastream.gpkg"
 GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
-GEOPACKAGE_RESOURCES_PATH="NULL"
-WEIGHTS_FILENAME="NULL"
-if [ -e "$RESOURCE_PATH" ]; then
+
+if [ -z "$RESOURCE_PATH" ]; then    
+    echo "No resource path provided. Generating datastream resources with defaults"
+    RESOURCES_DEFAULT="s3://ngen-datastream/resources_default"
+    aws s3 sync $RESOURCES_DEFAULT $DATASTREAM_RESOURCES
+else    
     echo "Resource path option provided" $RESOURCE_PATH
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
-            echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
-            curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
-            if [[ $RESOURCE_PATH == *".tar."* ]]; then
-                tar -xzvf $(basename $RESOURCE_PATH)
-            fi
+        echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
+        curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
+        if [[ $RESOURCE_PATH == *".tar."* ]]; then
+            tar -xzvf $(basename $RESOURCE_PATH)
+        fi
+    elif [[ $RESOURCE_PATH == *"s3://"* ]]; then
+        aws s3 sync $RESOURCE_PATH $DATASTREAM_RESOURCES
     else
         if [ -e "$RESOURCE_PATH" ]; then
             echo "Copying into current data path "$DATA_PATH
             cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
-            if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
-                GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-                GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-                WEIGHTS_FILENAME=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
-            else
-                echo "Resource directory provided, but subsetting option overrides."
-            fi
         else
             echo $RESOURCE_PATH " provided doesn't exist!"
         fi
     fi
-else
-    # if a resource path is not supplied, generate one with defaults
-    echo "No resouce path provided. Generating datastream resources with defaults"
-    DATASTREAM_RESOURCES_CONFIGS=${DATASTREAM_RESOURCES%/}/ngen-configs
-    mkdir -p $DATASTREAM_RESOURCES
-    mkdir -p $DATASTREAM_RESOURCES_CONFIGS
-    GRID_FILE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nwm.t00z.short_range.forcing.f001.conus.nc"
-    GRID_FILE_PATH="${DATASTREAM_RESOURCES%/}/nwm_example_grid_file.nc"
-    NGEN_CONF_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/config.ini"
-    NGEN_CONF_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/config.ini"
-    NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/daily_run_realization.json"
-    NGEN_REAL_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/realization.json"
-    NGEN_TROUTE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen.yaml"
-    NGEN_TROUTE_PATH="${DATASTREAM_RESOURCES_CONFIGS%/}/ngen.yaml"
+fi
 
-    WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"
-    WEIGHTS_PATH="${DATASTREAM_RESOURCES%/}/weights_conus.json"
-
-    echo "curl'ing $GRID_FILE_PATH $GRID_FILE_DEFAULT"
-    curl -L -o $GRID_FILE_PATH $GRID_FILE_DEFAULT 
-    echo "curl'ing $NGEN_CONF_PATH $NGEN_CONF_DEFAULT"
-    curl -L -o $NGEN_CONF_PATH $NGEN_CONF_DEFAULT
-    echo "curl'ing $NGEN_REAL_PATH $NGEN_REAL_DEFAULT"
-    curl -L -o $NGEN_REAL_PATH $NGEN_REAL_DEFAULT
-    echo "curl'ing $NGEN_TROUTE_PATH $NGEN_TROUTE_DEFAULT"
-    curl -L -o $NGEN_TROUTE_PATH $NGEN_TROUTE_DEFAULT    
-    echo "curl'ing $WEIGHTS_PATH $WEIGHTS_DEFAULT"
-    curl -L -o $WEIGHTS_PATH $WEIGHTS_DEFAULT
-
-    GEOPACKAGE="conus.gpkg"
-    GEOPACKAGE_DEFAULT="https://lynker-spatial.s3.amazonaws.com/v20.1/$GEOPACKAGE"
-    GEOPACKAGE_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"    
-    echo "curl'ing $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT"
-    curl -L -o $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_DEFAULT
-
-    PARTITON="partitions_$(grep -c ^processor /proc/cpuinfo).json"
-    PARTITION_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/"$PARTITON
-    PARTITION_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$PARTITON"
-    PARTITION_NGENRUN_PATH="${NGEN_RUN_PATH%/}/$PARTITON"
-    echo "curl'ing $PARTITION_RESOURCES_PATH $PARTITION_DEFAULT, copying into $PARTITION_NGENRUN_PATH"
-    curl -L -o $PARTITION_RESOURCES_PATH $PARTITION_DEFAULT
+GRID_FILE_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm_example_grid_file.nc")
+WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
+GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+PARTITON="partitions_$(grep -c ^processor /proc/cpuinfo).json"
+PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*ngen.yaml")
+if [ -z $PARTITION_RESOURCES_PATH ]; then
     cp $PARTITION_RESOURCES_PATH $PARTITION_NGENRUN_PATH
-
 fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
+
+if [ -z "$SUBSET_ID" ]; then
+    :
+else
+    if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
+        echo "Overriding "$GEOPACKAGE_RESOURCES_PATH" with $SUBSET_ID"
+        GEOPACKAGE_RESOURCES_PATH="NULL"
+    fi
+    if [ -e $WEIGHTS_PATH ]; then
+        echo "Overriding "$WEIGHTS_PATH" with $SUBSET_ID"
+        WEIGHTS_PATH="NULL"
+    fi    
+fi
 
 if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
     echo $GEOPACKAGE_RESOURCES_PATH
@@ -223,10 +200,10 @@ DOCKER_TAG="forcingprocessor"
 FP_DOCKER="${DOCKER_DIR%/}/forcingprocessor"
 build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 
-if [ -e "$WEIGHTS_FILENAME" ]; then
-    echo "Using weights found in resources directory $WEIGHTS_FILENAME"
-    if [[ $(basename $WEIGHTS_FILENAME) != "weights.json" ]]; then
-        mv "$WEIGHTS_FILENAME" ""$DATASTREAM_RESOURCES"/weights.json"
+if [ -e "$WEIGHTS_PATH" ]; then
+    echo "Using weights found in resources directory $WEIGHTS_PATH"
+    if [[ $(basename $WEIGHTS_PATH) != "weights.json" ]]; then
+        mv "$WEIGHTS_PATH" ""$DATASTREAM_RESOURCES"/weights.json"
     fi
 else
     echo "Weights file not found. Creating from" $GEOPACKAGE
