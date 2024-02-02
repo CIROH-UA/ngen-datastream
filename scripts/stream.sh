@@ -93,13 +93,6 @@ fi
 mkdir -p $DATA_PATH
 NGEN_RUN_PATH="${DATA_PATH%/}/ngen-run"
 
-if [ -e "$DATA_PATH" ]; then
-    :
-else
-    echo "$DATA_PATH doesn't not exist!"
-    exit 1
-fi
-
 DATASTREAM_CONF_PATH="${DATA_PATH%/}/datastream-configs"
 DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
 mkdir -p $DATASTREAM_CONF_PATH
