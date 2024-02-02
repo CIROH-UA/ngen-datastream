@@ -1,6 +1,9 @@
 ARG FUNCTION_DIR="/ngen-datastream"
 FROM python:3.9 as build-image
 
+RUN apt-get upgrade
+RUN apt-get install -y pigz
+
 ARG FUNCTION_DIR
 WORKDIR /tmp
 RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
