@@ -1,14 +1,11 @@
 ARG FUNCTION_DIR="/ngen-datastream"
 FROM python:3.9 as build-image
 
-RUN apt-get upgrade
-RUN apt-get install -y pigz
-
 ARG FUNCTION_DIR
 WORKDIR /tmp
 RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
 
-FROM python:3.9-slim
+FROM python:3.9
 ARG FUNCTION_DIR
 WORKDIR ${FUNCTION_DIR}
 COPY --from=build-image /tmp/${FUNCTION_DIR} ${FUNCTION_DIR}
@@ -16,5 +13,9 @@ RUN pip3 install --upgrade pip && pip3 install -e "${FUNCTION_DIR}/forcingproces
 
 RUN groupadd -r mygroup && useradd -r -g mygroup myuser
 RUN chown -R myuser:mygroup ${FUNCTION_DIR}
+USER root
+RUN apt-get update && apt-get install -y pigz
+
 USER myuser
+
 
