@@ -121,10 +121,7 @@ else
     if [[ $RESOURCE_PATH == *"https://"* ]]; then
         echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
         curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
-        if [[ $RESOURCE_PATH == *".tar."* ]]; then
-            tar -xzvf $(basename $RESOURCE_PATH)
-        fi
-    elif [[ $RESOURCE_PATH == *"s3://"* ]]; then
+    elif [ $RESOURCE_PATH == *"s3://"* ]; then
         aws s3 sync $RESOURCE_PATH $DATASTREAM_RESOURCES
     else
         if [ -e "$RESOURCE_PATH" ]; then
@@ -134,6 +131,11 @@ else
             echo $RESOURCE_PATH " provided doesn't exist!"
         fi
     fi
+fi
+
+if [[ $RESOURCE_PATH == *".tar."* ]]; then
+    echo UNTESTED
+    tar -xzvf $(basename $RESOURCE_PATH)
 fi
 
 GRID_FILE_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm_example_grid_file.nc")
@@ -163,6 +165,7 @@ fi
 
 if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
     echo $GEOPACKAGE_RESOURCES_PATH
+    GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
     cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
@@ -207,14 +210,13 @@ if [ -e "$WEIGHTS_PATH" ]; then
     fi
 else
     echo "Weights file not found. Creating from" $GEOPACKAGE
-    NWM_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm*")
-    NWM_FILENAME=$(basename $NWM_FILE)
+    GRID_FILENAME=$(basename $GRID_FILE_PATH)
 
     GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/$GEOPACKAGE"
     WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
-    NWM_DOCKER=""$DOCKER_RESOURCES"/$NWM_FILENAME"
-    if [ -e "$NWM_FILE" ]; then
-        echo "Found $NWM_FILE"
+    GRID_DOCKER=""$DOCKER_RESOURCES"/$GRID_FILENAME"
+    if [ -e "$GRID_FILE_PATH" ]; then
+        echo "Found $GRID_FILE_PATH"
     else
         echo "Missing nwm example grid file!"
         exit 1
@@ -224,7 +226,7 @@ else
         -u $(id -u):$(id -g) \
         -w "$DOCKER_MOUNT" forcingprocessor \
         python "$DOCKER_FP_PATH"weight_generator.py \
-        $GEO_PATH_DOCKER $WEIGHTS_DOCKER $NWM_DOCKER
+        $GEO_PATH_DOCKER $WEIGHTS_DOCKER $GRID_DOCKER
 
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
 fi
