@@ -47,7 +47,7 @@ def generate_weights_file(geopackage,grid_file,weights_filepath):
     except:
         raise Exception(f'\n\nThere\'s a problem with {example_grid_filepath}!\n')
 
-    g_df = gpd.read_file(geopackage, layer='divide_id')
+    g_df = gpd.read_file(geopackage, layer='divides')
     gdf_proj = g_df.to_crs(projection)
 
     crosswalk_dict = {}
