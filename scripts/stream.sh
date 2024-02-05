@@ -36,10 +36,12 @@ END_DATE=""
 DATA_PATH=""
 RESOURCE_PATH=""
 RELATIVE_TO=""
+S3_MOUNT=""
 SUBSET_ID_TYPE=""
 SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
+
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -157,7 +159,6 @@ else
 fi
 
 if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
-    echo $GEOPACKAGE_RESOURCES_PATH
     GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
     cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
 else
@@ -215,7 +216,7 @@ else
         exit 1
     fi
 
-    docker run -it -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+    docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
         -w "$DOCKER_MOUNT" forcingprocessor \
         python "$DOCKER_FP_PATH"weight_generator.py \
@@ -236,14 +237,14 @@ python3 $CONF_GENERATOR \
     --hydrofabric-version "$HYDROFABRIC_VERSION"
 
 echo "Creating nwm filenames file"
-docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
     "$DOCKER_MOUNT"/datastream-configs/conf_nwmurl.json
 
 echo "Creating forcing files"
-docker run -it --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
@@ -254,22 +255,21 @@ VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
 
 echo "Validating " $NGEN_RUN_PATH
-docker run -it --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
 
 # ngen run
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
-docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
  
-mv $NGEN_RUN_PATH/*.csv $NGEN_OUTPUT_PATH
-
 # hashing
-docker run --rm -it -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
-# manage outputs
-aws s3 sync $DATA_PATH s3://ngen-datastream/daily/$DATE
+if [ -z $S3_MOUNT ]; then
+    mkdir $S3_MOUNT/$DATE
+    cp -r $NGEN_RUN_PATH $S3_MOUNT/$DATE
