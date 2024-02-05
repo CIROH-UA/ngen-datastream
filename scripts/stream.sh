@@ -224,8 +224,6 @@ else
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
 fi
 
-python3 -m pip install --upgrade pip
-pip3 install -r $PACAKGE_DIR/requirements.txt --no-cache
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
 python3 $CONF_GENERATOR \
     --start-date "$START_DATE" \
