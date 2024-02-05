@@ -1,18 +1,39 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-08cba41c585e4a2e2",
-    "InstanceType"       : "c5n.2xlarge",
+    "ImageId"            : "ami-02cf2f3fa2111b506",
+    "InstanceType"       : "c5n.18xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
     "MaxCount"           : 1,
-    "SecurityGroupIds"   : ["sg-0fc864d44ef677a07"],
+    "SecurityGroupIds"   : ["sg-066e56297c706ac84"],
     "IamInstanceProfile" : {
       "Name" : "Processor"
-    }
+    },
+    "TagSpecifications"   :[
+      {
+          "ResourceType": "instance",
+          "Tags": [
+              {
+                  "Key"   : "Name",
+                  "Value" : "ngendatastream_DATE"
+              }
+          ]
+      }
+  ],
+    "BlockDeviceMappings":[
+      {
+          "DeviceName": "/dev/xvda",  
+          "Ebs": {
+              "VolumeSize": 128,
+              "VolumeType": "gp2"  
+          }
+      }
+    ]
   },
 
-  "config_bucket" : "ngenresourcesdev",
-  "run_type"      : "dailyrun",
-  "obj_key"       : "/forcings/forcings.tar.gz"
+  "region"   : "us-east-2",
+  "commands"  : ["/home/ec2-user/ngen-datastream/scripts/stream.sh -c /home/ec2-user/ngen-datastream/configs/conf_datastream_daily.sh"],
+  "bucket"   : "ngen-datastream",
+  "obj_key"  : "daily/DATE/ngen-run/outputs/cat-1.csv"
 }

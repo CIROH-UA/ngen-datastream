@@ -22,9 +22,8 @@ def wait_for_object_existence(bucket_name,object_key):
 def lambda_handler(event, context):
     
     bucket  = event['bucket']
-    prefix  = event['prefix']
     obj_key = event['obj_key']
-    wait_for_object_existence(bucket, prefix + obj_key)
+    wait_for_object_existence(bucket, obj_key)
     
     print(f'{obj_key} exists! Success!')
     return event
