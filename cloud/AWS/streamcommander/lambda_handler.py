@@ -36,7 +36,9 @@ def lambda_handler(event, context):
     response = client_ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName='AWS-RunShellScript',
-        Parameters={'commands': event['commands']}
+        Parameters={'commands': event['commands'],
+                    "executionTimeout": [f"{3600*24}" for x in range(len(event['commands']))]
+                    }
     )
     wait_for_command_response(response,instance_id)
     print(f'{instance_id} is launched and processing forcings')

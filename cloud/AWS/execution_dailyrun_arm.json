@@ -1,12 +1,12 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-04d28890d40332840",
-    "InstanceType"       : "c5n.18xlarge",
+    "ImageId"            : "ami-0f3181afcca1d96cd",
+    "InstanceType"       : "hpc7g.16xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
     "MaxCount"           : 1,
-    "SecurityGroupIds"   : ["sg-066e56297c706ac84"],
+    "SecurityGroupIds"   : ["sg-0ab5f40d1eb97d163"],
     "IamInstanceProfile" : {
       "Name" : "Processor"
     },
@@ -32,7 +32,7 @@
     ]
   },
 
-  "region"   : "us-east-2",
+  "region"   : "us-east-1",
   "commands"  : ["mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount", "/home/ec2-user/ngen-datastream/scripts/stream.sh -c /home/ec2-user/ngen-datastream/configs/conf_datastream_daily.sh > /home/ec2-user/ngen-datastream/log.txt"],
   "bucket"   : "ngen-datastream",
   "obj_key"  : "daily/DATE/ngen-run/outputs/cat-1.csv"
