@@ -1,0 +1,166 @@
+{
+    "Comment": "A description of my state machine",
+    "StartAt": "EC2StarterFromAMI",
+    "States": {
+      "EC2StarterFromAMI": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:us-east-2:857712214391:function:ec2start_ami:$LATEST"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException",
+              "Lambda.TooManyRequestsException",
+              "States.Timeout"
+            ],
+            "BackoffRate": 2,
+            "Comment": "Try restarting",
+            "IntervalSeconds": 2,
+            "MaxAttempts": 10
+          }
+        ],
+        "Next": "Commander"
+      },
+      "Commander": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:us-east-2:857712214391:function:ec2commander:$LATEST"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException",
+              "Lambda.TooManyRequestsException"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 3,
+            "BackoffRate": 2
+          }
+        ],
+        "Next": "EC2Poller",
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.TaskFailed"
+            ],
+            "Comment": "In case of failure",
+            "Next": "EC2Stopper",
+            "ResultPath": "$.failedInput"
+          }
+        ]
+      },
+      "EC2Poller": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:us-east-2:857712214391:function:CommandPoller:$LATEST"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "States.Timeout"
+            ],
+            "IntervalSeconds": 1,
+            "Comment": "Retry for a long time just incase forcingprocessor takes awhile",
+            "BackoffRate": 1,
+            "MaxAttempts": 100
+          }
+        ],
+        "Next": "Choice",
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.TaskFailed"
+            ],
+            "Next": "EC2Stopper",
+            "Comment": "Kill EC2 incase of failure",
+            "ResultPath": "$.failedInput"
+          }
+        ]
+      },
+      "Choice": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.ii_pass",
+            "BooleanEquals": true,
+            "Next": "RunChecker"
+          },
+          {
+            "Variable": "$.ii_pass",
+            "BooleanEquals": false,
+            "Next": "EC2Poller"
+          }
+        ]
+      },
+      "RunChecker": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:us-east-2:857712214391:function:S3ObjectChecker:$LATEST"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException",
+              "Lambda.TooManyRequestsException"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 3,
+            "BackoffRate": 2
+          }
+        ],
+        "Next": "EC2Stopper",
+        "Catch": [
+          {
+            "ErrorEquals": [
+              "States.TaskFailed"
+            ],
+            "Comment": "Kill EC2 incase of failure",
+            "Next": "EC2Stopper",
+            "ResultPath": "$.failedInput"
+          }
+        ]
+      },
+      "EC2Stopper": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:us-east-2:857712214391:function:EC2Stopper:$LATEST"
+        },
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException",
+              "Lambda.TooManyRequestsException"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 3,
+            "BackoffRate": 2
+          }
+        ],
+        "End": true
+      }
+    }
+  }
