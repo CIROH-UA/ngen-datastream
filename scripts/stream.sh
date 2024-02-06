@@ -53,6 +53,7 @@ while [ "$#" -gt 0 ]; do
         -i|--id-type) SUBSET_ID_TYPE="$2"; shift 2;;
         -I|--id) SUBSET_ID="$2"; shift 2;;
         -v|--version) HYDROFABRIC_VERSION="$2"; shift 2;;
+        -S|--s3-mount) S3_MOUNT="$2"; shift 2;;
         -c|--conf-file) CONF_FILE="$2"; shift 2;;
         *) usage;;
     esac

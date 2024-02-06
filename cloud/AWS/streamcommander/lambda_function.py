@@ -37,7 +37,7 @@ def lambda_handler(event, context):
         InstanceIds=[instance_id],
         DocumentName='AWS-RunShellScript',
         Parameters={'commands': event['commands'],
-                    "executionTimeout": [f"{3600*24}" for x in range(len(event['commands']))]
+                    "executionTimeout": [f"{3600*24}"]
                     }
     )
     wait_for_command_response(response,instance_id)
