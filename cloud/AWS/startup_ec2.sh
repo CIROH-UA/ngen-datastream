@@ -25,8 +25,8 @@ sudo dnf install docker -y
 sudo systemctl start docker
 sudo usermod -aG docker ${USER}
 mkdir -p /home/ec2-user/ngen-datastream/data/mount
-
 sudo yum install -y ./mount-s3.rpm
+
 echo "cd docker && sudo docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . && docker build -t awiciroh/t-route:latest -f Dockerfile.t-route . --no-cache && docker build -t awiciroh/ngen -f Dockerfile.ngen . --no-cache && docker build -t awiciroh/ciroh-ngen-image:latest-local -f Dockerfile . --no-cache"
 echo "copy that ^^ and log out of session, log back in and run that command"
 
