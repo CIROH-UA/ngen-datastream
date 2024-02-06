@@ -76,6 +76,7 @@ fi
 DATE=$(env TZ=US/Eastern date +'%Y%m%d')
 if [ $START_DATE == "DAILY" ]; then
     DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
+    S3_OUT="$S3_MOUNT/daily"
 fi
 
 if [ ${#RELATIVE_TO} -gt 0 ] ; then
@@ -264,12 +265,16 @@ echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
  
 # hashing
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
+mv $DATASTREAM_RESOURCES "../datastream-resources-$DATE"
+
 if [ -z $S3_MOUNT ]; then
-    mkdir $S3_MOUNT/$DATE
-    cp -r $NGEN_RUN_PATH $S3_MOUNT/$DATE
+    mkdir -p $S3_MOUNT
+    mount-s3 ngen-datastream $S3_MOUNT
+    cp -r $DATA_PATH $S3_OUT
+    
