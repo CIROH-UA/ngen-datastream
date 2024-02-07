@@ -1,4 +1,4 @@
-import pytest, os
+import pytest, os, json
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
@@ -64,7 +64,12 @@ def test_generate_weights(get_paths):
     catchment_list = list(weights_df.divide_id.unique())
     del weights_df        
     
-    get_weight_json(catchment_list,0)
+    weights = get_weight_json(catchment_list,0)
+    
+    data = json.dumps(weights)
+    with open(pytest.full_weight,'w') as fp:
+        fp.write(data)    
+        
     assert pytest.full_weight.exists()
 
 def test_processor(get_time, get_paths):
