@@ -9,11 +9,7 @@ from forcingprocessor.forcingprocessor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 from forcingprocessor.weights_parq2json import get_weight_json
 
-grid_filename   = "nwm.t00z.medium_range.forcing.f001.conus.nc"
-geopkg_filename = "Gages-04185000.gpkg"
-weight_name     = "Gages-04185000-weights.json"
-
-geopkg_file     = f"https://ngenresourcesdev.s3.us-east-2.amazonaws.com/{geopkg_filename}"
+weight_name = "weights_01.json"
 
 @pytest.fixture()
 def get_time():
@@ -29,11 +25,7 @@ def get_paths():
     pytest.pwd      = pwd
     pytest.data_dir = data_dir
 
-    full_geo    = (data_dir/geopkg_filename).resolve()
-    full_grid   = (data_dir/grid_filename).resolve()
     full_weight = (data_dir/weight_name).resolve()
-    pytest.full_geo    = full_geo
-    pytest.full_grid   = full_grid
     pytest.full_weight = full_weight
 
     pytest.filenamelist = (pwd/"filenamelist.txt").resolve()
@@ -59,17 +51,13 @@ def test_generate_filenames(get_paths, get_time):
     assert pytest.filenamelist.exists()
 
 def test_generate_weights(get_paths):
-    uri = "s3://lynker-spatial/v20.1/forcing_weights/forcing_weights_01.parquet"
-    weights_df = pd.read_parquet(uri)
-    catchment_list = list(weights_df.divide_id.unique())
-    del weights_df        
     
-    weights = get_weight_json(catchment_list,0)
-    
+    weights = get_weight_json(["cat-1","cat-10","cat-100","cat-1000","cat-10000","cat-100000"],0)
+
     data = json.dumps(weights)
     with open(pytest.full_weight,'w') as fp:
         fp.write(data)    
-        
+
     assert pytest.full_weight.exists()
 
 def test_processor(get_time, get_paths):
