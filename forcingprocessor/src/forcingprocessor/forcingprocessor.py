@@ -180,6 +180,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
     data_list = []
     t_list = []
     nfiles = len(nwm_files)
+    nvar = len(nwm_variables)
     if fs_type == 'google' : fs = gcsfs.GCSFileSystem() 
     id = os.getpid()
     if ii_verbose: print(f'Process #{id} extracting data from {nfiles} files',end=None,flush=True)
@@ -203,7 +204,7 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()
             shp = nwm_data["U2D"].shape
-            data_allvars = np.zeros(shape=(len(nwm_variables), shp[1], shp[2]), dtype=np.float32)            
+            data_allvars = np.zeros(shape=(nvar, shp[1], shp[2]), dtype=np.float32)            
             for var_dx, jvar in enumerate(nwm_variables):                
                 if jvar == 'RAINRATE': # HACK CONVERSION
                     data_allvars[var_dx, :, :] = 3600 * np.squeeze(nwm_data[jvar].values)
@@ -214,15 +215,21 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
             t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
         del nwm_data
-        tfill += time.perf_counter() - t0
+        tfill += time.perf_counter() - t0        
 
         t0 = time.perf_counter()
+        data_allvars = data_allvars.reshape(nvar, shp[1] * shp[2])
         ncatch = len(crosswalk_dict)
-        nvar   = len(nwm_variables)
         data_array = np.zeros((nvar,ncatch), dtype=np.float32)
         jcatch = 0
         for key, value in crosswalk_dict.items(): 
-            data_array[:,jcatch] = np.nanmean(data_allvars[:, value[0], value[1]], axis=1)   
+            weights = value[0]
+            coverage = np.array(value[1])
+            coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
+            jcatch_data_mask = data_allvars[:,weights] 
+            weight_sum = np.sum(coverage)
+            data_array[:,jcatch] = np.sum(coverage_mat * jcatch_data_mask ,axis=1) / weight_sum  
+
             jcatch += 1  
         data_list.append(data_array)
         tdata += time.perf_counter() - t0
@@ -520,7 +527,7 @@ def prep_ngen_data(conf):
                 Bucket=output_bucket,
                 Key=f"{output_path}/metadata/forcings_metadata/conf.json"
             )
-        
+
     if ii_verbose: print(f'Opening weight file...\n')        
     ii_weights_in_bucket = weight_file.find('//') >= 0
     if ii_weights_in_bucket:
@@ -587,8 +594,8 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n')
-        # [data_array, t_ax] = forcing_grid2catchment(crosswalk_dict, jnwm_files, fs)
-        data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_process,crosswalk_dict,fs)
+        [data_array, t_ax] = forcing_grid2catchment(crosswalk_dict, jnwm_files, fs)
+        # data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_process,crosswalk_dict,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
         score = complexity / t_extract
