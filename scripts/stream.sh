@@ -135,7 +135,6 @@ if [[ $RESOURCE_PATH == *".tar."* ]]; then
     tar -xzvf $(basename $RESOURCE_PATH)
 fi
 
-GRID_FILE_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwm_example_grid_file.nc")
 WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
 PARTITON="partitions_$(grep -c ^processor /proc/cpuinfo).json"
@@ -206,23 +205,15 @@ if [ -e "$WEIGHTS_PATH" ]; then
     fi
 else
     echo "Weights file not found. Creating from" $GEOPACKAGE
-    GRID_FILENAME=$(basename $GRID_FILE_PATH)
 
     GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/$GEOPACKAGE"
     WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
-    GRID_DOCKER=""$DOCKER_RESOURCES"/$GRID_FILENAME"
-    if [ -e "$GRID_FILE_PATH" ]; then
-        echo "Found $GRID_FILE_PATH"
-    else
-        echo "Missing nwm example grid file!"
-        exit 1
-    fi
 
     docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
         -w "$DOCKER_MOUNT" forcingprocessor \
-        python "$DOCKER_FP_PATH"weight_generator.py \
-        $GEO_PATH_DOCKER $WEIGHTS_DOCKER $GRID_DOCKER
+        python "$DOCKER_FP_PATH"weights_parq2json.py \
+        --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER
 
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
 fi
@@ -275,7 +266,5 @@ tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 mv $DATASTREAM_RESOURCES "../datastream-resources-$DATE"
 
 if [ -z $S3_MOUNT ]; then
-    mkdir -p $S3_MOUNT
-    mount-s3 ngen-datastream $S3_MOUNT
     cp -r $DATA_PATH $S3_OUT
     
