@@ -1,4 +1,5 @@
 import pytest, os
+import pandas as pd
 from pathlib import Path
 from datetime import datetime
 import requests
@@ -6,7 +7,7 @@ from datetime import datetime
 
 from forcingprocessor.forcingprocessor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
-from forcingprocessor.weight_generator import generate_weights_file
+from forcingprocessor.weights_parq2json import get_weight_json
 
 grid_filename   = "nwm.t00z.medium_range.forcing.f001.conus.nc"
 geopkg_filename = "Gages-04185000.gpkg"
@@ -58,17 +59,12 @@ def test_generate_filenames(get_paths, get_time):
     assert pytest.filenamelist.exists()
 
 def test_generate_weights(get_paths):
-
-    geopkg_local = (pytest.data_dir/geopkg_filename).resolve()
-    if not geopkg_local.exists(): 
-        os.system(f'wget {geopkg_file} -P {pytest.data_dir}')
-
-    grid_file    = f"https://noaa-nwm-pds.s3.amazonaws.com/nwm.{pytest.date}/forcing_medium_range/{grid_filename}"
-    grid_local = (pytest.data_dir/grid_filename).resolve()
-    if not grid_local.exists(): 
-        os.system(f'wget {grid_file} -P {pytest.data_dir}')
+    uri = "s3://lynker-spatial/v20.1/forcing_weights/forcing_weights_01.parquet"
+    weights_df = pd.read_parquet(uri)
+    catchment_list = list(weights_df.divide_id.unique())
+    del weights_df        
     
-    generate_weights_file(pytest.full_geo, pytest.full_grid, pytest.full_weight)
+    get_weight_json(catchment_list,0)
     assert pytest.full_weight.exists()
 
 def test_processor(get_time, get_paths):
