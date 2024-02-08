@@ -120,8 +120,8 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time
     
     """
-    launch_time     = 2.5
-    cycle_time      = 48
+    launch_time     = 0.1
+    cycle_time      = 35
     files_per_cycle = 1
     files_per_proc  = distribute_work(files,nprocs)
     files_per_proc  = load_balance(files_per_proc,launch_time,cycle_time,files_per_cycle)
@@ -129,22 +129,23 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
 
     start  = 0
     nfiles = len(files)
-    crosswalk_dict_list = []
     files_list          = []
     fs_list             = []
     for i in range(nprocs):
         end = min(start + files_per_proc[i],nfiles)
-        crosswalk_dict_list.append(crosswalk_dict)
         files_list.append(files[start:end])
         fs_list.append(fs)
         start = end
 
+    def init_pool(the_data):
+        global weights_json
+        weights_json = the_data        
+
     data_ax = []
     t_ax_local = []
-    with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
+    with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(crosswalk_dict,)) as pool:
         for results in pool.map(
         forcing_grid2catchment,
-        crosswalk_dict_list,
         files_list,
         fs_list
         ):
@@ -159,12 +160,11 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
   
     return data_array, t_ax_local
 
-def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
+def forcing_grid2catchment(nwm_files: list, fs=None):
     """
     General function to retrieve catchment level data from national water model files
 
     Inputs:
-    crosswalk_dict: dict of catchments to use as indices
     nwm_files: list of filenames (urls for remote, local paths otherwise),
     fs: an optional file system for cloud storage reads
 
@@ -219,10 +219,10 @@ def forcing_grid2catchment(crosswalk_dict: dict, nwm_files: list, fs=None):
 
         t0 = time.perf_counter()
         data_allvars = data_allvars.reshape(nvar, shp[1] * shp[2])
-        ncatch = len(crosswalk_dict)
+        ncatch = len(weights_json)
         data_array = np.zeros((nvar,ncatch), dtype=np.float32)
         jcatch = 0
-        for key, value in crosswalk_dict.items(): 
+        for key, value in weights_json.items(): 
             weights = value[0]
             coverage = np.array(value[1])
             coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
