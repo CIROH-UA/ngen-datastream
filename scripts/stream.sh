@@ -265,6 +265,6 @@ tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
 mv $DATASTREAM_RESOURCES "../datastream-resources-$DATE"
 
-if [ -z $S3_MOUNT ]; then
+if [ -n $S3_MOUNT ]; then
     cp -r $DATA_PATH $S3_OUT
     
