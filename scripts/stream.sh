@@ -76,9 +76,22 @@ fi
 
 DATE=$(env TZ=US/Eastern date +'%Y%m%d')
 if [ $START_DATE == "DAILY" ]; then
-    DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
-    S3_OUT="$S3_MOUNT/daily"
+    if [ -z $END_DATE ]; then
+        DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
+    else
+        DATA_PATH="${PACAKGE_DIR%/}/data/$END_DATE"
+    fi
+    if [ -n $S3_MOUNT ]; then
+        S3_OUT="$S3_MOUNT/daily"
+    fi
+else
+    DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
+    if [ -n $S3_MOUNT ]; then
+        S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
+    fi
 fi
+
+echo "DATA_PATH: " $DATA_PATH
 
 if [ ${#RELATIVE_TO} -gt 0 ] ; then
     echo "Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
