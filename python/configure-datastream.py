@@ -71,10 +71,14 @@ def create_ds_confs_daily(conf, today, tomorrow):
     return conf, fp_conf, nwm_conf
 
 def create_confs(conf):
-    
+        
     if conf['globals']['start_date'] == "DAILY":
-        now = datetime.now(tz.timezone('US/Eastern'))
-        today = now.replace(hour=1, minute=0, second=0, microsecond=0)
+        if conf['globals']['end_date'] != "":
+            # allows for a "daily" run that is not the current date
+            start_date = datetime.strptime(conf['globals']['end_date'],'%Y%m%d')
+        else:
+            start_date = datetime.now(tz.timezone('US/Eastern'))
+        today = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
         tomorrow = today + timedelta(hours=23)
         
         today_ds_confs = today.strftime('%Y%m%d%H%M')
@@ -92,8 +96,6 @@ def create_confs(conf):
         data_dir = Path(conf['globals']['relative_to'],conf['globals']['data_dir'])
         ngen_config_dir = Path(data_dir,'ngen-run','config')
         datastream_config_dir = Path(data_dir,'datastream-configs')
-        resources_dir = Path(data_dir,'datastream-resources')
-        resources_config_dir = Path(resources_dir,'ngen-configs')        
         
         ds_conf, fp_conf, nwm_conf = create_ds_confs_daily(conf, today_ds_confs, tomorrow_ds_confs)
 
