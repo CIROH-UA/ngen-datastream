@@ -8,7 +8,7 @@
     "MaxCount"           : 1,
     "SecurityGroupIds"   : ["sg-066e56297c706ac84"],
     "IamInstanceProfile" : {
-      "Name" : "Processor"
+      "Name" : "EC2ForcingProcessor"
     },
     "TagSpecifications"   :[
       {
