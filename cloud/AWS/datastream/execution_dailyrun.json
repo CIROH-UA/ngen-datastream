@@ -1,7 +1,7 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-0d93002aa2fb716c2",
+    "ImageId"            : "ami-0f543bde58455541d",
     "InstanceType"       : "c5n.18xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
@@ -34,9 +34,9 @@
 
   "region"   : "us-east-2",
   "commands"  : [
-    "mkdir -p /home/ec2-user/ngen-datastream/data/mount",
-    "mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount",
-    "/home/ec2-user/ngen-datastream/scripts/stream.sh -c /home/ec2-user/ngen-datastream/configs/conf_datastream_daily.sh > /home/ec2-user/ngen-datastream/log.txt"
+    "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -c /home/ec2-user/ngen-datastream/configs/conf_datastream_daily.sh > /home/ec2-user/ngen-datastream/log.txt'"
   ],
   "bucket"   : "ngen-datastream",
   "obj_key"  : "daily/DATE/ngen-run/outputs/cat-1.csv"
