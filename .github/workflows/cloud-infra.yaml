@@ -27,13 +27,14 @@ jobs:
     #     INSTANCE_TYPE=$(jq -r '.isntance_paramters.InstanceType' ./execution_dailyrun.json)
     #     SECURITY_GRP=$(jq -r '.isntance_paramters.InstanceType' ./execution_dailyrun.json)
     #     ROLE=$(jq -r '.isntance_paramters.IamInstanceProfile' ./execution_dailyrun.json)
+    #     BLOCK_MAPPINGS=$(jq -r '.isntance_paramters.BlockDeviceMappings' ./execution_dailyrun.json)
     #     REGION=$(jq -r '.region' execution_dailyrun.json)      
         
     # - name: Create AMI
     #   run: |        
     #     curl -L -O https://github.com/CIROH-UA/ngen-datastream/blob/main/cloud/AWS/startup_ec2_gh.sh
     #     tag_str="ResourceType=instance,Tags=[{Key=Name,Value="ngen-datastream_$(env TZ=US/Eastern date +'%Y%m%d%H%M')"}]"
-    #     output=$(aws ec2 run-instances --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --instance-type $INSTANCE_TYPE --region $REGION --key-name datastream-github --security-group-ids $SECURITY_GRP --tag-specifications tag_str --user-data  file://startup_ec2_gh.sh --iam-instance-profile Name="EC2ForcingProcessor")
+    #     output=$(aws ec2 run-instances --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --instance-type $INSTANCE_TYPE --region $REGION --key-name datastream-github --security-group-ids $SECURITY_GRP --tag-specifications tag_str --user-data  file://startup_ec2_gh.sh --iam-instance-profile Name=$ROLE --block-device-mappings $BLOCK_MAPPINGS)
     #     instance_id=$(echo $output | jq -r '.Instances[0].InstanceId')
     #     aws ec2 wait instance-running --instance-ids $instance_id
     #     ami_output=$(aws ec2 create-image --instance-id $instance_id --name "My_AMI_Name" --region $REGION --description "My AMI Description")
