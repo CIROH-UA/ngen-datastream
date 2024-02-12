@@ -1,7 +1,7 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-0f543bde58455541d",
+    "ImageId"            : "ami-0a66c9b0ffd24577b",
     "InstanceType"       : "c5n.18xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
