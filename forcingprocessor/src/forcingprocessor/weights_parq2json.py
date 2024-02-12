@@ -7,7 +7,9 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset
 
-def get_weight_json(catchments,jproc):
+def get_weight_json(catchments,jproc,version=None):
+    if version is None: version = "v20.1"
+
     
     weight_data = {}
     ncatch = len(catchments)
@@ -38,12 +40,10 @@ if __name__ == "__main__":
     parser.add_argument('--gpkg', dest="geopackage", type=str, help="Path to geopackage file",default = None)
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
     parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"")
-    args = parser.parse_args() 
+    args = parser.parse_args()
 
-    global version
     version = args.version    
-
-    weight_versions = ["v20.1"]
+    weight_versions = ["v20.1",None]
     if version not in weight_versions: 
         raise Exception(f'version must one of: {weight_versions}')
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         import geopandas as gpd
         gpd.options.io_engine = "pyogrio"
         catchments     = gpd.read_file(args.geopackage, layer='divides')
-        catchment_list = sorted(list(catchments['divide_id']))      
+        catchment_list = sorted(list(catchments['divide_id']))   
 
     nprocs = os.cpu_count() - 2
     catchment_list_list = []
