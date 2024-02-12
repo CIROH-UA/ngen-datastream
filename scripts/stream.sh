@@ -285,6 +285,8 @@ TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
 cp $TAR_PATH $S3_OUT
+cp $DATA_PATH/merkdir.file $S3_OUT
+cp -r $DATASTREAM_CONF_PATH $S3_OUT
 
 echo "ngen-datastream run complete! Data exists here: $S3_OUT"
 echo "and here: $DATA_PATH"
