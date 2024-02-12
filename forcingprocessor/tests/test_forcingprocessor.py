@@ -24,6 +24,7 @@ def get_paths():
     pwd      = Path.cwd()
     pytest.pwd      = pwd
     pytest.data_dir = data_dir
+    os.system(f"mkdir {data_dir}")
 
     full_weight = (data_dir/weight_name).resolve()
     pytest.full_weight = full_weight
