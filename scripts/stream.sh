@@ -42,7 +42,6 @@ SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
 
-
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -s|--start-date) START_DATE="$2"; shift 2;;
@@ -74,6 +73,15 @@ else
     echo "No configuration file detected, using cli args"
 fi
 
+if [ -n "$SUBSET_ID" ]; then    
+    if [ $HYDROFABRIC_VERSION == "v20.1" ]; then
+        :
+    else
+        echo "Subsetting and weight generation are not supported for hydrofabric versions less than v20.1, set to v20.1"
+        exit
+    fi
+fi
+
 DATE=$(env TZ=US/Eastern date +'%Y%m%d')
 if [ $START_DATE == "DAILY" ]; then
     if [ -z $END_DATE ]; then
@@ -82,7 +90,7 @@ if [ $START_DATE == "DAILY" ]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$END_DATE"
     fi
     if [ -n $S3_MOUNT ]; then
-        S3_OUT="$S3_MOUNT/daily"
+        S3_OUT="$S3_MOUNT/daily/$DATE"
     fi
 else
     DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
@@ -150,9 +158,9 @@ fi
 
 WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-PARTITON="partitions_$(grep -c ^processor /proc/cpuinfo).json"
-PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*ngen.yaml")
-if [ -z $PARTITION_RESOURCES_PATH ]; then
+PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
+if [ -e "$PARTITION_RESOURCES_PATH" ]; then
+    echo "Found $PARTITION_RESOURCES_PATH, copying to $$PARTITION_NGENRUN_PATH"
     cp $PARTITION_RESOURCES_PATH $PARTITION_NGENRUN_PATH
 fi
 
@@ -206,7 +214,6 @@ DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
 DOCKER_CONFIGS="${DOCKER_MOUNT%/}/datastream-configs"
 DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
-# forcingprocessor
 DOCKER_TAG="forcingprocessor"
 FP_DOCKER="${DOCKER_DIR%/}/forcingprocessor"
 build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
@@ -229,6 +236,7 @@ else
         --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER
 
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
+        
 fi
 
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
@@ -265,19 +273,19 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
 
-# ngen run
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
+
+echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
  
-# hashing
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
-mv $DATASTREAM_RESOURCES "../datastream-resources-$DATE"
+cp $TAR_PATH $S3_OUT
 
-if [ -n $S3_MOUNT ]; then
-    cp -r $DATA_PATH $S3_OUT
+echo "ngen-datastream run complete! Data exists here: $S3_OUT"
+echo "and here: $DATA_PATH"
     

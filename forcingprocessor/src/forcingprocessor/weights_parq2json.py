@@ -1,7 +1,7 @@
 import pandas as pd
 import concurrent.futures as cf
 import json
-import os, time, argparse
+import os, argparse
 
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -13,7 +13,7 @@ def get_weight_json(catchments,jproc):
     ncatch = len(catchments)
 
     w = pa.dataset.dataset(
-        's3://lynker-spatial/v20.1/forcing_weights.parquet', format='parquet'
+        f's3://lynker-spatial/{version}/forcing_weights.parquet', format='parquet'
     ).filter(
         pc.field('divide_id').isin(catchments)
     ).to_batches()
@@ -37,16 +37,25 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpkg', dest="geopackage", type=str, help="Path to geopackage file",default = None)
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
+    parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"")
     args = parser.parse_args() 
+
+    global version
+    version = args.version    
+
+    weight_versions = ["v20.1"]
+    if version not in weight_versions: 
+        raise Exception(f'version must one of: {weight_versions}')
 
     if args.geopackage is None:
         # go for conus
-        uri = "s3://lynker-spatial/v20.1/forcing_weights.parquet"
+        uri = f"s3://lynker-spatial/{version}/forcing_weights.parquet"
         weights_df = pd.read_parquet(uri)
         catchment_list = list(weights_df.divide_id.unique())
         del weights_df
     else:
         import geopandas as gpd
+        gpd.options.io_engine = "pyogrio"
         catchments     = gpd.read_file(args.geopackage, layer='divides')
         catchment_list = sorted(list(catchments['divide_id']))      
 
@@ -63,7 +72,7 @@ if __name__ == "__main__":
         i = k
         
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
-        results = pool.map(get_weight_json, catchment_list_list,[x for x in range(nprocs)])
+        results = pool.map(get_weight_json,catchment_list_list,[x for x in range(nprocs)])
 
     weights = {}
     for jweights in results:
