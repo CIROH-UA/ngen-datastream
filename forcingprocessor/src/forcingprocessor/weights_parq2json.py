@@ -55,7 +55,7 @@ if __name__ == "__main__":
         del weights_df
     else:
         import geopandas as gpd
-        gpd.options.io_engine = "pyogrio"
+        # gpd.options.io_engine = "pyogrio"
         catchments     = gpd.read_file(args.geopackage, layer='divides')
         catchment_list = sorted(list(catchments['divide_id']))   
 
