@@ -82,20 +82,22 @@ if [ -n "$SUBSET_ID" ]; then
     fi
 fi
 
-DATE=$(env TZ=US/Eastern date +'%Y%m%d')
-if [ $START_DATE == "DAILY" ]; then
-    if [ -z $END_DATE ]; then
-        DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
+if [ -z $DATA_PATH ]; then
+    DATE=$(env TZ=US/Eastern date +'%Y%m%d')
+    if [ $START_DATE == "DAILY" ]; then
+        if [ -z $END_DATE ]; then
+            DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
+        else
+            DATA_PATH="${PACAKGE_DIR%/}/data/$END_DATE"
+        fi
+        if [ -n $S3_MOUNT ]; then
+            S3_OUT="$S3_MOUNT/daily/$DATE"
+        fi
     else
-        DATA_PATH="${PACAKGE_DIR%/}/data/$END_DATE"
-    fi
-    if [ -n $S3_MOUNT ]; then
-        S3_OUT="$S3_MOUNT/daily/$DATE"
-    fi
-else
-    DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
-    if [ -n $S3_MOUNT ]; then
-        S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
+        DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
+        if [ -n $S3_MOUNT ]; then
+            S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
+        fi
     fi
 fi
 
@@ -279,6 +281,8 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:la
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
  
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+
+find . -name '*.csv' -print0 | xargs -0 mv -t $NGEN_OUTPUT_PATH
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
