@@ -1,8 +1,11 @@
 # NextGen Datastream
 The datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. In its current implementation, the datastream is a shell script that orchestrates each step in the process. 
 
+## Disclaimer
+This software is designed for deployment in HPC architecture and will consume the majority of resources by default. The intended use of this software is to take advantage of HPC hardware to solve the necessary computations quickly. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes, the internal algorithms were designed to perform best on a dedicated HPC host.
+
 ## Install
-If you'd like to run the stream, clone this repo and execute the command below. The stream will handle initialization and installation of the datastream tools. To utilize the individual tools in the stream, see their respective readme's for installation instructions.
+[AWS Linux Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/cloud/AWS/startup_ec2.sh)
 
 ## Run it with config file
 ```
@@ -31,6 +34,7 @@ See [config  directory](https://github.com/CIROH-UA/ngen-datastream/tree/main/co
 | DATA_PATH           | Name used in constructing the parent directory of the datastream. Must not exist prior to datastream run | :white_check_mark: |
 | RESOURCE_PATH       | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#datastream-resources-defaults) |  |
 | RELATIVE_TO         | Absolute path to be prepended to any other path given in configuration file |  |
+| S3_MOUNT            | Location of mounted S3 bucket to write out too |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
 | SUBSET_ID           | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
 | HYDROFABRIC_VERSION |  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  |
@@ -72,13 +76,7 @@ datastream-resources/
 #### `ngen-configs/` holds all non-hydrofabric configuration files for NextGen (`realizion.json`,`config.ini`)
 
 #### `datastream-resources/` Defaults
-```
-GRID_FILE_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/nwm.t00z.short_range.forcing.f001.conus.nc"
-NGEN_CONF_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/config.ini"
-NGEN_REAL_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/daily_run_realization.json"
-WEIGHTS_DEFAULT="https://ngenresourcesdev.s3.us-east-2.amazonaws.com/weights_conus_v21.json"https://lynker-spatial.s3.amazonaws.com/v20.1/conus.gpkg
-
-```
+The URI below holds the default resource directory for the datastream, which is used during the "daily" runs. This directory holds files for a standard NGIAB formulation over CONUS. Use `aws s3 ls s3://ngen-datastream/resources_default/` to inspect the files.
 
 ### `ngen-run/` 
 Running NextGen requires building a standard run directory complete with only the necessary files. The datastream constructs this automatically, but can be manually built as well. Below is an explanation of the standard. Reference for discussion of the standard [here](https://github.com/CIROH-UA/NGIAB-CloudInfra/pull/17). 
