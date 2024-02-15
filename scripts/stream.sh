@@ -269,7 +269,7 @@ VALIDATOR="/ngen-datastream/python/run_validator.py"
 DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
-
+    
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
@@ -282,12 +282,13 @@ echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
  
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
-find . -name '*.csv' -print0 | xargs -0 mv -t $NGEN_OUTPUT_PATH
+find . -maxdepth 1 -name $NGEN_RUN_PATH'/*.csv' -print0 | xargs -0 mv -t $NGEN_OUTPUT_PATH
 
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
+mkdir $S3_OUT
 cp $TAR_PATH $S3_OUT
 cp $DATA_PATH/merkdir.file $S3_OUT
 cp -r $DATASTREAM_CONF_PATH $S3_OUT
