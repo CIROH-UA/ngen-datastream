@@ -118,8 +118,8 @@ def create_confs(conf):
     
     ds_conf, fp_conf = create_ds_conf_fp(conf, start, end)
 
-    if len(conf['nwmurl-file']) > 0:
-        with open(conf['nwmurl-file'],'r') as fp:
+    if len(conf['globals']['nwmurl_file']) > 0:
+        with open(conf['globals']['nwmurl_file'],'r') as fp:
             nwm_conf = json.load(fp)
             conf['nwmurl'] = nwm_conf
     else:
