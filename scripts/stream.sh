@@ -89,16 +89,16 @@ if [ $START_DATE == "DAILY" ]; then
     else
         DATA_PATH="${PACAKGE_DIR%/}/data/$END_DATE"
     fi
-    if [ -n $S3_MOUNT ]; then
+    if [ -n "${S3_MOUNT}" ]; then
         S3_OUT="$S3_MOUNT/daily/$DATE"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT        
     fi
 else
-    if [ -z $DATA_PATH ]; then
+    if [ -z "${DATA_PATH}" ]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
     fi
-    if [ -n $S3_MOUNT ]; then
+    if [ -n "${S3_MOUNT}" ]; then
         S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT
@@ -163,7 +163,15 @@ if [[ $RESOURCE_PATH == *".tar."* ]]; then
 fi
 
 WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
+NWEIGHT=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights" | wc -l)
+if [ ${NWEIGHT} -gt 1 ]; then
+    echo "At most one weight file is allowed in "$DATASTREAM_RESOURCES
+fi
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
+if [ ${NGEO} -gt 1 ]; then
+    echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
+fi
 PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
 if [ -e "$PARTITION_RESOURCES_PATH" ]; then
     echo "Found $PARTITION_RESOURCES_PATH, copying to $$PARTITION_NGENRUN_PATH"
