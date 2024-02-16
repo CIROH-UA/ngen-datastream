@@ -120,7 +120,7 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time
     
     """
-    launch_time     = 0.1
+    launch_time     = 0.05
     cycle_time      = 35
     files_per_cycle = 1
     files_per_proc  = distribute_work(files,nprocs)
@@ -246,9 +246,9 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     
     """
 
-    launch_time          = 0.15
-    cycle_time           = 20
-    catchments_per_cycle = 200
+    launch_time          = 0.05
+    cycle_time           = 1
+    catchments_per_cycle = 223
     catchments_per_proc  = distribute_work(catchments,nprocs)
     catchments_per_proc  = load_balance(catchments_per_proc,launch_time,cycle_time,catchments_per_cycle)
 
