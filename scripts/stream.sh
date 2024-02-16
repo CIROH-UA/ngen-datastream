@@ -322,7 +322,7 @@ tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 
 echo "ngen-datastream run complete!"
 
-if [ -n "$S3_OUT" ]; then
+if [ -e "$S3_OUT" ]; then
     cp $TAR_PATH $S3_OUT
     cp $DATA_PATH/merkdir.file $S3_OUT
     cp -r $DATASTREAM_CONF_PATH $S3_OUT
