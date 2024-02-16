@@ -162,19 +162,28 @@ if [[ $RESOURCE_PATH == *".tar."* ]]; then
     tar -xzvf $(basename $RESOURCE_PATH)
 fi
 
+if [ $START_DATE == "DAILY" ]; then
+    :
+else
+    NWMURL_CONF_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*")
+    NNWMURL=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*" | wc -l)
+    if [ "$NNWMURL" -eq "0" ]; then
+        echo "nwmurl_conf.json is missing from "$DATASTREAM_RESOURCES
+        echo "exiting..."
+        exit 1
+    fi    
+    if [ ${NNWMURL} -gt 1 ]; then
+        echo "At most one nwmurl file is allowed in "$DATASTREAM_RESOURCES
+    fi
+    if [ -e "$NWMURL_CONF_PATH" ]; then 
+        echo "Using $NWMURL_CONF_PATH"
+    fi
+fi
+
 WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 NWEIGHT=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights" | wc -l)
 if [ ${NWEIGHT} -gt 1 ]; then
     echo "At most one weight file is allowed in "$DATASTREAM_RESOURCES
-fi
-
-NWMURL_CONF_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "nwmurl")
-NNWMURL=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl" | wc -l)
-if [ ${NNWMURL} -gt 1 ]; then
-    echo "At most one nwmurl file is allowed in "$DATASTREAM_RESOURCES
-fi
-if [ -e "$NWMURL_CONF_PATH" ]; then 
-    echo "Using $NWMURL_CONF_PATH"
 fi
 
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
