@@ -27,16 +27,17 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_ds_conf_fp(conf,start,end):
+def create_conf_fp(start,end,ii_retro):
+    if ii_retro:
+        filename = "retro_filenamelist.txt"
+    else:
+        filename = "filenamelist.txt"
     
-    conf['globals']['start_date'] = start
-    conf['globals']['end_date']   = end
-
     fp_conf = {
         "forcing" : {
             "start_date"   : start,
             "end_date"     : end,
-            "nwm_file"     : "/mounted_dir/datastream-resources/filenamelist.txt",
+            "nwm_file"     : f"/mounted_dir/datastream-resources/{filename}",
             "weight_file"  : "/mounted_dir/datastream-resources/weights.json",
         },
         "storage" : {
@@ -53,14 +54,11 @@ def create_ds_conf_fp(conf,start,end):
         }
     }
 
-    conf['forcingprcoessor'] = fp_conf
+    return fp_conf
 
-    return conf, fp_conf
-
-def create_ds_conf_nwm(conf,start,end):
+def create_conf_nwm_daily(start,end):
 
     num_hrs = 24
-
     nwm_conf = {
         "forcing_type" : "operational_archive",
         "start_date"   : start,
@@ -73,10 +71,7 @@ def create_ds_conf_nwm(conf,start,end):
         "fcst_cycle"   : [0],
         "lead_time"    : [x+1 for x in range(num_hrs)]
     }
-
-    conf['nwmurl'] = nwm_conf
-
-    return conf, nwm_conf    
+    return nwm_conf    
 
 def create_confs(conf):
         
@@ -88,46 +83,40 @@ def create_confs(conf):
             start_date = datetime.now(tz.timezone('US/Eastern'))
         today = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
         tomorrow = today + timedelta(hours=23)
-        
-        today_ds_confs = today.strftime('%Y%m%d%H%M')
-        tomorrow_ds_confs = tomorrow.strftime('%Y%m%d%H%M')
-
-        start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
-        end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
 
         if conf['globals'].get('data_dir',"") == "":
             conf['globals']['data_dir'] = today.strftime('%Y%m%d')
-
         if conf['globals'].get('relative_dir',"") == "":
-            conf['globals']['relative_to'] = str(Path(Path(Path(__file__).resolve()).parents[1],"data"))
+            conf['globals']['relative_to'] = str(Path(Path(Path(__file__).resolve()).parents[1],"data"))        
 
-        start = today_ds_confs
-        end = tomorrow_ds_confs
-        ds_conf, fp_conf = create_ds_conf_fp(conf, start, end)
-        nwm_conf = create_ds_conf_nwm(conf, start, end)
-        
+        start = today.strftime('%Y%m%d%H%M')
+        end = tomorrow.strftime('%Y%m%d%H%M')
+        start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
+        end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
+        nwm_conf = create_conf_nwm_daily(start, end)
+
     else: 
         start = conf['globals']['start_date']
         end   = conf['globals']['end_date']
         start_realization =  datetime.strptime(start,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
         end_realization   =  datetime.strptime(end,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
+        with open(conf['globals']['nwmurl_file'],'r') as fp:
+            nwm_conf = json.load(fp)
+            nwm_conf['start_date'] = start
+            nwm_conf['end_date']   = end
+
+    ii_retro = nwm_conf['forcing_type'] == 'retrospective'
+    fp_conf = create_conf_fp(start, end, ii_retro)  
+    conf['nwmurl'] = nwm_conf 
+    conf['forcingprocessor'] = nwm_conf      
 
     data_dir = Path(conf['globals']['relative_to'],conf['globals']['data_dir'])
     ngen_config_dir = Path(data_dir,'ngen-run','config')
     datastream_config_dir = Path(data_dir,'datastream-configs')        
-    
-    ds_conf, fp_conf = create_ds_conf_fp(conf, start, end)
-
-    if len(conf['globals']['nwmurl_file']) > 0:
-        with open(conf['globals']['nwmurl_file'],'r') as fp:
-            nwm_conf = json.load(fp)
-            conf['nwmurl'] = nwm_conf
-    else:
-        nwm_conf = create_ds_conf_nwm(conf, start, end)
 
     write_json(nwm_conf,datastream_config_dir,'conf_nwmurl.json')
     write_json(fp_conf,datastream_config_dir,'conf_fp.json')
-    write_json(ds_conf,datastream_config_dir,'conf_datastream.json')
+    write_json(conf,datastream_config_dir,'conf_datastream.json')
 
     print(f'\ndatastream configs have been generated and placed here\n{datastream_config_dir}\n')    
     
