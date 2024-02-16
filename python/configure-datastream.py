@@ -10,7 +10,8 @@ def generate_config(args):
             "end_date": args.end_date,
             "data_dir": args.data_dir,
             "relative_to": args.relative_to,
-            "resource_dir": args.resource_dir
+            "resource_dir": args.resource_dir,
+            "nwmurl_file" : args.nwmurl_file
         },
         "subset": {
             "id_type": args.subset_id_type,
@@ -26,7 +27,7 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_ds_confs(conf,start,end):
+def create_ds_conf_fp(conf,start,end):
     
     conf['globals']['start_date'] = start
     conf['globals']['end_date']   = end
@@ -52,6 +53,12 @@ def create_ds_confs(conf,start,end):
         }
     }
 
+    conf['forcingprcoessor'] = fp_conf
+
+    return conf, fp_conf
+
+def create_ds_conf_nwm(conf,start,end):
+
     num_hrs = 24
 
     nwm_conf = {
@@ -67,10 +74,9 @@ def create_ds_confs(conf,start,end):
         "lead_time"    : [x+1 for x in range(num_hrs)]
     }
 
-    conf['forcingprcoessor'] = fp_conf
     conf['nwmurl'] = nwm_conf
 
-    return conf, fp_conf, nwm_conf    
+    return conf, nwm_conf    
 
 def create_confs(conf):
         
@@ -97,7 +103,8 @@ def create_confs(conf):
 
         start = today_ds_confs
         end = tomorrow_ds_confs
-        ds_conf, fp_conf, nwm_conf = create_ds_confs(conf, start, end)                                    
+        ds_conf, fp_conf = create_ds_conf_fp(conf, start, end)
+        nwm_conf = create_ds_conf_nwm(conf, start, end)
         
     else: 
         start = conf['globals']['start_date']
@@ -108,8 +115,16 @@ def create_confs(conf):
     data_dir = Path(conf['globals']['relative_to'],conf['globals']['data_dir'])
     ngen_config_dir = Path(data_dir,'ngen-run','config')
     datastream_config_dir = Path(data_dir,'datastream-configs')        
-        
-    ds_conf, fp_conf, nwm_conf = create_ds_confs(conf, start, end)
+    
+    ds_conf, fp_conf = create_ds_conf_fp(conf, start, end)
+
+    if len(conf['nwmurl-file']) > 0:
+        with open(conf['nwmurl-file'],'r') as fp:
+            nwm_conf = json.load(fp)
+            conf['nwmurl'] = nwm_conf
+    else:
+        nwm_conf = create_ds_conf_nwm(conf, start, end)
+
     write_json(nwm_conf,datastream_config_dir,'conf_nwmurl.json')
     write_json(fp_conf,datastream_config_dir,'conf_fp.json')
     write_json(ds_conf,datastream_config_dir,'conf_datastream.json')
@@ -144,6 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--subset-id-type", help="Set the subset ID type")
     parser.add_argument("--subset-id", help="Set the subset ID")
     parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
+    parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
 
     args = parser.parse_args()
 
