@@ -41,6 +41,7 @@ SUBSET_ID_TYPE=""
 SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
+NWMURL_FILE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -54,6 +55,7 @@ while [ "$#" -gt 0 ]; do
         -v|--version) HYDROFABRIC_VERSION="$2"; shift 2;;
         -S|--s3-mount) S3_MOUNT="$2"; shift 2;;
         -c|--conf-file) CONF_FILE="$2"; shift 2;;
+        -n|--nwmurl_file) NWMURL_FILE="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -262,7 +264,8 @@ python3 $CONF_GENERATOR \
     --resource-dir "$RESOURCE_PATH" \
     --subset-id-type "$SUBSET_ID_TYPE" \
     --subset-id "$SUBSET_ID" \
-    --hydrofabric-version "$HYDROFABRIC_VERSION"
+    --hydrofabric-version "$HYDROFABRIC_VERSION" \
+    --nwmurl_file "$NWMURL_FILE"
 
 echo "Creating nwm filenames file"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
