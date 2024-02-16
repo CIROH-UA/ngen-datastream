@@ -41,7 +41,6 @@ SUBSET_ID_TYPE=""
 SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
-NWMURL_FILE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -55,7 +54,6 @@ while [ "$#" -gt 0 ]; do
         -v|--version) HYDROFABRIC_VERSION="$2"; shift 2;;
         -S|--s3-mount) S3_MOUNT="$2"; shift 2;;
         -c|--conf-file) CONF_FILE="$2"; shift 2;;
-        -n|--nwmurl_file) NWMURL_FILE="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -169,14 +167,26 @@ NWEIGHT=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights" | wc -l)
 if [ ${NWEIGHT} -gt 1 ]; then
     echo "At most one weight file is allowed in "$DATASTREAM_RESOURCES
 fi
+
+NWMURL_CONF_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "nwmurl")
+NNWMURL=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl" | wc -l)
+if [ ${NNWMURL} -gt 1 ]; then
+    echo "At most one nwmurl file is allowed in "$DATASTREAM_RESOURCES
+fi
+if [ -e "$NWMURL_CONF_PATH" ]; then 
+    echo "Using $NWMURL_CONF_PATH"
+fi
+
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
 NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
+
 PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
 if [ -e "$PARTITION_RESOURCES_PATH" ]; then
-    echo "Found $PARTITION_RESOURCES_PATH, copying to $$PARTITION_NGENRUN_PATH"
+    PARTITION_NGENRUN_PATH=$NGEN_RUN_PATH/$(basename $PARTITION_RESOURCES_PATH)
+    echo "Found $PARTITION_RESOURCES_PATH, copying to $PARTITION_NGENRUN_PATH"
     cp $PARTITION_RESOURCES_PATH $PARTITION_NGENRUN_PATH
 fi
 
@@ -265,7 +275,7 @@ python3 $CONF_GENERATOR \
     --subset-id-type "$SUBSET_ID_TYPE" \
     --subset-id "$SUBSET_ID" \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
-    --nwmurl_file "$NWMURL_FILE"
+    --nwmurl_file "$NWMURL_CONF_PATH"
 
 echo "Creating nwm filenames file"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
