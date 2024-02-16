@@ -234,7 +234,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
         data_list.append(data_array)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
-        if ii_verbose: print(f'\nTime for fs open file: {topen:.2f}\nTime for xarray open dataset: {txrds:.2f}\nTime to fill array: {tfill:.2f}\nTime to calculate catchment values: {tdata:.2f}\nAverage time per file {ttotal/(j+1):.2f} s', end=None,flush=True)
+        if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s', end=None,flush=True)
         report_usage()
 
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process')
