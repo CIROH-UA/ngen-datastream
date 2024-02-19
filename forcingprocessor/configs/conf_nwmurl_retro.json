@@ -1,0 +1,9 @@
+{
+    "forcing_type" : "retrospective",
+    "start_date"   : "",
+    "end_date"     : "",
+    "urlbaseinput" : 1,
+    "selected_object_type" : [1],
+    "selected_var_types"   : [6],
+    "write_to_file" : true
+}
