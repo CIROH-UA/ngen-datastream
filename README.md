@@ -9,9 +9,9 @@ This software is designed for deployment in HPC architecture and will consume th
 
 ## Run it
 ```
-> ./scripts/stream.sh --help
+> ./ngen-datastream/scripts/stream.sh --help
 
-Usage: ./scripts/stream.sh [options]
+Usage: ./ngen-datastream/scripts/stream.sh [options]
 Either provide a datastream configuration file
   -c, --CONF-FILE           <Path to datastream configuration file>
 or run with cli args
