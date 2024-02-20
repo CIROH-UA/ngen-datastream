@@ -85,13 +85,11 @@ A text file given to forcingprocessor that contains each nwm forcing file name. 
  ```
 
 ## weight_file
-In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a [geopackage](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) with the [weight generator](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/src/forcingprocessor/weight_generator.py). An example weight file has been provided [here](https://ngenresourcesdev.s3.us-east-2.amazonaws.com/01_weights.json). An example NWM forcing file can be found within the this [NOAA AWS bucket](https://noaa-nwm-pds.s3.amazonaws.com/index.html).
+In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a [geopackage](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) with the [weight generator](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/src/forcingprocessor/weights_parq2json.py). An example weight file has been provided [here](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/weights_w_cov.json). 
 
  ```
- python weight_generator.py <path to geopackage> <path to output weights to> <path to example NWM forcing file>
+ python weights_parq2json.py --gpkg <path to geopackage> --outname <path to output weights to> --version <hydrofabric version>
  ```
-
-The weight generator will input an example NWM forcing netcdf to reference the NWM grid, a geopackage that contains all of the catchments the user wants weights for, and a file name for the weight file. Subsetted geopackages can be made with [hfsubset](https://github.com/LynkerIntel/hfsubset). 
 
 ## Run Notes
-This tool is CPU, memory, and I/O intensive. For the best performance, run with `proc_process` equal to than half of available cores and `write_threads` equal to the number of available cores. Best to experiment with your resources to find out what works best. These options default to 50% and 100% available cores respectively.
+This tool is CPU, memory, and I/O intensive. Best to experiment with `proc_process` and `write_process` on your resources to find out what works best. These options default to 50% and 100% available cores respectively.
