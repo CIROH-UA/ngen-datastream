@@ -59,7 +59,7 @@ if __name__ == "__main__":
         catchments     = gpd.read_file(args.geopackage, layer='divides')
         catchment_list = sorted(list(catchments['divide_id']))   
 
-    nprocs = os.cpu_count() // 3
+    nprocs = os.cpu_count() // 5
     catchment_list_list = []
     ncatchments = len(catchment_list)
     nper = ncatchments // nprocs
