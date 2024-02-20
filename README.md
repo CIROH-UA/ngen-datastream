@@ -7,41 +7,48 @@ This software is designed for deployment in HPC architecture and will consume th
 ## Install
 [AWS Linux Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/cloud/AWS/startup_ec2.sh)
 
-## Run it with config file
+## Run it
 ```
-/ngen-datastream/scripts/stream.sh --conf-file /ngen-datastream/configs/conf_datastream_daily.sh
-```
-See [config  directory](https://github.com/CIROH-UA/ngen-datastream/tree/main/configs) for examples
+> ./scripts/stream.sh --help
 
-## Run it with cli args
+Usage: ./scripts/stream.sh [options]
+Either provide a datastream configuration file
+  -c, --conf-file           <Path to datastream configuration file>
+or run with cli args
+  -s, --START_DATE          <YYYYMMDDHHMM or "DAILY">
+  -e, --END_DATE            <YYYYMMDDHHMM>
+  -d, --DATA_PATH           <Path to write to>
+  -r, --RESOURCE_PATH       <Path to resource directory>
+  -t, --RELATIVE_TO         <Path to prepend to all paths>
+  -S, --S3_MOUNT            <Path to mount s3 bucket to>
+  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>
+  -I, --SUBSET_ID           <Hydrofabric id to subset>
+  -v, --HYDROFABRIC_VERSION <Hydrofabric version>
 ```
-/ngen-datastream/scripts/stream.sh \
-  --start-date "" \
-  --end-date "" \
-  --data-path "" \
-  --resource-path"" \
-  --relative-to "" \
-  --id-type "" \
-  --id "" \
-  --version ""
+Example command for the the DAILY run
 ```
+./ngen-datastream/scripts/stream.sh --CONF_FILE ./ngen-datastream/configs/conf_datastream_daily.sh
+```
+See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for examples
 
-## Explanation of cli args (variables in  `conf_datastream.sh`)
+
+## Explanation of cli args (variables in defined in `conf_datastream.sh`)
 | Field               | Description              | Required |
 |---------------------|--------------------------|------|
-| START_DATE          | Start simulation time (YYYYMMDDHHMM) | :white_check_mark: |
+| START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
-| DATA_PATH           | Name used in constructing the parent directory of the datastream. Must not exist prior to datastream run | :white_check_mark: |
+| DATA_PATH           | Path to construct the datastream run. | :white_check_mark: |
 | RESOURCE_PATH       | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#datastream-resources-defaults) |  |
 | RELATIVE_TO         | Absolute path to be prepended to any other path given in configuration file |  |
-| S3_MOUNT            | Location of mounted S3 bucket to write out too |
+| S3_MOUNT            | Path to mount S3 bucket to. datastream will copy outputs here. |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
 | SUBSET_ID           | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
 | HYDROFABRIC_VERSION |  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  |
 
 ## NextGen Datastream Directory Stucture
+When the datastream is executed a folder of the structure below will be constructed at `DATA_PATH`
 ```
-data_dir/
+DATA-PATH/
 │
 ├── datastream-configs/
 │
@@ -49,8 +56,10 @@ data_dir/
 |
 ├── ngen-run/
 ```
+Each folder is explained below
 
 ### `datastream-configs/` 
+
 Automatically generated. Holds all of the configuration files the datastream needs in order to run. Note! The datastream can modify `conf_datastream.json` and generate it's own internal configs. `datastream-configs/` is the first place to look to confirm that a datastream run has been executed according to the user's specifications. 
 Example directory:
 ```
@@ -63,19 +72,35 @@ datastream-configs/
 ├── conf_nwmurl.json
 ```
 ### `datastream-resources/` 
-Copied into `data_dir` if user supplied, generated with defaults if not. Holds the data files required to perform computations required by the datastream. The user can supply this directory by pointing the configuration file to `resource_dir`. If not given by the user, datastream will generate this folder with these [defaults](#resource_dir). If the user executes the stream in this way, there is no control over the spatial domain. 
+Automatically generated with [defaults](#Defaults) or copied from user defined `RESOURCE_PATH`. Holds the data files required to perform computations required by the datastream. 
+#### Rules for manually building a `RESOURCE_PATH`
+A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages)
 ```
-datastream-resources/
+RESOURCE_PATH/
 │
-├── ngen-configs/
+├── NGEN-CONFIGS/
 │
-├── <your-geopackage>.gpkg
+├── GEOPACKAGE
 |
-├── <nwm-example-grid-file>.nc
+├── NWM_EXAMPLE_GRID_FILE
+|
+├── WEIGHT_FILE
+|
+├── CONF_NWMURL
 ```
-#### `ngen-configs/` holds all non-hydrofabric configuration files for NextGen (`realizion.json`,`config.ini`)
 
-#### `datastream-resources/` Defaults
+| File        |    Example link    | Description  | Naming |
+|-------------|--------|--------------------------|-----|
+| GEOPACKAGE | [nextgen_01.gpkg](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) | Hydrofabric file of version $\geq$ v20.1 Ignored if hydrofabric options are set in datastream config. [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) for generating your own. The datastream has hfsubset integrated. | *.gpkg |
+| NWM_EXAMPLE_GRID_FILE | [202001021700.LDASIN_DOMAIN1](https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/CONUS/netcdf/FORCING/2020/202001021700.LDASIN_DOMAIN1) | Example forcings file used in weight calculation. Not needed if WEIGHT_FILE exists | nwm_example_grid_file.nc |
+| WEIGHT_FILE | [weights.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/weights_w_cov.json) | [weights file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) | \*weights\*.json |
+| CONF_NWMURL | [nwmurl_conf.json](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/configs/conf_nwmurl_retro.json) | [nwmurl config file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#nwm_file). Not required for `DAILY` runs | \*nwmurl\*.json |
+| NGEN-CONFIGS | [ngen-configs/realization.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/ngen-configs/realization.json) | Any files required for ngen/NGIAB run. Copied into `DATA_PATH/ngen_run/configs` | ngen-configs/realization.json |
+
+If `RESOURCE_PATH` contains a geopackage, the datastream will run over the entirety of the spatial domain contained within the geopackage. The hydrofabric subsetting options in the datastream config will take precedence even if a geopackage is found within `RESOURCE_PATH`. Only a single geopackage is allowed.
+An optional weights.json file can be placed in `RESOURCE_PATH`, see [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) for a description. The datastream will create this file if not present. If not running `DAILY`, conf_nwmurl.json is required and explained [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#nwm_file)
+
+#### Defaults
 The URI below holds the default resource directory for the datastream, which is used during the "daily" runs. This directory holds files for a standard NGIAB formulation over CONUS. Use `aws s3 ls s3://ngen-datastream/resources_default/` to inspect the files.
 
 ### `ngen-run/` 
