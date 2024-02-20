@@ -17,17 +17,20 @@ build_docker_container() {
 }
 
 usage() {
+    echo ""
     echo "Usage: $0 [options]"
-    echo "Options:"
-    echo "  -s, --start-date <start_date>         "
-    echo "  -e, --end-date <end_date>             "
-    echo "  -d, --data-path <data_path>           "
-    echo "  -r, --resource-path <resource_path>   "
-    echo "  -t, --relative-to <relative_to>       "
-    echo "  -i, --id-type <id_type>               "
-    echo "  -I, --id <id>                         "
-    echo "  -v, --version <version>               "
-    echo "  -c, --conf-file <conf_file>           "
+    echo "Either provide a datastream configuration file"
+    echo "  -c, --CONF_FILE          <Path to datastream configuration file> "  
+    echo "or run with cli args"
+    echo "  -s, --START_DATE          <YYYYMMDDHHMM or \"DAILY\"> "
+    echo "  -e, --END_DATE            <YYYYMMDDHHMM> "
+    echo "  -d, --DATA_PATH           <Path to write to> "
+    echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
+    echo "  -t, --RELATIVE_TO         <Path to prepend to all paths> "
+    echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
+    echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
+    echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
+    echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
     exit 1
 }
 
@@ -44,16 +47,16 @@ CONF_FILE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        -s|--start-date) START_DATE="$2"; shift 2;;
-        -e|--end-date) END_DATE="$2"; shift 2;;
-        -d|--data-path) DATA_PATH="$2"; shift 2;;
-        -r|--resource-path) RESOURCE_PATH="$2"; shift 2;;
-        -t|--relative-to) RELATIVE_TO="$2"; shift 2;;
-        -i|--id-type) SUBSET_ID_TYPE="$2"; shift 2;;
-        -I|--id) SUBSET_ID="$2"; shift 2;;
-        -v|--version) HYDROFABRIC_VERSION="$2"; shift 2;;
-        -S|--s3-mount) S3_MOUNT="$2"; shift 2;;
-        -c|--conf-file) CONF_FILE="$2"; shift 2;;
+        -s|--START_DATE) START_DATE="$2"; shift 2;;
+        -e|--END_DATE) END_DATE="$2"; shift 2;;
+        -d|--DATA_PATH) DATA_PATH="$2"; shift 2;;
+        -r|--RESOURCE_PATH) RESOURCE_PATH="$2"; shift 2;;
+        -t|--RELATIVE_TO) RELATIVE_TO="$2"; shift 2;;
+        -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
+        -i|--SUBSET_ID_TYPE) SUBSET_ID_TYPE="$2"; shift 2;;
+        -I|--SUBSET_ID) SUBSET_ID="$2"; shift 2;;
+        -v|--HYDROFABRIC_VERSION) HYDROFABRIC_VERSION="$2"; shift 2;;        
+        -c|--CONF_FILE) CONF_FILE="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -142,10 +145,10 @@ if [ -z "$RESOURCE_PATH" ]; then
     aws s3 sync $RESOURCES_DEFAULT $DATASTREAM_RESOURCES
 else    
     echo "Resource path option provided" $RESOURCE_PATH
-    if [[ $RESOURCE_PATH == *"https://"* ]]; then
+    if [[ "$RESOURCE_PATH" == *"https://"* ]]; then
         echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
         curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
-    elif [ $RESOURCE_PATH == *"s3://"* ]; then
+    elif [[ "$RESOURCE_PATH" == *"s3://"* ]]; then
         aws s3 sync $RESOURCE_PATH $DATASTREAM_RESOURCES
     else
         if [ -e "$RESOURCE_PATH" ]; then
