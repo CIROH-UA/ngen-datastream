@@ -38,12 +38,12 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | DATA_PATH           | Path to construct the datastream run. | :white_check_mark: |
-| RESOURCE_PATH       | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#datastream-resources-defaults) |  |
+| RESOURCE_PATH       | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#defaults) |  |
 | RELATIVE_TO         | Absolute path to be prepended to any other path given in configuration file |  |
 | S3_MOUNT            | Path to mount S3 bucket to. datastream will copy outputs here. |
-| SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
-| SUBSET_ID           | catchment id to subset. If not provided, spatial domain is set to CONUS [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) |   |
-| HYDROFABRIC_VERSION |  [See hfsubset for options](https://github.com/LynkerIntel/hfsubset)  |
+| SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
+| SUBSET_ID           | catchment id to subset [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
+| HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  |
 
 ## NextGen Datastream Directory Stucture
 When the datastream is executed a folder of the structure below will be constructed at `DATA_PATH`
@@ -72,13 +72,11 @@ datastream-configs/
 ├── conf_nwmurl.json
 ```
 ### `datastream-resources/` 
-Automatically generated with [defaults](#Defaults) or copied from user defined `RESOURCE_PATH`. Holds the data files required to perform computations required by the datastream. 
+Automatically generated with [defaults](#defaults) or copied from user defined `RESOURCE_PATH`. Holds the data files required to perform computations required by the datastream. 
 #### Rules for manually building a `RESOURCE_PATH`
-A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages)
+A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages). Not every file is required.
 ```
 RESOURCE_PATH/
-│
-├── NGEN-CONFIGS/
 │
 ├── GEOPACKAGE
 |
@@ -87,18 +85,17 @@ RESOURCE_PATH/
 ├── WEIGHT_FILE
 |
 ├── CONF_NWMURL
+│
+├── NGEN-CONFIGS/
 ```
 
 | File        |    Example link    | Description  | Naming |
 |-------------|--------|--------------------------|-----|
-| GEOPACKAGE | [nextgen_01.gpkg](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) | Hydrofabric file of version $\geq$ v20.1 Ignored if hydrofabric options are set in datastream config. [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) for generating your own. The datastream has hfsubset integrated. | *.gpkg |
+| GEOPACKAGE | [nextgen_01.gpkg](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) | Hydrofabric file of version $\geq$ v20.1 Ignored if subset hydrofabric options are set in datastream config. [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) for generating your own. The datastream has hfsubset integrated. | *.gpkg |
 | NWM_EXAMPLE_GRID_FILE | [202001021700.LDASIN_DOMAIN1](https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/CONUS/netcdf/FORCING/2020/202001021700.LDASIN_DOMAIN1) | Example forcings file used in weight calculation. Not needed if WEIGHT_FILE exists | nwm_example_grid_file.nc |
 | WEIGHT_FILE | [weights.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/weights_w_cov.json) | [weights file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) | \*weights\*.json |
 | CONF_NWMURL | [nwmurl_conf.json](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/configs/conf_nwmurl_retro.json) | [nwmurl config file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#nwm_file). Not required for `DAILY` runs | \*nwmurl\*.json |
 | NGEN-CONFIGS | [ngen-configs/realization.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/ngen-configs/realization.json) | Any files required for ngen/NGIAB run. Copied into `DATA_PATH/ngen_run/configs` | ngen-configs/realization.json |
-
-If `RESOURCE_PATH` contains a geopackage, the datastream will run over the entirety of the spatial domain contained within the geopackage. The hydrofabric subsetting options in the datastream config will take precedence even if a geopackage is found within `RESOURCE_PATH`. Only a single geopackage is allowed.
-An optional weights.json file can be placed in `RESOURCE_PATH`, see [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) for a description. The datastream will create this file if not present. If not running `DAILY`, conf_nwmurl.json is required and explained [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#nwm_file)
 
 #### Defaults
 The URI below holds the default resource directory for the datastream, which is used during the "daily" runs. This directory holds files for a standard NGIAB formulation over CONUS. Use `aws s3 ls s3://ngen-datastream/resources_default/` to inspect the files.
