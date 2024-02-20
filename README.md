@@ -13,7 +13,7 @@ This software is designed for deployment in HPC architecture and will consume th
 
 Usage: ./scripts/stream.sh [options]
 Either provide a datastream configuration file
-  -c, --conf-file           <Path to datastream configuration file>
+  -c, --CONF-FILE           <Path to datastream configuration file>
 or run with cli args
   -s, --START_DATE          <YYYYMMDDHHMM or "DAILY">
   -e, --END_DATE            <YYYYMMDDHHMM>
