@@ -31,6 +31,7 @@ usage() {
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
     echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
+    echo "  -n, --NPROCS              <Process limit> "
     exit 1
 }
 
@@ -44,6 +45,7 @@ SUBSET_ID_TYPE=""
 SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
+NPROCS=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -57,16 +59,23 @@ while [ "$#" -gt 0 ]; do
         -I|--SUBSET_ID) SUBSET_ID="$2"; shift 2;;
         -v|--HYDROFABRIC_VERSION) HYDROFABRIC_VERSION="$2"; shift 2;;        
         -c|--CONF_FILE) CONF_FILE="$2"; shift 2;;
+        -n|--NPROCS) NPROCS="$2"; shift 2;;
         *) usage;;
     esac
 done
+
+if [ -n "$NPROCS" ]; then
+    NPROCS=$(nproc) - 2
+fi
 
 if [ -n "$CONF_FILE" ]; then
     echo "Configuration option provided" $CONF_FILE
     if [ -e "$CONF_FILE" ]; then
         echo "Any variables defined in "$CONF_FILE" will override cli args"
-        echo "Using options:"
+        echo ""
         cat $CONF_FILE
+        echo ""
+        echo ""
         source "$CONF_FILE"
     else
         echo $CONF_FILE" not found!!"
@@ -108,16 +117,17 @@ else
     fi
 fi
 
-echo "DATA_PATH: " $DATA_PATH
-
 if [ ${#RELATIVE_TO} -gt 0 ] ; then
-    echo "Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
+    echo "Relative path provided. Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
     DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
     if [ -n "$RESOURCE_PATH" ]; then
         echo "Prepending ${RELATIVE_TO} to ${RESOURCE_PATH#/}"
         RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
     fi
 fi
+
+echo "DATA_PATH: " $DATA_PATH
+echo "RESOURCE_PATH: " $RESOURCE_PATH
 
 if [ -e "$DATA_PATH" ]; then
     echo "The path $DATA_PATH exists. Please delete it or set a different path."
@@ -155,7 +165,7 @@ else
             echo "Copying into current data path "$DATA_PATH
             cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
         else
-            echo $RESOURCE_PATH " provided doesn't exist!"
+            echo $RESOURCE_PATH " doesn't exist!"
         fi
     fi
 fi
@@ -271,7 +281,7 @@ else
         -u $(id -u):$(id -g) \
         -w "$DOCKER_MOUNT" forcingprocessor \
         python "$DOCKER_FP_PATH"weights_parq2json.py \
-        --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER
+        --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER --nprocs $NPROCS
 
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
         
@@ -287,7 +297,8 @@ python3 $CONF_GENERATOR \
     --subset-id-type "$SUBSET_ID_TYPE" \
     --subset-id "$SUBSET_ID" \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
-    --nwmurl_file "$NWMURL_CONF_PATH"
+    --nwmurl_file "$NWMURL_CONF_PATH" \
+    --nprocs "$NPROCS"
 
 echo "Creating nwm filenames file"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \

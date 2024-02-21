@@ -1,12 +1,12 @@
 {
     "forcing_type" : "operational_archive",
-    "start_date"   : "202310300000",
-    "end_date"     : "202310300000",
-    "runinput"     : 1,
+    "start_date"   : "",
+    "end_date"     : "",
+    "fcst_cycle"   : [0],
+    "lead_time"    : [],
     "varinput"     : 5,
     "geoinput"     : 1,
-    "meminput"     : 0,
+    "runinput"     : 2,    
     "urlbaseinput" : 7,
-    "fcst_cycle"   : [0],
-    "lead_time"    : [1,2,3,4,5,6]
+    "meminput"     : 0
 }
