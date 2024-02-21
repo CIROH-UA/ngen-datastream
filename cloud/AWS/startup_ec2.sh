@@ -15,7 +15,10 @@ sudo dnf install docker -y
 sudo systemctl start docker
 sudo usermod -aG docker ec2-user
 sudo newgrp docker
-cd ngen-datastream/NGIAB-CloudInfra/docker 
-sudo docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . && docker build -t awiciroh/t-route:latest -f Dockerfile.t-route . --no-cache && docker build -t awiciroh/ngen -f Dockerfile.ngen . --no-cache && docker build -t awiciroh/ciroh-ngen-image:latest-local -f Dockerfile . --no-cache
+cd ngen-datastream/NGIAB-CloudInfra/
+git submodule init
+git submodule update
+cd docker
+docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . && docker build -t awiciroh/t-route:latest -f Dockerfile.t-route . --no-cache && docker build -t awiciroh/ngen -f Dockerfile.ngen . --no-cache && docker build -t awiciroh/ciroh-ngen-image:latest-local -f Dockerfile . --no-cache
 echo "done!"
 
