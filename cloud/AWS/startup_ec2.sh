@@ -15,9 +15,7 @@ sudo dnf install docker -y
 sudo systemctl start docker
 sudo usermod -aG docker ec2-user
 sudo newgrp docker
-mkdir docker
-aws s3 sync s3://ngen-datastream/docker/docker /home/ec2-user/docker
-cd docker 
+cd ngen-datastream/NGIAB-CloudInfra/docker 
 sudo docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . && docker build -t awiciroh/t-route:latest -f Dockerfile.t-route . --no-cache && docker build -t awiciroh/ngen -f Dockerfile.ngen . --no-cache && docker build -t awiciroh/ciroh-ngen-image:latest-local -f Dockerfile . --no-cache
 echo "done!"
 
