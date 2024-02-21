@@ -1,3 +1,5 @@
+# CONFIGURATION FILE FOR NGEN-DATASTREAM
+
 START_DATE="200301200100"
 END_DATE="200301210100"
 DATA_PATH="/home/ec2-user/datastream-small-run"
@@ -7,3 +9,4 @@ RESOURCE_PATH="s3://ngen-datastream/resources_small/"
 # SUBSET_ID_TYPE=""
 # SUBSET_ID=""
 # HYDROFABRIC_VERSION=""
+# NPROCS=""

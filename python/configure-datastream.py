@@ -6,17 +6,18 @@ import pytz as tz
 def generate_config(args):
     config = {
         "globals": {
-            "start_date": args.start_date,
-            "end_date": args.end_date,
-            "data_dir": args.data_dir,
-            "relative_to": args.relative_to,
-            "resource_dir": args.resource_dir,
-            "nwmurl_file" : args.nwmurl_file
+            "start_date"   : args.start_date,
+            "end_date"     : args.end_date,
+            "data_dir"     : args.data_dir,
+            "relative_to"  : args.relative_to,
+            "resource_dir" : args.resource_dir,
+            "nwmurl_file"  : args.nwmurl_file,
+            "nprocs"       : args.nprocs
         },
         "subset": {
-            "id_type": args.subset_id_type,
-            "id": args.subset_id,
-            "version": args.hydrofabric_version
+            "id_type"      : args.subset_id_type,
+            "id"           : args.subset_id,
+            "version"      : args.hydrofabric_version
         }
     }
     return config
@@ -27,7 +28,7 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(start,end,ii_retro):
+def create_conf_fp(start,end,ii_retro,nprocs):
     if ii_retro:
         filename = "retro_filenamelist.txt"
     else:
@@ -49,8 +50,8 @@ def create_conf_fp(start,end,ii_retro):
         "run" : {
             "verbose"        : True,
             "collect_stats"  : True,
-            "proc_process"   : int(os.cpu_count() * 0.8),
-            "write_process"  : os.cpu_count()
+            "proc_process"   : min(int(os.cpu_count() * 0.8),nprocs),
+            "write_process"  : min(os.cpu_count(),nprocs)
         }
     }
 
@@ -106,7 +107,7 @@ def create_confs(conf):
             nwm_conf['end_date']   = end
 
     ii_retro = nwm_conf['forcing_type'] == 'retrospective'
-    fp_conf = create_conf_fp(start, end, ii_retro)  
+    fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'])  
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf      
 
@@ -149,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--subset-id", help="Set the subset ID")
     parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
     parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
+    parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
 
     args = parser.parse_args()
 
