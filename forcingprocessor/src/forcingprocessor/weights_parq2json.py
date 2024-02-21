@@ -40,6 +40,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpkg', dest="geopackage", type=str, help="Path to geopackage file",default = None)
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
     parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"",default = None)
+    parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="Maximum number of processes")
     args = parser.parse_args()
 
     version = args.version    
@@ -60,7 +61,8 @@ if __name__ == "__main__":
         catchments     = gpd.read_file(args.geopackage, layer='divides')
         catchment_list = sorted(list(catchments['divide_id']))   
 
-    nprocs = 2
+    nprocs = min(os.cpu_count() // 5, args.nprocs_max)
+    print(f'Querying weights with {nprocs} processes')
     catchment_list_list = []
     ncatchments = len(catchment_list)
     nper = ncatchments // nprocs
