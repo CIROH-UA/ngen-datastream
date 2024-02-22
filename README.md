@@ -2,7 +2,7 @@
 The datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. In its current implementation, the datastream is a shell script that orchestrates each step in the process. 
 
 ## Disclaimer
-This software is designed for deployment in HPC architecture and will consume the majority of resources by default. The intended use of this software is to take advantage of HPC hardware to solve the necessary computations quickly. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes, the internal algorithms were designed to perform best on a dedicated HPC host.
+This software is designed for deployment in HPC architecture and will consume the majority of resources by default. The intended use of this software is to take advantage of HPC hardware to solve the necessary computations quickly. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes (via `NPROCS`), the internal algorithms were designed to perform best on a dedicated HPC host.
 
 ## Install
 [AWS Linux Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/cloud/AWS/startup_ec2.sh)
@@ -24,6 +24,7 @@ or run with cli args
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>
   -I, --SUBSET_ID           <Hydrofabric id to subset>
   -v, --HYDROFABRIC_VERSION <Hydrofabric version>
+  -n, --NPROCS              <Process limit> 
 ```
 Example command for the the DAILY run
 ```
@@ -44,6 +45,7 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | SUBSET_ID           | catchment id to subset [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  |
+| NPROCS              | Maximum number of processes to use in any step of the datastream. Set this is not running on HPC |  |
 
 ## NextGen Datastream Directory Stucture
 When the datastream is executed a folder of the structure below will be constructed at `DATA_PATH`
