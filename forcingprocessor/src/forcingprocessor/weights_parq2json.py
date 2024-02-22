@@ -61,10 +61,10 @@ if __name__ == "__main__":
         catchments     = gpd.read_file(args.geopackage, layer='divides')
         catchment_list = sorted(list(catchments['divide_id']))   
 
-    nprocs = min(os.cpu_count() // 5, args.nprocs_max)
-    print(f'Querying weights with {nprocs} processes')
-    catchment_list_list = []
     ncatchments = len(catchment_list)
+    nprocs = min([os.cpu_count() // 5, args.nprocs_max,ncatchments])
+    print(f'Querying weights with {nprocs} processes')
+    catchment_list_list = []    
     nper = ncatchments // nprocs
     nleft = ncatchments - (nper * nprocs)
     i = 0
