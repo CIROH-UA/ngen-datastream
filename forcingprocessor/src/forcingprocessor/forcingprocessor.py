@@ -320,7 +320,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
         flat_filenames = [item for sublist in filenames for item in sublist]
     else:
         flat_ids  = ids
-        dfs = dfs
+        flat_dfs = dfs
         flat_filenames = filenames
 
     return flat_ids, flat_dfs, flat_filenames
