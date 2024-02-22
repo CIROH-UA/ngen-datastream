@@ -314,14 +314,9 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
 
     print(f'\n\nGathering data from write processes...')
 
-    if len(ids) > 1:
-        flat_ids  = [item for sublist in ids for item in sublist]
-        flat_dfs  = [item for sublist in dfs for item in sublist]
-        flat_filenames = [item for sublist in filenames for item in sublist]
-    else:
-        flat_ids  = ids
-        flat_dfs = dfs
-        flat_filenames = filenames
+    flat_ids  = [item for sublist in ids for item in sublist]
+    flat_dfs  = [item for sublist in dfs for item in sublist]
+    flat_filenames = [item for sublist in filenames for item in sublist]
 
     return flat_ids, flat_dfs, flat_filenames
 
@@ -371,10 +366,7 @@ def write_data(
 
         if storage_type.lower() == 's3':
             buf = BytesIO()
-            filename = f"cat-{cat_id}." + output_file_type
-
-            dfs.append(df)
-            filenames.append(str(Path(filename).name))  
+            filename = f"cat-{cat_id}." + output_file_type             
 
             if output_file_type == "parquet":
                 df.to_parquet(buf, index=False)                
@@ -393,7 +385,10 @@ def write_data(
             if output_file_type == "parquet":
                 df.to_parquet(filename, index=False)                
             elif output_file_type == "csv":
-                df.to_csv(filename, index=False)                                         
+                df.to_csv(filename, index=False)         
+
+        dfs.append(df)     
+        filenames.append(str(Path(filename).name))                                            
 
         if j == 0:
             if storage_type.lower() == 's3':
