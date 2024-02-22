@@ -45,7 +45,7 @@ SUBSET_ID_TYPE=""
 SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
-NPROCS=""
+NPROCS="$(( $(nproc) - 2 ))"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -64,9 +64,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-if [ -n "$NPROCS" ]; then
-    NPROCS=$(nproc) - 2
-fi
+echo ""
+echo "Running datastream with ${NPROCS} processes"
 
 if [ -n "$CONF_FILE" ]; then
     echo "Configuration option provided" $CONF_FILE
@@ -324,7 +323,7 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     --data_dir $DOCKER_MOUNT
 
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto $NPROCS
 
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
  
