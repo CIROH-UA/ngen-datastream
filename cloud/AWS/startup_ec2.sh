@@ -15,7 +15,9 @@ sudo dnf install docker -y
 sudo systemctl start docker
 sudo usermod -aG docker ec2-user
 sudo newgrp docker
-cd ngen-datastream/NGIAB-CloudInfra/
+cd /home/ec2-user/ngen-datastream/docker
+docker build -t forcingprocessor -f ./forcingprocessor/Dockerfile --no-cache && docker build -t validator -f ./validator/Dockerfile --no-cache
+cd /home/ec2-user/ngen-datastream/NGIAB-CloudInfra/
 git submodule init
 git submodule update
 cd docker
