@@ -9,7 +9,7 @@ This software is designed for deployment in HPC architecture and will consume th
 
 ## Run it
 ```
-> ngen-datastream --help
+> ./ngen-datastream/scripts/stream.sh --help
 
 Usage: ./ngen-datastream/scripts/stream.sh [options]
 Either provide a datastream configuration file
@@ -28,7 +28,7 @@ or run with cli args
 ```
 Example command for the the DAILY run
 ```
-ngen-datastream --CONF_FILE conf_datastream_daily.sh
+./ngen-datastream/scripts/stream.sh --CONF_FILE conf_datastream_daily.sh
 ```
 See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for examples
 
