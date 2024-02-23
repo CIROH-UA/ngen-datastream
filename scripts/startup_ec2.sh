@@ -10,7 +10,6 @@ tar -xzvf hfsubset-linux_amd64.tar.gz
 rm hfsubset-linux_amd64.tar.gz mount-s3.rpm
 sudo mv hfsubset /usr/bin/hfsubset
 git clone https://github.com/CIROH-UA/ngen-datastream.git
-sudo ln $(eval echo ~$USER)/ngen-datastream/scripts/stream.sh /bin/ngen-datastream
 sudo dnf update -y
 sudo dnf install dnf-plugins-core -y
 sudo dnf install docker -y
