@@ -323,7 +323,7 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     --data_dir $DOCKER_MOUNT
 
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest-local "$DOCKER_MOUNT" auto $NPROCS
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
 
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
  
