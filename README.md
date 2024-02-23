@@ -5,7 +5,7 @@ The datastream automates the process of collecting and formatting input data for
 This software is designed for deployment in HPC architecture and will consume the majority of resources by default. The intended use of this software is to take advantage of HPC hardware to solve the necessary computations quickly. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes (via `NPROCS`), the internal algorithms were designed to perform best on a dedicated HPC host.
 
 ## Install
-[AWS Linux Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/cloud/AWS/startup_ec2.sh)
+[Linux Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md)
 
 ## Run it
 ```
