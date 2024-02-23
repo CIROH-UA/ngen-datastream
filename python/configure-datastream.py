@@ -79,7 +79,7 @@ def create_confs(conf):
     if conf['globals']['start_date'] == "DAILY":
         if conf['globals']['end_date'] != "":
             # allows for a "daily" run that is not the current date
-            start_date = datetime.strptime(conf['globals']['end_date'],'%Y%m%d')
+            start_date = datetime.strptime(conf['globals']['end_date'],'%Y%m%d%H%M')
         else:
             start_date = datetime.now(tz.timezone('US/Eastern'))
         today = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
