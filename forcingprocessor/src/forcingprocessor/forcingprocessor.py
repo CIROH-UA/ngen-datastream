@@ -94,7 +94,7 @@ def load_balance(items_per_proc,launch_delay,single_ex, exec_count):
             break
         completion_time = [single_ex * x / exec_count + launch_delay*j for j, x in enumerate(items_per_proc)]
 
-    completion_time = [single_ex * x / exec_count + 2*j for j, x in enumerate(items_per_proc)]
+    completion_time = [single_ex * x / exec_count + j for j, x in enumerate(items_per_proc)]
     global ntasked
     ntasked = len(np.nonzero(items_per_proc)[0])
     if nprocs > ntasked: 
@@ -248,7 +248,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
 
     launch_time          = 0.05
     cycle_time           = 1
-    catchments_per_cycle = 223
+    catchments_per_cycle = 200
     catchments_per_proc  = distribute_work(catchments,nprocs)
     catchments_per_proc  = load_balance(catchments_per_proc,launch_time,cycle_time,catchments_per_cycle)
 
@@ -589,7 +589,7 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n')
-        # [data_array, t_ax] = forcing_grid2catchment(crosswalk_dict, jnwm_files, fs)
+        # [data_array, t_ax] = forcing_grid2catchment(jnwm_files, fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_process,crosswalk_dict,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
