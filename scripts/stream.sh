@@ -94,6 +94,7 @@ if [ -n "$SUBSET_ID" ]; then
 fi
 echo $END_DATE
 DATE=$(env TZ=US/Eastern date +'%Y%m%d')
+END=
 if [ $START_DATE == "DAILY" ]; then
     if [[ -z "$END_DATE" ]]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
@@ -103,9 +104,9 @@ if [ $START_DATE == "DAILY" ]; then
             mkdir -p $S3_OUT 
         fi
     else
-        DATA_PATH="${PACAKGE_DIR%/}/data/$END_DATE"
+        DATA_PATH="${PACAKGE_DIR%/}/data/${END_DATE::-4}"
         if [ -n "${S3_MOUNT}" ]; then
-            S3_OUT="$S3_MOUNT/daily/$END_DATE"
+            S3_OUT="$S3_MOUNT/daily/${END_DATE::-4}"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
         fi
