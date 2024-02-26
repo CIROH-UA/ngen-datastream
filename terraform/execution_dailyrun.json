@@ -1,7 +1,7 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-0e2b5393393d4fe67",
+    "ImageId"            : "ami-003fc611504cf8f19",
     "InstanceType"       : "hpc6a.48xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
