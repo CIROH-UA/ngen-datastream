@@ -127,6 +127,35 @@ resource "aws_iam_policy_attachment" "datastream_attachment" {
   policy_arn = aws_iam_policy.datastreamlambda_policy.arn
 }
 
+data "archive_file" "python_lambda_starter" {  
+  type = "zip"  
+  source_file = "${path.module}/lambda_functions/start_ami/lambda_function.py" 
+  output_path = "${path.module}/lambda_functions/starter_lambda.zip"
+}
+
+data "archive_file" "python_lambda_commander" {  
+  type = "zip"  
+  source_file = "${path.module}/lambda_functions/streamcommander/lambda_function.py" 
+  output_path = "${path.module}/lambda_functions/commander_lambda.zip"
+}
+
+data "archive_file" "python_lambda_poller" {  
+  type = "zip"  
+  source_file = "${path.module}/lambda_functions/poller/lambda_function.py" 
+  output_path = "${path.module}/lambda_functions/poller_lambda.zip"
+}
+
+data "archive_file" "python_lambda_checker" {  
+  type = "zip"  
+  source_file = "${path.module}/lambda_functions/checker/lambda_function.py" 
+  output_path = "${path.module}/lambda_functions/checker_lambda.zip"
+}
+
+data "archive_file" "python_lambda_stopper" {  
+  type = "zip"  
+  source_file = "${path.module}/lambda_functions/stopper/lambda_function.py" 
+  output_path = "${path.module}/lambda_functions/stopper_lambda.zip"
+}
 
 resource "aws_lambda_function" "starter_lambda" {
   function_name = var.starter_lambda_name
