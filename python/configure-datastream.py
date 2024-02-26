@@ -1,7 +1,23 @@
 import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
-import pytz as tz
+import pytz as tz, re
+
+def generate_noah_owp_conf(namelist_file,start,end):
+    with open(namelist_file,'r') as fp:
+        conf_template = fp.readlines()
+
+    noah_owp_conf_str = conf_template
+    for j,jline in enumerate(conf_template):
+        if "startdate" in jline:
+            pattern = r'(startdate\s*=\s*")[0-9]{12}'
+            noah_owp_conf_str[j] = re.sub(pattern, f"startdate        = \"{start}", jline)
+        if "enddate" in jline:
+            pattern = r'(enddate\s*=\s*")[0-9]{12}'
+            noah_owp_conf_str[j] =  re.sub(pattern, f"enddate          = \"{end}", jline)            
+
+    with open(namelist_file,'w') as fp:
+        fp.writelines(noah_owp_conf_str)
 
 def generate_config(args):
     config = {
@@ -122,12 +138,17 @@ def create_confs(conf):
     print(f'\ndatastream configs have been generated and placed here\n{datastream_config_dir}\n')    
     
     realization_file = None
+    noah_owp = None
     for path, _, files in os.walk(ngen_config_dir):
         for jfile in files:
             jfile_path = os.path.join(path,jfile)
             if jfile_path.find('realization') >= 0: 
                     realization_file = jfile_path
-                    break
+            if jfile_path.find('namelist.input') >= 0: 
+                    noah_owp = jfile_path
+
+    if noah_owp:
+        generate_noah_owp_conf(noah_owp,start,end)
 
     if not realization_file: raise Exception(f"Cannot find realization file in {ngen_config_dir}")
 
