@@ -1,5 +1,60 @@
 # Install Instructions for ngen-datastream
-ngen-datastream is designed for linux operating systems. These instructions assuming starting from a freshly launched host.
+
+## Step-by-step
+Note the instructions here are meant for either Fedora or Amazon Linux distributions. 
+
+1) clone this repository
+```
+git clone https://github.com/CIROH-UA/ngen-datastream.git
+```
+2) install packages
+```
+sudo dnf update -y
+sudo dnf install git pip pigz awscli
+```
+3) install docker
+```
+sudo dnf update -y
+sudo dnf install dnf-plugins-core -y
+sudo dnf install docker -y
+sudo systemctl start docker
+sudo usermod -aG docker ec2-user
+sudo newgrp docker
+```
+test with `docker run hello-world`
+
+4) build docker containers
+```
+cd ~/ngen-datastream/docker && \
+docker build -t forcingprocessor --no-cache ./forcingprocessor && \
+docker build -t validator --no-cache  ./validator && \
+git submodule init && \
+git submodule update && \
+cd ~/ngen-datastream/NGIAB-CloudInfra/docker && \
+docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . && \
+docker build -t awiciroh/t-route:latest -f ./Dockerfile.t-route . --no-cache --build-arg TAG_NAME=latest && \
+docker build -t awiciroh/ngen:latest -f ./Dockerfile.ngen . --no-cache --build-arg TAG_NAME=latest && \
+docker build -t awiciroh/ciroh-ngen-image:latest -f ./Dockerfile . --no-cache --build-arg TAG_NAME=latest 
+
+
+4) install hfsubset, this is required if you intend to use the subsetting feature
+```
+curl -L -O https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
+tar -xzvf hfsubset-linux_amd64.tar.gz
+rm hfsubset-linux_amd64.tar.gz
+sudo mv hfsubset /usr/bin/hfsubset
+```
+5) install mount-s3, this is required if you instend to mount a s3 bucket as an output for the datastream
+```
+curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.rpm
+sudo dnf install ./mount-s3.rpm
+rm mount-s3.rpm
+```
+
+
+## Scripts
+
+ngen-datastream was designed on Fedora and Amazon Linux. These instructions assuming starting from a freshly launched host.
 
 1) Create a shell script that will execute the install instructions. This will install the datastream, related packages, and docker.
 ```
