@@ -35,7 +35,7 @@ docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . &
 docker build -t awiciroh/t-route:latest -f ./Dockerfile.t-route . --no-cache --build-arg TAG_NAME=latest && \
 docker build -t awiciroh/ngen:latest -f ./Dockerfile.ngen . --no-cache --build-arg TAG_NAME=latest && \
 docker build -t awiciroh/ciroh-ngen-image:latest -f ./Dockerfile . --no-cache --build-arg TAG_NAME=latest 
-
+```
 
 4) install hfsubset, this is required if you intend to use the subsetting feature
 ```
@@ -50,7 +50,7 @@ curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3
 sudo dnf install ./mount-s3.rpm
 rm mount-s3.rpm
 ```
-
+You're ready to run ngen-datastream!
 
 ## Scripts
 
