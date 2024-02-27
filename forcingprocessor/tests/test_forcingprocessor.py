@@ -7,7 +7,7 @@ from datetime import datetime
 
 from forcingprocessor.forcingprocessor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
-from forcingprocessor.weights_parq2json import get_weight_json
+from forcingprocessor.weights_parq2json import get_weight_json, get_catchments_from_gpkg
 
 weight_name = "weights_01.json"
 
@@ -60,6 +60,11 @@ def test_generate_weights(get_paths):
         fp.write(data)    
 
     assert pytest.full_weight.exists()
+
+    os.system('curl -L -O https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_09.gpkg')
+
+    get_catchments_from_gpkg('./nextgen_09.gpkg')
+
 
 def test_processor(get_time, get_paths):
     

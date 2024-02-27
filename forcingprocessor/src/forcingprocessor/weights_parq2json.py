@@ -1,7 +1,8 @@
 import concurrent.futures as cf
 import json
 import os, argparse, time
-
+import geopandas as gpd
+gpd.options.io_engine = "pyogrio"
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset
@@ -34,6 +35,12 @@ def get_weight_json(catchments,version=None):
 
     return (weight_data)
 
+def get_catchments_from_gpkg(gpkg):
+    catchments     = gpd.read_file(gpkg, layer='divides')
+    catchment_list = sorted(list(catchments['divide_id']))  
+
+    return catchment_list
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -56,10 +63,7 @@ if __name__ == "__main__":
         catchment_list = list(weights_df.divide_id.unique())
         del weights_df
     else:
-        import geopandas as gpd
-        # gpd.options.io_engine = "pyogrio"
-        catchments     = gpd.read_file(args.geopackage, layer='divides')
-        catchment_list = sorted(list(catchments['divide_id']))   
+        catchments_list = get_catchments_from_gpkg(args.gpkg)
 
     ncatchments = len(catchment_list)
     nprocs = min([os.cpu_count() // 5, args.nprocs_max,ncatchments])
