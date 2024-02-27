@@ -1,7 +1,7 @@
 # Install Instructions for ngen-datastream
+These steps are [scripted](#scripts) for easy use on Fedora or Amazon Linux distributions.
 
 ## Step-by-step
-Note the instructions here are meant for either Fedora or Amazon Linux distributions. 
 
 1) clone this repository
 ```
