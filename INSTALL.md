@@ -2,15 +2,14 @@
 These steps are [scripted](#scripts) for easy use on Fedora or Amazon Linux distributions.
 
 ## Step-by-step
-
-1) clone this repository
-```
-git clone https://github.com/CIROH-UA/ngen-datastream.git
-```
-2) install packages
+1) install packages
 ```
 sudo dnf update -y
 sudo dnf install git pip pigz awscli
+```
+2) clone this repository
+```
+git clone https://github.com/CIROH-UA/ngen-datastream.git
 ```
 3) install docker
 ```
