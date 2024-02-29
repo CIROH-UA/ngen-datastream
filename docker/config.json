@@ -1,0 +1,8 @@
+{
+  "proxies": {
+    "default": {
+      "httpProxy": "http://squid-research-dmz01.ua.edu:3128",
+      "httpsProxy": "http://squid-research-dmz01.ua.edu:3128"
+    }
+  }
+}
