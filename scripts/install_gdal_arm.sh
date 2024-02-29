@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#https://repost.aws/articles/ARJV3lAJE0TcWZMrxqpQ5D3Q/installing-python-package-geopandas-on-amazon-linux-2023-for-graviton
+
 dnf -y install gcc-c++ cpp sqlite-devel libtiff cmake python3-pip \
     python-devel openssl-devel tcl libtiff-devel libcurl-devel \
     swig libpng-devel libjpeg-turbo-devel expat-devel
