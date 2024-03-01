@@ -5,4 +5,4 @@ RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
 
 RUN pip3 install --upgrade pip
 RUN pip3 install -e "/ngen-cal/python/ngen_conf"
-RUN pip3 install --no-cache-dir -r "/ngen-cal/requirements.txt"
+# RUN pip3 install --no-cache-dir -r "/ngen-cal/requirements.txt"
