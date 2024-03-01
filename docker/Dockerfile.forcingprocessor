@@ -1,0 +1,9 @@
+ARG TAG_NAME
+FROM datastream-deps:${TAG_NAME} as datastream_base
+
+RUN pip3 install -e /ngen-datastream/forcingprocessor
+
+RUN groupadd -r mygroup && useradd -r -g mygroup myuser
+RUN chown -R myuser:mygroup /ngen-datastream
+
+
