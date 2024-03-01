@@ -1,33 +1,50 @@
 # Install Instructions for ngen-datastream
-These steps are [scripted](#scripts) for easy use on Fedora or Amazon Linux distributions.
+These steps are [scripted](#scripts) or provided step-by-step below.
 
-## Step-by-step
+## Step-by-step 
+These instructions were verified with Amazon Linux 2023. Steps may vary with different distributions of Linux.
 
-1) clone this repository
+`$USER=($whomami)`
+
+For `x86`, `PKG_MNGR="dnf"`
+
+For `aarch64`, `PKG_MNGR="yum"`
+
+1) Update package manager and install packages
+```
+sudo $PKG_MNGR update -y
+sudo $PKG_MNGR install git pip python pigz awscli -y
+```
+`x86`
+```
+sudo $PKG_MNGR update -y
+sudo $PKG_MNGR install dnf-plugins-core -y
+```
+2) install packages from internet
+
+`x86` : `curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.rpm` 
+
+`aarch64` : `curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/arm64/mount-s3.rpm`
+```
+sudo dnf update -y
+sudo dnf ./mount-s3.rpm
+```
+3) clone this repository
 ```
 git clone https://github.com/CIROH-UA/ngen-datastream.git
 ```
-2) install packages
+4) install docker
 ```
 sudo dnf update -y
-sudo dnf install git pip pigz awscli
-```
-2) clone this repository
-```
-git clone https://github.com/CIROH-UA/ngen-datastream.git
-```
-3) install docker
-```
-sudo dnf update -y
-sudo dnf install dnf-plugins-core -y
-sudo dnf install docker -y
+sudo $PKG_MNGR install docker -y
 sudo systemctl start docker
-sudo usermod -aG docker ec2-user
+sudo usermod -aG docker $USER
 sudo newgrp docker
+su $USER
 ```
 test with `docker run hello-world`
 
-4) build docker containers
+5) build docker containers
 ```
 cd ~/ngen-datastream/docker && \
 docker build -t forcingprocessor --no-cache ./forcingprocessor && \
@@ -41,20 +58,10 @@ docker build -t awiciroh/ngen:latest -f ./Dockerfile.ngen . --no-cache --build-a
 docker build -t awiciroh/ciroh-ngen-image:latest -f ./Dockerfile . --no-cache --build-arg TAG_NAME=latest 
 ```
 
-4) install hfsubset, this is required if you intend to use the subsetting feature
-```
-curl -L -O https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
-tar -xzvf hfsubset-linux_amd64.tar.gz
-rm hfsubset-linux_amd64.tar.gz
-sudo mv hfsubset /usr/bin/hfsubset
-```
-5) install mount-s3, this is required if you instend to mount a s3 bucket as an output for the datastream
-```
-curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.rpm
-sudo dnf install ./mount-s3.rpm
-rm mount-s3.rpm
-```
+`aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
+
 You're ready to run ngen-datastream!
+
 
 ## Scripts
 
@@ -62,12 +69,12 @@ ngen-datastream was designed on Fedora and Amazon Linux. These instructions assu
 
 1) Create a shell script that will execute the install instructions. This will install the datastream, related packages, and docker.
 ```
-vi ./startup.sh
+vi ./install.sh
 ```
-2) Copy the contents of this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/startup_ec2.sh). `:wq` to save and close the file.
+2) Copy the contents of this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/install.sh). `:wq` to save and close the file.
 Change permissions and execute the startup script
 ```
-chmod +700 ./startup.sh && ./startup.sh
+chmod +700 ./startup.sh && ./install.sh
 ```
 3) Exit the session and log back in to ensure docker daemon is running.
 
@@ -75,6 +82,8 @@ chmod +700 ./startup.sh && ./startup.sh
 ```
 ./ngen-datastream/scripts/docker_builds.sh
 ```
+You're ready to run ngen-datastream!
 
-## AWS
-If you intended to interact with AWS via the datastream. Remember to configure AWS credentials on the host appropriately via `aws configure`.
+`aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
+
+You're ready to run ngen-datastream!

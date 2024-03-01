@@ -1,15 +1,9 @@
-# Docker commands
-This directory holds Dockerfiles to create containers for each component of the datastream. Below are example commands to utilize these containers individually.
+```
+DATASTREAM_PATH="$(eval echo ~$USER)/ngen-datastream"
+DATASTREAM_DOCKER="$DATASTREAM_PATH"/docker
 
-# ForcingProcessor
-```
-docker build /ngen-datastream/docker/forcingprocessor -t forcingprocessor --no-cache
-docker run -it --rm -v /ngen-datastream:/mounted_dir forcingprocessor python /ngen-datastream/forcingprocessor/src/forcingprocessor/forcingprocessor.py /mounted_dir/forcingprocessor/configs/conf_docker.json
-```
-Note that both the filenamelist.txt and weights.json file must be generated first and paths properly set in the config. 
-
-# Validator
-```
-docker build /ngen-datastream/docker/validator -t validator --no-cache
-docker run -it --rm -v /ngen-datastream:/mounted_dir validator python /ngen-cal/python/run_validator.py --data_dir /mounted_dir/data/standard_run
+cd $DATASTREAM_DOCKER
+docker build -t datastream-deps:latest -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=latest && \
+docker build -t forcingprocessor:latest -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=latest && \
+    docker build -t validator:latest -f Dockerfile.validator . --no-cache --build-arg TAG_NAME=latest
 ```

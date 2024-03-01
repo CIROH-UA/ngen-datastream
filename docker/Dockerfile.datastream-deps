@@ -1,9 +1,6 @@
-ARG FUNCTION_DIR="/ngen-datastream"
-FROM amazonlinux:2023 as build-image
+FROM amazonlinux:2023 as datastream-base
 
-ARG FUNCTION_DIR
-
-RUN dnf -y install pigz tar git
+RUN dnf -y install pigz tar git python
 
 RUN if [[ "$(uname -m)" == "aarch64" ]]; then \
         dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-pip \
@@ -31,10 +28,3 @@ RUN if [[ "$(uname -m)" == "aarch64" ]]; then \
         fi
 
 RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
-WORKDIR ${FUNCTION_DIR}
-RUN pip3 install -e "${FUNCTION_DIR}/forcingprocessor"
-
-RUN groupadd -r mygroup && useradd -r -g mygroup myuser
-RUN chown -R myuser:mygroup ${FUNCTION_DIR}
-
-

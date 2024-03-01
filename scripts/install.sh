@@ -15,15 +15,13 @@ else \
 fi
 curl -L -O https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
 sudo $PKG_MNGR update -y
-sudo $PKG_MNGR install ./mount-s3.rpm git pip pigz awscli -y
+sudo $PKG_MNGR install ./mount-s3.rpm git pip pigz awscli python -y
 tar -xzvf hfsubset-linux_amd64.tar.gz
 rm hfsubset-linux_amd64.tar.gz mount-s3.rpm
 sudo mv hfsubset /usr/bin/hfsubset
 git clone https://github.com/CIROH-UA/ngen-datastream.git
 sudo $PKG_MNGR install docker -y
 sudo systemctl start docker
-sudo usermod -aG docker ec2-user
+sudo usermod -aG docker $USER
 sudo newgrp docker
-su $USER
-"~/ngen-datastream/scripts/docker_builds.sh"
 

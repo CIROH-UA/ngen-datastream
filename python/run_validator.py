@@ -4,6 +4,7 @@ from ngen.config.validate import validate_paths
 from ngen.config.configurations import Routing
 import re
 import geopandas
+geopandas.options.io_engine = "pyogrio"
 import pandas as pd
 from datetime import datetime
 import concurrent.futures as cf
