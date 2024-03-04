@@ -16,6 +16,23 @@ build_docker_container() {
     fi
 }
 
+get_file() {
+    local FILE="$1"
+    local OUTFILE="$2"
+
+    if [[ "$FILE" == *"https://"* ]]; then
+        curl -# -L -o "$OUTFILE" "$FILE"
+    elif [[ "$FILE" == *"s3://"* ]]; then
+        aws s3 sync "$FILE" "$OUTFILE"
+    else
+        if [ -e "$FILE" ]; then
+            cp -r "$FILE" "$OUTFILE"
+        else
+            echo "$FILE doesn't exist!"
+        fi
+    fi
+}
+
 usage() {
     echo ""
     echo "Usage: $0 [options]"
@@ -39,6 +56,7 @@ START_DATE=""
 END_DATE=""
 DATA_PATH=""
 RESOURCE_PATH=""
+GEOPACKAGE=""
 RELATIVE_TO=""
 S3_MOUNT=""
 SUBSET_ID_TYPE=""
@@ -53,6 +71,7 @@ while [ "$#" -gt 0 ]; do
         -e|--END_DATE) END_DATE="$2"; shift 2;;
         -d|--DATA_PATH) DATA_PATH="$2"; shift 2;;
         -r|--RESOURCE_PATH) RESOURCE_PATH="$2"; shift 2;;
+        -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
         -t|--RELATIVE_TO) RELATIVE_TO="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
         -i|--SUBSET_ID_TYPE) SUBSET_ID_TYPE="$2"; shift 2;;
@@ -155,26 +174,7 @@ mkdir -p $NGEN_OUTPUT_PATH
 GEOPACKGE_NGENRUN="datastream.gpkg"
 GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
 
-if [ -z "$RESOURCE_PATH" ]; then    
-    echo "No resource path provided. Generating datastream resources with defaults"
-    RESOURCES_DEFAULT="s3://ngen-datastream/resources_default"
-    aws s3 sync $RESOURCES_DEFAULT $DATASTREAM_RESOURCES
-else    
-    echo "Resource path option provided" $RESOURCE_PATH
-    if [[ "$RESOURCE_PATH" == *"https://"* ]]; then
-        echo "curl'ing $DATASTREAM_RESOURCES $RESOURCE_PATH"
-        curl -# -L -o $DATASTREAM_RESOURCES $RESOURCE_PATH
-    elif [[ "$RESOURCE_PATH" == *"s3://"* ]]; then
-        aws s3 sync $RESOURCE_PATH $DATASTREAM_RESOURCES
-    else
-        if [ -e "$RESOURCE_PATH" ]; then
-            echo "Copying into current data path "$DATA_PATH
-            cp -r $RESOURCE_PATH $DATASTREAM_RESOURCES
-        else
-            echo $RESOURCE_PATH " doesn't exist!"
-        fi
-    fi
-fi
+get_file "$RESOURCE_PATH" $DATASTREAM_RESOURCES
 
 if [[ $RESOURCE_PATH == *".tar."* ]]; then
     echo UNTESTED
@@ -205,11 +205,13 @@ if [ ${NWEIGHT} -gt 1 ]; then
     echo "At most one weight file is allowed in "$DATASTREAM_RESOURCES
 fi
 
+
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
 NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
+
 
 PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
 if [ -e "$PARTITION_RESOURCES_PATH" ]; then
@@ -235,8 +237,17 @@ else
 fi
 
 if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
-    GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-    cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
+    if [ -z "$GEOPACKAGE" ]; then 
+        GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
+        cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
+    else
+        echo "Overriding "$GEOPACKAGE_RESOURCES_PATH" with $GEOPACKAGE"
+        rm $GEOPACKAGE_RESOURCES_PATH
+        if [ -e "$WEIGHTS_PATH" ]; then
+            rm "$WEIGHTS_PATH"
+        fi
+        GEOPACKAGE_RESOURCES_PATH=""
+    fi  
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
         echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
@@ -257,7 +268,15 @@ else
 
         cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH        
 
-    fi        
+    fi   
+fi
+
+if [ -z "$GEOPACKAGE_RESOURCES_PATH" ]; then
+    GEO_BASE="$(basename $GEOPACKAGE)"
+    GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/$GEO_BASE"
+    get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
+    cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH 
+    GEOPACKAGE="$GEO_BASE"
 fi
 
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
