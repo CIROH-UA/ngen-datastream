@@ -63,7 +63,7 @@ if __name__ == "__main__":
         catchment_list = list(weights_df.divide_id.unique())
         del weights_df
     else:
-        catchments_list = get_catchments_from_gpkg(args.geopackage)
+        catchment_list = get_catchments_from_gpkg(args.geopackage)
 
     ncatchments = len(catchment_list)
     nprocs = min([os.cpu_count() // 5, args.nprocs_max,ncatchments])
