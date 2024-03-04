@@ -45,6 +45,7 @@ usage() {
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
     echo "  -t, --RELATIVE_TO         <Path to prepend to all paths> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
+    echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
     echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
@@ -59,6 +60,7 @@ RESOURCE_PATH=""
 GEOPACKAGE=""
 RELATIVE_TO=""
 S3_MOUNT=""
+S3_PREFIX=""
 SUBSET_ID_TYPE=""
 SUBSET_ID=""
 HYDROFABRIC_VERSION=""
@@ -74,6 +76,7 @@ while [ "$#" -gt 0 ]; do
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
         -t|--RELATIVE_TO) RELATIVE_TO="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
+        -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -i|--SUBSET_ID_TYPE) SUBSET_ID_TYPE="$2"; shift 2;;
         -I|--SUBSET_ID) SUBSET_ID="$2"; shift 2;;
         -v|--HYDROFABRIC_VERSION) HYDROFABRIC_VERSION="$2"; shift 2;;        
@@ -117,15 +120,17 @@ END=
 if [ $START_DATE == "DAILY" ]; then
     if [[ -z "$END_DATE" ]]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
-        if [ -n "${S3_MOUNT}" ]; then
-            S3_OUT="$S3_MOUNT/daily/$DATE"
+        if [ -n "${S3_MOUNT}" ]; then     
+            [ -n "${S3_PREFIX}" ] && S3_PREFIX="daily/$DATE"       
+            S3_OUT="$S3_MOUNT/$S3_PREFIX"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
         fi
     else
         DATA_PATH="${PACAKGE_DIR%/}/data/${END_DATE::-4}"
         if [ -n "${S3_MOUNT}" ]; then
-            S3_OUT="$S3_MOUNT/daily/${END_DATE::-4}"
+            [ -n "${S3_PREFIX}" ] && S3_PREFIX="daily/${END_DATE::-4}"
+            S3_OUT="$S3_MOUNT/$S3_PREFIX"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
         fi
