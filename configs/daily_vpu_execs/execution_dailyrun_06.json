@@ -1,0 +1,43 @@
+{
+  "instance_parameters": {
+    "ImageId": "ami-003fc611504cf8f19",
+    "InstanceType": "hpc6a.48xlarge",
+    "KeyName": "Processor",
+    "MinCount": 1,
+    "MaxCount": 1,
+    "SecurityGroupIds": [
+      "sg-066e56297c706ac84"
+    ],
+    "IamInstanceProfile": {
+      "Name": "EC2ForcingProcessor"
+    },
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ngendatastream_parallel_06"
+          }
+        ]
+      }
+    ],
+    "BlockDeviceMappings": [
+      {
+        "DeviceName": "/dev/xvda",
+        "Ebs": {
+          "VolumeSize": 64,
+          "VolumeType": "gp2"
+        }
+      }
+    ]
+  },
+  "region": "us-east-2",
+  "commands": [
+    "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -g https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_06.gpkg -r /home/ec2-user/ngen-datastream/data/mount/resources_default -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/06> /home/ec2-user/ngen-datastream/log.txt'"
+  ],
+  "bucket": "ngen-datastream",
+  "obj_key": "daily/DATE/ngen-run/outputs/cat-1.csv"
+}
