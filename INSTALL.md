@@ -1,5 +1,29 @@
 # Install Instructions for ngen-datastream
-These steps are [scripted](#scripts) or provided step-by-step below.
+These steps are provided [scripted](#scripts) or [step-by-step](#step-by-step). Note some steps are arch specific
+
+## Scripted
+ngen-datastream was designed on Fedora and Amazon Linux. These instructions assuming starting from a freshly launched host.
+
+1) Create a shell script that will execute the install instructions. This will install the datastream, related packages, and docker.
+```
+vi ./install.sh
+```
+2) Copy the contents of this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/install.sh). `:wq` to save and close the file.
+Change permissions and execute the startup script
+```
+chmod +700 ./install.sh && ./install.sh
+```
+3) Exit the session and log back in to ensure docker daemon is running.
+
+4) Run the docker builds script
+```
+./ngen-datastream/scripts/docker_builds.sh -d <path to ngen-datastream directory>
+```
+You're ready to run ngen-datastream!
+
+`aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
+
+You're ready to run ngen-datastream!
 
 ## Step-by-step 
 These instructions were verified with Amazon Linux 2023. Steps may vary with different distributions of Linux.
@@ -62,28 +86,3 @@ docker build -t awiciroh/ciroh-ngen-image:latest -f ./Dockerfile . --no-cache --
 
 You're ready to run ngen-datastream!
 
-
-## Scripts
-
-ngen-datastream was designed on Fedora and Amazon Linux. These instructions assuming starting from a freshly launched host.
-
-1) Create a shell script that will execute the install instructions. This will install the datastream, related packages, and docker.
-```
-vi ./install.sh
-```
-2) Copy the contents of this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/install.sh). `:wq` to save and close the file.
-Change permissions and execute the startup script
-```
-chmod +700 ./install.sh && ./install.sh
-```
-3) Exit the session and log back in to ensure docker daemon is running.
-
-4) Run the docker builds script
-```
-./ngen-datastream/scripts/docker_builds.sh -d <path to ngen-datastream directory>
-```
-You're ready to run ngen-datastream!
-
-`aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
-
-You're ready to run ngen-datastream!
