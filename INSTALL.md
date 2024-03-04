@@ -74,13 +74,13 @@ vi ./install.sh
 2) Copy the contents of this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/install.sh). `:wq` to save and close the file.
 Change permissions and execute the startup script
 ```
-chmod +700 ./startup.sh && ./install.sh
+chmod +700 ./install.sh && ./install.sh
 ```
 3) Exit the session and log back in to ensure docker daemon is running.
 
 4) Run the docker builds script
 ```
-./ngen-datastream/scripts/docker_builds.sh
+./ngen-datastream/scripts/docker_builds.sh -d <path to ngen-datastream directory>
 ```
 You're ready to run ngen-datastream!
 
