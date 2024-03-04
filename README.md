@@ -1,8 +1,9 @@
 # NextGen Datastream
 The datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. In its current implementation, the datastream is a shell script that orchestrates each step in the process. 
 
-## Disclaimer
-This software is designed for deployment in HPC architecture and will consume the majority of resources by default. The intended use of this software is to take advantage of HPC hardware to solve the necessary computations quickly. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes (via `NPROCS`), the internal algorithms were designed to perform best on a dedicated HPC host.
+## Usage
+Hardware - This software is designed for deployment in HPC architecture and will consume the majority of resources by default. The intended use of this software is to take advantage of HPC hardware to solve the necessary computations quickly. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes (via `NPROCS`), the internal algorithms were designed to perform best on a dedicated HPC host.
+Scalability - Horizontal scaling is achieved by splitting the problem spatially. A datastream execution takes a geopackage (either as cli arg or via `RESOURCE_DIR`), which provides the spatial domain overwhich to run. 
 
 ## Install
 [Linux Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md)
