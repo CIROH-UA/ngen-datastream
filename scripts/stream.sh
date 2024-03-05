@@ -37,9 +37,8 @@ get_file() {
 
 log_time() {
     local LABEL="$1"
-    local LOG="$1"
-    LABEL=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
-    echo "START: $LABEL" >> $LOG
+    local LOG="$2"
+    echo "$LABEL: $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')" >> $LOG
 }
 
 usage() {
@@ -229,6 +228,7 @@ fi
 
 
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
+GEO_BASE=$(basename $GEOPACKAGE_RESOURCES_PATH)
 NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
@@ -244,6 +244,9 @@ fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
+if [ ${NGEO} == 1 ]; then
+    mv $NGEN_CONFIG_PATH/$GEO_BASE $GEOPACKAGE_NGENRUN_PATH
+fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
 log_time "SUBSET_START" $DATASTREAM_PROFILING
 if [ -z "$SUBSET_ID" ]; then
@@ -299,11 +302,12 @@ if [ -z "$GEOPACKAGE_RESOURCES_PATH" ]; then
     GEO_BASE="$(basename $GEOPACKAGE)"
     GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/$GEO_BASE"
     get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
+    cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
     GEOPACKAGE="$GEO_BASE"
 fi
 
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
-cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
+
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
