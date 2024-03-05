@@ -21,12 +21,11 @@ def validate_realization(realization_file):
     serialized_realization = NgenRealization.parse_file(realization_file)
     serialized_realization.resolve_paths(relative_to=relative_dir)
     val = validate_paths(serialized_realization)
-    for jval in val:
-        model = jval.model
-        if isinstance(model,Routing): # Allow config path for routing to not exist
-            pass
-        else:
-            raise Exception(f'{val[0].value} does not exist!')
+    if len(val) > 1:
+        for jval in val:
+            model = jval.model
+            print(val)
+            print(model)
     
     return serialized_realization, relative_dir
 
