@@ -299,11 +299,11 @@ if [ -z "$GEOPACKAGE_RESOURCES_PATH" ]; then
     GEO_BASE="$(basename $GEOPACKAGE)"
     GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/$GEO_BASE"
     get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
-    cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH 
     GEOPACKAGE="$GEO_BASE"
 fi
 
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
+cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
@@ -369,7 +369,6 @@ log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/run_validator.py"
-PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
@@ -381,10 +380,11 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
+PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 echo "Generating PET and CFE configs" $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $PET_CFE_GEN \
-    --hf_file $GEOPACKAGE_NGENRUN_PATH --hf_lnk_file "$DOCKER_MOUNT/config/gpkg_attr.txt"  --outfile "$DOCKER_MOUNT/config" 
+    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file "$DOCKER_MOUNT/config/gpkg_attr.txt"  --outdir "$DOCKER_MOUNT/config" 
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
