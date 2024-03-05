@@ -3,6 +3,7 @@ set -e
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
+START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
 
 build_docker_container() {
     local DOCKER_TAG="$1"
@@ -29,8 +30,16 @@ get_file() {
             cp -r "$FILE" "$OUTFILE"
         else
             echo "$FILE doesn't exist!"
+            exit 1
         fi
     fi
+}
+
+log_time() {
+    local LABEL="$1"
+    local LOG="$1"
+    LABEL=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
+    echo "START: $LABEL" >> $LOG
 }
 
 usage() {
@@ -173,8 +182,12 @@ NGEN_RUN_PATH="${DATA_PATH%/}/ngen-run"
 
 DATASTREAM_CONF_PATH="${DATA_PATH%/}/datastream-configs"
 DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
+DATASTREAM_PROFILING="${DATASTREAM_CONF_PATH%/}/profile.txt"
 mkdir -p $DATASTREAM_CONF_PATH
+touch $DATASTREAM_PROFILING
+echo "START: $START_TIME" > $DATASTREAM_PROFILING
 
+log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
 NGEN_CONFIG_PATH="${NGEN_RUN_PATH%/}/config"
 NGEN_OUTPUT_PATH="${NGEN_RUN_PATH%/}/outputs"
 mkdir -p $NGEN_CONFIG_PATH
@@ -231,7 +244,8 @@ fi
 
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
-
+log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
+log_time "SUBSET_START" $DATASTREAM_PROFILING
 if [ -z "$SUBSET_ID" ]; then
     :
 else
@@ -245,10 +259,9 @@ else
     fi    
 fi
 
-if [ -e $GEOPACKAGE_RESOURCES_PATH ]; then
-    if [ -z "$GEOPACKAGE" ]; then 
+if [[ -e $GEOPACKAGE_RESOURCES_PATH ]]; then
+    if [[ -z "$GEOPACKAGE" ]]; then 
         GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-        cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
     else
         echo "Overriding "$GEOPACKAGE_RESOURCES_PATH" with $GEOPACKAGE"
         rm $GEOPACKAGE_RESOURCES_PATH
@@ -279,7 +292,9 @@ else
 
     fi   
 fi
+log_time "SUBSET_END" $DATASTREAM_PROFILING
 
+log_time "WEIGHTS_START" $DATASTREAM_PROFILING
 if [ -z "$GEOPACKAGE_RESOURCES_PATH" ]; then
     GEO_BASE="$(basename $GEOPACKAGE)"
     GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/$GEO_BASE"
@@ -308,7 +323,7 @@ if [ -e "$WEIGHTS_PATH" ]; then
 else
     echo "Weights file not found. Creating from" $GEOPACKAGE
 
-    GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/$GEOPACKAGE"
+    GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/ngen-configs/$GEOPACKAGE"
     WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
 
     docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
@@ -320,7 +335,9 @@ else
     WEIGHTS_FILE="${DATA%/}/${GEOPACKAGE#/}"
         
 fi
+log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 
+log_time "CONFGEN_START" $DATASTREAM_PROFILING
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
 python3 $CONF_GENERATOR \
     --start-date "$START_DATE" \
@@ -333,7 +350,8 @@ python3 $CONF_GENERATOR \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
     --nwmurl_file "$NWMURL_CONF_PATH" \
     --nprocs "$NPROCS"
-
+log_time "CONFGEN_END" $DATASTREAM_PROFILING
+log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
@@ -347,6 +365,9 @@ docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
+log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
+
+log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/run_validator.py"
 PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 DOCKER_TAG="validator"
@@ -357,30 +378,41 @@ echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
+log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
+log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
 echo "Generating PET and CFE configs" $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $PET_CFE_GEN \
     --hf_file $GEOPACKAGE_NGENRUN_PATH --hf_lnk_file "$DOCKER_MOUNT/config/gpkg_attr.txt"  --outfile "$DOCKER_MOUNT/config" 
+log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING
 
+log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
+log_time "NGEN_END" $DATASTREAM_PROFILING
 
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
- 
-docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 
+log_time "MERKLE_START" $DATASTREAM_PROFILING
+docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+log_time "MERKLE_END" $DATASTREAM_PROFILING
+
+log_time "TAR_START" $DATASTREAM_PROFILING
 TAR_NAME="ngen-run.tar.gz"
 TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
+log_time "TAR_END" $DATASTREAM_PROFILING
 
 echo "ngen-datastream run complete!"
 
 if [ -e "$S3_OUT" ]; then
+    log_time "S3_MOVE_START" $DATASTREAM_PROFILING
     cp $TAR_PATH $S3_OUT
     cp $DATA_PATH/merkdir.file $S3_OUT
     cp -r $DATASTREAM_CONF_PATH $S3_OUT
     echo "Data exists here: $S3_OUT"
+    log_time "S3_MOVE_END" $DATASTREAM_PROFILING
 fi
 echo "Data exists here: $DATA_PATH"
     
