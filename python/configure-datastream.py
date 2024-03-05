@@ -19,6 +19,19 @@ def generate_noah_owp_conf(namelist_file,start,end):
     with open(namelist_file,'w') as fp:
         fp.writelines(noah_owp_conf_str)
 
+def generate_troute_conf(namelist_file,start):
+    with open(namelist_file,'r') as fp:
+        conf_template = fp.readlines()
+
+    troute_conf_str = conf_template
+    for j,jline in enumerate(conf_template):
+        if "start_datetime" in jline:
+            pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
+            troute_conf_str[j] = re.sub(pattern, start, jline)           
+
+    with open(namelist_file,'w') as fp:
+        fp.writelines(troute_conf_str)          
+
 def generate_config(args):
     config = {
         "globals": {
@@ -90,6 +103,7 @@ def create_conf_nwm_daily(start,end):
     }
     return nwm_conf    
 
+
 def create_confs(conf):
         
     if conf['globals']['start_date'] == "DAILY":
@@ -139,16 +153,22 @@ def create_confs(conf):
     
     realization_file = None
     noah_owp = None
+    ngen_yaml = None
     for path, _, files in os.walk(ngen_config_dir):
         for jfile in files:
             jfile_path = os.path.join(path,jfile)
             if jfile_path.find('realization') >= 0: 
-                    realization_file = jfile_path
+                realization_file = jfile_path
             if jfile_path.find('namelist.input') >= 0: 
-                    noah_owp = jfile_path
+                noah_owp = jfile_path
+            if jfile_path.find('ngen.yaml') >= 0: 
+                ngen_yaml = jfile_path
 
     if noah_owp:
         generate_noah_owp_conf(noah_owp,start,end)
+
+    if ngen_yaml:
+        generate_troute_conf(ngen_yaml,start_realization)
 
     if not realization_file: raise Exception(f"Cannot find realization file in {ngen_config_dir}")
 
