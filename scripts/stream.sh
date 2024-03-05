@@ -120,16 +120,20 @@ END=
 if [ $START_DATE == "DAILY" ]; then
     if [[ -z "$END_DATE" ]]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
-        if [ -n "${S3_MOUNT}" ]; then     
-            [ -n "${S3_PREFIX}" ] && S3_PREFIX="daily/$DATE"       
+        if [[ -n "${S3_MOUNT}" ]]; then     
+            if [[ -z "${S3_PREFIX}" ]]; then
+                S3_PREFIX="daily/$DATE" 
+            fi
             S3_OUT="$S3_MOUNT/$S3_PREFIX"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
         fi
     else
         DATA_PATH="${PACAKGE_DIR%/}/data/${END_DATE::-4}"
-        if [ -n "${S3_MOUNT}" ]; then
-            [ -n "${S3_PREFIX}" ] && S3_PREFIX="daily/${END_DATE::-4}"
+        if [[ -n "${S3_MOUNT}" ]]; then
+            if [[ -z "${S3_PREFIX}" ]]; then
+                S3_PREFIX="daily/${END_DATE::-4}"
+            fi 
             S3_OUT="$S3_MOUNT/$S3_PREFIX"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
@@ -137,20 +141,20 @@ if [ $START_DATE == "DAILY" ]; then
     fi
 
 else
-    if [ -z "${DATA_PATH}" ]; then
+    if [[ -z "${DATA_PATH}" ]]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
     fi
-    if [ -n "${S3_MOUNT}" ]; then
+    if [[ -n "${S3_MOUNT}" ]]; then
         S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT
     fi
 fi
 
-if [ ${#RELATIVE_TO} -gt 0 ] ; then
+if [[ ${#RELATIVE_TO} -gt 0 ]] ; then
     echo "Relative path provided. Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
     DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
-    if [ -n "$RESOURCE_PATH" ]; then
+    if [[ -n "$RESOURCE_PATH" ]]; then
         echo "Prepending ${RELATIVE_TO} to ${RESOURCE_PATH#/}"
         RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
     fi
@@ -344,6 +348,7 @@ docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
 
 VALIDATOR="/ngen-datastream/python/run_validator.py"
+PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
 build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
@@ -352,6 +357,11 @@ echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
+
+echo "Generating PET and CFE configs" $NGEN_RUN_PATH
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
+    validator python $PET_CFE_GEN \
+    --hf_file $GEOPACKAGE_NGENRUN_PATH --hf_lnk_file "$DOCKER_MOUNT/config/gpkg_attr.txt"  --outfile "$DOCKER_MOUNT/config" 
 
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS

@@ -4,3 +4,5 @@ FROM datastream-deps:${TAG_NAME} as datastream_base
 RUN git clone https://github.com/NOAA-OWP/ngen-cal
 RUN pip3 install geopandas pyogrio
 RUN pip3 install -e "/ngen-cal/python/ngen_conf"
+RUN pip3 install -e "/ngen-cal/python/ngen_config_gen"
+
