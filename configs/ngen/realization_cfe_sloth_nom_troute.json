@@ -58,9 +58,9 @@
                     "params": {
                         "name": "bmi_c",
                         "model_type_name": "PET",
-                        "library_file": "/beegfs/projects/hydrofcst/SHARP/models/ngen/extern/evapotranspiration/cmake_build/libpetbmi",
+                        "library_file": "/dmod/shared_libs/libpetbmi.so.1.0.0",
                         "forcing_file": "",
-                        "init_config": "/beegfs/projects/hydrofcst/SHARP/sharp_data/states/clear_ck/pet/PET_{{id}}.ini",
+                        "init_config": "./config/PET_{{id}}.ini",
                         "allow_exceed_end_time": true,
                         "main_output_variable": "water_potential_evaporation_flux",
                         "registration_function": "register_bmi_pet",
