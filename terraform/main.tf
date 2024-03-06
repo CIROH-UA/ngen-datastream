@@ -440,8 +440,15 @@ resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
   policy_arn = aws_iam_policy.scheduler_policy.arn
 }
 
+variable "vpu_execution_names" {
+  type    = list(string)
+  default = ["01","02","03N","03S","03W","04","05","06", "07","08","09",
+            "10L","10U","11","12","13","14","15","16","17","18",]
+}
+
 resource "aws_scheduler_schedule" "data_stream_schedule" {
-  name       = var.schedule_name
+  for_each   = toset(var.vpu_execution_names)
+  name       = each.value
   group_name = "default"
 
   flexible_time_window {
@@ -454,7 +461,7 @@ resource "aws_scheduler_schedule" "data_stream_schedule" {
   target {
     arn      = aws_sfn_state_machine.datastream_state_machine.arn
     role_arn = aws_iam_role.scheduler_role.arn
-    input = file("${path.module}/${var.execution_name}")
+    input = file("${path.module}/executions/vpu_executions/${var.execution_name}_${each.value}.json")
   }
 
 }
