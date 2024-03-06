@@ -131,7 +131,9 @@ DATE=$(env TZ=US/Eastern date +'%Y%m%d')
 END=
 if [ $START_DATE == "DAILY" ]; then
     if [[ -z "$END_DATE" ]]; then
-        DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
+        if [[ -z "$DATA_PATH" ]]; then
+            DATA_PATH="${PACAKGE_DIR%/}/data/$DATE"
+        fi
         if [[ -n "${S3_MOUNT}" ]]; then     
             if [[ -z "${S3_PREFIX}" ]]; then
                 S3_PREFIX="daily/$DATE" 
@@ -141,7 +143,9 @@ if [ $START_DATE == "DAILY" ]; then
             mkdir -p $S3_OUT 
         fi
     else
-        DATA_PATH="${PACAKGE_DIR%/}/data/${END_DATE::-4}"
+        if [[ -z "$DATA_PATH" ]]; then
+            DATA_PATH="${PACAKGE_DIR%/}/data/${END_DATE::-4}"
+        fi
         if [[ -n "${S3_MOUNT}" ]]; then
             if [[ -z "${S3_PREFIX}" ]]; then
                 S3_PREFIX="daily/${END_DATE::-4}"
