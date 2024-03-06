@@ -1,7 +1,7 @@
 {
   "instance_parameters": {
-    "ImageId": "ami-003fc611504cf8f19",
-    "InstanceType": "hpc6a.48xlarge",
+    "ImageId": "ami-0e0aaecba7c6d9816",
+    "InstanceType": "t2.2xlarge",
     "KeyName": "Processor",
     "MinCount": 1,
     "MaxCount": 1,
@@ -17,7 +17,7 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "ngendatastream_parallel_16"
+            "Value": "ngendatastream_parallel_03N"
           }
         ]
       }
@@ -36,7 +36,7 @@
   "commands": [
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
     "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -g https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_16.gpkg -r /home/ec2-user/ngen-datastream/data/mount/resources_default -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/16> /home/ec2-user/ngen-datastream/log.txt'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -g https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_03N.gpkg -r /home/ec2-user/ngen-datastream/data/mount/resources_default -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/03N > /home/ec2-user/ngen-datastream/log.txt'"
   ],
   "bucket": "ngen-datastream",
   "obj_key": "daily/DATE/ngen-run/outputs/cat-1.csv"

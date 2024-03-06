@@ -1,0 +1,2 @@
+x86: ami-0e0aaecba7c6d9816
+arm: ami-07c34fc6310d1ce5c
