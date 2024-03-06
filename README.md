@@ -3,6 +3,7 @@ The datastream automates the process of collecting and formatting input data for
 
 ## Usage
 Hardware - This software is best deploymented on a dedicated host and will consume the majority of resources by default. While the datastream will run locally on a user's laptop, the internal algorithms were designed to perform best on a dedicated host. Complete datastream run for a day over VPU 09 takes about 7 minutes on a free AWS t2.2xlarge ec2 instance (8vCPU,32GB) with CFE, PET, and NOM NGEN configuration. 
+
 Scalability - Horizontal scaling is achieved by splitting the problem spatially. A datastream execution takes a geopackage (either as cli arg or via `RESOURCE_DIR`), which provides the spatial domain overwhich to run. 
 
 ## [Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md)
