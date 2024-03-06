@@ -139,7 +139,11 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
 
     def init_pool(the_data):
         global weights_json
-        weights_json = the_data        
+        weights_json = the_data
+    
+    global x_min, x_max, y_min, y_max
+    [x_min, x_max, y_min, y_max] = crosswalk_dict['window']
+    del crosswalk_dict['window']
 
     data_ax = []
     t_ax_local = []
@@ -198,18 +202,21 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             file_obj = nwm_file
 
         topen += time.perf_counter() - t0
-        t0 = time.perf_counter()                
+        t0 = time.perf_counter()  
+
+        dx = x_max - x_min + 1
+        dy = y_max - y_min + 1
 
         with xr.open_dataset(file_obj, engine=eng) as nwm_data:
             txrds += time.perf_counter() - t0
-            t0 = time.perf_counter()
-            shp = nwm_data["U2D"].shape
-            data_allvars = np.zeros(shape=(nvar, shp[1], shp[2]), dtype=np.float32)            
+            t0 = time.perf_counter()                     
+            shp = nwm_data["U2D"].shape   
+            data_allvars = np.zeros(shape=(nvar, dx, dy), dtype=np.float32)            
             for var_dx, jvar in enumerate(nwm_variables):                
                 if jvar == 'RAINRATE': # HACK CONVERSION
-                    data_allvars[var_dx, :, :] = 3600 * np.squeeze(nwm_data[jvar].values)
+                    data_allvars[var_dx, :, :] = 3600 * np.squeeze(nwm_data[jvar].values[:,x_min:x_max+1,y_min:y_max+1])
                 else:
-                    data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar].values)   
+                    data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar].values[:,x_min:x_max+1,y_min:y_max+1])   
 
             time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
             t = time_splt[0] + " " + time_splt[1]
@@ -218,7 +225,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
         tfill += time.perf_counter() - t0        
 
         t0 = time.perf_counter()
-        data_allvars = data_allvars.reshape(nvar, shp[1] * shp[2])
+        data_allvars = data_allvars.reshape(nvar, dx * dy)
         ncatch = len(weights_json)
         data_array = np.zeros((nvar,ncatch), dtype=np.float32)
         jcatch = 0
@@ -226,7 +233,11 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             weights = value[0]
             coverage = np.array(value[1])
             coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
-            jcatch_data_mask = data_allvars[:,weights] 
+            weights_dx, weights_dy = np.unravel_index(weights,(shp[1], shp[2]))
+            weights_dx_shifted = list(weights_dx - x_min)
+            weights_dy_shifted = list(weights_dy - y_min)
+            weights_window = np.ravel_multi_index(np.array([weights_dx_shifted,weights_dy_shifted]),(dx,dy))
+            jcatch_data_mask = data_allvars[:,weights_window] 
             weight_sum = np.sum(coverage)
             data_array[:,jcatch] = np.sum(coverage_mat * jcatch_data_mask ,axis=1) / weight_sum  
 
@@ -589,6 +600,10 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n')
+        # global weights_json, x_min, x_max, y_min, y_max
+        # [x_min, x_max, y_min, y_max] = crosswalk_dict['window']
+        # del crosswalk_dict['window']
+        # weights_json = crosswalk_dict
         # [data_array, t_ax] = forcing_grid2catchment(jnwm_files, fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_process,crosswalk_dict,fs)
         t_extract = time.perf_counter() - t0
