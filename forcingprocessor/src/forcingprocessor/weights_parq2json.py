@@ -1,8 +1,8 @@
-import concurrent.futures as cf
 import json
 import numpy as np
-import os, argparse, time
+import argparse, time
 import geopandas as gpd
+import pandas as pd
 gpd.options.io_engine = "pyogrio"
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -25,16 +25,20 @@ def get_weight_json(catchments,version):
     t_weights = time.perf_counter()    
     [x_min, x_max] = [10000,0]
     [y_min, y_max] = [10000,0]
+    count = 0
+    ncatchments = len(catchments)
     for batch in w:
+        count += 1
         tbl = batch.to_pandas()
         if tbl.empty:
             continue    
-    
-        for j, jcatch in enumerate(catchments):
-            df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]
-            if df_jcatch.empty:
-                continue  
+        uni_cat = tbl.divide_id.unique()    
+        located = [x for x in catchments if x in uni_cat]  
+        [catchments.remove(x) for x in located]
+        for j, jcatch in enumerate(located):         
+            df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]           
             ncatch_found+=1
+            print(f'batch: {count}, {ncatchments} catchments remaining. {100*ncatch_found/ncatchments:.1f}%',end='\r')
             idx_list = [int(x) for x in list(df_jcatch['cell'])]
             df_catch = list(df_jcatch['coverage_fraction'])
             weight_data[jcatch] = [idx_list,df_catch]
@@ -65,7 +69,6 @@ if __name__ == "__main__":
     parser.add_argument('--catchment_list', dest="catchment_list", type=str, help="list of catchments",default = None)
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
     parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"",default = "v20.1")
-    parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="Maximum number of processes",default=1)
     args = parser.parse_args()
 
     version = args.version    
@@ -78,15 +81,19 @@ if __name__ == "__main__":
     else:
         if args.geopackage is None:
             # go for conus
-            import pandas as pd
             print(f'Extracting conus weights')
             uri = f"s3://lynker-spatial/{version}/forcing_weights.parquet"
             weights_df = pd.read_parquet(uri) 
             catchment_list = list(weights_df.divide_id.unique())
             del weights_df
         else:
-            print(f'Extracting weights from gpkg')
-            catchment_list = get_catchments_from_gpkg(args.geopackage)
+            if 's3://' in args.geopackage:
+                weights_df = pd.read_parquet(args.geopackage) 
+                catchment_list = list(weights_df.divide_id.unique())
+                del weights_df
+            else:
+                print(f'Extracting weights from gpkg')
+                catchment_list = get_catchments_from_gpkg(args.geopackage)
 
     (weights, x_min, x_max, y_min, y_max) = get_weight_json(catchment_list,args.version)
 
