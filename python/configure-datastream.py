@@ -174,6 +174,7 @@ def create_confs(conf):
 
     with open(realization_file,'r') as fp:
         data = json.load(fp)
+    os.remove(realization_file)
 
     data['time']['start_time'] = start_realization
     data['time']['end_time']   = end_realization

@@ -51,6 +51,8 @@ usage() {
     echo "  -e, --END_DATE            <YYYYMMDDHHMM> "
     echo "  -d, --DATA_PATH           <Path to write to> "
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
+    echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
+    echo "  -G, --GEOPACAKGE_ATTR     <Path to geopackage attributes file> "
     echo "  -t, --RELATIVE_TO         <Path to prepend to all paths> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
     echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
@@ -66,6 +68,7 @@ END_DATE=""
 DATA_PATH=""
 RESOURCE_PATH=""
 GEOPACKAGE=""
+GEOPACKAGE_ATTR=""
 RELATIVE_TO=""
 S3_MOUNT=""
 S3_PREFIX=""
@@ -82,6 +85,7 @@ while [ "$#" -gt 0 ]; do
         -d|--DATA_PATH) DATA_PATH="$2"; shift 2;;
         -r|--RESOURCE_PATH) RESOURCE_PATH="$2"; shift 2;;
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
+        -G|--GEOPACKAGE_ATTR) GEOPACKAGE_ATTR="$2"; shift 2;;
         -t|--RELATIVE_TO) RELATIVE_TO="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
@@ -238,7 +242,6 @@ if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
 
-
 PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
 if [ -e "$PARTITION_RESOURCES_PATH" ]; then
     PARTITION_NGENRUN_PATH=$NGEN_RUN_PATH/$(basename $PARTITION_RESOURCES_PATH)
@@ -270,8 +273,8 @@ if [[ -e $GEOPACKAGE_RESOURCES_PATH ]]; then
     if [[ -z "$GEOPACKAGE" ]]; then 
         GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
     else
-        echo "Overriding "$GEOPACKAGE_RESOURCES_PATH" with $GEOPACKAGE"
-        rm $GEOPACKAGE_RESOURCES_PATH
+        echo "Overriding "$GEOPACKAGE_NGENRUN_PATH" with $GEOPACKAGE"
+        rm $GEOPACKAGE_NGENRUN_PATH
         if [ -e "$WEIGHTS_PATH" ]; then
             rm "$WEIGHTS_PATH"
         fi
@@ -304,14 +307,13 @@ log_time "SUBSET_END" $DATASTREAM_PROFILING
 log_time "WEIGHTS_START" $DATASTREAM_PROFILING
 if [ -z "$GEOPACKAGE_RESOURCES_PATH" ]; then
     GEO_BASE="$(basename $GEOPACKAGE)"
-    GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/$GEO_BASE"
+    GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/ngen-configs/$GEO_BASE"
     get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
     cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
     GEOPACKAGE="$GEO_BASE"
 fi
 
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
-
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
 DOCKER_MOUNT="/mounted_dir"
@@ -388,11 +390,19 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
+if [ -z "$GEOPACKAGE_ATTR" ]; then
+    GEOPACKAGE_ATTR="$NGEN_RUN_PATH/config/gpkg_attr.txt" 
+    if [ ! -f $GEOPACAKGE_ATTR ]; then
+        echo "geopackage attribute file is required!"
+        exit 1
+    fi
+fi
+ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
 PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 echo "Generating PET and CFE configs" $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $PET_CFE_GEN \
-    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file "$DOCKER_MOUNT/config/gpkg_attr.txt"  --outdir "$DOCKER_MOUNT/config" 
+    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" 
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
