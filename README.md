@@ -2,7 +2,7 @@
 The datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. In its current implementation, the datastream is a shell script that orchestrates each step in the process. 
 
 ## Usage
-Hardware - This software is best deploymented in HPC architecture and will consume the majority of resources by default. While it is possible to run the datastream using resources available on a laptop by capping the number of allowed processes (via `NPROCS`), the internal algorithms were designed to perform best on a dedicated host.
+Hardware - This software is best deploymented on a dedicated host and will consume the majority of resources by default. While the datastream will run locally on a user's laptop, the internal algorithms were designed to perform best on a dedicated host. Complete datastream run for a day over VPU 09 takes about 7 minutes on a free AWS t2.2xlarge ec2 instance (8vCPU,32GB) with CFE, PET, and NOM NGEN configuration. 
 Scalability - Horizontal scaling is achieved by splitting the problem spatially. A datastream execution takes a geopackage (either as cli arg or via `RESOURCE_DIR`), which provides the spatial domain overwhich to run. 
 
 ## [Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md)
