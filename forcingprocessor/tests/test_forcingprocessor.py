@@ -53,7 +53,7 @@ def test_generate_filenames(get_paths, get_time):
 
 def test_generate_weights(get_paths):
     
-    weights = get_weight_json(["cat-1","cat-10","cat-100","cat-1000","cat-10000","cat-100000"])
+    weights = get_weight_json(["cat-1","cat-10","cat-100","cat-1000","cat-10000","cat-100000"],"v20.1")
 
     data = json.dumps(weights)
     with open(pytest.full_weight,'w') as fp:

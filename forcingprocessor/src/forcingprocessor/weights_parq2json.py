@@ -8,7 +8,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset
 
-def get_weight_json(catchments,version=None):
+def get_weight_json(catchments,version):
     if version is None: version = "v20.1"
 
     data_shp = (3840,4608)
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument('--gpkg', dest="geopackage", type=str, help="Path to geopackage file",default = None)
     parser.add_argument('--catchment_list', dest="catchment_list", type=str, help="list of catchments",default = None)
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
-    parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"",default = None)
+    parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"",default = "v20.1")
     parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="Maximum number of processes",default=1)
     args = parser.parse_args()
 
@@ -79,14 +79,16 @@ if __name__ == "__main__":
         if args.geopackage is None:
             # go for conus
             import pandas as pd
+            print(f'Extracting conus weights')
             uri = f"s3://lynker-spatial/{version}/forcing_weights.parquet"
             weights_df = pd.read_parquet(uri) 
             catchment_list = list(weights_df.divide_id.unique())
             del weights_df
         else:
+            print(f'Extracting weights from gpkg')
             catchment_list = get_catchments_from_gpkg(args.geopackage)
 
-    (weights, x_min, x_max, y_min, y_max) = get_weight_json(catchment_list)
+    (weights, x_min, x_max, y_min, y_max) = get_weight_json(catchment_list,args.version)
 
     weights['window'] = [x_min,x_max,y_min,y_max]
 
