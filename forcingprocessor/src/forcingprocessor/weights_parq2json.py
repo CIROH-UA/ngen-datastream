@@ -1,6 +1,5 @@
 import json, os
 import concurrent.futures as cf
-import numpy as np
 import argparse, time
 import geopandas as gpd
 import pandas as pd
@@ -9,24 +8,21 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset
 
-def get_catchment_idx(tbl,catchments):
+def get_catchment_idx(proc_pairs):
     weight_data = {}
     ncatch_found = 0
-    for _, jcatch in enumerate(catchments):         
-        df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]           
-        ncatch_found+=1
-        idx_list = [int(x) for x in list(df_jcatch['cell'])]
-        df_catch = list(df_jcatch['coverage_fraction'])
-        weight_data[jcatch] = [idx_list,df_catch]
+    for tbl, catchments in proc_pairs:
+        for jcatch in catchments:         
+            df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]           
+            ncatch_found+=1
+            idx_list = [int(x) for x in list(df_jcatch['cell'])]
+            df_catch = list(df_jcatch['coverage_fraction'])
+            weight_data[jcatch] = [idx_list,df_catch]
+    return (weight_data)
 
-    return weight_data
-
-def get_weight_json(catchments,args):
-    if args.version is None: 
-        version = "v20.1"
-    else:
-        version = args.version
-    print(f'Querying data from lynker-spatial')
+def get_weight_json(catchments,version,nprocs):
+    if version is None: version = "v20.1"
+    print(f'Beginning weights query')
     w = pa.dataset.dataset(
         f's3://lynker-spatial/{version}/forcing_weights.parquet', format='parquet'
     ).filter(
@@ -35,7 +31,9 @@ def get_weight_json(catchments,args):
     batch: pa.RecordBatch
     t_weights = time.perf_counter()    
     count = 0
-    tbl_main = None
+    ncatchments = len(catchments)
+    print(f'Querying weights for {ncatchments} catchments')
+    proc_pairs = []
     for batch in w:
         count += 1
         tbl = batch.to_pandas()
@@ -43,40 +41,40 @@ def get_weight_json(catchments,args):
             continue    
         uni_cat = tbl.divide_id.unique()    
         located = [x for x in catchments if x in uni_cat]  
-        nlocated = len(located)
-        if nlocated > 0:
-            if tbl_main is not None: tbl_main = pd.concat([tbl_main,tbl], ignore_index=True)
-            else: tbl_main = tbl
+        if len(located) > 0:
+            proc_pairs.append([tbl,located])
+            print(f'found {len(located)} in batch {count}')
 
-    nprocs = min(os.cpu_count(), args.nprocs_max,len(located))
-    print(f'Calculating {nlocated} weights with {nprocs} processes')
-    catchment_list = []  
-    tbl_list = []    
-    nper = nlocated // nprocs
-    nleft = nlocated - (nper * nprocs)
+    print(f'Weights have been retrieved, converting from tabular to per-catchment json for forcingprocessor')
+    npairs = len(proc_pairs)
+    nprocs = min(os.cpu_count(), nprocs,npairs)
+    proc_pairs_list = []    
+    nper = npairs // nprocs
+    nleft = npairs - (nper * nprocs)
     i = 0
     k = 0
     for j in range(nprocs):
         k = nper + i + nleft      
-        catchment_list.append(located[i:k])
-        tbl_list.append(tbl_main)
+        proc_pairs_list.append(proc_pairs[i:k])
         i = k
 
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
-        results = pool.map(get_catchment_idx,tbl_list,catchment_list)
+        results = pool.map(get_catchment_idx,proc_pairs_list)
 
-        weights = {}
-        for jweights in results:
-            weights = weights | jweights            
+    weights = {}
+    for jweights in results:
+        weights = weights | jweights           
+    
+    nweights = len(weights)
+    assert nweights == ncatchments, f'nweights {nweights} does not equal ncatchments {ncatchments}!!'
 
-    print(f'Weights calculated for {len(weights)} catchments in {time.perf_counter() - t_weights:.1f} seconds')
+    print(f'Weights calculated for {nweights} catchments in {time.perf_counter() - t_weights:.1f} seconds')
 
     return weights
 
 def get_catchments_from_gpkg(gpkg):
     catchments     = gpd.read_file(gpkg, layer='divides')
     catchment_list = sorted(list(catchments['divide_id']))  
-
     return catchment_list
 
 if __name__ == "__main__":
@@ -84,9 +82,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpkg', dest="geopackage", type=str, help="Path to geopackage file",default = None)
     parser.add_argument('--catchment_list', dest="catchment_list", type=str, help="list of catchments",default = None)
+    parser.add_argument('--nprocs', dest="nprocs_max", type=str, help="maximum processes",default = os.cpu_count())
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
     parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"",default = "v20.1")
-    parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="Maximum number of processes",default=os.cpu_count())
     args = parser.parse_args()
 
     version = args.version    
@@ -113,7 +111,7 @@ if __name__ == "__main__":
                 print(f'Extracting weights from gpkg')
                 catchment_list = get_catchments_from_gpkg(args.geopackage)
 
-    weights = get_weight_json(catchment_list,args)
+    weights = get_weight_json(catchment_list,args.version,args.nprocs_max)
 
     data = json.dumps(weights)
     with open(args.weights_filename,'w') as fp:
