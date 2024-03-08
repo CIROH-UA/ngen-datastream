@@ -32,7 +32,7 @@ def get_weight_json(catchments,version,nprocs):
     t_weights = time.perf_counter()    
     count = 0
     ncatchments = len(catchments)
-    print(f'Querying weights for {ncatchments} catchments')
+    print(f'Querying weights for {ncatchments} catchments',flush=True)
     proc_pairs = []
     for batch in w:
         count += 1
@@ -43,9 +43,9 @@ def get_weight_json(catchments,version,nprocs):
         located = [x for x in catchments if x in uni_cat]  
         if len(located) > 0:
             proc_pairs.append([tbl,located])
-            print(f'found {len(located)} in batch {count}')
+            print(f'found {len(located)} in batch {count}',flush=True)
 
-    print(f'Weights have been retrieved, converting from tabular to per-catchment json for forcingprocessor')
+    print(f'Weights have been retrieved, converting from tabular to per-catchment json for forcingprocessor',flush=True)
     npairs = len(proc_pairs)
     nprocs = min(os.cpu_count(), nprocs,npairs)
     proc_pairs_list = []    
@@ -68,7 +68,7 @@ def get_weight_json(catchments,version,nprocs):
     nweights = len(weights)
     assert nweights == ncatchments, f'nweights {nweights} does not equal ncatchments {ncatchments}!!'
 
-    print(f'Weights calculated for {nweights} catchments in {time.perf_counter() - t_weights:.1f} seconds')
+    print(f'Weights calculated for {nweights} catchments in {time.perf_counter() - t_weights:.1f} seconds',flush=True)
 
     return weights
 
