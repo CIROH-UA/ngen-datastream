@@ -45,20 +45,22 @@ def get_weight_json(catchments,args):
         uni_cat = tbl.divide_id.unique()    
         located = [x for x in catchments if x in uni_cat]  
         [catchments.remove(x) for x in located]
-        if len(located) > 0:
+        nlocated = len(located)
+        if nlocated > 0:
             nprocs = min(os.cpu_count(), args.nprocs_max,len(located))
-            print(f'Calculating {len(located)} weights with {nprocs} processes')
+            print(f'Calculating {nlocated} weights with {nprocs} processes')
             catchment_list = []  
             tbl_list = []    
-            nper = ncatchments // nprocs
-            nleft = ncatchments - (nper * nprocs)
+            nper = nlocated // nprocs
+            nleft = nlocated - (nper * nprocs)
             i = 0
             k = 0
-            for _ in range(nprocs):
+            for j in range(nprocs):
                 k = nper + i + nleft      
                 catchment_list.append(located[i:k])
                 tbl_list.append(tbl)
                 i = k
+                
 
             with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
                 results = pool.map(get_catchment_idx,tbl_list,catchment_list)
