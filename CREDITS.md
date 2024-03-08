@@ -1,4 +1,3 @@
-References
 The following software libraries and other references are utilized in the creation this repository.
 
 [hfsubset](https://github.com/LynkerIntel/hfsubset/tree/main) - distributed by LynkerIntel under [GBL-3.0](https://github.com/CIROH-UA/ngen-datastream/blob/main/LICENSE.md) and [Open Database License](https://github.com/CIROH-UA/ngen-datastream/blob/main/ODbl.md)
