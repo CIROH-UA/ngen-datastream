@@ -139,3 +139,7 @@ NextGen requires a single geopackage file. This fle is the [hydrofabric](https:/
 The ngen framework uses a merkel tree hashing algorithm to version each ngen run with [ht tool](https://github.com/aaraney/ht). This means that the changes a user makes to any input files in `ngen-run` will be tracked and diff'd against previous input directories. While an explaination of how awesome this is can be found [elsewhere](https://en.wikipedia.org/wiki/Merkle_tree), the important thing to know is the user must prepare a clean input directory (`ngen-run`) for each run they want to make. 
 
 "Clean" means here that every file in the `ngen-run` is required for the immediate run the user intends to make. For instance, if the user creates a new realization configuration file, the old file must be removed before using `ngen-run` as an input directory to ngen. In other words, each configuration file type (realization, catchment, nexus, etc.) must be unique within `ngen-run`.
+
+## License
+
+`ngen-datastream` is distributed under [GNU General Public License v3.0 or later](LICENSE.md)
