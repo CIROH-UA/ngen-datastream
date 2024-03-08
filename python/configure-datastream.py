@@ -79,8 +79,8 @@ def create_conf_fp(start,end,ii_retro,nprocs):
         "run" : {
             "verbose"        : True,
             "collect_stats"  : True,
-            "proc_process"   : min(int(os.cpu_count() * 0.8),nprocs),
-            "write_process"  : min(int(os.cpu_count() * 0.8),nprocs)
+            "proc_process"   : os.cpu_count(),
+            "write_process"  : os.cpu_count()
         }
     }
 
