@@ -209,11 +209,6 @@ GEOPACKAGE_NGENRUN_PATH="${NGEN_CONFIG_PATH%/}/$GEOPACKGE_NGENRUN"
 
 get_file "$RESOURCE_PATH" $DATASTREAM_RESOURCES
 
-if [[ $RESOURCE_PATH == *".tar."* ]]; then
-    echo UNTESTED
-    tar -xzvf $(basename $RESOURCE_PATH)
-fi
-
 if [ $START_DATE == "DAILY" ]; then
     :
 else
@@ -240,7 +235,6 @@ fi
 
 
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
-GEO_BASE=$(basename $GEOPACKAGE_RESOURCES_PATH)
 NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
@@ -256,10 +250,11 @@ fi
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 if [ ${NGEO} == 1 ]; then
+    GEO_BASE=$(basename $GEOPACKAGE_RESOURCES_PATH)
     mv $NGEN_CONFIG_PATH/$GEO_BASE $GEOPACKAGE_NGENRUN_PATH
 fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
-log_time "SUBSET_START" $DATASTREAM_PROFILING
+
 if [ -z "$SUBSET_ID" ]; then
     :
 else
@@ -286,10 +281,20 @@ if [[ -e $GEOPACKAGE_RESOURCES_PATH ]]; then
     fi  
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
-        echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
-        exit 1
+        if [ ! -f "$GEOPACKAGE_RESOURCES_PATH" ]; then
+            log_time "GEOPACKAGE_DL" $DATASTREAM_PROFILING
+            GEO_BASE="$(basename $GEOPACKAGE)"
+            GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/ngen-configs/$GEO_BASE"
+            get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
+            cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
+            GEOPACKAGE="$GEO_BASE"
+            log_time "GEOPACKAGE_DL" $DATASTREAM_PROFILING
+        else
+            echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
+            exit 1
+        fi
     else
-
+        log_time "SUBSET_START" $DATASTREAM_PROFILING
         GEOPACKAGE="$SUBSET_ID.gpkg"
         GEOPACKAGE_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
 
@@ -303,20 +308,11 @@ else
         hfsubset -o $GEOPACKAGE_RESOURCES_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
 
         cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH        
-
+        log_time "SUBSET_END" $DATASTREAM_PROFILING
     fi   
 fi
-log_time "SUBSET_END" $DATASTREAM_PROFILING
 
 log_time "WEIGHTS_START" $DATASTREAM_PROFILING
-if [ -z "$GEOPACKAGE_RESOURCES_PATH" ]; then
-    GEO_BASE="$(basename $GEOPACKAGE)"
-    GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/ngen-configs/$GEO_BASE"
-    get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
-    cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
-    GEOPACKAGE="$GEO_BASE"
-fi
-
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
 
 DOCKER_DIR="$(dirname "${SCRIPT_DIR%/}")/docker"
