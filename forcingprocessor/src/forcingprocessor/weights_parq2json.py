@@ -47,7 +47,7 @@ def get_weight_json(catchments,version,nprocs):
 
     print(f'Weights have been retrieved, converting from tabular to per-catchment json for forcingprocessor',flush=True)
     npairs = len(proc_pairs)
-    nprocs = min(os.cpu_count(), nprocs,npairs)
+    nprocs = min(os.cpu_count(), nprocs, npairs)
     proc_pairs_list = []    
     nper = npairs // nprocs
     nleft = npairs - (nper * nprocs)
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpkg', dest="geopackage", type=str, help="Path to geopackage file",default = None)
     parser.add_argument('--catchment_list', dest="catchment_list", type=str, help="list of catchments",default = None)
-    parser.add_argument('--nprocs', dest="nprocs_max", type=str, help="maximum processes",default = os.cpu_count())
+    parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="maximum processes",default = os.cpu_count())
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
     parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v21\"",default = "v20.1")
     args = parser.parse_args()
