@@ -33,10 +33,9 @@ def get_weight_json(catchments,args):
         pc.field('divide_id').isin(catchments)
     ).to_batches()
     batch: pa.RecordBatch
-    ncatch_found = 0
     t_weights = time.perf_counter()    
     count = 0
-    ncatchments = len(catchments)
+    tbl_main = None
     for batch in w:
         count += 1
         tbl = batch.to_pandas()
@@ -44,26 +43,27 @@ def get_weight_json(catchments,args):
             continue    
         uni_cat = tbl.divide_id.unique()    
         located = [x for x in catchments if x in uni_cat]  
-        [catchments.remove(x) for x in located]
         nlocated = len(located)
         if nlocated > 0:
-            nprocs = min(os.cpu_count(), args.nprocs_max,len(located))
-            print(f'Calculating {nlocated} weights with {nprocs} processes')
-            catchment_list = []  
-            tbl_list = []    
-            nper = nlocated // nprocs
-            nleft = nlocated - (nper * nprocs)
-            i = 0
-            k = 0
-            for j in range(nprocs):
-                k = nper + i + nleft      
-                catchment_list.append(located[i:k])
-                tbl_list.append(tbl)
-                i = k
-                
+            if tbl_main is not None: tbl_main = pd.concat([tbl_main,tbl], ignore_index=True)
+            else: tbl_main = tbl
 
-            with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
-                results = pool.map(get_catchment_idx,tbl_list,catchment_list)
+    nprocs = min(os.cpu_count(), args.nprocs_max,len(located))
+    print(f'Calculating {nlocated} weights with {nprocs} processes')
+    catchment_list = []  
+    tbl_list = []    
+    nper = nlocated // nprocs
+    nleft = nlocated - (nper * nprocs)
+    i = 0
+    k = 0
+    for j in range(nprocs):
+        k = nper + i + nleft      
+        catchment_list.append(located[i:k])
+        tbl_list.append(tbl_main)
+        i = k
+
+    with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        results = pool.map(get_catchment_idx,tbl_list,catchment_list)
 
         weights = {}
         for jweights in results:
