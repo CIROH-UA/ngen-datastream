@@ -10,9 +10,6 @@ import pyarrow.dataset
 
 def get_weight_json(catchments,version):
     if version is None: version = "v20.1"
-
-    data_shp = (3840,4608)
-    
     weight_data = {}
     print(f'Beginning weights query')
     w = pa.dataset.dataset(
@@ -23,8 +20,6 @@ def get_weight_json(catchments,version):
     batch: pa.RecordBatch
     ncatch_found = 0
     t_weights = time.perf_counter()    
-    [x_min, x_max] = [10000,0]
-    [y_min, y_max] = [10000,0]
     count = 0
     ncatchments = len(catchments)
     for batch in w:
@@ -38,23 +33,14 @@ def get_weight_json(catchments,version):
         for j, jcatch in enumerate(located):         
             df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]           
             ncatch_found+=1
-            print(f'batch: {count}, {ncatchments} catchments remaining. {100*ncatch_found/ncatchments:.1f}%',end='\r')
+            print(f'{ncatchments-ncatch_found} catchments remaining. {100*ncatch_found/ncatchments:.1f}% complete',end='\r')
             idx_list = [int(x) for x in list(df_jcatch['cell'])]
             df_catch = list(df_jcatch['coverage_fraction'])
             weight_data[jcatch] = [idx_list,df_catch]
-            [x,y] = np.unravel_index(idx_list,(data_shp[0], data_shp[1]))
-            jxmin = min(x)
-            jxmax = max(x)
-            jymin = min(y)
-            jymax = max(y)
-            if jxmin < x_min: x_min = jxmin
-            if jxmax > x_max: x_max = jxmax
-            if jymin < y_min: y_min = jymin
-            if jymax > y_max: y_max = jymax
     
     print(f'Weights calculated for {ncatch_found} catchments in {time.perf_counter() - t_weights:.1f} seconds')
 
-    return (weight_data, int(x_min), int(x_max), int(y_min), int(y_max))
+    return weight_data
 
 def get_catchments_from_gpkg(gpkg):
     catchments     = gpd.read_file(gpkg, layer='divides')
@@ -95,9 +81,7 @@ if __name__ == "__main__":
                 print(f'Extracting weights from gpkg')
                 catchment_list = get_catchments_from_gpkg(args.geopackage)
 
-    (weights, x_min, x_max, y_min, y_max) = get_weight_json(catchment_list,args.version)
-
-    weights['window'] = [x_min,x_max,y_min,y_max]
+    weights = get_weight_json(catchment_list,args.version)
 
     data = json.dumps(weights)
     with open(args.weights_filename,'w') as fp:
