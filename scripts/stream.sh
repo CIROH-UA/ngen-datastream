@@ -229,6 +229,7 @@ NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
+GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
 
 # Look for geopackage attributes file
 if [ -z "$GEOPACKAGE_ATTR" ]; then
