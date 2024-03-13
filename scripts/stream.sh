@@ -269,16 +269,7 @@ else
 fi
 
 if [[ -e $GEOPACKAGE_RESOURCES_PATH ]]; then
-    if [[ -z "$GEOPACKAGE" ]]; then 
-        GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-    else
-        echo "Overriding "$GEOPACKAGE_NGENRUN_PATH" with $GEOPACKAGE"
-        rm $GEOPACKAGE_NGENRUN_PATH
-        if [ -e "$WEIGHTS_PATH" ]; then
-            rm "$WEIGHTS_PATH"
-        fi
-        GEOPACKAGE_RESOURCES_PATH=""
-    fi  
+    :
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
         if [ ! -f "$GEOPACKAGE_RESOURCES_PATH" ]; then
@@ -398,6 +389,9 @@ if [ -z "$GEOPACKAGE_ATTR" ]; then
     fi
 fi
 ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
+if [ ! -f "$GEOPACKAGE_ATTR" ];then
+    get_file $GEOPACKAGE_ATTR $NGEN_CONFIG_PATH/$ATTR_BASE
+fi
 PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 echo "Generating PET and CFE configs" $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \

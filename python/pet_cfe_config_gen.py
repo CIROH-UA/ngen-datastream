@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if os.path.exists(args.hf_lnk_file):
+    if '.txt' in args.hf_lnk_file:
         with open(args.hf_lnk_file,'r') as fp:
             data=fp.readlines()
             hf_lnk_file = data[0] 
