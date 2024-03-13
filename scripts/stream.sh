@@ -216,21 +216,37 @@ else
     fi
 fi
 
+# Look for weights file
 WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 NWEIGHT=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights" | wc -l)
 if [ ${NWEIGHT} -gt 1 ]; then
     echo "At most one weight file is allowed in "$DATASTREAM_RESOURCES
 fi
 
-
+# Look for geopackage file
 GEOPACKAGE_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg")
 NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
 
+# Look for geopackage attributes file
+if [ -z "$GEOPACKAGE_ATTR" ]; then
+    GEOPACKAGE_ATTR="$DATASTREAM_RESOURCES/ngen-configs/gpkg_attr.txt" 
+    if [ ! -f $GEOPACAKGE_ATTR ]; then
+        echo "geopackage attribute file is required!"
+        exit 1
+    fi
+fi
+ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
+if [ ! -f "$GEOPACKAGE_ATTR" ];then
+    get_file $GEOPACKAGE_ATTR $NGEN_CONFIG_PATH/$ATTR_BASE
+fi
+
+# Look for pkl file
 PKL_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "noah-owp-modular-init.namelist.input.pkl")
 
+# Look for partitions file
 PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
 if [ -e "$PARTITION_RESOURCES_PATH" ]; then
     PARTITION_NGENRUN_PATH=$NGEN_RUN_PATH/$(basename $PARTITION_RESOURCES_PATH)
@@ -238,6 +254,7 @@ if [ -e "$PARTITION_RESOURCES_PATH" ]; then
     cp $PARTITION_RESOURCES_PATH $PARTITION_NGENRUN_PATH
 fi
 
+# Look for ngen configs folder
 NGEN_CONFS="${DATASTREAM_RESOURCES%/}/ngen-configs/*"
 cp $NGEN_CONFS $NGEN_CONFIG_PATH
 if [ ${NGEO} == 1 ]; then
@@ -330,6 +347,14 @@ fi
 log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 
 log_time "CONFGEN_START" $DATASTREAM_PROFILING
+if [ ! -f $PKL_FILE ]; then
+    echo "Creating noah-owp pickle file"
+    NOAHOWPPFL_GENERATOR="$PACAKGE_DIR/python/noahowp_pkl.py"
+    python3 $NOAHOWPPFL_GENERATOR \
+        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" \
+        --out_dir "$NGEN_CONFIG_PATH" 
+fi
+
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
 python3 $CONF_GENERATOR \
     --start-date "$START_DATE" \
@@ -372,17 +397,6 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-if [ -z "$GEOPACKAGE_ATTR" ]; then
-    GEOPACKAGE_ATTR="$NGEN_RUN_PATH/config/gpkg_attr.txt" 
-    if [ ! -f $GEOPACAKGE_ATTR ]; then
-        echo "geopackage attribute file is required!"
-        exit 1
-    fi
-fi
-ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
-if [ ! -f "$GEOPACKAGE_ATTR" ];then
-    get_file $GEOPACKAGE_ATTR $NGEN_CONFIG_PATH/$ATTR_BASE
-fi
 PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
 echo "Generating PET and CFE configs" $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
