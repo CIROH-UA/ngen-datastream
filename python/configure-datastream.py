@@ -2,25 +2,31 @@ import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytz as tz, re
+import pickle, copy        
 
-def generate_noah_owp_conf(namelist_file,start,end):
-    with open(namelist_file,'r') as fp:
-        conf_template = fp.readlines()
+def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
 
-    noah_owp_conf_str = conf_template
-    for j,jline in enumerate(conf_template):
-        if "startdate" in jline:
-            pattern = r'(startdate\s*=\s*")[0-9]{12}'
-            noah_owp_conf_str[j] = re.sub(pattern, f"startdate        = \"{start}", jline)
-        if "enddate" in jline:
-            pattern = r'(enddate\s*=\s*")[0-9]{12}'
-            noah_owp_conf_str[j] =  re.sub(pattern, f"enddate          = \"{end}", jline)            
+    with open(pkl_file, 'rb') as fp:
+        nom_dict = pickle.load(fp)
 
-    with open(namelist_file,'w') as fp:
-        fp.writelines(noah_owp_conf_str)
+    for jcatch in nom_dict:
+        jcatch_str = copy.deepcopy(nom_dict[jcatch])
+        for j,jline in enumerate(jcatch_str):
+            if "startdate" in jline:
+                pattern = r'(startdate\s*=\s*")[0-9]{12}'
+                jcatch_str[j] = re.sub(pattern, f"startdate        = \"{start}", jline)
+            if "enddate" in jline:
+                pattern = r'(enddate\s*=\s*")[0-9]{12}'
+                jcatch_str[j] =  re.sub(pattern, f"enddate          = \"{end}", jline)
 
-def generate_troute_conf(namelist_file,start):
-    with open(namelist_file,'r') as fp:
+        with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
+            fp.writelines(jcatch_str)
+
+def generate_troute_conf(out_dir,start):
+
+    template = Path(__file__).parent.parent/"configs/ngen/ngen.yaml"
+
+    with open(template,'r') as fp:
         conf_template = fp.readlines()
 
     troute_conf_str = conf_template
@@ -29,7 +35,7 @@ def generate_troute_conf(namelist_file,start):
             pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
             troute_conf_str[j] = re.sub(pattern, start, jline)           
 
-    with open(namelist_file,'w') as fp:
+    with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)          
 
 def generate_config(args):
@@ -40,7 +46,8 @@ def generate_config(args):
             "data_dir"     : args.data_dir,
             "resource_dir" : args.resource_dir,
             "nwmurl_file"  : args.nwmurl_file,
-            "nprocs"       : args.nprocs
+            "nprocs"       : args.nprocs,
+            "noahowp_pkl"  : args.pkl_file
         },
         "subset": {
             "id_type"      : args.subset_id_type,
@@ -149,23 +156,16 @@ def create_confs(conf):
     print(f'\ndatastream configs have been generated and placed here\n{datastream_config_dir}\n')    
     
     realization_file = None
-    noah_owp = None
-    ngen_yaml = None
     for path, _, files in os.walk(ngen_config_dir):
         for jfile in files:
             jfile_path = os.path.join(path,jfile)
             if jfile_path.find('realization') >= 0: 
                 realization_file = jfile_path
-            if jfile_path.find('namelist.input') >= 0: 
-                noah_owp = jfile_path
-            if jfile_path.find('ngen.yaml') >= 0: 
-                ngen_yaml = jfile_path
 
-    if noah_owp:
-        generate_noah_owp_conf(noah_owp,start,end)
+    if len(args.pkl_file) > 0:
+        gen_noah_owp_confs_from_pkl(conf['globals']['noahowp_pkl'],ngen_config_dir,start,end)
 
-    if ngen_yaml:
-        generate_troute_conf(ngen_yaml,start_realization)
+    generate_troute_conf(ngen_config_dir,start_realization)
 
     if not realization_file: raise Exception(f"Cannot find realization file in {ngen_config_dir}")
 
@@ -183,12 +183,14 @@ if __name__ == "__main__":
     parser.add_argument("--start-date", help="Set the start date")
     parser.add_argument("--end-date", help="Set the end date")
     parser.add_argument("--data-dir", help="Set the data directory")
+    parser.add_argument("--gpkg_attr", type=int,help="Path to geopackage attributes file")
     parser.add_argument("--resource-dir", help="Set the resource directory")
     parser.add_argument("--subset-id-type", help="Set the subset ID type")
     parser.add_argument("--subset-id", help="Set the subset ID")
     parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
     parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
+    parser.add_argument("--pkl_file", help="NoahOWP pickle",default="")
 
     args = parser.parse_args()
 
