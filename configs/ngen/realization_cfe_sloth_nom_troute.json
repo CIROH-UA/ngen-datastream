@@ -37,7 +37,7 @@
                         "model_type_name": "NoahOWP",
                         "library_file": "/dmod/shared_libs/libsurfacebmi.so",
                         "forcing_file": "",
-                        "init_config": "./config/noah-owp-modular-init.namelist.input",
+                        "init_config": "./config/noah-owp-modular-init-{{id}}.namelist.input",
                         "allow_exceed_end_time": true,
                         "main_output_variable": "QINSUR",
                         "variables_names_map": {

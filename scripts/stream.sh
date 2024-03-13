@@ -75,6 +75,7 @@ SUBSET_ID=""
 HYDROFABRIC_VERSION=""
 CONF_FILE=""
 NPROCS="$(( $(nproc) - 2 ))"
+PKL_FILE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -228,6 +229,8 @@ if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
 
+PKL_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "noah-owp-modular-init.namelist.input.pkl")
+
 PARTITION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "partitions")
 if [ -e "$PARTITION_RESOURCES_PATH" ]; then
     PARTITION_NGENRUN_PATH=$NGEN_RUN_PATH/$(basename $PARTITION_RESOURCES_PATH)
@@ -337,7 +340,8 @@ python3 $CONF_GENERATOR \
     --subset-id "$SUBSET_ID" \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
     --nwmurl_file "$NWMURL_CONF_PATH" \
-    --nprocs "$NPROCS"
+    --nprocs "$NPROCS" \
+    --pkl_file "$PKL_FILE"
 log_time "CONFGEN_END" $DATASTREAM_PROFILING
 log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
