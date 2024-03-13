@@ -10,7 +10,6 @@ from ngen.config_gen.models.cfe import Cfe
 from ngen.config_gen.models.pet import Pet
 
 def gen_pet_cfe(hf_file,hf_lnk_file,out):
-    print(f'Generating PET and CFE configs',flush=True)
     hf: gpd.GeoDataFrame = gpd.read_file(hf_file, layer="divides")
     hf_lnk_data: pd.DataFrame = pd.read_parquet(hf_lnk_file)
     hook_provider = DefaultHookProvider(hf=hf, hf_lnk_data=hf_lnk_data)
