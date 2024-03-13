@@ -38,7 +38,6 @@ def generate_config(args):
             "start_date"   : args.start_date,
             "end_date"     : args.end_date,
             "data_dir"     : args.data_dir,
-            "relative_to"  : args.relative_to,
             "resource_dir" : args.resource_dir,
             "nwmurl_file"  : args.nwmurl_file,
             "nprocs"       : args.nprocs
@@ -116,9 +115,7 @@ def create_confs(conf):
         tomorrow = today + timedelta(hours=23)
 
         if conf['globals'].get('data_dir',"") == "":
-            conf['globals']['data_dir'] = today.strftime('%Y%m%d')
-        if conf['globals'].get('relative_dir',"") == "":
-            conf['globals']['relative_to'] = str(Path(Path(Path(__file__).resolve()).parents[1],"data"))        
+            conf['globals']['data_dir'] = today.strftime('%Y%m%d')      
 
         start = today.strftime('%Y%m%d%H%M')
         end = tomorrow.strftime('%Y%m%d%H%M')
@@ -141,7 +138,7 @@ def create_confs(conf):
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf      
 
-    data_dir = Path(conf['globals']['relative_to'],conf['globals']['data_dir'])
+    data_dir = Path(conf['globals']['data_dir'])
     ngen_config_dir = Path(data_dir,'ngen-run','config')
     datastream_config_dir = Path(data_dir,'datastream-configs')        
 
@@ -186,7 +183,6 @@ if __name__ == "__main__":
     parser.add_argument("--start-date", help="Set the start date")
     parser.add_argument("--end-date", help="Set the end date")
     parser.add_argument("--data-dir", help="Set the data directory")
-    parser.add_argument("--relative-to", help="Set the relative directory")
     parser.add_argument("--resource-dir", help="Set the resource directory")
     parser.add_argument("--subset-id-type", help="Set the subset ID type")
     parser.add_argument("--subset-id", help="Set the subset ID")
