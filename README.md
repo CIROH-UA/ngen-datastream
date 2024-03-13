@@ -1,33 +1,35 @@
-# NextGen Datastream
-The datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. In its current implementation, the datastream is a shell script that orchestrates each step in the process. 
+# NextGen Water Modeling Framework Datastream
+`ngen-datastream` automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion.
 
-## Usage
-Hardware - This software is best deploymented on a dedicated host and will consume the majority of resources by default. While the datastream will run locally on a user's laptop, the internal algorithms were designed to perform best on a dedicated host. Complete datastream run for a day over VPU 09 takes about 7 minutes on a free AWS t2.2xlarge ec2 instance (8vCPU,32GB) with CFE, PET, and NOM NGEN configuration. 
+`Hardware` - While `ngen-datastream` will run locally on a user's laptop, it is often the case that NextGen runs are so large that running on a dedicated host will be optimal. 
 
-Scalability - Horizontal scaling is achieved by splitting the problem spatially. A datastream execution takes a geopackage (either as cli arg or via `RESOURCE_DIR`), which provides the spatial domain overwhich to run. 
+`Speed` - Complete datastream run for a day over VPU 09 takes about 7 minutes on a free AWS t2.2xlarge ec2 instance (8vCPU, 32GB) with CFE, PET, and NOM NextGen configuration. 
 
 ## [Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md)
 
 ## Run it
+`ngen-datastream` can be executed using cli args or a configuration file.
 ```
 > ./ngen-datastream/scripts/stream.sh --help
 
 Usage: ./ngen-datastream/scripts/stream.sh [options]
 Either provide a datastream configuration file
-  -c, --CONF-FILE           <Path to datastream configuration file>
+  -c, --CONF_FILE          <Path to datastream configuration file>
 or run with cli args
   -s, --START_DATE          <YYYYMMDDHHMM or "DAILY">
   -e, --END_DATE            <YYYYMMDDHHMM>
   -d, --DATA_PATH           <Path to write to>
   -r, --RESOURCE_PATH       <Path to resource directory>
-  -t, --RELATIVE_TO         <Path to prepend to all paths>
+  -g, --GEOPACAKGE          <Path to geopackage file>
+  -G, --GEOPACAKGE_ATTR     <Path to geopackage attributes file>
   -S, --S3_MOUNT            <Path to mount s3 bucket to>
+  -o, --S3_PREFIX           <File prefix within s3 mount>
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>
   -I, --SUBSET_ID           <Hydrofabric id to subset>
   -v, --HYDROFABRIC_VERSION <Hydrofabric version>
-  -n, --NPROCS              <Process limit> 
+  -n, --NPROCS              <Process limit>
 ```
-Example command for the the DAILY run
+Example command for the the DAILY run:
 ```
 ./ngen-datastream/scripts/stream.sh --CONF_FILE conf_datastream_daily.sh
 ```
@@ -40,15 +42,17 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | DATA_PATH           | Path to construct the datastream run. | :white_check_mark: |
-| RESOURCE_PATH       | Folder name that contains the datastream resources. If not provided, datastream will create this folder with [default options](#defaults) |  |
-| RELATIVE_TO         | Absolute path to be prepended to any other path given in configuration file |  |
-| S3_MOUNT            | Path to mount S3 bucket to. datastream will copy outputs here. |
+| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it with this arg. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
+| GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
+| GEOPACKAGE_ATTR     | Path to hydrofabric attributes, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
+| S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
+| S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | SUBSET_ID           | catchment id to subset [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  |
-| NPROCS              | Maximum number of processes to use in any step of the datastream. Set this is not running on HPC |  |
+| NPROCS              | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
 
-## NextGen Datastream Directory Stucture
+## `ngen-datastream` Output Directory Structure
 When the datastream is executed a folder of the structure below will be constructed at `DATA_PATH`
 ```
 DATA-PATH/
@@ -63,16 +67,18 @@ Each folder is explained below
 
 ### `datastream-configs/` 
 
-Automatically generated. Holds all of the configuration files the datastream needs in order to run. Note! The datastream can modify `conf_datastream.json` and generate it's own internal configs. `datastream-configs/` is the first place to look to confirm that a datastream run has been executed according to the user's specifications. 
+Automatically generated. Holds all of the configuration files the datastream needs in order to run. `datastream-configs/` is the first place to look to confirm that a datastream run has been executed according to the user's specifications. 
 Example directory:
 ```
 datastream-configs/
 │
 ├── conf_datastream.json
 │
-├── conf_forcingprocessor.json
+├── conf_fp.json
 |
 ├── conf_nwmurl.json
+|
+├── profile.txt
 ```
 ### `datastream-resources/` 
 Automatically generated with [defaults](#defaults) or copied from user defined `RESOURCE_PATH`. Holds the data files required to perform computations required by the datastream. 
@@ -80,28 +86,31 @@ Automatically generated with [defaults](#defaults) or copied from user defined `
 A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages). Not every file is required.
 ```
 RESOURCE_PATH/
-│
-├── GEOPACKAGE
 |
-├── NWM_EXAMPLE_GRID_FILE
+├── ngen-configs/
+|   │
+|   ├── nextgen_01.gpkg
+|   │
+|   ├── nextgen_01.parquet   
+|   │
+|   ├── realization.json 
 |
-├── WEIGHT_FILE
+├── weights.json
 |
-├── CONF_NWMURL
-│
-├── NGEN-CONFIGS/
+├── conf_nwmurl.json
+  
 ```
 
-| File        |    Example link    | Description  | Naming |
+| File Type        |    Example link    | Description  | Naming |
 |-------------|--------|--------------------------|-----|
-| GEOPACKAGE | [nextgen_01.gpkg](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) | Hydrofabric file of version $\geq$ v20.1 Ignored if subset hydrofabric options are set in datastream config. [See hfsubset for options](https://github.com/LynkerIntel/hfsubset) for generating your own. The datastream has hfsubset integrated. | *.gpkg |
-| NWM_EXAMPLE_GRID_FILE | [202001021700.LDASIN_DOMAIN1](https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/CONUS/netcdf/FORCING/2020/202001021700.LDASIN_DOMAIN1) | Example forcings file used in weight calculation. Not needed if WEIGHT_FILE exists | nwm_example_grid_file.nc |
-| WEIGHT_FILE | [weights.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/weights_w_cov.json) | [weights file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) | \*weights\*.json |
+| GEOPACKAGE | [ngen-configs/nextgen_01.gpkg](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) | Hydrofabric file of version $\geq$ v20.1 Ignored if subset hydrofabric options are set in datastream config. See [Lynker-Spatial](https://www.lynker-spatial.com/#v20.1/gpkg/) for complete VPU geopackages or [hfsubset](https://github.com/LynkerIntel/hfsubset) for generating your own custom domain. `hfsubset` can be invoked indirectly through `ngen-datastream` through the subsetting args. | *.gpkg |
+| GEOPACKGE_ATTR | [ngen-configs/nextgen_01.parquet ](https://lynker-spatial.s3.amazonaws.com/v20.1/model_attributes/nextgen_09.parquet) | See [Lynker-Spatial](https://www.lynker-spatial.com/#v20.1/model_attributes/) for geopackage attributes files. Necessary for the creation of ngen bmi module config files. | nwm_example_grid_file.nc |
+| REALIZATION | [ngen-configs/realization.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/ngen-configs/realization.json) | ngen realization file. | ngen-configs/realization.json |
+| WEIGHTS_FILE | [weights.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_small/weights.json) | [weights file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) | \*weights\*.json |
 | CONF_NWMURL | [nwmurl_conf.json](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/configs/conf_nwmurl_retro.json) | [nwmurl config file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#nwm_file). Not required for `DAILY` runs | \*nwmurl\*.json |
-| NGEN-CONFIGS | [ngen-configs/realization.json](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/ngen-configs/realization.json) | Any files required for ngen/NGIAB run. Copied into `DATA_PATH/ngen_run/configs` | ngen-configs/realization.json |
 
 #### Defaults
-The URI below holds the default resource directory for the datastream, which is used during the "daily" runs. This directory holds files for a standard NGIAB formulation over CONUS. Use `aws s3 ls s3://ngen-datastream/resources_default/` to inspect the files.
+The URI below holds the default resource directory for the datastream, which is used during development runs. This directory holds files for a standard NGIAB formulation over VPU_09. Use `aws s3 ls s3://ngen-datastream/resources_small/` to inspect the files.
 
 ### `ngen-run/` 
 Running NextGen requires building a standard run directory complete with only the necessary files. The datastream constructs this automatically, but can be manually built as well. Below is an explanation of the standard. Reference for discussion of the standard [here](https://github.com/CIROH-UA/NGIAB-CloudInfra/pull/17). 
@@ -132,14 +141,11 @@ The `ngen-run` directory contains the following subfolders:
 Model Configuration Example files: `config.ini`,`realization.json`
 The realization file serves as the primary model configuration for the ngen framework. Downloand an example realization file [here](https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/configs/realization.json). This file specifies which models/modules to run and with which parameters, run parameters like date and time, and hydrofabric specifications. If experiencing run-time errors, the realization file is the first place to check. Other files may be placed in this subdirectory that relate to internal-ngen-models/modules (`config.ini`). It is common to define variables like soil parameters in these files for ngen modules to use.
 
-Hydrofabric Example files: `nextgen_01.gpkg`
-NextGen requires a single geopackage file. This fle is the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example geopackage can be found [here](https://lynker-spatial.s3.amazonaws.com/v20/gpkg/nextgen_01.gpkg). Tools to subset a geopackage into a smaller domain can be found at [Lynker's hfsubset](https://github.com/LynkerIntel/hfsubset).
+Hydrofabric Example files: `nextgen_01.gpkg`,`nextgen_01.parquet`
+NextGen requires a single geopackage file. This fle is the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example geopackage can be found [here](https://lynker-spatial.s3.amazonaws.com/v20/gpkg/nextgen_01.gpkg). Tools to subset a geopackage into a smaller domain can be found at [Lynker's hfsubset](https://github.com/LynkerIntel/hfsubset). `ngen-datastream` requires a geopackage attributes file, `nextgen_01.parquet`, which is required for generating ngen bmi module configuration files.
 
 ## Versioning
-The ngen framework uses a merkel tree hashing algorithm to version each ngen run with [ht tool](https://github.com/aaraney/ht). This means that the changes a user makes to any input files in `ngen-run` will be tracked and diff'd against previous input directories. While an explaination of how awesome this is can be found [elsewhere](https://en.wikipedia.org/wiki/Merkle_tree), the important thing to know is the user must prepare a clean input directory (`ngen-run`) for each run they want to make. 
-
-"Clean" means here that every file in the `ngen-run` is required for the immediate run the user intends to make. For instance, if the user creates a new realization configuration file, the old file must be removed before using `ngen-run` as an input directory to ngen. In other words, each configuration file type (realization, catchment, nexus, etc.) must be unique within `ngen-run`.
+`ngen-datstream` uses a merkel tree hashing algorithm to version each execution with [merkdir](https://github.com/makew0rld/merkdir). This means all input and output files in a `ngen-datastream` execution will be hashed in such a way that tracking minute changes among millions of files is trivial.
 
 ## License
-
 `ngen-datastream` is distributed under [GNU General Public License v3.0 or later](LICENSE.md)

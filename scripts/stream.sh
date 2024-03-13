@@ -53,7 +53,6 @@ usage() {
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
     echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
     echo "  -G, --GEOPACAKGE_ATTR     <Path to geopackage attributes file> "
-    echo "  -t, --RELATIVE_TO         <Path to prepend to all paths> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
     echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
@@ -69,7 +68,6 @@ DATA_PATH=""
 RESOURCE_PATH=""
 GEOPACKAGE=""
 GEOPACKAGE_ATTR=""
-RELATIVE_TO=""
 S3_MOUNT=""
 S3_PREFIX=""
 SUBSET_ID_TYPE=""
@@ -86,7 +84,6 @@ while [ "$#" -gt 0 ]; do
         -r|--RESOURCE_PATH) RESOURCE_PATH="$2"; shift 2;;
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
         -G|--GEOPACKAGE_ATTR) GEOPACKAGE_ATTR="$2"; shift 2;;
-        -t|--RELATIVE_TO) RELATIVE_TO="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -i|--SUBSET_ID_TYPE) SUBSET_ID_TYPE="$2"; shift 2;;
@@ -164,15 +161,6 @@ else
         S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT
-    fi
-fi
-
-if [[ ${#RELATIVE_TO} -gt 0 ]] ; then
-    echo "Relative path provided. Prepending ${RELATIVE_TO} to ${DATA_PATH#/}"
-    DATA_PATH="${RELATIVE_TO%/}/${DATA_PATH%/}"
-    if [[ -n "$RESOURCE_PATH" ]]; then
-        echo "Prepending ${RELATIVE_TO} to ${RESOURCE_PATH#/}"
-        RESOURCE_PATH="${RELATIVE_TO%/}/${RESOURCE_PATH%/}"
     fi
 fi
 
@@ -344,7 +332,6 @@ python3 $CONF_GENERATOR \
     --start-date "$START_DATE" \
     --end-date "$END_DATE" \
     --data-dir "$DATA_PATH" \
-    --relative-to "$RELATIVE_TO" \
     --resource-dir "$RESOURCE_PATH" \
     --subset-id-type "$SUBSET_ID_TYPE" \
     --subset-id "$SUBSET_ID" \
