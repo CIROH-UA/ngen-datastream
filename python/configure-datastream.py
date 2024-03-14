@@ -34,7 +34,7 @@ def generate_troute_conf(out_dir,start,gpkg):
     catchment_list = sorted(list(catchments['divide_id']))
     list_str=""
     for jcatch in catchment_list:
-        list_str += (f"\n           -\"nex-{jcatch[4:]}_output.csv\" ")        
+        list_str += (f"\n               - nex-{jcatch[4:]}_output.csv ")        
     list_str = list_str[:-2]
     troute_conf_str = conf_template
     for j,jline in enumerate(conf_template):
@@ -44,7 +44,7 @@ def generate_troute_conf(out_dir,start,gpkg):
 
         pattern = r'^\s*qlat_files\s*:\s*\[\]'
         if re.search(pattern,jline):
-            troute_conf_str[j] = re.sub(pattern,  f"        qlat_files  : {list_str}      ", jline)
+            troute_conf_str[j] = re.sub(pattern,  f"          qlat_files: {list_str}      ", jline)
 
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)          
