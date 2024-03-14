@@ -362,6 +362,8 @@ python3 $CONF_GENERATOR \
     --end-date "$END_DATE" \
     --data-dir "$DATA_PATH" \
     --resource-dir "$RESOURCE_PATH" \
+    --gpkg "$GEOPACKAGE_RESOURCES_PATH" \
+    --gpkg_attr "$GEOPACKAGE_ATTR" \
     --subset-id-type "$SUBSET_ID_TYPE" \
     --subset-id "$SUBSET_ID" \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
