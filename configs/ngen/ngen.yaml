@@ -55,7 +55,7 @@ compute_parameters:
         dt                          : 300 # [sec]
         qlat_input_folder           : ./
         qlat_file_pattern_filter    : "nex-*"
-
+        qlat_files                  : []
         binary_nexus_file_folder    : ./ # this is required if nexus_file_pattern_filter="nex-*"
         nts                         : 288
         max_loop_size               : 720 # [hr]  

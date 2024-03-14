@@ -2,7 +2,8 @@ import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytz as tz, re
-import pickle, copy        
+import pickle, copy  
+from geopandas import gpd      
 
 def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
 
@@ -22,18 +23,28 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
         with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
             fp.writelines(jcatch_str)
 
-def generate_troute_conf(out_dir,start):
+def generate_troute_conf(out_dir,start,gpkg):
 
     template = Path(__file__).parent.parent/"configs/ngen/ngen.yaml"
 
     with open(template,'r') as fp:
         conf_template = fp.readlines()
 
+    catchments     = gpd.read_file(gpkg, layer='divides')
+    catchment_list = sorted(list(catchments['divide_id']))
+    list_str=""
+    for jcatch in catchment_list:
+        list_str += (f"\n           -\"nex-{jcatch[4:]}_output.csv\" ")        
+    list_str = list_str[:-2]
     troute_conf_str = conf_template
     for j,jline in enumerate(conf_template):
         if "start_datetime" in jline:
             pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
             troute_conf_str[j] = re.sub(pattern, start, jline)           
+
+        pattern = r'^\s*qlat_files\s*:\s*\[\]'
+        if re.search(pattern,jline):
+            troute_conf_str[j] = re.sub(pattern,  f"        qlat_files  : {list_str}      ", jline)
 
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)          
@@ -44,6 +55,8 @@ def generate_config(args):
             "start_date"   : args.start_date,
             "end_date"     : args.end_date,
             "data_dir"     : args.data_dir,
+            "gpkg"         : args.gpkg,
+            "gpkg_attr"    : args.gpkg_attr,
             "resource_dir" : args.resource_dir,
             "nwmurl_file"  : args.nwmurl_file,
             "nprocs"       : args.nprocs,
@@ -165,7 +178,7 @@ def create_confs(conf):
     if len(args.pkl_file) > 0:
         gen_noah_owp_confs_from_pkl(conf['globals']['noahowp_pkl'],ngen_config_dir,start,end)
 
-    generate_troute_conf(ngen_config_dir,start_realization)
+    generate_troute_conf(ngen_config_dir,start_realization,conf['globals']['gpkg'])
 
     if not realization_file: raise Exception(f"Cannot find realization file in {ngen_config_dir}")
 
@@ -183,7 +196,8 @@ if __name__ == "__main__":
     parser.add_argument("--start-date", help="Set the start date")
     parser.add_argument("--end-date", help="Set the end date")
     parser.add_argument("--data-dir", help="Set the data directory")
-    parser.add_argument("--gpkg_attr", type=int,help="Path to geopackage attributes file")
+    parser.add_argument("--gpkg",help="Path to geopackage file")    
+    parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file")
     parser.add_argument("--resource-dir", help="Set the resource directory")
     parser.add_argument("--subset-id-type", help="Set the subset ID type")
     parser.add_argument("--subset-id", help="Set the subset ID")
