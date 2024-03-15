@@ -1,53 +1,7 @@
 import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
-import pytz as tz, re
-import pickle, copy  
-from geopandas import gpd      
-
-def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
-
-    with open(pkl_file, 'rb') as fp:
-        nom_dict = pickle.load(fp)
-
-    for jcatch in nom_dict:
-        jcatch_str = copy.deepcopy(nom_dict[jcatch])
-        for j,jline in enumerate(jcatch_str):
-            if "startdate" in jline:
-                pattern = r'(startdate\s*=\s*")[0-9]{12}'
-                jcatch_str[j] = re.sub(pattern, f"startdate        = \"{start}", jline)
-            if "enddate" in jline:
-                pattern = r'(enddate\s*=\s*")[0-9]{12}'
-                jcatch_str[j] =  re.sub(pattern, f"enddate          = \"{end}", jline)
-
-        with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
-            fp.writelines(jcatch_str)
-
-def generate_troute_conf(out_dir,start,gpkg):
-
-    template = Path(__file__).parent.parent/"configs/ngen/ngen.yaml"
-
-    with open(template,'r') as fp:
-        conf_template = fp.readlines()
-
-    catchments     = gpd.read_file(gpkg, layer='divides')
-    catchment_list = sorted(list(catchments['divide_id']))
-    list_str=""
-    for jcatch in catchment_list:
-        list_str += (f"\n               - nex-{jcatch[4:]}_output.csv ")        
-    list_str = list_str[:-2]
-    troute_conf_str = conf_template
-    for j,jline in enumerate(conf_template):
-        if "start_datetime" in jline:
-            pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
-            troute_conf_str[j] = re.sub(pattern, start, jline)           
-
-        pattern = r'^\s*qlat_files\s*:\s*\[\]'
-        if re.search(pattern,jline):
-            troute_conf_str[j] = re.sub(pattern,  f"          qlat_files: {list_str}      ", jline)
-
-    with open(Path(out_dir,"ngen.yaml"),'w') as fp:
-        fp.writelines(troute_conf_str)          
+import pytz as tz
 
 def generate_config(args):
     config = {
@@ -59,8 +13,7 @@ def generate_config(args):
             "gpkg_attr"    : args.gpkg_attr,
             "resource_dir" : args.resource_dir,
             "nwmurl_file"  : args.nwmurl_file,
-            "nprocs"       : args.nprocs,
-            "noahowp_pkl"  : args.pkl_file
+            "nprocs"       : args.nprocs
         },
         "subset": {
             "id_type"      : args.subset_id_type,
@@ -175,11 +128,6 @@ def create_confs(conf):
             if jfile_path.find('realization') >= 0: 
                 realization_file = jfile_path
 
-    if len(args.pkl_file) > 0:
-        gen_noah_owp_confs_from_pkl(conf['globals']['noahowp_pkl'],ngen_config_dir,start,end)
-
-    generate_troute_conf(ngen_config_dir,start_realization,conf['globals']['gpkg'])
-
     if not realization_file: raise Exception(f"Cannot find realization file in {ngen_config_dir}")
 
     with open(realization_file,'r') as fp:
@@ -204,7 +152,6 @@ if __name__ == "__main__":
     parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
     parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
-    parser.add_argument("--pkl_file", help="NoahOWP pickle",default="")
 
     args = parser.parse_args()
 

@@ -1,7 +1,6 @@
 import os, argparse
 from ngen.config.realization import NgenRealization
 from ngen.config.validate import validate_paths
-from ngen.config.configurations import Routing
 import re
 import geopandas
 geopandas.options.io_engine = "pyogrio"
@@ -29,61 +28,51 @@ def validate_realization(realization_file):
     
     return serialized_realization, relative_dir
 
-def validate_forcings(forcing_files, catchments):
+def validate_catchment_files(validations, catchments):
     """
+    General function to validate any files that need to be associated with a catchment
+
+    Inputs:
+    validations: dictionary of list of patterns and files to match. Each list should be a 1:1 correspondence between a catchment and it's file.
+    Multiple lists are allowed to allow for multiple file types (forcings, ngen configs like CFE)
     Validates 
-    1) forcing file names match realization file description
-    2) forcing files exist for each catchment in geojson
-    3) forcingg start/end times and interval match realization file
+    1) file names match realization file description
+    2) files exist for each catchment in geojson
+    3) start/end times and interval match realization file
     """
-            
-    ncatchments = len(catchments)    
-    write_int = 5000    
-    for j, jcatch in enumerate(catchments):    
-        if (j + 1) % write_int or j == ncatchments - 1: 
-            print(f'{100*j/ncatchments:.1f}%', end = "\r")
-        jid         = re.findall(r'\d+', jcatch)[0]
-        pattern     = serialized_realization.global_config.forcing.file_pattern
-        jcatch_pattern = pattern.replace('{{id}}',jid)
-        compiled       = re.compile(jcatch_pattern)      
+    for jval in validations:
+        pattern     = validations[jval]['pattern']
+        files       = jval['files']
+        for j, jcatch in enumerate(catchments):    
+            jid         = re.findall(r'\d+', jcatch)[0]                        
+            jcatch_pattern = pattern.replace('{{id}}',jid)
+            compiled       = re.compile(jcatch_pattern)      
 
-        jfile = forcing_files[j]     
-        assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"            
+            jfile = files[j]     
+            assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"            
 
-        if j == 0:
-            start_time = serialized_realization.time.start_time
-            end_time   = serialized_realization.time.end_time
-            dt_s = serialized_realization.time.output_interval
-            full_path = os.path.join(forcing_dir,forcing_files[0])
-            df = pd.read_csv(full_path)
-            forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
-            forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
-            dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (len(df['time']) - 1)
-            assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
-            assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
-            assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
+            if jval == "forcing":
+                if j == 0:
+                    start_time = serialized_realization.time.start_time
+                    end_time   = serialized_realization.time.end_time
+                    dt_s = serialized_realization.time.output_interval
+                    full_path = os.path.join(forcing_dir,files[0])
+                    df = pd.read_csv(full_path)
+                    forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
+                    forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
+                    dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (len(df['time']) - 1)
+                    assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
+                    assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
+                    assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
 
 def validate_data_dir(data_dir):
 
-    forcing_files    = []
-    catchment_file   = None
-    nexus_file       = None
     realization_file = None
     geopackage_file  = None
     for path, _, files in os.walk(data_dir):
         for jfile in files:
             jfile_path = os.path.join(path,jfile)
             if jfile_path.find('config') >= 0:
-                if jfile_path.find('catchments') >= 0:
-                    if catchment_file is None:                         
-                        catchment_file = jfile_path
-                    else: 
-                        raise Exception('This run directory contains more than a single catchment file, remove all but one.')
-                if jfile_path.find('nexus') >= 0: 
-                    if nexus_file is None: 
-                        nexus_file = jfile_path
-                    else: 
-                        raise Exception('This run directory contains more than a single nexus file, remove all but one.')
                 if jfile_path.find('realization') >= 0: 
                     if realization_file is None: 
                         realization_file = jfile_path
@@ -94,18 +83,9 @@ def validate_data_dir(data_dir):
                         geopackage_file = jfile_path
                     else: 
                         raise Exception('This run directory contains more than a single geopackage file, remove all but one.')                    
-            if jfile_path.find('forcing') >= 0 and jfile_path.find('forcing_metadata') < 0: 
-                forcing_files.append(jfile_path) 
 
-    if not geopackage_file:
-        file_list = [catchment_file,nexus_file,realization_file]
-    else:
-        file_list = [geopackage_file,realization_file]
-        if catchment_file or nexus_file: raise Exception('The spatial domain must only be defined with either a geopackage, or catchment/nexus files. Not both.')
-    if any([x is None for x in file_list]):
-        raise Exception(f'Missing configuration file!')      
-
-    print(f'Configurations found! Retrieving catchment data...')
+    if realization_file is None: raise Exception(f"")
+    print(f'Realization found! Retrieving catchment data...')
 
     catchments     = geopandas.read_file(geopackage_file, layer='divides')
     catchment_list = sorted(list(catchments['divide_id']))
@@ -113,35 +93,55 @@ def validate_data_dir(data_dir):
     global serialized_realization
     serialized_realization, relative_dir = validate_realization(realization_file)    
 
-    print(f'Done\nValidating individual catchment forcing paths')
-    global forcing_dir
+    print(f'Done\nValidating required individual catchment paths')
+    global forcing_dir, config_dir, validate_type_names
     forcing_dir    = os.path.join(relative_dir,serialized_realization.global_config.forcing.path)
-    forcing_files = sorted([x for _,_,x in os.walk(forcing_dir)][0])  
+    config_dir     = os.path.join(data_dir,"config")
+    forcing_files  = [x for _,_,x in os.walk(forcing_dir)]
+    if len(forcing_files) == 0: raise Exception(f"No forcing files in {forcing_dir}")
+    forcing_files  = sorted(forcing_files[0])
+    config_files   = [os.path.join("config",x) for x in [x for _,_,x in os.walk(config_dir)][0]]
 
+    validate_files = {"pattern":serialized_realization.global_config.forcing.file_pattern,"forcing": forcing_files}
+
+    serialized_realization = NgenRealization.parse_file(realization_file)
+    for jform in serialized_realization.global_config.formulations:
+        for jmod in jform.params.modules:
+            try:
+                if jmod.params.model_name == "SLOTH": continue
+                pattern = str(jmod.params.config)
+                jcatch_pattern = pattern.replace('{{id}}',r'[^/]+')
+                compiled       = re.compile(jcatch_pattern) 
+                validate_files[jmod.params.model_name] = {"pattern":pattern,"files":sorted([x for x in config_files if bool(compiled.match(x))])}
+            except:
+               pass
+
+    validate_catchment_files(validate_files,catchment_list)
+    
     nprocs = os.cpu_count()
-    forcing_files_list = []
+    val_dict_list = []
     catchment_list_list = []
-    realization_file_list = []
     ncatchments = len(catchment_list)
     nper = ncatchments // nprocs
     nleft = ncatchments - (nper * nprocs)
     i = 0
     k = 0
     for _ in range(nprocs):
-        realization_file_list.append(realization_file)
-        k = nper + i + nleft      
-        jfiles = forcing_files[i:k]
+        k = nper + i + nleft   
+        tmp_dict = {}
+        for jval in validate_files:    
+            tmp_dict[jval] = validate_files[jval][i:k] 
+        val_dict_list.append(tmp_dict)
         jcatchments = catchment_list[i:k]
-        forcing_files_list.append(jfiles)
         catchment_list_list.append(jcatchments)
         i = k
         
     with cf.ProcessPoolExecutor() as pool:
         for results in pool.map(
-            validate_forcings,
-            forcing_files_list,
+            validate_catchment_files,
+            val_dict_list,
             catchment_list_list):
-            pass
+            pass    
 
     print(f'\nNGen run folder is valid\n')        
 
