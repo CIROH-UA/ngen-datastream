@@ -29,7 +29,7 @@ h5py==3.10.0
 idna==3.6
 jmespath==1.0.1
 multidict==6.0.5
-numpy==1.26.4
+numpy<1.25
 nwmurl==0.2.2
 oauthlib==3.2.2
 packaging==24.0
