@@ -216,6 +216,12 @@ else
     fi
 fi
 
+REALIZATION=$(find "$NGEN_CONFIG_PATH" -type f -name "realization")
+if [ ! -f $REALIZATION ]; then
+    echo "realization file is required"
+    exit 1
+fi
+
 # Look for weights file
 WEIGHTS_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights*")
 NWEIGHT=$(find "$DATASTREAM_RESOURCES" -type f -name "*weights" | wc -l)
@@ -232,12 +238,14 @@ fi
 GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
 
 # Look for geopackage attributes file
-if [ -z "$GEOPACKAGE_ATTR" ]; then
-    GEOPACKAGE_ATTR="$DATASTREAM_RESOURCES/ngen-configs/gpkg_attr.txt" 
-    if [ ! -f $GEOPACAKGE_ATTR ]; then
-        echo "geopackage attribute file is required!"
-        exit 1
+# HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
+if [ -z $GEOPACAKGE_ATTR ]; then
+    GEOPACKAGE_ATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet")
+    NATTR=$($GEOPACKAGE_ATTR | wc -l)
+    if [ ${NATTR} ! == 1 ]; then
+        echo "A single geopackage attributes file is requried"
     fi
+    echo "Using "$GEOPACKAGE_ATTR "for geopackage attributes"
 fi
 ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
 if [ ! -f "$GEOPACKAGE_ATTR" ];then
@@ -347,13 +355,13 @@ else
 fi
 log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 
-log_time "CONFGEN_START" $DATASTREAM_PROFILING
+
+log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
 if [ ! -f $PKL_FILE ]; then
     echo "Creating noah-owp pickle file"
     NOAHOWPPFL_GENERATOR="$PACAKGE_DIR/python/noahowp_pkl.py"
     python3 $NOAHOWPPFL_GENERATOR \
-        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" \
-        --out_dir "$NGEN_CONFIG_PATH" 
+        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" --out_dir "$NGEN_CONFIG_PATH"         
 fi
 
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
@@ -368,9 +376,19 @@ python3 $CONF_GENERATOR \
     --subset-id "$SUBSET_ID" \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
     --nwmurl_file "$NWMURL_CONF_PATH" \
-    --nprocs "$NPROCS" \
-    --pkl_file "$PKL_FILE"
-log_time "CONFGEN_END" $DATASTREAM_PROFILING
+    --nprocs "$NPROCS"
+log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
+
+
+log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
+NGEN_CONFGEN="/ngen-datastream/python/ngen_configs_gen.py"
+echo "Generating NGEN configs"
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
+    validator python $NGEN_CONFGEN \
+    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$PKL_FILE" --realization "$NGEN_CONFIG_PATH/realization.json"
+log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
+
+
 log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
@@ -378,34 +396,24 @@ docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
     "$DOCKER_MOUNT"/datastream-configs/conf_nwmurl.json
-
 echo "Creating forcing files"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_CONFIGS"/conf_fp.json
-
 log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
+    
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/run_validator.py"
 DOCKER_TAG="validator"
 VAL_DOCKER="${DOCKER_DIR%/}/validator"
-build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"
-    
+build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"    
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
-
-log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-PET_CFE_GEN="/ngen-datastream/python/pet_cfe_config_gen.py"
-echo "Generating PET and CFE configs" $NGEN_RUN_PATH
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
-    validator python $PET_CFE_GEN \
-    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" 
-log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
