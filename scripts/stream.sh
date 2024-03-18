@@ -97,7 +97,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 echo ""
-echo "Running datastream with ${NPROCS} processes"
+echo "Running datastream with max ${NPROCS} processes"
 
 if [ -n "$CONF_FILE" ]; then
     echo "Configuration option provided" $CONF_FILE
@@ -124,9 +124,8 @@ if [ -n "$SUBSET_ID" ]; then
         exit
     fi
 fi
-echo $END_DATE
+
 DATE=$(env TZ=US/Eastern date +'%Y%m%d')
-END=
 if [ $START_DATE == "DAILY" ]; then
     if [[ -z "$END_DATE" ]]; then
         if [[ -z "$DATA_PATH" ]]; then
@@ -153,7 +152,6 @@ if [ $START_DATE == "DAILY" ]; then
             mkdir -p $S3_OUT 
         fi
     fi
-
 else
     if [[ -z "${DATA_PATH}" ]]; then
         DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
@@ -164,9 +162,8 @@ else
         mkdir -p $S3_OUT
     fi
 fi
-
-echo "DATA_PATH: " $DATA_PATH
-echo "RESOURCE_PATH: " $RESOURCE_PATH
+DATA_PATH=$(readlink -f "$DATA_PATH")
+RESOURCE_PATH=$(readlink -f "$RESOURCE_PATH")
 
 if [ -e "$DATA_PATH" ]; then
     echo "The path $DATA_PATH exists. Please delete it or set a different path."
@@ -241,8 +238,8 @@ GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
 # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
 if [ -z $GEOPACAKGE_ATTR ]; then
     GEOPACKAGE_ATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet")
-    NATTR=$($GEOPACKAGE_ATTR | wc -l)
-    if [ ${NATTR} ! == 1 ]; then
+    NATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet" | wc -l)
+    if [ ${NATTR} != 1 ]; then
         echo "A single geopackage attributes file is requried"
     fi
     echo "Using "$GEOPACKAGE_ATTR "for geopackage attributes"
@@ -361,10 +358,15 @@ if [ ! -f $PKL_FILE ]; then
     echo "Creating noah-owp pickle file"
     NOAHOWPPFL_GENERATOR="$PACAKGE_DIR/python/noahowp_pkl.py"
     python3 $NOAHOWPPFL_GENERATOR \
-        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" --out_dir "$NGEN_CONFIG_PATH"         
+        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" --out_dir "$NGEN_CONFIG_PATH"      
+else
+    cp $PKL_FILE "$NGEN_CONFIG_PATH" 
+    PKL_BASE=$(basename $PKL_FILE)
+    PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
 fi
 
 CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
+echo "Generating ngen-datastream configs"
 python3 $CONF_GENERATOR \
     --start-date "$START_DATE" \
     --end-date "$END_DATE" \
@@ -385,7 +387,7 @@ NGEN_CONFGEN="/ngen-datastream/python/ngen_configs_gen.py"
 echo "Generating NGEN configs"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $NGEN_CONFGEN \
-    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$PKL_FILE" --realization "$NGEN_CONFIG_PATH/realization.json"
+    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json"
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
 

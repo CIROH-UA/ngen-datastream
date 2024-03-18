@@ -40,12 +40,12 @@ def validate_catchment_files(validations, catchments):
     2) files exist for each catchment in geojson
     3) start/end times and interval match realization file
     """
+    
     for jval in validations:
         pattern     = validations[jval]['pattern']
-        files       = jval['files']
+        files       = validations[jval]['files']
         for j, jcatch in enumerate(catchments):    
-            jid         = re.findall(r'\d+', jcatch)[0]                        
-            jcatch_pattern = pattern.replace('{{id}}',jid)
+            jcatch_pattern = pattern.replace('{{id}}',jcatch)
             compiled       = re.compile(jcatch_pattern)      
 
             jfile = files[j]     
@@ -102,8 +102,7 @@ def validate_data_dir(data_dir):
     forcing_files  = sorted(forcing_files[0])
     config_files   = [os.path.join("config",x) for x in [x for _,_,x in os.walk(config_dir)][0]]
 
-    validate_files = {"pattern":serialized_realization.global_config.forcing.file_pattern,"forcing": forcing_files}
-
+    validate_files = {"forcing":{"pattern":serialized_realization.global_config.forcing.file_pattern,"files": forcing_files}}
     serialized_realization = NgenRealization.parse_file(realization_file)
     for jform in serialized_realization.global_config.formulations:
         for jmod in jform.params.modules:
@@ -115,8 +114,6 @@ def validate_data_dir(data_dir):
                 validate_files[jmod.params.model_name] = {"pattern":pattern,"files":sorted([x for x in config_files if bool(compiled.match(x))])}
             except:
                pass
-
-    validate_catchment_files(validate_files,catchment_list)
     
     nprocs = os.cpu_count()
     val_dict_list = []
@@ -130,7 +127,9 @@ def validate_data_dir(data_dir):
         k = nper + i + nleft   
         tmp_dict = {}
         for jval in validate_files:    
-            tmp_dict[jval] = validate_files[jval][i:k] 
+            tmp_dict[jval] = {}
+            tmp_dict[jval]['pattern'] = validate_files[jval]['pattern']
+            tmp_dict[jval]['files'] = validate_files[jval]['files'][i:k] 
         val_dict_list.append(tmp_dict)
         jcatchments = catchment_list[i:k]
         catchment_list_list.append(jcatchments)
