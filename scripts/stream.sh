@@ -59,6 +59,8 @@ usage() {
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
     echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
     echo "  -n, --NPROCS              <Process limit> "
+    echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "
+    echo "  -h, --host_type           <Host type> "
     exit 1
 }
 
@@ -76,6 +78,8 @@ HYDROFABRIC_VERSION=""
 CONF_FILE=""
 NPROCS="$(( $(nproc) - 2 ))"
 PKL_FILE=""
+DOMAIN_NAME=""
+HOST_TYPE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -92,6 +96,8 @@ while [ "$#" -gt 0 ]; do
         -v|--HYDROFABRIC_VERSION) HYDROFABRIC_VERSION="$2"; shift 2;;        
         -c|--CONF_FILE) CONF_FILE="$2"; shift 2;;
         -n|--NPROCS) NPROCS="$2"; shift 2;;
+        -D|--DOMAIN_NAME) DOMAIN_NAME="$2"; shift 2;;
+        -h|--HOST_TYPE) HOST_TYPE="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -317,6 +323,10 @@ else
     fi   
 fi
 
+if [ -n "$DOMAIN_NAME" ]; then
+    DOMAIN_NAME=${GEOPACKAGE%".gpkg"}
+fi
+
 log_time "WEIGHTS_START" $DATASTREAM_PROFILING
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
 
@@ -378,7 +388,9 @@ python3 $CONF_GENERATOR \
     --subset-id "$SUBSET_ID" \
     --hydrofabric-version "$HYDROFABRIC_VERSION" \
     --nwmurl_file "$NWMURL_CONF_PATH" \
-    --nprocs "$NPROCS"
+    --nprocs "$NPROCS" \
+    --domain_name "$DOMAIN_NAME" \
+    --host_type "$HOST_TYPE"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 
