@@ -2,10 +2,21 @@ import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytz as tz
+import psutil
+import subprocess
 
 def generate_config(args):
+    if args.host_type is None:
+        host_type = args.host_type
+    try:        
+        host_type=str(subprocess.check_output("ec2-metadata --instance-type", shell=True))  
+        host_type = host_type.split(": ")[1][:-3]
+    except: 
+        host_type="Not Specified"
+
     config = {
         "globals": {
+            "domain_name"  : args.domain_name,
             "start_date"   : args.start_date,
             "end_date"     : args.end_date,
             "data_dir"     : args.data_dir,
@@ -19,6 +30,11 @@ def generate_config(args):
             "id_type"      : args.subset_id_type,
             "id"           : args.subset_id,
             "version"      : args.hydrofabric_version
+        },
+        "host":{
+            "host_cores"   : os.cpu_count(),
+            "host_RAM"     : psutil.virtual_memory()[0],    
+            "host_type"    : host_type
         }
     }
     return config
@@ -152,6 +168,8 @@ if __name__ == "__main__":
     parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
     parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
+    parser.add_argument("--host_type", type=str,help="Type of host",default=None)
+    parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
 
     args = parser.parse_args()
 
