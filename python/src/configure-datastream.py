@@ -2,6 +2,7 @@ import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytz as tz
+import platform
 import psutil
 import subprocess
 
@@ -34,7 +35,8 @@ def generate_config(args):
         "host":{
             "host_cores"   : os.cpu_count(),
             "host_RAM"     : psutil.virtual_memory()[0],    
-            "host_type"    : host_type
+            "host_type"    : host_type,
+            "host_arch"    : platform.machine()
         }
     }
     return config
