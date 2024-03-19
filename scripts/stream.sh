@@ -353,26 +353,28 @@ log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
 DOCKER_TAG="datastream:latest"
 echo "Generating ngen-datastream configs"
-CONFIGURER="/ngen-datastream/python/src/configure-datastream.py"
+CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH"--resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-if [ ! -f $PKL_FILE ]; then
+if [ ! ${#PKL_FILE} -gt 1 ]; then
     echo "Generating noah-owp pickle file"
-    NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/noahowp_pkl.py"
+    NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
+    PKL_FILE=$NGEN_CONFIG_PATH"/noah-owp-modular-init.namelist.input.pkl"
     docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
         python $NOAHOWPPKL_GENERATOR \
-        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" --out_dir "$NGEN_CONFIG_PATH"      
+        --hf_lnk_file "$DOCKER_MOUNT/config/$ATTR_BASE" --outdir $DOCKER_MOUNT"/config"      
 else
     cp $PKL_FILE "$NGEN_CONFIG_PATH" 
-    PKL_BASE=$(basename $PKL_FILE)
-    PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
 fi
+PKL_BASE=$(basename $PKL_FILE)
+PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
+
 echo "Generating NGEN configs"
-NGEN_CONFGEN="/ngen-datastream/python/ngen_configs_gen.py"
+NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $NGEN_CONFGEN \
     --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json"
@@ -381,6 +383,7 @@ log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
+DOCKER_TAG="forcingprocessor:latest"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
@@ -395,23 +398,28 @@ log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
     
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
-VALIDATOR="/ngen-datastream/python/run_validator.py"
+VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
+DOCKER_TAG="datastream:latest"
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
-    validator python $VALIDATOR \
+    $DOCKER_TAG python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
+
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
+
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
+
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 log_time "MERKLE_END" $DATASTREAM_PROFILING
+
 
 log_time "TAR_START" $DATASTREAM_PROFILING
 TAR_NAME="ngen-run.tar.gz"
