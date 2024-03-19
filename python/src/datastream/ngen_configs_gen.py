@@ -35,7 +35,7 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
 
 def generate_troute_conf(out_dir,start,gpkg):
 
-    template = Path(__file__).parent.parent/"configs/ngen/ngen.yaml"
+    template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
 
     with open(template,'r') as fp:
         conf_template = fp.readlines()
