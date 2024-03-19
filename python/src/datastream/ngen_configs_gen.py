@@ -91,7 +91,7 @@ if __name__ == "__main__":
         "--outdir",
         dest="outdir", 
         type=str,
-        help="Path to the .gpkg attributes", 
+        help="Path to write ngen configs", 
         required=False
     )    
     parser.add_argument(
