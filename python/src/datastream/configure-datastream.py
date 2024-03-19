@@ -10,9 +10,11 @@ def generate_config(args):
     if args.host_type is None:
         host_type = args.host_type
     try:        
+        print(f'Attempting to auto detect AWS host type...')    
         host_type=str(subprocess.check_output("ec2-metadata --instance-type", shell=True))  
         host_type = host_type.split(": ")[1][:-3]
     except: 
+        print(f'Not running on AWS host')
         host_type="Not Specified"
 
     config = {
