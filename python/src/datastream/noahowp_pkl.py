@@ -4,7 +4,7 @@ import pandas as pd
 
 def gen_noah_owp_pkl(attrs_path,out):
     print(f'Generating NoahOWP pkl',flush=True)
-    template = Path(__file__).parent.parent/"configs/ngen/noah-owp-modular-init.namelist.input"
+    template = Path(__file__).parent.parent.parent.parent/"configs/ngen/noah-owp-modular-init.namelist.input"
     with open(template,'r') as fp:
         conf_template = fp.readlines()
     
