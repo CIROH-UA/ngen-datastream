@@ -5,18 +5,6 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
 
-build_docker_container() {
-    local DOCKER_TAG="$1"
-    local DOCKER_IMAGE="$2"
-
-    if docker inspect "$DOCKER_TAG" &>/dev/null; then
-        echo "The Docker container "$DOCKER_TAG" exists. Not building."
-    else
-        echo "Building $DOCKER_TAG container..."
-        docker build $DOCKER_IMAGE -t $DOCKER_TAG --no-cache
-    fi
-}
-
 get_file() {
     local FILE="$1"
     local OUTFILE="$2"
@@ -338,7 +326,6 @@ DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
 DOCKER_TAG="forcingprocessor"
 FP_DOCKER="${DOCKER_DIR%/}/forcingprocessor"
-build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 
 if [ -e "$WEIGHTS_PATH" ]; then
     echo "Using weights found in resources directory $WEIGHTS_PATH"
@@ -364,41 +351,30 @@ log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
+DOCKER_TAG="datastream:latest"
+echo "Generating ngen-datastream configs"
+CONFIGURER="/ngen-datastream/python/src/configure-datastream.py"
+docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+    python $CONFIGURER \
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH"--resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE"
+log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
+
+log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
 if [ ! -f $PKL_FILE ]; then
-    echo "Creating noah-owp pickle file"
-    NOAHOWPPFL_GENERATOR="$PACAKGE_DIR/python/noahowp_pkl.py"
-    python3 $NOAHOWPPFL_GENERATOR \
+    echo "Generating noah-owp pickle file"
+    NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/noahowp_pkl.py"
+    docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+        python $NOAHOWPPKL_GENERATOR \
         --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" --out_dir "$NGEN_CONFIG_PATH"      
 else
     cp $PKL_FILE "$NGEN_CONFIG_PATH" 
     PKL_BASE=$(basename $PKL_FILE)
     PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
 fi
-
-CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
-echo "Generating ngen-datastream configs"
-python3 $CONF_GENERATOR \
-    --start-date "$START_DATE" \
-    --end-date "$END_DATE" \
-    --data-dir "$DATA_PATH" \
-    --resource-dir "$RESOURCE_PATH" \
-    --gpkg "$GEOPACKAGE_RESOURCES_PATH" \
-    --gpkg_attr "$GEOPACKAGE_ATTR" \
-    --subset-id-type "$SUBSET_ID_TYPE" \
-    --subset-id "$SUBSET_ID" \
-    --hydrofabric-version "$HYDROFABRIC_VERSION" \
-    --nwmurl_file "$NWMURL_CONF_PATH" \
-    --nprocs "$NPROCS" \
-    --domain_name "$DOMAIN_NAME" \
-    --host_type "$HOST_TYPE"
-log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
-
-
-log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-NGEN_CONFGEN="/ngen-datastream/python/ngen_configs_gen.py"
 echo "Generating NGEN configs"
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
-    validator python $NGEN_CONFGEN \
+NGEN_CONFGEN="/ngen-datastream/python/ngen_configs_gen.py"
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+    python $NGEN_CONFGEN \
     --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json"
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
@@ -420,9 +396,6 @@ log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/run_validator.py"
-DOCKER_TAG="validator"
-VAL_DOCKER="${DOCKER_DIR%/}/validator"
-build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"    
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     validator python $VALIDATOR \
