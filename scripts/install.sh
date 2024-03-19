@@ -9,6 +9,9 @@ if [ "$ARCH" = "x86_64" ]; then \
 elif [ "$ARCH" = "aarch64" ]; then \
     curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/arm64/mount-s3.rpm
     PKG_MNGR="yum"
+    sudo $PKG_MNGR -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-pip \
+        python-devel openssl-devel tcl libtiff-devel libcurl-devel \
+        swig libpng-devel libjpeg-turbo-devel expat-devel
 else \
     echo "Unsupported architecture: $ARCH"; \
     exit 1; \
