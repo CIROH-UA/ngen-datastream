@@ -4,6 +4,7 @@ import argparse
 import re
 import pickle, copy
 from pathlib import Path
+gpd.options.io_engine = "pyogrio"
 
 from ngen.config_gen.file_writer import DefaultFileWriter
 from ngen.config_gen.hook_providers import DefaultHookProvider
