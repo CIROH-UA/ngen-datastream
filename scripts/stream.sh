@@ -4,6 +4,12 @@ set -e
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
+if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
+    HOST_TYPE=$(ec2-metadata --isntance-type)
+else
+    HOST_TYPE="NON-AWS"
+fi
+echo "HOST_TYPE" $HOST_TYPE
 
 get_file() {
     local FILE="$1"
@@ -67,7 +73,6 @@ CONF_FILE=""
 NPROCS="$(( $(nproc) - 2 ))"
 PKL_FILE=""
 DOMAIN_NAME=""
-HOST_TYPE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -172,7 +177,7 @@ DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
 DATASTREAM_PROFILING="${DATASTREAM_CONF_PATH%/}/profile.txt"
 mkdir -p $DATASTREAM_CONF_PATH
 touch $DATASTREAM_PROFILING
-echo "START: $START_TIME" > $DATASTREAM_PROFILING
+echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
 
 log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
 NGEN_CONFIG_PATH="${NGEN_RUN_PATH%/}/config"
@@ -427,8 +432,6 @@ TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 log_time "TAR_END" $DATASTREAM_PROFILING
 
-echo "ngen-datastream run complete!"
-
 if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING
     cp $TAR_PATH $S3_OUT
@@ -438,4 +441,8 @@ if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
 fi
 echo "Data exists here: $DATA_PATH"
+
+log_time "DATASTREAM_END" $DATASTREAM_PROFILING
+echo "ngen-datastream run complete! Goodbye!"
+
     
