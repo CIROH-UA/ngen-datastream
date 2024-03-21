@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     globals = [x[0] for x in serialized_realization]
     if "routing" in globals:
-        print(f'Generating t-route config from template')
+        print(f'Generating t-route config from template',flush = True)
         generate_troute_conf(args.outdir,start,args.hf_file) 
 
-    print(f'Done!')
+    print(f'Done!',flush = True)
