@@ -151,7 +151,7 @@ if __name__ == "__main__":
         gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models)
 
     globals = [x[0] for x in serialized_realization]
-    if "routing" in globals:
+    if serialized_realization.routing is not None:
         print(f'Generating t-route config from template',flush = True)
         generate_troute_conf(args.outdir,start,args.hf_file) 
 
