@@ -16,7 +16,7 @@ def validate_realization(realization_file):
     """
     relative_dir     = os.path.dirname(os.path.dirname(realization_file))
 
-    print(f'Done\nValidating {realization_file}')
+    print(f'Done\nValidating {realization_file}',flush = True)
     serialized_realization = NgenRealization.parse_file(realization_file)
     serialized_realization.resolve_paths(relative_to=relative_dir)
     val = validate_paths(serialized_realization)
@@ -84,8 +84,8 @@ def validate_data_dir(data_dir):
                     else: 
                         raise Exception('This run directory contains more than a single geopackage file, remove all but one.')                    
 
-    if realization_file is None: raise Exception(f"")
-    print(f'Realization found! Retrieving catchment data...')
+    if realization_file is None: raise Exception(f"Did not find realization file in ngen-run/config!!!")
+    print(f'Realization found! Retrieving catchment data...',flush = True)
 
     catchments     = geopandas.read_file(geopackage_file, layer='divides')
     catchment_list = sorted(list(catchments['divide_id']))
@@ -93,7 +93,7 @@ def validate_data_dir(data_dir):
     global serialized_realization
     serialized_realization, relative_dir = validate_realization(realization_file)    
 
-    print(f'Done\nValidating required individual catchment paths')
+    print(f'Done\nValidating required individual catchment paths',flush = True)
     global forcing_dir, config_dir, validate_type_names
     forcing_dir    = os.path.join(relative_dir,serialized_realization.global_config.forcing.path)
     config_dir     = os.path.join(data_dir,"config")
@@ -142,7 +142,7 @@ def validate_data_dir(data_dir):
             catchment_list_list):
             pass    
 
-    print(f'\nNGen run folder is valid\n')        
+    print(f'\nNGen run folder is valid\n',flush = True)        
 
 if __name__ == "__main__":
 
