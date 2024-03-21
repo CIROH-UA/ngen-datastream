@@ -5,7 +5,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
 if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
-    HOST_TYPE=$(ec2-metadata --isntance-type)
+    HOST_TYPE=$(ec2-metadata --instance-type)
 else
     HOST_TYPE="NON-AWS"
 fi
@@ -14,6 +14,8 @@ echo "HOST_TYPE" $HOST_TYPE
 get_file() {
     local FILE="$1"
     local OUTFILE="$2"
+
+    echo "Retrieving "$FILE " and storing it here "$OUTFILE
 
     if [[ "$FILE" == *"https://"* ]]; then
         curl -# -L -o "$OUTFILE" "$FILE"
@@ -46,7 +48,7 @@ usage() {
     echo "  -d, --DATA_PATH           <Path to write to> "
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
     echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
-    echo "  -G, --GEOPACAKGE_ATTR     <Path to geopackage attributes file> "
+    echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
     echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
@@ -231,11 +233,12 @@ NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
-GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-
+if [ ${NGEO} -gt 0 ]; then
+    GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
+fi
 # Look for geopackage attributes file
 # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
-if [ -z $GEOPACAKGE_ATTR ]; then
+if [ -z $GEOPACKAGE_ATTR ]; then
     GEOPACKAGE_ATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet")
     NATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet" | wc -l)
     if [ ${NATTR} != 1 ]; then
