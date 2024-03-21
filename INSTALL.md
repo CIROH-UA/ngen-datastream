@@ -19,8 +19,6 @@ chmod +700 ./install.sh && ./install.sh
 ```
 ./ngen-datastream/scripts/docker_builds.sh -d <path to ngen-datastream directory>
 ```
-You're ready to run ngen-datastream!
-
 `aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
 
 You're ready to run ngen-datastream!
