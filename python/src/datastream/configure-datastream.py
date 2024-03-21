@@ -2,30 +2,25 @@ import argparse, json, os
 from datetime import datetime, timedelta
 from pathlib import Path
 import pytz as tz
+import platform
 import psutil
 import subprocess
 
 def generate_config(args):
-    if args.host_type is None:
-        host_type = args.host_type
-    try:        
-        host_type=str(subprocess.check_output("ec2-metadata --instance-type", shell=True))  
-        host_type = host_type.split(": ")[1][:-3]
-    except: 
-        host_type="Not Specified"
+    host_type = args.host_type
 
     config = {
         "globals": {
-            "domain_name"  : args.domain_name,
-            "start_date"   : args.start_date,
-            "end_date"     : args.end_date,
-            "data_dir"     : args.data_dir,
-            "gpkg"         : args.gpkg,
-            "gpkg_attr"    : args.gpkg_attr,
-            "resource_dir" : args.resource_dir,
-            "nwmurl_file"  : args.nwmurl_file,
-            "nprocs"       : args.nprocs
-        },
+            "domain_name"   : args.domain_name,
+            "start_date"    : args.start_date,
+            "end_date"      : args.end_date,
+            "data_path"     : args.data_path,
+            "gpkg"          : args.gpkg,
+            "gpkg_attr"     : args.gpkg_attr,
+            "resource_path" : args.resource_path,
+            "nwmurl_file"   : args.nwmurl_file,
+            "nprocs"        : args.nprocs
+        }, 
         "subset": {
             "id_type"      : args.subset_id_type,
             "id"           : args.subset_id,
@@ -34,7 +29,8 @@ def generate_config(args):
         "host":{
             "host_cores"   : os.cpu_count(),
             "host_RAM"     : psutil.virtual_memory()[0],    
-            "host_type"    : host_type
+            "host_type"    : host_type,
+            "host_arch"    : platform.machine()
         }
     }
     return config
@@ -45,7 +41,7 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(start,end,ii_retro,nprocs):
+def create_conf_fp(start,end,ii_retro,nprocs,docker_mount):
     if ii_retro:
         filename = "retro_filenamelist.txt"
     else:
@@ -55,20 +51,20 @@ def create_conf_fp(start,end,ii_retro,nprocs):
         "forcing" : {
             "start_date"   : start,
             "end_date"     : end,
-            "nwm_file"     : f"/mounted_dir/datastream-resources/{filename}",
-            "weight_file"  : "/mounted_dir/datastream-resources/weights.json",
+            "nwm_file"     : f"{docker_mount}/datastream-resources/{filename}",
+            "weight_file"  : f"{docker_mount}/datastream-resources/weights.json",
         },
         "storage" : {
             "storage_type"     : "local",
             "output_bucket"    : "",
-            "output_path"      : "/mounted_dir/ngen-run",
+            "output_path"      : f"{docker_mount}/ngen-run",
             "output_file_type" : "csv",
         },
         "run" : {
             "verbose"        : True,
             "collect_stats"  : True,
-            "proc_process"   : os.cpu_count(),
-            "write_process"  : os.cpu_count()
+            "proc_process"   : min(os.cpu_count(),nprocs),
+            "write_process"  : min(os.cpu_count(),nprocs)
         }
     }
 
@@ -91,8 +87,7 @@ def create_conf_nwm_daily(start,end):
     }
     return nwm_conf    
 
-
-def create_confs(conf):
+def create_confs(conf,args):
         
     if conf['globals']['start_date'] == "DAILY":
         if conf['globals']['end_date'] != "":
@@ -103,8 +98,8 @@ def create_confs(conf):
         today = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
         tomorrow = today + timedelta(hours=23)
 
-        if conf['globals'].get('data_dir',"") == "":
-            conf['globals']['data_dir'] = today.strftime('%Y%m%d')      
+        if conf['globals'].get('data_path',"") == "":
+            conf['globals']['data_path'] = today.strftime('%Y%m%d')      
 
         start = today.strftime('%Y%m%d%H%M')
         end = tomorrow.strftime('%Y%m%d%H%M')
@@ -117,19 +112,26 @@ def create_confs(conf):
         end   = conf['globals']['end_date']
         start_realization =  datetime.strptime(start,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
         end_realization   =  datetime.strptime(end,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
-        with open(conf['globals']['nwmurl_file'],'r') as fp:
+        nwmurl_file=conf['globals']['nwmurl_file']
+        if os.path.exists(args.docker_mount):
+            rel=os.path.relpath(conf['globals']['nwmurl_file'],conf['globals']['data_path'])
+            nwmurl_file = os.path.join(args.docker_mount,rel)
+        with open(nwmurl_file,'r') as fp:
             nwm_conf = json.load(fp)
             nwm_conf['start_date'] = start
             nwm_conf['end_date']   = end
 
     ii_retro = nwm_conf['forcing_type'] == 'retrospective'
-    fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'])  
+    fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount)  
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf      
 
-    data_dir = Path(conf['globals']['data_dir'])
-    ngen_config_dir = Path(data_dir,'ngen-run','config')
-    datastream_config_dir = Path(data_dir,'datastream-configs')        
+    if os.path.exists(args.docker_mount):
+        data_path = Path(args.docker_mount)
+    else:
+        data_path = Path(conf['globals']['data_path'])
+    ngen_config_dir = Path(data_path,'ngen-run','config')
+    datastream_config_dir = Path(data_path,'datastream-configs')    
 
     write_json(nwm_conf,datastream_config_dir,'conf_nwmurl.json')
     write_json(fp_conf,datastream_config_dir,'conf_fp.json')
@@ -156,26 +158,21 @@ def create_confs(conf):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--conf", type=str, help="A json containing user inputs to run ngen-datastream")
-    parser.add_argument("--start-date", help="Set the start date")
-    parser.add_argument("--end-date", help="Set the end date")
-    parser.add_argument("--data-dir", help="Set the data directory")
+    parser.add_argument("--docker_mount", help="Path to DATA_PATH mount within docker container",default=None)
+    parser.add_argument("--start_date", help="Set the start date")
+    parser.add_argument("--end_date", help="Set the end date")
+    parser.add_argument("--data_path", help="Set the data directory")
     parser.add_argument("--gpkg",help="Path to geopackage file")    
     parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file")
-    parser.add_argument("--resource-dir", help="Set the resource directory")
-    parser.add_argument("--subset-id-type", help="Set the subset ID type")
-    parser.add_argument("--subset-id", help="Set the subset ID")
-    parser.add_argument("--hydrofabric-version", help="Set the Hydrofabric version")
+    parser.add_argument("--resource_path", help="Set the resource directory")
+    parser.add_argument("--subset_id_type", help="Set the subset ID type")
+    parser.add_argument("--subset_id", help="Set the subset ID")
+    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version")
     parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
     parser.add_argument("--host_type", type=str,help="Type of host",default=None)
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
 
     args = parser.parse_args()
-
-    if not args.conf:        
-        conf = generate_config(args)
-    else:
-        conf = args.conf
-
-    create_confs(conf)
+    conf = generate_config(args)
+    create_confs(conf,args)

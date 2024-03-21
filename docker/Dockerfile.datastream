@@ -1,0 +1,5 @@
+ARG TAG_NAME
+FROM datastream-deps:${TAG_NAME} as datastream_base
+
+RUN pip3 install -e "/ngen-datastream/python"
+

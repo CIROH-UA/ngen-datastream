@@ -3,7 +3,7 @@
 
 `Hardware` - While `ngen-datastream` will run locally on a user's laptop, it is often the case that NextGen runs are so large that running on a dedicated host will be optimal. 
 
-`Speed` - Complete datastream run for a day over VPU 09 takes about 7 minutes on a free AWS t2.2xlarge ec2 instance (8vCPU, 32GB) with CFE, PET, and NOM NextGen configuration. 
+`Speed` - Complete datastream run for a day over VPU 09 takes about 7 minutes on a free-tier AWS t2.2xlarge ec2 instance (8vCPU, 32GB) with CFE, PET, and NOM NextGen configuration. 
 
 ## [Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md)
 
@@ -28,6 +28,8 @@ or run with cli args
   -I, --SUBSET_ID           <Hydrofabric id to subset>
   -v, --HYDROFABRIC_VERSION <Hydrofabric version>
   -n, --NPROCS              <Process limit>
+  -D, --DOMAIN_NAME         <Name for spatial domain>
+  -h, --host_type           <Host type>
 ```
 Example command for the the DAILY run:
 ```
@@ -51,6 +53,9 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | SUBSET_ID           | catchment id to subset [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  |
 | NPROCS              | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
+| DOMAIN_NAME         | Name for spatial domain in run, stripped from gpkg if not supplied |  |
+| HOST_TYPE           | The type or name of the host on which ngen-datastream is running, will autofill with ec2 instance type if running on AWS. |  |
+
 
 ## `ngen-datastream` Output Directory Structure
 When the datastream is executed a folder of the structure below will be constructed at `DATA_PATH`
@@ -80,8 +85,13 @@ datastream-configs/
 |
 ├── profile.txt
 ```
-### `datastream-resources/` 
-Automatically generated with [defaults](#defaults) or copied from user defined `RESOURCE_PATH`. Holds the data files required to perform computations required by the datastream. 
+### `RESOURCE_PATH` and `datastream-resources/` 
+`datastream-resources/` holds all the input data files required to perform the various computations `ngen-datastream` performs. This folder is generated during a `ngen-datastream` execution This folder is not required as input, but can be a useful method for supplying ngen-datastream with files like geopackages, realization files, and forcing weights.
+
+Examples of the application of the resource directory:
+1) Repeated executions. `ngen-datastream` will retrieve files (that are given as arguements) remotely, however this can take time depending on the networking between the data source and host. Storing these files locally in `RESOURCE_PATH` for repeated runs will save time and network bandwith.
+2) Communicating runs. ngen-datastream versions everything in `DATA_PATH`, which means a single hash corresponds to a unique `RESOURCE_PATH`, which allows users to quickly identify potential differences between `ngen-datastream` input data.
+
 #### Rules for manually building a `RESOURCE_PATH`
 A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages). Not every file is required.
 ```

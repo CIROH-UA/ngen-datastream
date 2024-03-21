@@ -4,22 +4,18 @@ set -e
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
-
-build_docker_container() {
-    local DOCKER_TAG="$1"
-    local DOCKER_IMAGE="$2"
-
-    if docker inspect "$DOCKER_TAG" &>/dev/null; then
-        echo "The Docker container "$DOCKER_TAG" exists. Not building."
-    else
-        echo "Building $DOCKER_TAG container..."
-        docker build $DOCKER_IMAGE -t $DOCKER_TAG --no-cache
-    fi
-}
+if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
+    HOST_TYPE=$(ec2-metadata --instance-type)
+else
+    HOST_TYPE="NON-AWS"
+fi
+echo "HOST_TYPE" $HOST_TYPE
 
 get_file() {
     local FILE="$1"
     local OUTFILE="$2"
+
+    echo "Retrieving "$FILE " and storing it here "$OUTFILE
 
     if [[ "$FILE" == *"https://"* ]]; then
         curl -# -L -o "$OUTFILE" "$FILE"
@@ -52,7 +48,7 @@ usage() {
     echo "  -d, --DATA_PATH           <Path to write to> "
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
     echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
-    echo "  -G, --GEOPACAKGE_ATTR     <Path to geopackage attributes file> "
+    echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
     echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
@@ -60,7 +56,7 @@ usage() {
     echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
     echo "  -n, --NPROCS              <Process limit> "
     echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "
-    echo "  -h, --host_type           <Host type> "
+    echo "  -H, --host_type           <Host type> "
     exit 1
 }
 
@@ -79,7 +75,6 @@ CONF_FILE=""
 NPROCS="$(( $(nproc) - 2 ))"
 PKL_FILE=""
 DOMAIN_NAME=""
-HOST_TYPE=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -184,7 +179,7 @@ DATASTREAM_RESOURCES="${DATA_PATH%/}/datastream-resources"
 DATASTREAM_PROFILING="${DATASTREAM_CONF_PATH%/}/profile.txt"
 mkdir -p $DATASTREAM_CONF_PATH
 touch $DATASTREAM_PROFILING
-echo "START: $START_TIME" > $DATASTREAM_PROFILING
+echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
 
 log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
 NGEN_CONFIG_PATH="${NGEN_RUN_PATH%/}/config"
@@ -238,11 +233,12 @@ NGEO=$(find "$DATASTREAM_RESOURCES" -type f -name "*.gpkg" | wc -l)
 if [ ${NGEO} -gt 1 ]; then
     echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES
 fi
-GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
-
+if [ ${NGEO} -gt 0 ]; then
+    GEOPACKAGE=$(basename $GEOPACKAGE_RESOURCES_PATH)
+fi
 # Look for geopackage attributes file
 # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
-if [ -z $GEOPACAKGE_ATTR ]; then
+if [ -z $GEOPACKAGE_ATTR ]; then
     GEOPACKAGE_ATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet")
     NATTR=$(find "$DATASTREAM_RESOURCES" -type f -name "*.parquet" | wc -l)
     if [ ${NATTR} != 1 ]; then
@@ -288,18 +284,17 @@ else
     fi    
 fi
 
+log_time "GET_GEOPACKAGE_START" $DATASTREAM_PROFILING
 if [[ -e $GEOPACKAGE_RESOURCES_PATH ]]; then
     :
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
         if [ ! -f "$GEOPACKAGE_RESOURCES_PATH" ]; then
-            log_time "GEOPACKAGE_DL" $DATASTREAM_PROFILING
             GEO_BASE="$(basename $GEOPACKAGE)"
             GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/ngen-configs/$GEO_BASE"
             get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
             cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
-            GEOPACKAGE="$GEO_BASE"
-            log_time "GEOPACKAGE_DL" $DATASTREAM_PROFILING
+            GEOPACKAGE="$GEO_BASE"            
         else
             echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
             exit 1
@@ -326,6 +321,7 @@ fi
 if [ -n "$DOMAIN_NAME" ]; then
     DOMAIN_NAME=${GEOPACKAGE%".gpkg"}
 fi
+log_time "GET_GEOPACKAGE_END" $DATASTREAM_PROFILING
 
 log_time "WEIGHTS_START" $DATASTREAM_PROFILING
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
@@ -338,7 +334,6 @@ DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
 DOCKER_TAG="forcingprocessor"
 FP_DOCKER="${DOCKER_DIR%/}/forcingprocessor"
-build_docker_container "$DOCKER_TAG" "$FP_DOCKER"
 
 if [ -e "$WEIGHTS_PATH" ]; then
     echo "Using weights found in resources directory $WEIGHTS_PATH"
@@ -364,47 +359,39 @@ log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
-if [ ! -f $PKL_FILE ]; then
-    echo "Creating noah-owp pickle file"
-    NOAHOWPPFL_GENERATOR="$PACAKGE_DIR/python/noahowp_pkl.py"
-    python3 $NOAHOWPPFL_GENERATOR \
-        --hf_lnk_file "$NGEN_CONFIG_PATH/$ATTR_BASE" --out_dir "$NGEN_CONFIG_PATH"      
-else
-    cp $PKL_FILE "$NGEN_CONFIG_PATH" 
-    PKL_BASE=$(basename $PKL_FILE)
-    PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
-fi
-
-CONF_GENERATOR="$PACAKGE_DIR/python/configure-datastream.py"
+DOCKER_TAG="datastream:latest"
 echo "Generating ngen-datastream configs"
-python3 $CONF_GENERATOR \
-    --start-date "$START_DATE" \
-    --end-date "$END_DATE" \
-    --data-dir "$DATA_PATH" \
-    --resource-dir "$RESOURCE_PATH" \
-    --gpkg "$GEOPACKAGE_RESOURCES_PATH" \
-    --gpkg_attr "$GEOPACKAGE_ATTR" \
-    --subset-id-type "$SUBSET_ID_TYPE" \
-    --subset-id "$SUBSET_ID" \
-    --hydrofabric-version "$HYDROFABRIC_VERSION" \
-    --nwmurl_file "$NWMURL_CONF_PATH" \
-    --nprocs "$NPROCS" \
-    --domain_name "$DOMAIN_NAME" \
-    --host_type "$HOST_TYPE"
+CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
+docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+    python $CONFIGURER \
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
-
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-NGEN_CONFGEN="/ngen-datastream/python/ngen_configs_gen.py"
+if [ ! ${#PKL_FILE} -gt 1 ]; then
+    echo "Generating noah-owp pickle file"
+    NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
+    PKL_FILE=$NGEN_CONFIG_PATH"/noah-owp-modular-init.namelist.input.pkl"
+    docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+        python $NOAHOWPPKL_GENERATOR \
+        --hf_lnk_file "$DOCKER_MOUNT/config/$ATTR_BASE" --outdir $DOCKER_MOUNT"/config"      
+else
+    cp $PKL_FILE "$NGEN_CONFIG_PATH" 
+fi
+PKL_BASE=$(basename $PKL_FILE)
+PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
+
 echo "Generating NGEN configs"
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
-    validator python $NGEN_CONFGEN \
+NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+    python $NGEN_CONFGEN \
     --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json"
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
 
 log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
+DOCKER_TAG="forcingprocessor:latest"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
@@ -419,26 +406,28 @@ log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
     
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
-VALIDATOR="/ngen-datastream/python/run_validator.py"
-DOCKER_TAG="validator"
-VAL_DOCKER="${DOCKER_DIR%/}/validator"
-build_docker_container "$DOCKER_TAG" "$VAL_DOCKER"    
+VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
+DOCKER_TAG="datastream:latest"
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
-    validator python $VALIDATOR \
+    $DOCKER_TAG python $VALIDATOR \
     --data_dir $DOCKER_MOUNT
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
+
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
+
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
+
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 log_time "MERKLE_END" $DATASTREAM_PROFILING
+
 
 log_time "TAR_START" $DATASTREAM_PROFILING
 TAR_NAME="ngen-run.tar.gz"
@@ -446,7 +435,7 @@ TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 log_time "TAR_END" $DATASTREAM_PROFILING
 
-echo "ngen-datastream run complete!"
+log_time "DATASTREAM_END" $DATASTREAM_PROFILING
 
 if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING
@@ -457,4 +446,8 @@ if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
 fi
 echo "Data exists here: $DATA_PATH"
+
+
+echo "ngen-datastream run complete! Goodbye!"
+
     
