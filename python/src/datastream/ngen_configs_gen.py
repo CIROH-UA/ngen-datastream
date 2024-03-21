@@ -4,6 +4,7 @@ import argparse
 import re
 import pickle, copy
 from pathlib import Path
+gpd.options.io_engine = "pyogrio"
 
 from ngen.config_gen.file_writer import DefaultFileWriter
 from ngen.config_gen.hook_providers import DefaultHookProvider
@@ -35,7 +36,7 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
 
 def generate_troute_conf(out_dir,start,gpkg):
 
-    template = Path(__file__).parent.parent/"configs/ngen/ngen.yaml"
+    template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
 
     with open(template,'r') as fp:
         conf_template = fp.readlines()
@@ -91,7 +92,7 @@ if __name__ == "__main__":
         "--outdir",
         dest="outdir", 
         type=str,
-        help="Path to the .gpkg attributes", 
+        help="Path to write ngen configs", 
         required=False
     )    
     parser.add_argument(
@@ -150,8 +151,8 @@ if __name__ == "__main__":
         gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models)
 
     globals = [x[0] for x in serialized_realization]
-    if "routing" in globals:
-        print(f'Generating t-route config from template')
+    if serialized_realization.routing is not None:
+        print(f'Generating t-route config from template',flush = True)
         generate_troute_conf(args.outdir,start,args.hf_file) 
 
-    print(f'Done!')
+    print(f'Done!',flush = True)
