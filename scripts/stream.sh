@@ -56,7 +56,7 @@ usage() {
     echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
     echo "  -n, --NPROCS              <Process limit> "
     echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "
-    echo "  -h, --host_type           <Host type> "
+    echo "  -H, --host_type           <Host type> "
     exit 1
 }
 
@@ -284,18 +284,17 @@ else
     fi    
 fi
 
+log_time "GET_GEOPACKAGE_START" $DATASTREAM_PROFILING
 if [[ -e $GEOPACKAGE_RESOURCES_PATH ]]; then
     :
 else
     if [ "$SUBSET_ID" = "null" ] || [ -z "$SUBSET_ID" ]; then
         if [ ! -f "$GEOPACKAGE_RESOURCES_PATH" ]; then
-            log_time "GEOPACKAGE_DL" $DATASTREAM_PROFILING
             GEO_BASE="$(basename $GEOPACKAGE)"
             GEOPACKAGE_RESOURCES_PATH="$DATASTREAM_RESOURCES/ngen-configs/$GEO_BASE"
             get_file "$GEOPACKAGE" "$GEOPACKAGE_RESOURCES_PATH"
             cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH
-            GEOPACKAGE="$GEO_BASE"
-            log_time "GEOPACKAGE_DL" $DATASTREAM_PROFILING
+            GEOPACKAGE="$GEO_BASE"            
         else
             echo "Geopackage does not exist and user has not specified subset! No way to determine spatial domain. Exiting." $GEOPACKAGE
             exit 1
@@ -322,6 +321,7 @@ fi
 if [ -n "$DOMAIN_NAME" ]; then
     DOMAIN_NAME=${GEOPACKAGE%".gpkg"}
 fi
+log_time "GET_GEOPACKAGE_END" $DATASTREAM_PROFILING
 
 log_time "WEIGHTS_START" $DATASTREAM_PROFILING
 echo "Using geopackage $GEOPACKAGE, Named $GEOPACKGE_NGENRUN for ngen_run"
@@ -435,6 +435,8 @@ TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
 log_time "TAR_END" $DATASTREAM_PROFILING
 
+log_time "DATASTREAM_END" $DATASTREAM_PROFILING
+
 if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING
     cp $TAR_PATH $S3_OUT
@@ -445,7 +447,7 @@ if [ -e "$S3_OUT" ]; then
 fi
 echo "Data exists here: $DATA_PATH"
 
-log_time "DATASTREAM_END" $DATASTREAM_PROFILING
+
 echo "ngen-datastream run complete! Goodbye!"
 
     
