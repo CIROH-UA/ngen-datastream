@@ -4,12 +4,17 @@ set -e
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
-if [ -f /sys/hypervisor/uuid ] && [ `head -c 3 /sys/hypervisor/uuid` == ec2 ]; then
-    HOST_TYPE=$(ec2-metadata --instance-type)
-else
+HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
+HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
+if ! command -v ec2-metadata >/dev/null 2>&1; then
     HOST_TYPE="NON-AWS"
+else
+    HOST_TYPE=$(ec2-metadata --instance-type)
+    HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
 fi
+
 echo "HOST_TYPE" $HOST_TYPE
+echo "HOST_OS" $HOST_OS
 
 get_file() {
     local FILE="$1"
@@ -249,7 +254,9 @@ fi
 ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
 if [ ! -f "$GEOPACKAGE_ATTR" ];then
     get_file $GEOPACKAGE_ATTR $NGEN_CONFIG_PATH/$ATTR_BASE
+    cp $NGEN_CONFIG_PATH/$ATTR_BASE "$DATASTREAM_RESOURCES/ngen-configs/$ATTR_BASE"
 fi
+
 
 # Look for pkl file
 PKL_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "noah-owp-modular-init.namelist.input.pkl")
@@ -386,8 +393,11 @@ NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $NGEN_CONFGEN \
     --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json"
+cp -r $NGEN_CONFIG_PATH/*.ini $DATASTREAM_RESOURCES/ngen-configs/
+cp -r $NGEN_CONFIG_PATH/*.input $DATASTREAM_RESOURCES/ngen-configs/
+cp -r $NGEN_CONFIG_PATH/*.yaml $DATASTREAM_RESOURCES/ngen-configs/
+cp -r $NGEN_CONFIG_PATH/*.pkl $DATASTREAM_RESOURCES/ngen-configs/
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
-
 
 log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
@@ -397,6 +407,7 @@ docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -w "$DOCKER_RESOURCES" $DOCKER_TAG \
     python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
     "$DOCKER_MOUNT"/datastream-configs/conf_nwmurl.json
+cp $DATASTREAM_RESOURCES/*filenamelist* $DATASTREAM_CONF_PATH/filenamelist.txt
 echo "Creating forcing files"
 docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
     -u $(id -u):$(id -g) \
@@ -420,9 +431,9 @@ echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
+cp -r $NGEN_RUN_PATH/*partitions* $DATASTREAM_RESOURCES/
 
 echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
-
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT

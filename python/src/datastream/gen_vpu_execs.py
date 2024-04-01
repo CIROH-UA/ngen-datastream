@@ -1,6 +1,7 @@
 import argparse, os
 import json, re, copy
 import pandas as pd
+from datetime import datetime
 
 def generate_vpu_execs(instance_types,conf,out_dir,arch,arch_file):
     if os.path.exists(out_dir):
@@ -21,13 +22,21 @@ def generate_vpu_execs(instance_types,conf,out_dir,arch,arch_file):
         ami = ami.replace(f'{arch}: ','')
 
     instance_name = execution_template['instance_parameters']['TagSpecifications'][0]['Tags'][0]['Value']
+    daily_date = datetime.now()
+    daily_date = daily_date.strftime('%Y%m%d')    
     for j,jvpu in enumerate(VPUs):
         exec_jvpu = copy.deepcopy(execution_template)
         exec_jvpu['instance_parameters']['ImageId'] = ami
         exec_jvpu['instance_parameters']['InstanceType'] = instance_types[j]
-        exec_jvpu['instance_parameters']['TagSpecifications'][0]['Tags'][0]['Value'] = re.sub(pattern, jvpu, instance_name)
+        exec_jvpu['instance_parameters']['TagSpecifications'][0]['Tags'][0]['Value'] = re.sub(pattern_vpu, jvpu, instance_name)
         stream_command = copy.deepcopy(exec_jvpu['commands'][2])
-        exec_jvpu['commands'][2] = re.sub(pattern, jvpu, stream_command)
+        exec_jvpu['commands'][2] = re.sub(pattern_vpu, jvpu, stream_command)
+        stream_command = copy.deepcopy(exec_jvpu['commands'][2])
+        exec_jvpu['commands'][2] = re.sub(pattern_date, daily_date, stream_command)        
+        obj_key = copy.deepcopy(exec_jvpu['obj_key'])
+        exec_jvpu['obj_key'] = re.sub(pattern_vpu, jvpu, obj_key)
+        obj_key = copy.deepcopy(exec_jvpu['obj_key'])
+        exec_jvpu['obj_key'] = re.sub(pattern_date, daily_date, obj_key)
         out_file = os.path.join(out_dir,f"execution_dailyrun_{jvpu}.json")        
         with open(out_file,'w') as fp:
             json.dump(exec_jvpu,fp,indent=2)
@@ -36,7 +45,7 @@ def generate_vpu_sizes():
     file_str = "https://lynker-spatial.s3.amazonaws.com/v20.1/model_attributes/nextgen_$VPU.parquet"
     ncatchment_vpu = []
     for j,jvpu in enumerate(VPUs):
-        data = pd.read_parquet(re.sub(pattern, jvpu, file_str))
+        data = pd.read_parquet(re.sub(pattern_vpu, jvpu, file_str))
         ncatchment = len(data)
         ncatchment_vpu.append(ncatchment)
 
@@ -45,18 +54,19 @@ def generate_vpu_sizes():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--exec_template", type=str, help="A statemachine execution json file for ngen-datastream")
-    parser.add_argument("--arch_file", type=str, help="Text file that holds the AMIs for each architecture")
+    parser.add_argument("--ami_file", type=str, help="Text file that holds the AMIs for each architecture")
     parser.add_argument("--arch", type=str, help="x86 or arm")
     parser.add_argument("--out_dir", type=str, help="Path to write executions out to, must not exist")
 
     args    = parser.parse_args()
     conf    = args.exec_template
     out_dir = args.out_dir
-    arch_file = args.arch_file
+    ami_file = args.ami_file
     arch    = args.arch
 
-    global VPUs, pattern
-    pattern = r'\$VPU'
+    global VPUs, pattern_vpu, pattern_date
+    pattern_vpu = r'\$VPU'
+    pattern_date = r'\$DATE'
     VPUs = ["01","02","03N",
             "03S","03W","04",
             "05","06", "07",
@@ -75,7 +85,7 @@ if __name__ == "__main__":
                       34201, 80040, 40803]
 
     ec2_types = []
-    ec2_instance = 't2.'
+    ec2_instance = 't4g.'
     for jvpu in ncatchment_vpu:
         if jvpu > 60000:
             ec2_types.append(ec2_instance + '2xlarge')
@@ -84,6 +94,6 @@ if __name__ == "__main__":
         elif jvpu <= 30000:
             ec2_types.append(ec2_instance + '2xlarge')
 
-    generate_vpu_execs(ec2_types,conf,out_dir,arch,arch_file)
+    generate_vpu_execs(ec2_types,conf,out_dir,arch,ami_file)
 
 

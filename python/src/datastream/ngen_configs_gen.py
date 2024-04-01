@@ -71,6 +71,31 @@ def gen_petAORcfe(hf_file,hf_lnk_file,out,models):
         file_writer=file_writer,
     )
 
+# Austin's multiprocess example from chat 3/25
+# import concurrent.futures as cf
+# from functools import partial
+# def generate_configs_multiprocessing(
+#     hook_providers: Iterable["HookProvider"],
+#     hook_objects: Collection[BuilderVisitableFn],
+#     file_writer: FileWriter,
+#     pool: cf.ProcessPoolExecutor,
+# ):
+#     def capture(divide_id: str, bv: BuilderVisitableFn):
+#         bld_vbl = bv()
+#         bld_vbl.visit(hook_prov)
+#         model = bld_vbl.build()
+#         file_writer(divide_id, model)
+
+#     div_hook_obj = DivideIdHookObject()
+#     for hook_prov in hook_providers:
+#         # retrieve current divide id
+#         div_hook_obj.visit(hook_prov)
+#         divide_id = div_hook_obj.divide_id()
+#         assert divide_id is not None
+
+#         fn = partial(capture, divide_id=divide_id)
+#         pool.map(fn, hook_objects)
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()

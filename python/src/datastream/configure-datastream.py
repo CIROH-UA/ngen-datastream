@@ -4,7 +4,22 @@ from pathlib import Path
 import pytz as tz
 import platform
 import psutil
-import subprocess
+
+def bytes2human(n):
+    # http://code.activestate.com/recipes/578019
+    # >>> bytes2human(10000)
+    # '9.8K'
+    # >>> bytes2human(100001221)
+    # '95.4M'
+    symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    prefix = {}
+    for i, s in enumerate(symbols):
+        prefix[s] = 1 << (i + 1) * 10
+    for s in reversed(symbols):
+        if abs(n) >= prefix[s]:
+            value = float(n) / prefix[s]
+            return '%.1f%s' % (value, s)
+    return "%sB" % n
 
 def generate_config(args):
     host_type = args.host_type
@@ -19,7 +34,8 @@ def generate_config(args):
             "gpkg_attr"     : args.gpkg_attr,
             "resource_path" : args.resource_path,
             "nwmurl_file"   : args.nwmurl_file,
-            "nprocs"        : args.nprocs
+            "nprocs"        : args.nprocs,
+            "nts"           : 0
         }, 
         "subset": {
             "id_type"      : args.subset_id_type,
@@ -28,7 +44,8 @@ def generate_config(args):
         },
         "host":{
             "host_cores"   : os.cpu_count(),
-            "host_RAM"     : psutil.virtual_memory()[0],    
+            "host_RAM"     : bytes2human(psutil.virtual_memory()[0]),    
+            "host_OS"      : args.host_os,
             "host_type"    : host_type,
             "host_arch"    : platform.machine()
         }
@@ -124,7 +141,9 @@ def create_confs(conf,args):
     ii_retro = nwm_conf['forcing_type'] == 'retrospective'
     fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount)  
     conf['nwmurl'] = nwm_conf 
-    conf['forcingprocessor'] = nwm_conf      
+    conf['forcingprocessor'] = nwm_conf    
+
+    conf['globals']['nts'] = nwm_conf['lead_time']
 
     if os.path.exists(args.docker_mount):
         data_path = Path(args.docker_mount)
@@ -154,7 +173,9 @@ def create_confs(conf,args):
 
     data['time']['start_time'] = start_realization
     data['time']['end_time']   = end_realization
-    write_json(data,ngen_config_dir,'realization.json')    
+    write_json(data,ngen_config_dir,'realization.json')
+    write_json(data,datastream_config_dir,'realization.json')
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -171,6 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
     parser.add_argument("--host_type", type=str,help="Type of host",default=None)
+    parser.add_argument("--host_os", type=str,help="Operating system of host",default=None)
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
 
     args = parser.parse_args()
