@@ -24,6 +24,9 @@ cp -r /home/ec2-user/test/datastream-resources /home/ec2-user/resources_VPU09
 Then re-run ngen-datastream with the resource directory and a new data path to write out to. Now the user can make changes to the realization file and repeat the run, without re-generating input files. This is referred to running in "lite" mode.
 ```
 ./ngen-datastream/scripts/stream.sh \
--r /home/ec2-user/resources_VPU_09 \
+-s DAILY \
+-r /home/ec2-user/resources_VPU09 \
 -d /home/ec2-user/test2
 ```
+## Need help?
+If you're having trouble running ngen-datastream, reach out to Jordan (jlaser@lynker.com) or raise an issue in the repo.
