@@ -19,9 +19,10 @@ or run with cli args
   -s, --START_DATE          <YYYYMMDDHHMM or "DAILY">
   -e, --END_DATE            <YYYYMMDDHHMM>
   -d, --DATA_PATH           <Path to write to>
+  -R, --REALIZATION         <Path to realization file>
   -r, --RESOURCE_PATH       <Path to resource directory>
   -g, --GEOPACAKGE          <Path to geopackage file>
-  -G, --GEOPACAKGE_ATTR     <Path to geopackage attributes file>
+  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file>
   -S, --S3_MOUNT            <Path to mount s3 bucket to>
   -o, --S3_PREFIX           <File prefix within s3 mount>
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>
@@ -29,7 +30,6 @@ or run with cli args
   -v, --HYDROFABRIC_VERSION <Hydrofabric version>
   -n, --NPROCS              <Process limit>
   -D, --DOMAIN_NAME         <Name for spatial domain>
-  -h, --host_type           <Host type>
 ```
 Example command for the the DAILY run:
 ```
@@ -44,9 +44,10 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | DATA_PATH           | Path to construct the datastream run. | :white_check_mark: |
-| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it with this arg. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
+| REALIZATION | Path to NextGen realization file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
 | GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
 | GEOPACKAGE_ATTR     | Path to hydrofabric attributes, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
+| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it with this arg. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
 | S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
 | S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
@@ -54,7 +55,7 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  |
 | NPROCS              | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
 | DOMAIN_NAME         | Name for spatial domain in run, stripped from gpkg if not supplied |  |
-| HOST_TYPE           | The type or name of the host on which ngen-datastream is running, will autofill with ec2 instance type if running on AWS. |  |
+
 
 
 ## `ngen-datastream` Output Directory Structure
@@ -62,7 +63,7 @@ When the datastream is executed a folder of the structure below will be construc
 ```
 DATA-PATH/
 │
-├── datastream-configs/
+├── datastream-metadata/
 │
 ├── datastream-resources/
 |
@@ -70,12 +71,12 @@ DATA-PATH/
 ```
 Each folder is explained below
 
-### `datastream-configs/` 
+### `datastream-metadata/` 
 
-Automatically generated. Holds all of the configuration files the datastream needs in order to run. `datastream-configs/` is the first place to look to confirm that a datastream run has been executed according to the user's specifications. 
+Automatically generated. Holds all of the metadata and configuration files the datastream needs in order to run. `datastream-metadata/` is the first place to look to confirm that a datastream run has been executed according to the user's specifications. 
 Example directory:
 ```
-datastream-configs/
+datastream-metadata/
 │
 ├── conf_datastream.json
 │
@@ -84,16 +85,20 @@ datastream-configs/
 ├── conf_nwmurl.json
 |
 ├── profile.txt
+|
+├── filenamelist.txt
+|
+├── realization.json
 ```
-### `RESOURCE_PATH` and `datastream-resources/` 
-`datastream-resources/` holds all the input data files required to perform the various computations `ngen-datastream` performs. This folder is generated during a `ngen-datastream` execution This folder is not required as input, but can be a useful method for supplying ngen-datastream with files like geopackages, realization files, and forcing weights.
+### `RESOURCE_PATH` (`datastream-resources/`)
+`datastream-resources/` holds all the input data files required to perform the various computations `ngen-datastream` performs. This folder is not required as input, but will be a faster method for running ngen-datastream repeatedly over a given spatial domain.
 
 Examples of the application of the resource directory:
-1) Repeated executions. `ngen-datastream` will retrieve files (that are given as arguements) remotely, however this can take time depending on the networking between the data source and host. Storing these files locally in `RESOURCE_PATH` for repeated runs will save time and network bandwith.
+1) Repeated executions. `ngen-datastream` will retrieve files (that are given as arguements) remotely, however this can take time depending on the networking between the data source and host. Storing these files locally in `RESOURCE_PATH` for repeated runs will save time and network bandwith. In addition, this saves on compute required to build input files from scratch.
 2) Communicating runs. ngen-datastream versions everything in `DATA_PATH`, which means a single hash corresponds to a unique `RESOURCE_PATH`, which allows users to quickly identify potential differences between `ngen-datastream` input data.
 
-#### Rules for manually building a `RESOURCE_PATH`
-A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages). Not every file is required.
+#### Guide for building a `RESOURCE_PATH`
+The easiest way to create a reusable resource directory is to execute `ngen-datastream` and save `$DATA_PATH/datastream-resources` for later use. A user defined `RESOURCE_PATH` may take the form below. Only one file of each type is allowed (e.g. cannot have two geopackages).
 ```
 RESOURCE_PATH/
 |
@@ -104,6 +109,8 @@ RESOURCE_PATH/
 |   ├── nextgen_01.parquet   
 |   │
 |   ├── realization.json 
+|   │
+|   ├── ngen-bmi-configs.tar.gz
 |
 ├── weights.json
 |

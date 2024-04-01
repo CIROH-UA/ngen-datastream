@@ -1,87 +1,29 @@
 # Examples
-Below are a few different ways to run the datastream. Note that the `"DAILY"` runs are large and intended for HPC.
+Below are a few different ways to run the datastream. 
 
-## Small Run
-This run will include forcings from 200301200100 to 200301210100. The s3 URI will be sync'd into `RESOURCE_PATH`. The geopackage in the `RESOURCE_PATH` represents the smallest VPU (09) and defines the spatial domain of the datastream run.
+## First Run
+For a user's first time running ngen-datastream over a spatial domain, run with cli args and no resource directory.:
+```
+./ngen-datastream/scripts/stream.sh \
+-s DAILY \
+-R https://github.com/CIROH-UA/ngen-datastream/raw/main/configs/ngen/realization_cfe_sloth_nom.json \
+-g https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_09.gpkg \
+-G https://lynker-spatial.s3.amazonaws.com/v20.1/model_attributes/nextgen_09.parquet \
+-n 8 \
+-d /home/ec2-user/test
+```
+This command will execute ngen-datastream over VPU_09 with 24 hrs of forcings from today's date. The output will exist at `/home/ec2-user/test` with the reusable resource directory here `/home/ec2-user/test/datastream-resources`
 
-`/ngen-datastream/configs/conf_datastream_small.sh`
-```
-START_DATE="200301200100"
-END_DATE="200301210100"
-DATA_PATH="/home/ec2-user/datastream-small-run"
-RESOURCE_PATH="s3://ngen-datastream/resources_small/"
-# RELATIVE_TO=""
-# S3_MOUNT=""
-# SUBSET_ID_TYPE=""
-# SUBSET_ID=""
-# HYDROFABRIC_VERSION=""
-```
+## Repeated runs
+Now that the user has a resource directory made for VPU_09, repeated runs can be made by just providing the resource directory.
 
-`RESOURCE_PATH`
+First, copy the resource directory from the previous run:
 ```
-RESOURCE_PATH/
-│
-├── nextgen_09.gpkg 
-|
-├── nwm_example_grid_file.nc 
-|
-├── conf_nwmurl.json
-│
-├── ngen-configs
-    │
-    ├── config.ini
-    │
-    ├── ngen.yaml    
-    │
-    ├── realization.json    
+cp -r /home/ec2-user/test/datastream-resources /home/ec2-user/resources_VPU09
 ```
-`conf_nwmurl.json`
+Then re-run ngen-datastream with the resource directory and a new data path to write out to. Now the user can make changes to the realization file and repeat the run, without re-generating input files. This is referred to running in "lite" mode.
 ```
-{
-    "forcing_type" : "retrospective",
-    "start_date"   : "",
-    "end_date"     : "",
-    "urlbaseinput" : 1,
-    "selected_object_type" : [1],
-    "selected_var_types"   : [6],
-    "write_to_file" : true
-}
+./ngen-datastream/scripts/stream.sh \
+-r /home/ec2-user/resources_VPU_09 \
+-d /home/ec2-user/test2
 ```
-Note that `start_date` and `end_date` are not set. The datastream will do this for you.
-
-Run it: `./ngen-datastream/scripts/stream.sh --CONF-FILE ./ngen-datastream/configs/conf_datastream_small.sh`
-
-## "DAILY"
-For a CONUS wide run on today's date:
-```
-START_DATE="DAILY",
-END_DATE= 
-DATA_PATH="/home/ec2-user/example-datastream-folder"
-RESOURCE_PATH="s3://ngen-datastream/resources_default/"
-# RELATIVE_TO=""
-# S3_MOUNT=""
-# SUBSET_ID_TYPE=""
-# SUBSET_ID=""
-# HYDROFABRIC_VERSION=""
-```
-
-`RESOURCE_PATH`
-```
-RESOURCE_PATH/
-│
-├── conus.gpkg 
-|
-├── nwm_example_grid_file.nc 
-|
-├── weights.json
-│
-├── ngen-configs
-    │
-    ├── config.ini
-    │
-    ├── ngen.yaml    
-    │
-    ├── realization.json    
-```
-
-no `conf_nwmurl.json` needed
