@@ -34,8 +34,7 @@ def generate_config(args):
             "gpkg_attr"     : args.gpkg_attr,
             "resource_path" : args.resource_path,
             "nwmurl_file"   : args.nwmurl_file,
-            "nprocs"        : args.nprocs,
-            "nts"           : 0
+            "nprocs"        : args.nprocs
         }, 
         "subset": {
             "id_type"      : args.subset_id_type,
@@ -150,11 +149,11 @@ def create_confs(conf,args):
     else:
         data_path = Path(conf['globals']['data_path'])
     ngen_config_dir = Path(data_path,'ngen-run','config')
-    datastream_config_dir = Path(data_path,'datastream-configs')    
+    datastream_meta_dir = Path(data_path,'datastream-metadata')    
 
-    write_json(nwm_conf,datastream_config_dir,'conf_nwmurl.json')
-    write_json(fp_conf,datastream_config_dir,'conf_fp.json')
-    write_json(conf,datastream_config_dir,'conf_datastream.json')
+    write_json(nwm_conf,datastream_meta_dir,'conf_nwmurl.json')
+    write_json(fp_conf,datastream_meta_dir,'conf_fp.json')
+    write_json(conf,datastream_meta_dir,'conf_datastream.json')
 
     print(f'\ndatastream configs have been generated and placed here\n{datastream_config_dir}\n')    
     
@@ -174,7 +173,7 @@ def create_confs(conf,args):
     data['time']['start_time'] = start_realization
     data['time']['end_time']   = end_realization
     write_json(data,ngen_config_dir,'realization.json')
-    write_json(data,datastream_config_dir,'realization.json')
+    write_json(data,datastream_meta_dir,'realization.json')
 
 
 if __name__ == "__main__":
