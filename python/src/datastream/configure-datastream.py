@@ -155,7 +155,7 @@ def create_confs(conf,args):
     write_json(fp_conf,datastream_meta_dir,'conf_fp.json')
     write_json(conf,datastream_meta_dir,'conf_datastream.json')
 
-    print(f'\ndatastream configs have been generated and placed here\n{datastream_config_dir}\n')    
+    print(f'\ndatastream configs have been generated and placed here\n{datastream_meta_dir}\n')    
     
     realization_file = None
     for path, _, files in os.walk(ngen_config_dir):
