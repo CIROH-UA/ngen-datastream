@@ -1,8 +1,8 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-02f5334d0eb74d3fa",
-    "InstanceType"       : "t2.2xlarge",
+    "ImageId"            : "ami-0f27154b6e5061e13",
+    "InstanceType"       : "hpc7g.16xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
     "MaxCount"           : 1,
@@ -16,7 +16,7 @@
           "Tags": [
               {
                   "Key"   : "Name",
-                  "Value" : "ngendatastream_parallel_$VPU"
+                  "Value" : "ngendatastream_DATE"
               }
           ]
       }
@@ -32,12 +32,12 @@
     ]
   },
 
-  "region"   : "us-east-2",
+  "region"   : "us-east-1",
   "commands"  : [
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
     "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -G https://lynker-spatial.s3.amazonaws.com/v20.1/model_attributes/nextgen_$VPU.parquet -g https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_$VPU.gpkg -r /home/ec2-user/ngen-datastream/data/mount/resources_pet_cfe_sloth_nom -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/VPU_$VPU -n 8 > /home/ec2-user/ngen-datastream/log.txt'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -r /home/ec2-user/ngen-datastream/data/mount/resources_default -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/hpc7g.16xlarge > /home/ec2-user/ngen-datastream/log.txt'"
   ],
   "bucket"   : "ngen-datastream",
-  "obj_key"  : "daily/$DATE/VPU_$VPU/ngen-run.tar.gz"
+  "obj_key"  : "daily/DATE/ngen-run/outputs/cat-1.csv"
 }

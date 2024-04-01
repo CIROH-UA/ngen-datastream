@@ -19,17 +19,16 @@ def wait_for_instance_status(instance_id, status, max_retries=120):
         retries += 1
     return False
 
-def replace_in_dict(d, replacement):
-    pattern = "$DATE"
+def replace_in_dict(d, pattern, replacement):
     for key, value in d.items():
         if isinstance(value, dict):
-            replace_in_dict(value,pattern)
+            replace_in_dict(value, pattern, replacement)
         elif isinstance(value, str) and pattern in value:
             d[key] = value.replace(pattern, replacement)
         elif isinstance(value, list):
             for jelem in value:
                 if isinstance(jelem, dict):
-                    replace_in_dict(jelem,pattern)
+                    replace_in_dict(jelem, pattern, replacement)
                 elif isinstance(jelem, str) and pattern in jelem:
                     d[key] = jelem.replace(pattern, replacement)
     
@@ -43,7 +42,8 @@ def lambda_handler(event, context):
 
     date = datetime.now()
     date_fmt = date.strftime('%Y%m%d')
-    replace_in_dict(params, date_fmt)
+    replace_in_dict(params,"$DATE", date_fmt)
+    replace_in_dict(params,"$INSTANCE_TYPE", params['InstanceType'])
 
     response           = client_ec2.run_instances(**params)
     print(response)

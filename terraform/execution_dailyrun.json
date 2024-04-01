@@ -1,7 +1,7 @@
 {
   "instance_parameters" :
   {
-    "ImageId"            : "ami-003fc611504cf8f19",
+    "ImageId"            : "ami-0b01f2f85c830385a",
     "InstanceType"       : "hpc6a.48xlarge",
     "KeyName"            : "Processor",
     "MinCount"           : 1,
@@ -36,7 +36,7 @@
   "commands"  : [
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
     "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -c /home/ec2-user/ngen-datastream/configs/conf_datastream_daily.sh > /home/ec2-user/ngen-datastream/log.txt'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -r /home/ec2-user/ngen-datastream/data/mount/resources_default -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/hpc6a.48xlarge > /home/ec2-user/ngen-datastream/log.txt'"
   ],
   "bucket"   : "ngen-datastream",
   "obj_key"  : "daily/DATE/ngen-run/outputs/cat-1.csv"
