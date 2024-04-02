@@ -312,6 +312,7 @@ if [ ! -z $RESOURCE_PATH ]; then
     if [ -f "$NGEN_BMI_CONFS" ]; then
         echo "Using" $NGEN_BMI_CONFS
         tar -xf $NGEN_BMI_CONFS -C "${NGEN_CONFIG_PATH%/}"
+        IGNORE_BMI=("PET,CFE")
     fi 
 
 else
@@ -395,30 +396,27 @@ docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 
-if [ ! -f "$NGEN_BMI_CONFS" ]; then
-    log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-    # Look for pkl file
-    PKL_FILE=$(find "$DATASTREAM_RESOURCES" -type f -name "noah-owp-modular-init.namelist.input.pkl")
-    if [ ! -f "$PKL_FILE" ]; then
-        echo "Generating noah-owp pickle file"
-        NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
-        PKL_FILE=$NGEN_CONFIG_PATH"/noah-owp-modular-init.namelist.input.pkl"
-        docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
-            python $NOAHOWPPKL_GENERATOR \
-            --hf_lnk_file "$DOCKER_MOUNT/config/$GEO_ATTR_BASE" --outdir $DOCKER_MOUNT"/config"      
-    else
-        cp $PKL_FILE "$NGEN_CONFIG_PATH" 
-    fi
-    PKL_BASE=$(basename $PKL_FILE)
-    PKL_FILE="$NGEN_CONFIG_PATH"/$PKL_BASE
-
-    echo "Generating NGEN configs"
-    NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
+log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
+# Look for pkl file
+PKL_FILE=$(find "$NGEN_CONFIG_PATH" -type f -name "noah-owp-modular-init.namelist.input.pkl")
+if [ ! -f "$PKL_FILE" ]; then
+    echo "Generating noah-owp pickle file"
+    NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
     docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
-        python $NGEN_CONFGEN \
-        --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json"
-    log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
+        python $NOAHOWPPKL_GENERATOR \
+        --hf_lnk_file "$DOCKER_MOUNT/config/$GEO_ATTR_BASE" --outdir $DOCKER_MOUNT"/config"      
+else
+    cp $PKL_FILE "$NGEN_CONFIG_PATH" 
 fi
+PKL_BASE=$(basename $PKL_FILE)
+
+echo "Generating NGEN configs"
+NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
+    python $NGEN_CONFGEN \
+    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
+log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
+
 
 log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
 echo "Creating nwm filenames file"
@@ -462,22 +460,23 @@ log_time "MERKLE_END" $DATASTREAM_PROFILING
 
 
 log_time "TAR_START" $DATASTREAM_PROFILING
-TAR_NAME="ngen-run.tar.gz"
-TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
-tar -cf - $NGEN_RUN_PATH | pigz > $TAR_PATH
-
 TAR_NAME="ngen-bmi-configs.tar.gz"
-TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
-tar -cf - --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" --exclude="*.pkl" -C $NGEN_CONFIG_PATH . | pigz > $NGEN_BMI_CONFS
+NGENCON_TAR_PATH="${DATASTREAM_RESOURCES_NGENCONF_PATH%/}/$TAR_NAME"
+tar -cf - --exclude="*noah-owp*" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" --exclude="*.pkl" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
+
+TAR_NAME="ngen-run.tar.gz"
+NGENRUN_TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
+tar -cf - $NGEN_RUN_PATH | pigz > $NGENRUN_TAR_PATH
 log_time "TAR_END" $DATASTREAM_PROFILING
 
 log_time "DATASTREAM_END" $DATASTREAM_PROFILING
 
 if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING
-    cp $TAR_PATH $S3_OUT
+    cp $NGENRUN_TAR_PATH $S3_OUT
     cp $DATA_PATH/merkdir.file $S3_OUT
     cp -r $DATASTREAM_META_PATH $S3_OUT
+    cp -r $DATASTREAM_RESOURCES $S3_OUT
     echo "Data exists here: $S3_OUT"
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
 fi
