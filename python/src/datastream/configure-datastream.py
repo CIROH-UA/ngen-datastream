@@ -142,8 +142,6 @@ def create_confs(conf,args):
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
 
-    conf['globals']['nts'] = nwm_conf['lead_time']
-
     if os.path.exists(args.docker_mount):
         data_path = Path(args.docker_mount)
     else:
