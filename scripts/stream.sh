@@ -42,6 +42,7 @@ usage() {
     echo "  -d, --DATA_PATH           <Path to write to> "
     echo "  -R, --REALIZATION         <Path to realization file> "
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
+    echo "  -f, --FORCINGS_PATH       <Path to forcings tarball> "
     echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
     echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
@@ -60,6 +61,7 @@ END_DATE=""
 DATA_PATH=""
 REALIZATION=""
 RESOURCE_PATH=""
+FORCINGS_TAR=""
 GEOPACKAGE=""
 GEOPACKAGE_ATTR=""
 S3_MOUNT=""
@@ -90,6 +92,7 @@ while [ "$#" -gt 0 ]; do
         -d|--DATA_PATH) DATA_PATH="$2"; shift 2;;
         -R|--REALIZATION) REALIZATION="$2"; shift 2;;
         -r|--RESOURCE_PATH) RESOURCE_PATH="$2"; shift 2;;
+        -f|--FORCINGS_TAR) FORCINGS_TAR="$2"; shift 2;;
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
         -G|--GEOPACKAGE_ATTR) GEOPACKAGE_ATTR="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
@@ -192,6 +195,7 @@ touch $DATASTREAM_PROFILING
 echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
 
 NGEN_CONFIG_PATH="${NGEN_RUN_PATH%/}/config"
+NGEN_FORCINGS_PATH="${NGEN_RUN_PATH%/}/forcings"
 NGEN_OUTPUT_PATH="${NGEN_RUN_PATH%/}/outputs"
 NGEN_RESTART_PATH="${NGEN_RUN_PATH%/}/restart"
 NGEN_LAKEOUT_PATH="${NGEN_RUN_PATH%/}/lakeout"
@@ -217,21 +221,23 @@ else
     mkdir -p $DATASTREAM_RESOURCES_NGENCONF_PATH
 fi
 
-if [ $START_DATE == "DAILY" ]; then
-    :
-else
-    NWMURL_CONF_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*")
-    NNWMURL=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*" | wc -l)
-    if [ "$NNWMURL" -eq "0" ]; then
-        echo "nwmurl_conf.json is missing from "$DATASTREAM_RESOURCES
-        echo "exiting..."
-        exit 1
-    fi    
-    if [ ${NNWMURL} -gt 1 ]; then
-        echo "At most one nwmurl file is allowed in "$DATASTREAM_RESOURCES
-    fi
-    if [ -e "$NWMURL_CONF_PATH" ]; then 
-        echo "Using $NWMURL_CONF_PATH"
+if [ -z $FORCINGS_TAR ]; then
+    if [ $START_DATE == "DAILY" ]; then
+        :
+    else
+        NWMURL_CONF_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*")
+        NNWMURL=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*" | wc -l)
+        if [ "$NNWMURL" -eq "0" ]; then
+            echo "nwmurl_conf.json is missing from "$DATASTREAM_RESOURCES
+            echo "exiting..."
+            exit 1
+        fi    
+        if [ ${NNWMURL} -gt 1 ]; then
+            echo "At most one nwmurl file is allowed in "$DATASTREAM_RESOURCES
+        fi
+        if [ -e "$NWMURL_CONF_PATH" ]; then 
+            echo "Using $NWMURL_CONF_PATH"
+        fi
     fi
 fi
 
@@ -239,16 +245,7 @@ if [ ! -z $SUBSET_ID ]; then
     log_time "SUBSET_START" $DATASTREAM_PROFILING
     GEOPACKAGE="$SUBSET_ID.gpkg"
     GEOPACKAGE_RESOURCES_PATH="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
-
-    if command -v "hfsubset" &>/dev/null; then
-        echo "hfsubset is installed and available in the system's PATH. Subsetting, now!"
-    else
-        curl -L -o "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz" https://github.com/LynkerIntel/hfsubset/releases/download/hfsubset-release-12/hfsubset-linux_amd64.tar.gz
-        tar -xzvf "$DATASTREAM_RESOURCES/hfsubset-linux_amd64.tar.gz"
-    fi
-
     hfsubset -o $GEOPACKAGE_RESOURCES_PATH -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
-
     cp $GEOPACKAGE_RESOURCES_PATH $GEOPACKAGE_NGENRUN_PATH        
     log_time "SUBSET_END" $DATASTREAM_PROFILING
 fi   
@@ -313,7 +310,7 @@ if [ ! -z $RESOURCE_PATH ]; then
         echo "Using" $NGEN_BMI_CONFS
         tar -xf $NGEN_BMI_CONFS -C "${NGEN_CONFIG_PATH%/}"
         IGNORE_BMI=("PET,CFE")
-    fi 
+    fi     
 
 else
     echo "RESOURCE_PATH not provided, using cli args"
@@ -364,8 +361,6 @@ if [ -z "$DOMAIN_NAME" ]; then
 fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
 
-
-
 # begin calculations
 if [ -e "$WEIGHTS_PATH" ]; then
     echo "Using $WEIGHTS_PATH"
@@ -398,42 +393,52 @@ log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
 # Look for pkl file
-PKL_FILE=$(find "$NGEN_CONFIG_PATH" -type f -name "noah-owp-modular-init.namelist.input.pkl")
+PKL_NAME="noah-owp-modular-init.namelist.input.pkl"
+PKL_FILE=$(find "$NGEN_CONFIG_PATH" -type f -name $PKL_NAME)
 if [ ! -f "$PKL_FILE" ]; then
     echo "Generating noah-owp pickle file"
     NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
     docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
         python $NOAHOWPPKL_GENERATOR \
-        --hf_lnk_file "$DOCKER_MOUNT/config/$GEO_ATTR_BASE" --outdir $DOCKER_MOUNT"/config"      
+        --hf_lnk_file "$DOCKER_MOUNT/config/$GEO_ATTR_BASE" --outdir $DOCKER_MOUNT"/config"   
 else
     cp $PKL_FILE "$NGEN_CONFIG_PATH" 
 fi
-PKL_BASE=$(basename $PKL_FILE)
 
 echo "Generating NGEN configs"
 NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $NGEN_CONFGEN \
-    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_BASE --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
+    --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
 
-log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
-echo "Creating nwm filenames file"
-DOCKER_TAG="forcingprocessor:latest"
-docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
-    -u $(id -u):$(id -g) \
-    -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-    python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
-    "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-cp $DATASTREAM_RESOURCES/*filenamelist* $DATASTREAM_META_PATH/filenamelist.txt
-echo "Creating forcing files"
-docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
-    -u $(id -u):$(id -g) \
-    -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-    python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_META"/conf_fp.json
-log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
-    
+if [ ! -z $FORCINGS_TAR ]; then
+    log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
+    echo "Using $FORCINGS_TAR"
+    FORCINGS_BASE=$(basename $FORCINGS_TAR)    
+    mkdir -p $NGEN_FORCINGS_PATH
+    FORCINGS_NGEN_TAR="$NGEN_FORCINGS_PATH"/$FORCINGS_BASE
+    get_file "$FORCINGS_TAR" $FORCINGS_NGEN_TAR
+    tar -xf $FORCINGS_NGEN_TAR -C "${NGEN_RUN_PATH%/}"
+    log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
+else
+    log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
+    echo "Creating nwm filenames file"
+    DOCKER_TAG="forcingprocessor:latest"
+    docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+        -u $(id -u):$(id -g) \
+        -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+        python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
+        "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
+    cp $DATASTREAM_RESOURCES/*filenamelist* $DATASTREAM_META_PATH/filenamelist.txt
+    echo "Creating forcing files"
+    docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+        -u $(id -u):$(id -g) \
+        -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+        python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_META"/conf_fp.json
+    log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
+fi    
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
@@ -462,7 +467,7 @@ log_time "MERKLE_END" $DATASTREAM_PROFILING
 log_time "TAR_START" $DATASTREAM_PROFILING
 TAR_NAME="ngen-bmi-configs.tar.gz"
 NGENCON_TAR_PATH="${DATASTREAM_RESOURCES_NGENCONF_PATH%/}/$TAR_NAME"
-tar -cf - --exclude="*noah-owp*" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" --exclude="*.pkl" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
+tar -cf - --exclude="*noah-owp*" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
 
 TAR_NAME="ngen-run.tar.gz"
 NGENRUN_TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
