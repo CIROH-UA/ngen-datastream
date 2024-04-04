@@ -804,7 +804,7 @@ def prep_ngen_data(conf):
         else:
             path = str(metaf_path)
             combined_tar_filename = str(forcing_path) + '/forcings.tar.gz'
-            tar_cmd = f'tar cf - {forcing_path} {metaf_path} | pigz > forcings.tar.gz'
+            tar_cmd = f'tar cf - {forcing_path} {metaf_path} -C {bucket_path} . | pigz > forcings.tar.gz'
             os.system(tar_cmd)
             os.system(f'mv forcings.tar.gz {combined_tar_filename}')
 
