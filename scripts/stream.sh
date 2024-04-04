@@ -401,8 +401,6 @@ if [ ! -f "$PKL_FILE" ]; then
     docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
         python $NOAHOWPPKL_GENERATOR \
         --hf_lnk_file "$DOCKER_MOUNT/config/$GEO_ATTR_BASE" --outdir $DOCKER_MOUNT"/config"   
-else
-    cp $PKL_FILE "$NGEN_CONFIG_PATH" 
 fi
 
 echo "Generating NGEN configs"
@@ -467,7 +465,7 @@ log_time "MERKLE_END" $DATASTREAM_PROFILING
 log_time "TAR_START" $DATASTREAM_PROFILING
 TAR_NAME="ngen-bmi-configs.tar.gz"
 NGENCON_TAR_PATH="${DATASTREAM_RESOURCES_NGENCONF_PATH%/}/$TAR_NAME"
-tar -cf - --exclude="*noah-owp*" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
+tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
 
 TAR_NAME="ngen-run.tar.gz"
 NGENRUN_TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
