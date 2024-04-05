@@ -779,12 +779,12 @@ def prep_ngen_data(conf):
                         jcat = cats[j]
                         jdf  = dfs[j]
                         jfilename = filenames[j]
-                    with tempfile.NamedTemporaryFile() as tmpfile:
-                        if output_file_type == "parquet":
-                            jdf.to_parquet(tmpfile.name, index=False)
-                        elif output_file_type == "csv":
-                            jdf.to_csv(tmpfile.name, index=False)                        
-                        jtar.add(tmpfile.name, arcname=jfilename)
+                        with tempfile.NamedTemporaryFile() as tmpfile:
+                            if output_file_type == "parquet":
+                                jdf.to_parquet(tmpfile.name, index=False)
+                            elif output_file_type == "csv":
+                                jdf.to_csv(tmpfile.name, index=False)                        
+                            jtar.add(tmpfile.name, arcname=jfilename)
 
                 with open(tar_name, 'rb') as combined_tar:
                     s3 = boto3.client("s3")   
