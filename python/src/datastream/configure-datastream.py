@@ -227,7 +227,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--docker_mount", help="Path to DATA_PATH mount within docker container",default="")
     parser.add_argument("--start_date", help="Set the start date",default=None)
-    parser.add_argument("--end_date", help="Set the end date",default=None)
+    parser.add_argument("--end_date", help="Set the end date",default="")
     parser.add_argument("--data_path", help="Set the data directory",default="")
     parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
     parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file",default="")

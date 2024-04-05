@@ -125,7 +125,7 @@ def test_processor(get_time, get_paths):
                         
                 prep_ngen_data(conf)
 
-                tarball = (pytest.data_dir/pytest.date/"forcings/forcings.tar.gz").resolve()
+                tarball = (pytest.data_dir/pytest.date/"forcings/01_forcings.tar.gz").resolve()
                 assert tarball.exists()
                 os.remove(tarball)
         else:
