@@ -1,5 +1,5 @@
 import pandas as pd
-import argparse, os, json, sys
+import argparse, os, json, sys, re
 import requests
 import s3fs
 import gcsfs
@@ -297,6 +297,8 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     ids = []
     dfs = []
     filenames = []
+    file_sizes_MB = []
+    file_sizes_zipped_MB = []
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
          for results in pool.map(
         write_data,
@@ -311,14 +313,18 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
             ids.append(results[0])
             dfs.append(results[1])
             filenames.append(results[2])
+            file_sizes_MB.append(results[3])
+            file_sizes_zipped_MB.append(results[4])
 
     print(f'\n\nGathering data from write processes...')
 
     flat_ids  = [item for sublist in ids for item in sublist]
     flat_dfs  = [item for sublist in dfs for item in sublist]
     flat_filenames = [item for sublist in filenames for item in sublist]
+    flat_file_sizes = [item for sublist in file_sizes_MB for item in sublist]
+    flat_file_sizes_zipped = [item for sublist in file_sizes_zipped_MB for item in sublist]
 
-    return flat_ids, flat_dfs, flat_filenames
+    return flat_ids, flat_dfs, flat_filenames, flat_file_sizes, flat_file_sizes_zipped
 
 def write_data(
         data,
@@ -359,7 +365,8 @@ def write_data(
         t0 = time.perf_counter()
         
         if ii_append:
-            key = (out_path/f"cat-{cat_id}.csv").resolve()
+            if type(out_path) is str: key = out_path + f"/cat-{cat_id}.csv"
+            else: key = (out_path/f"cat-{cat_id}.csv").resolve()
             df_bucket = pd.read_csv(s3_client.get_object(Bucket = bucket, Key = key).get("Body"))
             df = pd.concat([df_bucket,df])
             del df_bucket              
@@ -376,8 +383,9 @@ def write_data(
             t_buff += time.perf_counter() - t0
             t0 = time.perf_counter()
 
-            buf.seek(0)            
-            s3_client.put_object(Bucket=bucket, Key=out_path + filename, Body=buf.getvalue()) 
+            buf.seek(0)   
+            if not ii_tar:   
+                s3_client.put_object(Bucket=bucket, Key=out_path + filename, Body=buf.getvalue()) 
             t_put += time.perf_counter() - t0            
 
         elif storage_type == 'local':
@@ -392,10 +400,23 @@ def write_data(
 
         if j == 0:
             if storage_type.lower() == 's3':
-                key = out_path + filename
-                file_size_MB = s3_client.get_object(Bucket = bucket, Key = key).get('ContentLength') / 1000000
+                filename = f"cat-{cat_id}." + output_file_type
+                if output_file_type == "parquet":
+                    df.to_parquet(filename, index=False)                
+                elif output_file_type == "csv":
+                    df.to_csv(filename, index=False)  
+                file_size_MB = os.path.getsize(filename) / 1000000
+                os.remove(filename)
+
             else:
                 file_size_MB = os.path.getsize(filename) / 1000000
+
+            pattern = r'\.\w+$'
+            filename_zip = re.sub(pattern, '.zip', filename)
+            with gzip.GzipFile(filename_zip, mode='w') as zipped_file:
+                df.to_csv(TextIOWrapper(zipped_file, 'utf8'), index=False) 
+            file_zipped_size_MB = os.path.getsize(filename_zip) / 1000000    
+            os.remove(filename_zip)            
 
         if ii_print and ii_verbose:
             if (j + 1) % write_int == 0 or j == nfiles - 1:
@@ -415,7 +436,7 @@ def write_data(
                 msg += f"Bandwidth (all processs)   {bandwidth_Mbps:.2f} Mbps"
                 print(msg)
 
-    return forcing_cat_ids, dfs, filenames
+    return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB]
 
 def start_end_interval(start_date,end_date,lead_time):
     start_obj = datetime.strptime(start_date, "%Y%m%d%H%M")
@@ -461,7 +482,7 @@ def prep_ngen_data(conf):
     output_path = conf["storage"].get("output_path","")
     output_file_type = conf["storage"].get("output_file_type","csv") 
 
-    global ii_verbose
+    global ii_verbose, ii_tar
     ii_verbose = conf["run"].get("verbose",False) 
     ii_collect_stats = conf["run"].get("collect_stats",True)
     ii_tar = conf["run"].get("ii_tar",True)
@@ -513,7 +534,11 @@ def prep_ngen_data(conf):
         with open(f"{bucket_path}/metadata/forcings_metadata/conf.json", 'w') as f:
             json.dump(conf, f)
 
-    elif storage_type == "S3":
+    elif storage_type.lower() == "s3":
+        bucket_path  = output_path
+        forcing_path = bucket_path + '/forcings'
+        meta_path    = bucket_path + '/metadata'
+        metaf_path   = bucket_path + '/metadata/forcings_metadata'
 
         s3 = boto3.client("s3")          
     
@@ -522,25 +547,49 @@ def prep_ngen_data(conf):
                 Bucket=output_bucket,
                 Key=f"{output_path}/metadata/forcings_metadata/conf.json"
             )
-
-    if ii_verbose: print(f'Opening weight file...\n')        
-    ii_weights_in_bucket = weight_file.find('//') >= 0
-    if ii_weights_in_bucket:
-        s3 = boto3.client("s3")    
-        weight_file_bucket = weight_file.split('/')[2]
-        ii_uri = weight_file.find('s3://') >= 0
         
-        if ii_uri:
-            weight_file_key = weight_file[weight_file.find(weight_file_bucket)+len(weight_file_bucket)+1:]
+
+    if ii_verbose: print(f'Opening weight file...\n') 
+    if weight_file is not list: weight_files = list(weight_file)
+    else: weight_files = weight_file
+
+    crosswalk_dict = {}
+    jcatchment_dict = {}
+    count = 0
+    
+    for jweight_file in weight_files:
+        pattern = r'VPU_(\d+)'
+        match = re.search(pattern, jweight_file)
+        if match: jname = match.group(1)
         else:
-            weight_file_bucket = weight_file_bucket.split('.')[0]
-            weight_file_key    = weight_file.split('amazonaws.com/')[-1]
-                
-        weight_file_obj = s3.get_object(Bucket=weight_file_bucket, Key=weight_file_key)    
-        crosswalk_dict = json.loads(weight_file_obj["Body"].read().decode())
-    else:
-        with open(weight_file, "r") as f:
-            crosswalk_dict = json.load(f)
+            count +=1
+            jname = str(count)
+
+        ii_weights_in_bucket = jweight_file.find('//') >= 0
+        if ii_weights_in_bucket:
+            s3 = boto3.client("s3")    
+            jweight_file_bucket = jweight_file.split('/')[2]
+            ii_uri = jweight_file.find('s3://') >= 0
+            
+            if ii_uri:
+                jweight_file_key = jweight_file[jweight_file.find(jweight_file_bucket)+len(jweight_file_bucket)+1:]
+            else:
+                jweight_file_bucket = jweight_file_bucket.split('.')[0]
+                jweight_file_key    = jweight_file.split('amazonaws.com/')[-1]
+                    
+            jweight_file_obj = s3.get_object(Bucket=jweight_file_bucket, Key=jweight_file_key)    
+            crosswalk_dict = crosswalk_dict | json.loads(jweight_file_obj["Body"].read().decode())
+            jcatchment_dict[jname] = list(crosswalk_dict.keys())
+        else:      
+            pattern = r'weights_(\d+)\.json'
+            match = re.search(pattern, jweight_file)
+            if match: jname = match.group(1)
+            else:
+                count +=1
+                jname = str(count)      
+            with open(jweight_file, "r") as f:
+                crosswalk_dict = crosswalk_dict | json.load(f)
+                jcatchment_dict[jname] = list(crosswalk_dict.keys())
 
     ncatchments = len(crosswalk_dict)
 
@@ -590,8 +639,6 @@ def prep_ngen_data(conf):
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n')
         # global weights_json, x_min, x_max, y_min, y_max
-        # [x_min, x_max, y_min, y_max] = crosswalk_dict['window']
-        # del crosswalk_dict['window']
         # weights_json = crosswalk_dict
         # [data_array, t_ax] = forcing_grid2catchment(jnwm_files, fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_process,crosswalk_dict,fs)
@@ -601,9 +648,10 @@ def prep_ngen_data(conf):
         if ii_verbose: print(f'Data extract processs: {proc_process:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None)
 
         t0 = time.perf_counter()
-        out_path = (output_path/'forcings/').resolve()
+        if type(output_path) is str: out_path = output_path + '/forcings/'
+        else: out_path = (output_path/'forcings/').resolve()
         if ii_verbose: print(f'Writing catchment forcings to {output_bucket} at {out_path}!', end=None)  
-        forcing_cat_ids, dfs, filenames = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),write_process,output_bucket,out_path,ii_append)      
+        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),write_process,output_bucket,out_path,ii_append)      
 
 
         ii_append = True
@@ -641,56 +689,13 @@ def prep_ngen_data(conf):
         nwm_file_size_med = np.median(nwm_file_sizes)
         nwm_file_size_std = np.std(nwm_file_sizes)
 
-        catchment_sizes = []
-        zipped_sizes = []
-        for j, jcatch in enumerate(forcing_cat_ids):   
-            # Check forcing size
-            if j > 10: break
-            filename = str(output_path) + "/forcings/" + f"cat-{jcatch}." + output_file_type
-            if storage_type.lower() == 's3':                
-                response = s3.head_object(
-                    Bucket=output_bucket,
-                    Key=filename
-                    )
-                size = response['ContentLength']
-            else:
-                size = os.path.getsize(filename)
-            
-            catchment_sizes.append(size)
+        catch_file_size_avg = np.average(file_sizes)
+        catch_file_size_med = np.median(file_sizes)
+        catch_file_size_std = np.std(file_sizes)    
 
-            # get zipped size            
-            zipname  = f"cat-{jcatch}." + 'zip'
-            zip_dir = f"{str(output_path)}/metadata/forcings_metadata/zipped_forcing/"
-            key_name = zip_dir + zipname
-            if storage_type.lower() == 's3':  
-                buf = BytesIO()
-                buf.seek(0)
-                df = pd.DataFrame(data_array[:,:,j])
-                with gzip.GzipFile(mode='w', fileobj=buf) as zipped_file:
-                    df.to_csv(TextIOWrapper(zipped_file, 'utf8'), index=False)                
-                s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())    
-                buf.close()                
-                response = s3.head_object(
-                    Bucket=output_bucket,
-                    Key=key_name
-                )
-                size = response['ContentLength']
-            else:
-                if not os.path.exists(zip_dir): os.mkdir(zip_dir)
-                df = pd.DataFrame(data_array[:,:,j])
-                with gzip.GzipFile(key_name, mode='w') as zipped_file:
-                    df.to_csv(TextIOWrapper(zipped_file, 'utf8'), index=False) 
-                size = os.path.getsize(key_name)
-
-            zipped_sizes.append(size)
-
-        catch_file_size_avg = np.average(catchment_sizes)
-        catch_file_size_med = np.median(catchment_sizes)
-        catch_file_size_std = np.std(catchment_sizes)    
-
-        catch_file_zip_size_avg = np.average(zipped_sizes)
-        catch_file_zip_size_med = np.median(zipped_sizes)
-        catch_file_zip_size_std = np.std(zipped_sizes)  
+        catch_file_zip_size_avg = np.average(file_sizes_zipped)
+        catch_file_zip_size_med = np.median(file_sizes_zipped)
+        catch_file_zip_size_std = np.std(file_sizes_zipped)  
 
         mil = 1000000
 
@@ -723,7 +728,7 @@ def prep_ngen_data(conf):
 
         # Save input config file and script commit 
         metadata_df = pd.DataFrame.from_dict(metadata)
-        if storage_type == 'S3':
+        if storage_type.lower() == 's3':
             
             # Write files to s3 bucket
             meta_path = f"{str(output_path)}/metadata/forcings_metadata/"
@@ -764,61 +769,47 @@ def prep_ngen_data(conf):
     if ii_tar:
         if ii_verbose: print(f'\nWriting tarball...')
         t0000 = time.perf_counter()
+        cats = list(crosswalk_dict.keys())
         if storage_type.lower() == 's3':
-            path = "/metadata/forcings_metadata/"
-            combined_tar_filename = 'forcings.tar.gz'
-            with tarfile.open(combined_tar_filename, 'w:gz') as combined_tar:        
-                if ii_collect_stats:
-                    buf = BytesIO() 
-
-                    filename = f"metadata." + output_file_type
-                    metadata_df.to_csv(buf, index=False)
-                    buf.seek(0)
-                    tarinfo = tarfile.TarInfo(name=path + filename)
-                    tarinfo.size = len(buf.getvalue())
-                    combined_tar.addfile(tarinfo, fileobj=buf)    
-
-                    filename = f"catchments_avg." + output_file_type
-                    avg_df.to_csv(buf, index=False)
-                    buf.seek(0)
-                    tarinfo = tarfile.TarInfo(name=path + filename)
-                    tarinfo.size = len(buf.getvalue())
-                    combined_tar.addfile(tarinfo, fileobj=buf)    
-
-                    filename = f"catchments_median." + output_file_type
-                    med_df.to_csv(buf, index=False)
-                    buf.seek(0)
-                    tarinfo = tarfile.TarInfo(name=path + filename)
-                    tarinfo.size = len(buf.getvalue())
-                    combined_tar.addfile(tarinfo, fileobj=buf)    
-                
-                for j, jdf in enumerate(dfs):
-                    jfilename = filenames[j]
+            for jcatchunk in jcatchment_dict:
+                tar_name = f'{jcatchunk}_forcings.tar.gz'
+                with tarfile.open(tar_name, 'w:gz') as jtar:
+                    for j, jcat in enumerate(jcatchment_dict[jcatchunk]):
+                        jcat = cats[j]
+                        jdf  = dfs[j]
+                        jfilename = filenames[j]
                     with tempfile.NamedTemporaryFile() as tmpfile:
                         if output_file_type == "parquet":
                             jdf.to_parquet(tmpfile.name, index=False)
                         elif output_file_type == "csv":
-                            jdf.to_csv(tmpfile.name, index=False)
-                        
-                        combined_tar.add(tmpfile.name, arcname=jfilename)
+                            jdf.to_csv(tmpfile.name, index=False)                        
+                        jtar.add(tmpfile.name, arcname=jfilename)
+
+                with open(tar_name, 'rb') as combined_tar:
+                    s3 = boto3.client("s3")   
+                    s3.upload_fileobj(combined_tar,output_bucket,out_path + tar_name)   
+                os.remove(tar_name)
+
         else:
-            path = str(metaf_path)
-            combined_tar_filename = str(forcing_path) + '/forcings.tar.gz'
-            tar_cmd = f'tar cf - {forcing_path} {metaf_path} -C {bucket_path} . | pigz > forcings.tar.gz'
-            os.system(tar_cmd)
-            os.system(f'mv forcings.tar.gz {combined_tar_filename}')
+            for jcatchunk in jcatchment_dict:
+                jcatchunk_forcing_names = ""
+                for j, jcat in enumerate(jcatchment_dict[jcatchunk]):
+                    jcatchunk_forcing_names += str(forcing_path) + f'/{jcat}.csv\n'
+                txt_file=f'{jcatchunk}.txt'
+                with open(txt_file,'w') as fp:
+                    fp.writelines(jcatchunk_forcing_names)
+                tar_name = f'{jcatchunk}_forcings.tar.gz'
+                combined_tar_filename = Path(forcing_path,tar_name)
+                tar_cmd = f"tar -cf - --files-from={txt_file} | pigz > {tar_name}"
+                os.system(tar_cmd)
+                os.system(f'mv {tar_name} {combined_tar_filename}')
+                os.remove(txt_file)
 
     tar_time = time.perf_counter() - t0000
 
-    if storage_type == 'S3':
-        with open(combined_tar_filename, 'rb') as combined_tar:
-            s3 = boto3.client("s3")   
-            s3.upload_fileobj(combined_tar,output_bucket,out_path + combined_tar_filename)   
-        os.remove(combined_tar_filename)
-
     if ii_verbose:
         print(f"\n\n--------SUMMARY-------")
-        if storage_type == "local": msg = f"\nData has been written locally to {bucket_path}"
+        if storage_type.lower() == "local": msg = f"\nData has been written locally to {bucket_path}"
         else: msg = f"\nData has been written to S3 bucket {output_bucket} at /{output_path}/forcing"
         msg += f"\nProcess data  : {t_extract:.2f}s"
         msg += f"\nWrite data    : {write_time:.2f}s"

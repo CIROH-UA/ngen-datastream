@@ -34,7 +34,8 @@ def generate_config(args):
             "gpkg_attr"     : args.gpkg_attr,
             "resource_path" : args.resource_path,
             "nwmurl_file"   : args.nwmurl_file,
-            "nprocs"        : args.nprocs
+            "nprocs"        : args.nprocs,
+            "forcing_split_vpu"    : args.forcing_split_vpu
         }, 
         "subset": {
             "id_type"      : args.subset_id_type,
@@ -57,23 +58,57 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(start,end,ii_retro,nprocs,docker_mount):
+def create_conf_fp(start,end,ii_retro,nprocs,docker_mount,forcing_split_vpu):
     if ii_retro:
         filename = "retro_filenamelist.txt"
     else:
         filename = "filenamelist.txt"
     
+    if forcing_split_vpu:
+        weights = [
+            "s3://ngen-datastream/resources/v20.1/VPU_01/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_02/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_03N/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_03S/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_03W/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_04/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_05/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_06/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_07/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_08/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_09/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_10L/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_10U/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_11/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_12/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_13/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_14/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_15/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_16/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_17/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_18/weights.json"
+        ]
+        storage_type = "s3"
+        output_bucket="ngen-datastream"
+        output_path  = f"forcings/v20.1/{start}-{end}"
+    else:
+        storage_type = "local"
+        weights = f"{docker_mount}/datastream-resources/weights.json"
+        output_bucket = ""
+        output_path = f"{docker_mount}/ngen-run"
+
+
     fp_conf = {
         "forcing" : {
             "start_date"   : start,
             "end_date"     : end,
-            "nwm_file"     : f"{docker_mount}/datastream-resources/{filename}",
-            "weight_file"  : f"{docker_mount}/datastream-resources/weights.json",
+            "nwm_file"     : f"{docker_mount}/datastream-metadata/{filename}",
+            "weight_file"  : weights,
         },
         "storage" : {
-            "storage_type"     : "local",
-            "output_bucket"    : "",
-            "output_path"      : f"{docker_mount}/ngen-run",
+            "storage_type"     : storage_type,
+            "output_bucket"    : output_bucket,
+            "output_path"      : output_path,
             "output_file_type" : "csv",
         },
         "run" : {
@@ -101,7 +136,19 @@ def create_conf_nwm_daily(start,end):
         "fcst_cycle"   : [0],
         "lead_time"    : [x+1 for x in range(num_hrs)]
     }
-    return nwm_conf    
+    return nwm_conf  
+
+def create_nwmurls_retro(start,end):
+    nwm_conf = {
+        "forcing_type" : "retrospective",
+        "start_date"   : start,
+        "end_date"     : end,
+        "urlbaseinput" : 4,
+        "selected_object_type" : [1],
+        "selected_var_types"   : [6],
+        "write_to_file"        : True
+    }
+    return nwm_conf
 
 def create_confs(conf,args):
         
@@ -129,13 +176,16 @@ def create_confs(conf,args):
         start_realization =  datetime.strptime(start,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
         end_realization   =  datetime.strptime(end,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
         nwmurl_file=conf['globals']['nwmurl_file']
-        if os.path.exists(args.docker_mount):
-            rel=os.path.relpath(conf['globals']['nwmurl_file'],conf['globals']['data_path'])
-            nwmurl_file = os.path.join(args.docker_mount,rel)
-        with open(nwmurl_file,'r') as fp:
-            nwm_conf = json.load(fp)
-            nwm_conf['start_date'] = start
-            nwm_conf['end_date']   = end
+        if nwmurl_file == "RETROSPECTIVE":
+            nwm_conf = create_nwmurls_retro(start,end)
+        else:
+            if os.path.exists(args.docker_mount):
+                rel=os.path.relpath(conf['globals']['nwmurl_file'],conf['globals']['data_path'])
+                nwmurl_file = os.path.join(args.docker_mount,rel)
+            with open(nwmurl_file,'r') as fp:
+                nwm_conf = json.load(fp)
+                nwm_conf['start_date'] = start
+                nwm_conf['end_date']   = end
 
     ii_retro = nwm_conf['forcing_type'] == 'retrospective'
     fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount)  
@@ -173,24 +223,25 @@ def create_confs(conf,args):
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization.json')
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--docker_mount", help="Path to DATA_PATH mount within docker container",default=None)
-    parser.add_argument("--start_date", help="Set the start date")
-    parser.add_argument("--end_date", help="Set the end date")
-    parser.add_argument("--data_path", help="Set the data directory")
-    parser.add_argument("--gpkg",help="Path to geopackage file")    
-    parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file")
-    parser.add_argument("--resource_path", help="Set the resource directory")
-    parser.add_argument("--subset_id_type", help="Set the subset ID type")
-    parser.add_argument("--subset_id", help="Set the subset ID")
-    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version")
-    parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file")
-    parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use")
-    parser.add_argument("--host_type", type=str,help="Type of host",default=None)
-    parser.add_argument("--host_os", type=str,help="Operating system of host",default=None)
+    parser.add_argument("--docker_mount", help="Path to DATA_PATH mount within docker container",default="")
+    parser.add_argument("--start_date", help="Set the start date",default=None)
+    parser.add_argument("--end_date", help="Set the end date",default=None)
+    parser.add_argument("--data_path", help="Set the data directory",default="")
+    parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
+    parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file",default="")
+    parser.add_argument("--resource_path", help="Set the resource directory",default="")
+    parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
+    parser.add_argument("--subset_id", help="Set the subset ID",default="")
+    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
+    parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file",default="")
+    parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use",default=os.cpu_count())
+    parser.add_argument("--host_type", type=str,help="Type of host",default="")
+    parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
+    parser.add_argument("--forcing_split_vpu", type=bool,help="true for forcingprocessor split",default=False)
+
 
     args = parser.parse_args()
     conf = generate_config(args)
