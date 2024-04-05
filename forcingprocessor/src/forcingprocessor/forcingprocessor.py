@@ -558,15 +558,16 @@ def prep_ngen_data(conf):
     count = 0
     
     for jweight_file in weight_files:
-        pattern = r'VPU_(\d+)'
-        match = re.search(pattern, jweight_file)
-        if match: jname = match.group(1)
-        else:
-            count +=1
-            jname = str(count)
+
 
         ii_weights_in_bucket = jweight_file.find('//') >= 0
         if ii_weights_in_bucket:
+            pattern = r'VPU_(\d+)*'
+            match = re.search(pattern, jweight_file)
+            if match: jname = match.group(1)
+            else:
+                count +=1
+                jname = str(count)
             s3 = boto3.client("s3")    
             jweight_file_bucket = jweight_file.split('/')[2]
             ii_uri = jweight_file.find('s3://') >= 0
