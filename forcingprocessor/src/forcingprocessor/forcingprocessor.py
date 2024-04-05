@@ -103,7 +103,7 @@ def load_balance(items_per_proc,launch_delay,single_ex, exec_count):
         completion_time = completion_time[:ntasked]
         items_per_proc = items_per_proc[:ntasked]
     if ii_verbose: print(f'item distribution {items_per_proc}')
-    if ii_verbose: print(f'Expected completion time {max(completion_time)} s with {nprocs} processes')
+    # if ii_verbose: print(f'Expected completion time {max(completion_time)} s with {nprocs} processes')
 
     assert nitems == np.sum(items_per_proc)
     return items_per_proc
@@ -550,7 +550,7 @@ def prep_ngen_data(conf):
         
 
     if ii_verbose: print(f'Opening weight file...\n') 
-    if weight_file is not list: weight_files = list(weight_file)
+    if type(weight_file) is not list: weight_files = [weight_file]
     else: weight_files = weight_file
 
     crosswalk_dict = {}
