@@ -2,20 +2,18 @@
     "forcing"  : {
         "start_date"   : "202311060000",
         "end_date"     : "202311060000",
-        "nwm_file"     : "./ngen-datastream/forcingprocessor/filenamelist.txt",
-        "weight_file"  : "https://ngenresourcesdev.s3.us-east-2.amazonaws.com/01_weights.json"
+        "nwm_file"     : "/home/user/filenamelist.txt",
+        "weight_file"  : ["s3://ngen-datastream/resources/v20.1/VPU_01/weights.json","s3://ngen-datastream/resources/v20.1/VPU_02/weights.json"]
     },
 
     "storage":{
-        "storage_type"      : "S3",
-        "output_bucket"     : "ngenforcingdev",
-        "output_path"       : "dailyrun/20231106",
-        "output_file_type"  : "csv"
+        "output_path"      : "/home/user/test",
+        "output_file_type" : ["tar","parquet"]
     },    
 
     "run" : {
         "verbose"       : true,
-        "collect_stats" : true
+        "collect_stats" : true,
+        "nprocs"        : 2
     }
 }
-

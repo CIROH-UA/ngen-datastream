@@ -53,7 +53,8 @@ def convert_url2key(nwm_file,fs_type):
     elif fs_type == 'google':
         bucket_key = "gs:/" + bucket_key
 
-    return bucket_key
+    bucket = _nc_file_parts[2]
+    return bucket, bucket_key[1:]
 
 def distribute_work(items,nprocs):
     """
@@ -188,7 +189,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
         t0 = time.perf_counter()        
         eng    = "h5netcdf"
         if fs:
-            if nwm_file.find('https://') >= 0: bucket_key = convert_url2key(nwm_file,fs_type)
+            if nwm_file.find('https://') >= 0: _, bucket_key = convert_url2key(nwm_file,fs_type)
             else: bucket_key = nwm_file
             file_obj   = fs.open(bucket_key, mode='rb')
         elif 'https://' in nwm_file:
@@ -240,7 +241,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process')
     return [data_list, t_list]
 
-def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_append):
+def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
     """
     Sets up the process pool for write_data
     
@@ -260,7 +261,6 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
     out_path_list         = []
     append_list           = []
     print_list            = []
-    bucket_list           = []
     worker_time_list      = []
     worker_data_list      = []
     worker_catchment_list = []
@@ -287,7 +287,6 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
             append_list.append(ii_append)
             print_list.append(ii_print)
             worker_time_list.append(t_ax)
-            bucket_list.append(output_bucket)
 
             worker_catchments = {}
             count = 0
@@ -305,7 +304,6 @@ def multiprocess_write(data,t_ax,catchments,nprocs,output_bucket,out_path,ii_app
         worker_data_list,
         worker_time_list,
         worker_catchment_list,
-        bucket_list,
         out_path_list,
         append_list,  
         print_list,      
@@ -330,11 +328,9 @@ def write_data(
         data,
         t_ax,
         catchments,
-        bucket,
         out_path,
         ii_append,
-        ii_print
-                
+        ii_print  
 ):
     s3_client = boto3.session.Session().client("s3")   
 
@@ -349,7 +345,10 @@ def write_data(
     write_int = 400
     t_df      = 0
     t_buff    = 0
-    t_put     = 0
+    t_put     = 0    
+    
+    if storage_type == 's3':
+        bucket, key_prefix = convert_url2key(out_path, storage_type)
 
     t00 = time.perf_counter()
     for j, jcatch in enumerate(catchments):
@@ -364,52 +363,51 @@ def write_data(
         forcing_cat_ids.append(cat_id)
 
         t0 = time.perf_counter()
+        if ii_append:
+            if type(out_path) is str: key = out_path + f"/cat-{cat_id}.csv"
+            else: key = (out_path/f"cat-{cat_id}.csv").resolve()
+            
+            df_bucket = pd.read_csv(s3_client.get_object(Bucket = bucket, Key = key).get("Body"))
+            df = pd.concat([df_bucket,df])
+            del df_bucket              
 
-        if not ii_tar:
-        
-            if ii_append:
-                if type(out_path) is str: key = out_path + f"/cat-{cat_id}.csv"
-                else: key = (out_path/f"cat-{cat_id}.csv").resolve()
-                df_bucket = pd.read_csv(s3_client.get_object(Bucket = bucket, Key = key).get("Body"))
-                df = pd.concat([df_bucket,df])
-                del df_bucket              
-
-            if storage_type.lower() == 's3':
-                buf = BytesIO()
-                filename = f"cat-{cat_id}." + output_file_type             
-
-                if output_file_type == "parquet":
+        if "parquet" in output_file_type or "csv" in output_file_type :
+            if storage_type == 's3':            
+                bucket, key_prefix = convert_url2key(out_path, storage_type)            
+                if "parquet" in output_file_type:
+                    buf = BytesIO()
+                    filename = key_prefix + f"/cat-{cat_id}.parquet"
                     df.to_parquet(buf, index=False)                
-                elif output_file_type == "csv":
+                elif "csv" in output_file_type:
+                    buf = BytesIO()
+                    filename = key_prefix + f"/cat-{cat_id}.csv"
                     df.to_csv(buf, index=False)                 
 
                 t_buff += time.perf_counter() - t0
-                t0 = time.perf_counter()
-
+                t0 = time.perf_counter()                
                 buf.seek(0)                  
-                s3_client.put_object(Bucket=bucket, Key=out_path + filename, Body=buf.getvalue()) 
+                s3_client.put_object(Bucket=bucket, Key=filename, Body=buf.getvalue()) 
                 t_put += time.perf_counter() - t0            
 
-            elif storage_type == 'local':
-                filename = str((out_path/Path(f"cat-{cat_id}." + output_file_type)).resolve())
-                if output_file_type == "parquet":
+            elif storage_type == 'local':                
+                if "parquet" in output_file_type:
+                    filename = str((out_path/Path(f"cat-{cat_id}.parquet" )).resolve())
                     df.to_parquet(filename, index=False)                
-                elif output_file_type == "csv":
-                    df.to_csv(filename, index=False)         
+                elif "csv" in output_file_type:
+                    filename = str((out_path/Path(f"cat-{cat_id}.csv" )).resolve())
+                    df.to_csv(filename, index=False)      
+        else: 
+            filename = f"./cat-{cat_id}.csv"
 
         dfs.append(df)     
         filenames.append(str(Path(filename).name))                                            
 
         if j == 0:
-            if storage_type.lower() == 's3':
-                filename = f"cat-{cat_id}." + output_file_type
-                if output_file_type == "parquet":
-                    df.to_parquet(filename, index=False)                
-                elif output_file_type == "csv":
-                    df.to_csv(filename, index=False)  
+            if not os.path.exists(filename):
+                filename = f"./cat-{cat_id}.csv"
+                df.to_csv(filename, index=False)  
                 file_size_MB = os.path.getsize(filename) / 1000000
                 os.remove(filename)
-
             else:
                 file_size_MB = os.path.getsize(filename) / 1000000
 
@@ -431,8 +429,8 @@ def write_data(
                 msg = f"\n{(j+1)*ntasked} files written out of {nfiles*ntasked}\n"
                 msg += f"rate             {rate:.2f} files/s\n"
                 msg += f"df conversion    {t_df:.2f}s\n"
-                if storage_type.lower() == "s3": msg += f"buff             {t_buff:.2f}s\n"
-                if storage_type.lower() == "s3": msg += f"put              {t_put:.2f}s\n"                
+                if storage_type == "s3": msg += f"buff             {t_buff:.2f}s\n"
+                if storage_type == "s3": msg += f"put              {t_put:.2f}s\n"                
                 msg += f"estimated total write time {estimate_total_time:.2f}s\n"
                 msg += f"progress                   {(j+1)/nfiles*100:.2f}%\n"
                 msg += f"Bandwidth (all processs)   {bandwidth_Mbps:.2f} Mbps"
@@ -441,22 +439,27 @@ def write_data(
     return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB]
 
 def write_tar(dfs,jcatchunk,catchments,filenames):
-        tar_name = f'{jcatchunk}_forcings.tar.gz'
+        if storage_type == "local":
+            tar_name = Path(forcing_path,f'{jcatchunk}_forcings.tar.gz')
+        else:
+            tar_name = f'{jcatchunk}_forcings.tar.gz'
         with tarfile.open(tar_name, 'w:gz') as jtar:
             for j, jcat in enumerate(catchments):
                 jdf  = dfs[j]
                 jfilename = filenames[j]
                 with tempfile.NamedTemporaryFile() as tmpfile:
-                    if output_file_type == "parquet":
+                    if "parquet" in  output_file_type:
                         jdf.to_parquet(tmpfile.name, index=False)
-                    elif output_file_type == "csv":
+                    else:
                         jdf.to_csv(tmpfile.name, index=False)                        
                     jtar.add(tmpfile.name, arcname=jfilename)
 
-        with open(tar_name, 'rb') as combined_tar:
-            s3 = boto3.client("s3")   
-            s3.upload_fileobj(combined_tar,output_bucket,out_path + tar_name)   
-        os.remove(tar_name)                    
+        if storage_type == "s3":
+            bucket, key = convert_url2key(forcing_path,storage_type)
+            with open(tar_name, 'rb') as combined_tar:
+                s3 = boto3.client("s3")   
+                s3.upload_fileobj(combined_tar, bucket, key + "/" + tar_name)   
+            os.remove(tar_name)                    
 
 def multiprocess_write_tars(dfs,catchments,filenames):  
     i=0
@@ -522,23 +525,15 @@ def prep_ngen_data(conf):
     conf['time']['end_time']        = end_time
     conf['time']['output_interval'] = output_interval
 
-    global storage_type, output_file_type, output_bucket, output_path, bucket_path, out_path
-    storage_type = conf["storage"]["storage_type"]
-    output_bucket = conf["storage"].get("output_bucket","")
+    global output_path, output_file_type
     output_path = conf["storage"].get("output_path","")
     output_file_type = conf["storage"].get("output_file_type","csv") 
 
-    global ii_verbose, ii_tar
+    global ii_verbose
     ii_verbose = conf["run"].get("verbose",False) 
     ii_collect_stats = conf["run"].get("collect_stats",True)
-    ii_tar = conf["run"].get("ii_tar",True)
-    proc_process = conf["run"].get("proc_process",None)
-    write_process = conf["run"].get("write_process",None)
-    nfile_chunk = conf["run"].get("nfile_chunk",None)
-
-    if proc_process is None: proc_process   = int(os.cpu_count() * 0.5)
-    if write_process is None: write_process = os.cpu_count()
-    if nfile_chunk is None: nfile_chunk     = 100000
+    nprocs = conf["run"].get("nprocs",int(os.cpu_count() * 0.5))
+    nfile_chunk = conf["run"].get("nfile_chunk",100000)
 
     if ii_verbose:
         msg = f"\nForcingProcessor has awoken. Let's do this."
@@ -551,102 +546,86 @@ def prep_ngen_data(conf):
     t_extract  = 0
     write_time = 0
 
-    # configuration validation
-    file_types = ["csv", "parquet"]
-    assert (
-        output_file_type in file_types
-    ), f"{output_file_type} for output_file_type is not accepted! Accepted: {file_types}"
-    bucket_types = ["local", "s3"]
-    assert (
-        storage_type.lower() in bucket_types
-    ), f"{storage_type} for storage_type is not accepted! Accepted: {bucket_types}"
-
+    file_types = ["csv", "parquet","tar"]
+    for jtype in output_file_type:
+        assert (
+            jtype in file_types
+        ), f"{jtype} for output_file_type is not accepted! Accepted: {file_types}"
+    global storage_type
+    if "s3" in output_path:
+        storage_type = "s3"
+    elif "google" in output_path:
+        storage_type = "google"
+    else:
+        storage_type = "local"
     
+    global forcing_path
     if storage_type == "local":
-
         if output_path == "":
             output_path = os.path.join(os.getcwd(),datentime)        
-
-        # Prep output directory
-        bucket_path  = Path(output_path, output_bucket)
-        forcing_path = Path(bucket_path, 'forcings')  
-        meta_path    = Path(bucket_path, 'metadata') 
-        metaf_path   = Path(bucket_path, 'metadata','forcings_metadata')        
-        if not os.path.exists(bucket_path):  os.system(f"mkdir {bucket_path}")
+        output_path  = Path(output_path)
+        forcing_path = Path(output_path, 'forcings')  
+        meta_path    = Path(output_path, 'metadata') 
+        metaf_path   = Path(output_path, 'metadata','forcings_metadata')        
+        if not os.path.exists(output_path):  os.system(f"mkdir {output_path}")
         if not os.path.exists(forcing_path): os.system(f"mkdir {forcing_path}")
         if not os.path.exists(meta_path):    os.system(f"mkdir {meta_path}")
         if not os.path.exists(metaf_path):   os.system(f"mkdir {metaf_path}")
-        output_path = bucket_path
-
-        with open(f"{bucket_path}/metadata/forcings_metadata/conf.json", 'w') as f:
+        conf_path = Path
+        with open(f"{metaf_path}/conf.json", 'w') as f:
             json.dump(conf, f)
 
-    elif storage_type.lower() == "s3":
+    elif storage_type == "s3":
         bucket_path  = output_path
         forcing_path = bucket_path + '/forcings'
         meta_path    = bucket_path + '/metadata'
         metaf_path   = bucket_path + '/metadata/forcings_metadata'
-
+        bucket, key  = convert_url2key(metaf_path,storage_type)
+        conf_path    = f"{key}/conf_fp.json"
         s3 = boto3.client("s3")          
-    
         s3.put_object(
                 Body=json.dumps(conf),
-                Bucket=output_bucket,
-                Key=f"{output_path}/metadata/forcings_metadata/conf.json"
+                Bucket=bucket,
+                Key=conf_path
             )
-        
 
     if ii_verbose: print(f'Opening weight file...\n',flush=True) 
     if type(weight_file) is not list: weight_files = [weight_file]
     else: weight_files = weight_file
-
     crosswalk_dict = {}
     jcatchment_dict = {}
     count = 0
-    
     for jweight_file in weight_files:
-
-
         ii_weights_in_bucket = jweight_file.find('//') >= 0
+        pattern = r'VPU_(\d+)*'
+        match = re.search(pattern, jweight_file)
+        if match: jname = "VPU_" + match.group(1)
+        else:
+            count +=1
+            jname = str(count)
         if ii_weights_in_bucket:
-            pattern = r'VPU_(\d+)*'
-            match = re.search(pattern, jweight_file)
-            if match: jname = match.group(1)
-            else:
-                count +=1
-                jname = str(count)
             s3 = boto3.client("s3")    
             jweight_file_bucket = jweight_file.split('/')[2]
             ii_uri = jweight_file.find('s3://') >= 0
-            
             if ii_uri:
                 jweight_file_key = jweight_file[jweight_file.find(jweight_file_bucket)+len(jweight_file_bucket)+1:]
             else:
                 jweight_file_bucket = jweight_file_bucket.split('.')[0]
                 jweight_file_key    = jweight_file.split('amazonaws.com/')[-1]
-                    
             jweight_file_obj = s3.get_object(Bucket=jweight_file_bucket, Key=jweight_file_key)
             new_dict = json.loads(jweight_file_obj["Body"].read().decode())
             crosswalk_dict = crosswalk_dict | new_dict
             jcatchment_dict[jname] = list(new_dict.keys())
-        else:      
-            pattern = r'weights_(\d+)\.json'
-            match = re.search(pattern, jweight_file)
-            if match: jname = match.group(1)
-            else:
-                count +=1
-                jname = str(count)      
+        else:        
             with open(jweight_file, "r") as f:
                 crosswalk_dict = crosswalk_dict | json.load(f)
                 jcatchment_dict[jname] = list(crosswalk_dict.keys())
-
     ncatchments = len(crosswalk_dict)
 
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
         for jline in fp.readlines():
             nwm_forcing_files.append(jline.strip())
-
     nfiles = len(nwm_forcing_files)
 
     global fs_type
@@ -668,12 +647,6 @@ def prep_ngen_data(conf):
         for jfile in nwm_forcing_files:
             print(f"{jfile}")
 
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            if file.endswith('.tar.gz') and file.find('tmp_') == 0:
-                tar_path = os.path.join(root, file)
-                os.remove(tar_path)
-
     if ii_verbose: print(f'Entering primary cycle\n',flush=True)
     nfiles_tot = min(nfile_chunk,nfiles)
     if ii_verbose: print(f'Time loop chunk number: {nfiles_tot}\n',flush=True)
@@ -690,22 +663,21 @@ def prep_ngen_data(conf):
         # global weights_json, x_min, x_max, y_min, y_max
         # weights_json = crosswalk_dict
         # [data_array, t_ax] = forcing_grid2catchment(jnwm_files, fs)
-        data_array, t_ax = multiprocess_data_extract(jnwm_files,proc_process,crosswalk_dict,fs)
+        data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,crosswalk_dict,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
         score = complexity / t_extract
-        if ii_verbose: print(f'Data extract processs: {proc_process:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None,flush=True)
+        if ii_verbose: print(f'Data extract processs: {nprocs:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None,flush=True)
 
         t0 = time.perf_counter()
-        if type(output_path) is str: out_path = output_path + '/forcings/'
-        else: out_path = (output_path/'forcings/').resolve()
-        if ii_verbose: print(f'Writing catchment forcings to {output_bucket} at {out_path}!', end=None,flush=True)  
-        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),write_process,output_bucket,out_path,ii_append)      
+        if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
+        write_data(data_array,t_ax,crosswalk_dict.keys(),forcing_path,False,False)      
+        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append,)      
 
         ii_append = True
         write_time += time.perf_counter() - t0    
         write_rate = ncatchments / write_time
-        if ii_verbose: print(f'\n\nWrite processs: {write_process}\nWrite time: {write_time:.2f}\nWrite rate {write_rate:.2f} files/second\n', end=None,flush=True)
+        if ii_verbose: print(f'\n\nWrite processs: {nprocs}\nWrite time: {write_time:.2f}\nWrite rate {write_rate:.2f} files/second\n', end=None,flush=True)
 
         loop_time = time.perf_counter() - t00
         if ii_verbose and nloops > 1: print(f'One loop took {loop_time:.2f} seconds. Estimated time to completion: {loop_time * (nloops - jloop):.2f}',flush=True)
@@ -722,7 +694,7 @@ def prep_ngen_data(conf):
         for j, jfile in enumerate(nwm_forcing_files):
             if j > 10: break
             if fs:
-                if jfile.find('https://') >= 0: bucket_key  = convert_url2key(jfile, fs_type) 
+                if jfile.find('https://') >= 0: _, bucket_key  = convert_url2key(jfile, fs_type) 
                 else: bucket_key = jfile
                 if fs_type == 'google': fs = gcsfs.GCSFileSystem() 
                 
@@ -776,98 +748,92 @@ def prep_ngen_data(conf):
 
         # Save input config file and script commit 
         metadata_df = pd.DataFrame.from_dict(metadata)
-        if storage_type.lower() == 's3':
+        if storage_type == 's3':
+            bucket, key = convert_url2key(output_path,storage_type)
             
             # Write files to s3 bucket
-            meta_path = f"{str(output_path)}/metadata/forcings_metadata/"
+            meta_path = f"{key}/metadata/forcings_metadata/"
             buf = BytesIO()   
-            filename = f"metadata." + output_file_type
-            if output_file_type == "csv": metadata_df.to_csv(buf, index=False)
-            else: metadata_df.to_parquet(buf, index=False)
+            if "parquet" in output_file_type: 
+                filename = f"metadata.parquet"
+                metadata_df.to_parquet(buf, index=False)
+            else: 
+                filename = f"metadata.csv"
+                metadata_df.to_csv(buf, index=False)
             buf.seek(0)
             key_name = meta_path + filename
-            s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())
-            filename = f"catchments_avg." + output_file_type
-            if output_file_type == "csv": avg_df.to_csv(buf, index=False)
-            else: avg_df.to_parquet(buf, index=False)
+            s3.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())
+            if "parquet" in output_file_type: 
+                filename = f"catchments_avg.parquet"
+                avg_df.to_parquet(buf, index=False)
+            else: 
+                filename = f"catchments_avg.csv"
+                avg_df.to_csv(buf, index=False)
             buf.seek(0)
             key_name = meta_path + filename
-            s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())        
-            filename = f"catchments_median." + output_file_type
-            if output_file_type == "csv": med_df.to_csv(buf, index=False)
-            else: med_df.to_parquet(buf, index=False)
+            s3.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())                    
+            if "parquet" in output_file_type:  
+                filename = f"catchments_median.parquet"
+                med_df.to_parquet(buf, index=False)
+            else: 
+                filename = f"catchments_median.csv"
+                med_df.to_csv(buf, index=False)
             buf.seek(0)
             key_name = meta_path + filename
-            s3.put_object(Bucket=output_bucket, Key=key_name, Body=buf.getvalue())
+            s3.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())
             buf.close()
         else:
             # Write files locally
-            filename = Path(metaf_path, f"metadata." + output_file_type)
-            if output_file_type == "csv": metadata_df.to_csv(filename, index=False)
-            else: metadata_df.to_parquet(buf, index=False)
-            filename = Path(metaf_path, f"catchments_avg." + output_file_type)
-            if output_file_type == "csv": avg_df.to_csv(filename, index=False)
-            else: avg_df.to_parquet(buf, index=False)            
-            filename = Path(metaf_path, f"catchments_median." + output_file_type)
-            if output_file_type == "csv": med_df.to_csv(filename, index=False)
-            else: med_df.to_parquet(buf, index=False)            
-        
+            if "parquet" in output_file_type:
+                filename = Path(metaf_path, f"metadata.parquet")
+                metadata_df.to_parquet(filename, index=False)
+            else: 
+                filename = Path(metaf_path, f"metadata.csv")
+                metadata_df.to_csv(filename, index=False)
+            if "parquet" in output_file_type:
+                filename = Path(metaf_path, f"catchments_avg.parquet")
+                avg_df.to_parquet(filename, index=False)
+            else: 
+                filename = Path(metaf_path, f"catchments_avg.csv")
+                avg_df.to_csv(filename, index=False)
+            if "parquet" in output_file_type:
+                filename = Path(metaf_path, f"catchments_median.parquet")
+                med_df.to_parquet(filename, index=False)
+            else: 
+                filename = Path(metaf_path, f"catchments_median.csv")
+                med_df.to_csv(filename, index=False)
         meta_time = time.perf_counter() - t000
 
-    if ii_tar:
+    if "tar" in output_file_type:
         if ii_verbose: print(f'\nWriting tarball...',flush=True)
         t0000 = time.perf_counter()
-        cats = list(crosswalk_dict.keys())
-        if storage_type.lower() == 's3':
-            multiprocess_write_tars(dfs,jcatchment_dict,filenames)
-            for jcatchunk in jcatchment_dict:
-                tar_name = f'{jcatchunk}_forcings.tar.gz'
-                with tarfile.open(tar_name, 'w:gz') as jtar:
-                    for j, jcat in enumerate(jcatchment_dict[jcatchunk]):
-                        jcat = cats[j]
-                        kcat = "cat-" + forcing_cat_ids[j]
-                        assert jcat == kcat
-                        jdf  = dfs[j]
-                        jfilename = filenames[j]
-                        with tempfile.NamedTemporaryFile() as tmpfile:
-                            if output_file_type == "parquet":
-                                jdf.to_parquet(tmpfile.name, index=False)
-                            elif output_file_type == "csv":
-                                jdf.to_csv(tmpfile.name, index=False)                        
-                            jtar.add(tmpfile.name, arcname=jfilename)
-
-                with open(tar_name, 'rb') as combined_tar:
-                    s3 = boto3.client("s3")   
-                    s3.upload_fileobj(combined_tar,output_bucket,out_path + tar_name)   
-                os.remove(tar_name)
-
-        else:
-            for jcatchunk in jcatchment_dict:
-                jcatchunk_forcing_names = ""
-                for j, jcat in enumerate(jcatchment_dict[jcatchunk]):
-                    jcatchunk_forcing_names += str(forcing_path) + f'/{jcat}.csv\n'
-                txt_file=f'{jcatchunk}.txt'
-                with open(txt_file,'w') as fp:
-                    fp.writelines(jcatchunk_forcing_names)
-                tar_name = f'{jcatchunk}_forcings.tar.gz'
-                combined_tar_filename = Path(forcing_path,tar_name)
-                tar_cmd = f"tar -cf - --files-from={txt_file} | pigz > {tar_name}"
-                os.system(tar_cmd)
-                os.system(f'mv {tar_name} {combined_tar_filename}')
-                os.remove(txt_file)
+        multiprocess_write_tars(dfs,jcatchment_dict,filenames)
+        # else:
+        #     for jcatchunk in jcatchment_dict:
+        #         jcatchunk_forcing_names = ""
+        #         for j, jcat in enumerate(jcatchment_dict[jcatchunk]):
+        #             jcatchunk_forcing_names += str(forcing_path) + f'/{jcat}.csv\n'
+        #         txt_file=f'{jcatchunk}.txt'
+        #         with open(txt_file,'w') as fp:
+        #             fp.writelines(jcatchunk_forcing_names)
+        #         tar_name = f'{jcatchunk}_forcings.tar.gz'
+        #         combined_tar_filename = Path(forcing_path,tar_name)
+        #         tar_cmd = f"tar -cf - --files-from={txt_file} | pigz > {tar_name}"
+        #         os.system(tar_cmd)
+        #         os.system(f'mv {tar_name} {combined_tar_filename}')
+        #         os.remove(txt_file)
 
     tar_time = time.perf_counter() - t0000
 
     if ii_verbose:
         print(f"\n\n--------SUMMARY-------")
-        if storage_type.lower() == "local": msg = f"\nData has been written locally to {bucket_path}"
-        else: msg = f"\nData has been written to S3 bucket {output_bucket} at /{output_path}/forcing"
+        msg = f"\nData has been written to {output_path}"
         msg += f"\nProcess data  : {t_extract:.2f}s"
         msg += f"\nWrite data    : {write_time:.2f}s"
         if ii_collect_stats: 
             runtime += meta_time
             msg += f"\nCollect stats : {meta_time:.2f}s"
-        if ii_tar:
+        if "tar" in output_file_type:
             runtime += tar_time
             msg += f"\nWrite tar     : {tar_time:.2f}s"
         msg += f"\nRuntime       : {runtime:.2f}s\n"

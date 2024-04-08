@@ -7,15 +7,13 @@
     },
 
     "storage":{
-        "storage_type"     : "local",
-        "output_bucket"    : "",
-        "output_path"      : "/mounted_dir",
-        "output_file_type" : "csv"
+        "output_path"      : "s3://ngen-datastream/forcings/v20.1/20240408",
+        "output_file_type" : ["tar"]
     },    
 
     "run" : {
         "verbose"       : true,
-        "collect_stats" : true
+        "collect_stats" : true,
+        "nprocs"        : 2
     }
 }
-
