@@ -88,15 +88,12 @@ def create_conf_fp(start,end,ii_retro,nprocs,docker_mount,forcing_split_vpu):
             "s3://ngen-datastream/resources/v20.1/VPU_17/weights.json",
             "s3://ngen-datastream/resources/v20.1/VPU_18/weights.json"
         ]
-        storage_type = "s3"
-        output_bucket="ngen-datastream"
-        output_path  = f"forcings/v20.1/{start}-{end}"
+        output_path  = f"s3://ngen-datastream/forcings/v20.1/{start}-{end}",
+        output_file_type = ["tar"]
     else:
-        storage_type = "local"
         weights = f"{docker_mount}/datastream-resources/weights.json"
-        output_bucket = ""
         output_path = f"{docker_mount}/ngen-run"
-
+        output_file_type = ["csv"]
 
     fp_conf = {
         "forcing" : {
@@ -106,16 +103,13 @@ def create_conf_fp(start,end,ii_retro,nprocs,docker_mount,forcing_split_vpu):
             "weight_file"  : weights,
         },
         "storage" : {
-            "storage_type"     : storage_type,
-            "output_bucket"    : output_bucket,
             "output_path"      : output_path,
-            "output_file_type" : "csv",
+            "output_file_type" : output_file_type,
         },
         "run" : {
             "verbose"        : True,
             "collect_stats"  : True,
-            "proc_process"   : min(os.cpu_count(),nprocs),
-            "write_process"  : min(os.cpu_count(),nprocs)
+            "nprocs"         : min(os.cpu_count(),nprocs),
         }
     }
 
