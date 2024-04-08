@@ -23,15 +23,14 @@ See the docker README for example run commands from the container.
     },
 
     "storage":{
-        "storage_type"     : "local",
-        "output_bucket"    : "",
         "output_path"      : "",
-        "output_file_type" : "csv"
+        "output_file_type" : []
     },    
 
     "run" : {
         "verbose"       : true,
         "collect_stats" : true,
+        "nprocs"        : 2
     }
 }
 ```
@@ -50,17 +49,15 @@ See the docker README for example run commands from the container.
 | Field             | Description                       | Required |
 |-------------------|-----------------------------------|----------|
 | storage_type      | Type of storage (local or s3)     | :white_check_mark: |
-| output_bucket     | If storage_type = s3: output bucket for output, If storage_type = local: appened to output_path |  |
-| output_path       | If storage_type = s3: prefix for output, If storage_type = local: absolute path for output, will default to cwd/date if left blank |   |
-| output_file_type  | Output file type (csv or parquet, csv is default)  |  |
+| output_path       | Path to write data to. Accepts local path or s3 | :white_check_mark: |
+| output_file_type  | List of output file types, e.g. ["tar","parquet"]  | :white_check_mark: |
 
 ### 3. Run
 | Field             | Description                    | Required |
 |-------------------|--------------------------------|----------|
 | verbose           | Get print statements, defaults to false           |  :white_check_mark: |
 | collect_stats     | Collect forcing metadata, defaults to true       |  :white_check_mark: |
-| proc_process      | Number of data processing processes, defaults to 50% available cores |   |
-| write_process     | Number of writing processes, defaults to 100% available cores      |   |
+| nprocs      | Number of data processing processes, defaults to 50% available cores |   |
 | nfile_chunk       | Number of files to process each write, defaults to 1000000. Only set this if experiencing memory constraints due to large number of nwm forcing files |   |
 
 ## nwm_file
@@ -90,6 +87,3 @@ In order to retrieve forcing data from a NWM grid for a given catchment, the ind
  ```
  python weights_parq2json.py --gpkg <path to geopackage> --outname <path to output weights to> --version <hydrofabric version>
  ```
-
-## Run Notes
-This tool is CPU, memory, and I/O intensive. Best to experiment with `proc_process` and `write_process` on your resources to find out what works best. These options default to 50% and 100% available cores respectively.
