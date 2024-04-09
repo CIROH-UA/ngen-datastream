@@ -78,10 +78,8 @@ def test_processor(get_time, get_paths):
     },
 
     "storage":{
-        "storage_type"      : "local",
-        "output_bucket"     : pytest.date,
         "output_path"       : str(pytest.data_dir),
-        "output_file_type"  : "csv"
+        "output_file_type"  : ["tar","csv"]
     },    
 
     "run" : {
@@ -125,7 +123,7 @@ def test_processor(get_time, get_paths):
                         
                 prep_ngen_data(conf)
 
-                tarball = (pytest.data_dir/pytest.date/"forcings/01_forcings.tar.gz").resolve()
+                tarball = (pytest.data_dir/"forcings/1_forcings.tar.gz").resolve()
                 assert tarball.exists()
                 os.remove(tarball)
         else:
