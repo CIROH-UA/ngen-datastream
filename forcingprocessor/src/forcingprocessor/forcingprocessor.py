@@ -336,7 +336,7 @@ def write_data(
 
     nfiles = len(catchments)
     id = os.getpid()
-    if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None)
+    if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None, flush =True)
 
     forcing_cat_ids = []
     dfs = []
@@ -434,7 +434,7 @@ def write_data(
                 msg += f"estimated total write time {estimate_total_time:.2f}s\n"
                 msg += f"progress                   {(j+1)/nfiles*100:.2f}%\n"
                 msg += f"Bandwidth (all processs)   {bandwidth_Mbps:.2f} Mbps"
-                print(msg)
+                print(msg,flush=True)
 
     return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB]
 
@@ -443,23 +443,38 @@ def write_tar(dfs,jcatchunk,catchments,filenames):
             tar_name = Path(forcing_path,f'{jcatchunk}_forcings.tar.gz')
         else:
             tar_name = f'{jcatchunk}_forcings.tar.gz'
-        with tarfile.open(tar_name, 'w:gz') as jtar:
-            for j, jcat in enumerate(catchments):
-                jdf  = dfs[j]
-                jfilename = filenames[j]
-                with tempfile.NamedTemporaryFile() as tmpfile:
-                    if "parquet" in  output_file_type:
-                        jdf.to_parquet(tmpfile.name, index=False)
-                    else:
-                        jdf.to_csv(tmpfile.name, index=False)                        
-                    jtar.add(tmpfile.name, arcname=jfilename)
-
+        print(f'Writing {jcatchunk} tar')
         if storage_type == "s3":
+            buffer = BytesIO()
+            with tarfile.open(fileobj=buffer, mode='w:gz') as jtar:
+                for j, jcat in enumerate(catchments):
+                    jdf  = dfs[j]
+                    jfilename = filenames[j]
+                    with tempfile.NamedTemporaryFile() as tmpfile:
+                        if "parquet" in  output_file_type:
+                            jdf.to_parquet(tmpfile.name, index=False)
+                        else:
+                            jdf.to_csv(tmpfile.name, index=False)                        
+                        jtar.add(tmpfile.name, arcname=jfilename)
+
+            print(f'Uploading {jcatchunk} tar to s3')
+            buffer.seek(0)
             bucket, key = convert_url2key(forcing_path,storage_type)
-            with open(tar_name, 'rb') as combined_tar:
-                s3 = boto3.client("s3")   
-                s3.upload_fileobj(combined_tar, bucket, key + "/" + tar_name)   
-            os.remove(tar_name)                    
+            s3 = boto3.client("s3")   
+            s3.put_object(Bucket = bucket, Key = key + "/" + tar_name, Body = tar_name)   
+
+        else:
+            with tarfile.open(tar_name, 'w:gz') as jtar:
+                for j, jcat in enumerate(catchments):
+                    jdf  = dfs[j]
+                    jfilename = filenames[j]
+                    with tempfile.NamedTemporaryFile() as tmpfile:
+                        if "parquet" in  output_file_type:
+                            jdf.to_parquet(tmpfile.name, index=False)
+                        else:
+                            jdf.to_csv(tmpfile.name, index=False)                        
+                        jtar.add(tmpfile.name, arcname=jfilename)          
+
 
 def multiprocess_write_tars(dfs,catchments,filenames):  
     i=0
