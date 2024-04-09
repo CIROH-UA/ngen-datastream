@@ -88,7 +88,7 @@ def create_conf_fp(start,end,ii_retro,nprocs,docker_mount,forcing_split_vpu):
             "s3://ngen-datastream/resources/v20.1/VPU_17/weights.json",
             "s3://ngen-datastream/resources/v20.1/VPU_18/weights.json"
         ]
-        output_path  = f"s3://ngen-datastream/forcings/v20.1/{start}-{end}",
+        output_path  = f"s3://ngen-datastream/forcings/v20.1/{start}-{end}"
         output_file_type = ["tar"]
     else:
         weights = f"{docker_mount}/datastream-resources/weights.json"
