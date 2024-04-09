@@ -475,9 +475,11 @@ def multiprocess_write_tars(dfs,catchments,filenames):
         jcatchunk_list.append(jchunk)
         catchments_list.append(catchments[jchunk])
         filenames_list.append(filenames[i:k]) 
+        for j,jfilename in enumerate(filenames[i:k]):
+            assert jfilename == catchments[jchunk][j] + ".csv"
         i=k      
 
-    with cf.ProcessPoolExecutor(max_workers=len(catchments)) as pool:
+    with cf.ProcessPoolExecutor(max_workers=min(len(catchments),nprocs)) as pool:
         for results in pool.map(
         write_tar,
         dfs_list,
@@ -529,7 +531,7 @@ def prep_ngen_data(conf):
     output_path = conf["storage"].get("output_path","")
     output_file_type = conf["storage"].get("output_file_type","csv") 
 
-    global ii_verbose
+    global ii_verbose, nprocs
     ii_verbose = conf["run"].get("verbose",False) 
     ii_collect_stats = conf["run"].get("collect_stats",True)
     nprocs = conf["run"].get("nprocs",int(os.cpu_count() * 0.5))
@@ -597,7 +599,7 @@ def prep_ngen_data(conf):
     count = 0
     for jweight_file in weight_files:
         ii_weights_in_bucket = jweight_file.find('//') >= 0
-        pattern = r'VPU_(\d+)*'
+        pattern = r'VPU_([^/]+)'
         match = re.search(pattern, jweight_file)
         if match: jname = "VPU_" + match.group(1)
         else:
