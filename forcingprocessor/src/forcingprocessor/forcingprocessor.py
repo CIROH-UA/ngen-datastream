@@ -52,9 +52,9 @@ def convert_url2key(nwm_file,fs_type):
         bucket_key = _nc_file_parts[2][:-17] + bucket_key
     elif fs_type == 'google':
         bucket_key = "gs:/" + bucket_key
-
+    if "s3://" in nwm_file: bucket_key = bucket_key[1:]
     bucket = _nc_file_parts[2]
-    return bucket, bucket_key[1:]
+    return bucket, bucket_key
 
 def distribute_work(items,nprocs):
     """
@@ -660,7 +660,6 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n',flush=True)
-        # global weights_json, x_min, x_max, y_min, y_max
         # weights_json = crosswalk_dict
         # [data_array, t_ax] = forcing_grid2catchment(jnwm_files, fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,crosswalk_dict,fs)
