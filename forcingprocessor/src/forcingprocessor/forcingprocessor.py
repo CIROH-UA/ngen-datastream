@@ -41,6 +41,26 @@ ngen_variables = [
     "DSWRF_surface",
 ] 
 
+def rho(temp): 
+    """
+        Calculate water density at temperature
+    """
+    return 999.99399 + 0.04216485*temp - 0.007097451*(temp**2) + 0.00003509571*(temp**3) - 9.9037785E-8*(temp**4) 
+
+def aorc_as_rate(dataFrame):
+    """
+        Convert kg/m^2 -> m/s
+    """
+    if isinstance(dataFrame.index, pd.MultiIndex):
+        interval = pd.Series(dataFrame.index.get_level_values(0))
+    else:
+        interval = pd.Series(dataFrame.index)
+    interval = ( interval.shift(-1) - interval ) / np.timedelta64(1, 's')
+    interval.index = dataFrame.index
+    precip_rate = ( dataFrame['APCP_surface'].shift(-1) / dataFrame['TMP_2maboveground'].apply(rho) ) / interval
+    precip_rate.name = 'precip_rate'
+    return precip_rate
+
 def convert_url2key(nwm_file,fs_type):
     bucket_key = ""
     _nc_file_parts = nwm_file.split('/')
@@ -200,18 +220,17 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
 
         topen += time.perf_counter() - t0
         t0 = time.perf_counter()  
-
+        print(f'made it 0',flush=True)
         with xr.open_dataset(file_obj, engine=eng) as nwm_data:
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()                     
             shp = nwm_data["U2D"].shape   
-            data_allvars = np.zeros(shape=(nvar, shp[1], shp[2]), dtype=np.float32)            
+            data_allvars = np.zeros(shape=(nvar, shp[1], shp[2]), dtype=np.float32)       
             for var_dx, jvar in enumerate(nwm_variables):                
                 if jvar == 'RAINRATE': # HACK CONVERSION
                     data_allvars[var_dx, :, :] = 3600 * np.squeeze(nwm_data[jvar].values)
                 else:
                     data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar].values)   
-
             time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
             t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
@@ -238,7 +257,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
         if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s', end=None,flush=True)
         report_usage()
 
-    if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process')
+    if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process',flush=True)
     return [data_list, t_list]
 
 def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
@@ -439,12 +458,9 @@ def write_data(
     return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB]
 
 def write_tar(dfs,jcatchunk,catchments,filenames):
-        if storage_type == "local":
-            tar_name = Path(forcing_path,f'{jcatchunk}_forcings.tar.gz')
-        else:
-            tar_name = f'{jcatchunk}_forcings.tar.gz'
         print(f'Writing {jcatchunk} tar')
         if storage_type == "s3":
+            tar_name = f'{jcatchunk}_forcings.tar.gz'
             buffer = BytesIO()
             with tarfile.open(fileobj=buffer, mode='w:gz') as jtar:
                 for j, jcat in enumerate(catchments):
@@ -461,9 +477,10 @@ def write_tar(dfs,jcatchunk,catchments,filenames):
             buffer.seek(0)
             bucket, key = convert_url2key(forcing_path,storage_type)
             s3 = boto3.client("s3")   
-            s3.put_object(Bucket = bucket, Key = key + "/" + tar_name, Body = tar_name)   
+            s3.put_object(Bucket = bucket, Key = key + "/" + tar_name, Body = buffer.getvalue())   
 
         else:
+            tar_name = Path(forcing_path,f'{jcatchunk}_forcings.tar.gz')
             with tarfile.open(tar_name, 'w:gz') as jtar:
                 for j, jcat in enumerate(catchments):
                     jdf  = dfs[j]
@@ -677,6 +694,7 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n',flush=True)
+        # global weights_json
         # weights_json = crosswalk_dict
         # [data_array, t_ax] = forcing_grid2catchment(jnwm_files, fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,crosswalk_dict,fs)
