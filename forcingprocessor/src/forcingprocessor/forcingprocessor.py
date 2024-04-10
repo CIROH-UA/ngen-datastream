@@ -10,7 +10,7 @@ import time
 import boto3
 from io import BytesIO, TextIOWrapper
 import concurrent.futures as cf
-from datetime import datetime
+from datetime import datetime, timezone
 import psutil
 import gzip
 import tarfile, tempfile
@@ -40,6 +40,11 @@ ngen_variables = [
     "PRES_surface",
     "DSWRF_surface",
 ] 
+
+def log_time(label, log_file):
+    timestamp = datetime.now(timezone.utc).astimezone().strftime('%Y%m%d%H%M%S')
+    with open(log_file, 'a') as f:
+        f.write(f"{label}: {timestamp}\n")
 
 def rho(temp): 
     """
@@ -521,18 +526,6 @@ def multiprocess_write_tars(dfs,catchments,filenames):
         ):
             pass
 
-def start_end_interval(start_date,end_date,lead_time):
-    start_obj = datetime.strptime(start_date, "%Y%m%d%H%M")
-    end_obj   = datetime.strptime(end_date, "%Y%m%d%H%M")
-
-    formatted_start = start_obj.strftime("%Y-%m-%d %H:%M:%S")
-    formatted_end   = end_obj.strftime("%Y-%m-%d %H:%M:%S")
-
-    if len(lead_time) > 1: output_interval = (lead_time[1] - lead_time[0]) * 3600
-    else: output_interval = 3600
-
-    return formatted_start, formatted_end, output_interval
-
 def prep_ngen_data(conf):
     """
     Primary function to retrieve forcing and hydrofabric data and convert it into files that can be ingested into ngen.
@@ -546,18 +539,14 @@ def prep_ngen_data(conf):
 
     t_start = time.perf_counter()
 
-    datentime = datetime.utcnow().strftime("%m%d%y_%H%M%S")       
+    datentime = datetime.utcnow().strftime("%m%d%y_%H%M%S")   
 
-    start_date = conf["forcing"].get("start_date",None)
-    end_date = conf["forcing"].get("end_date",None)
+    log_file = "./log_fp.txt"   
+    log_time("FORCINGPROCESSOR_START", log_file) 
+    log_time("CONFIGURATION_START", log_file) 
+
     weight_file = conf['forcing'].get("weight_file",None)
     nwm_file = conf['forcing'].get("nwm_file","")
-
-    start_time, end_time, output_interval = start_end_interval(start_date,end_date,[])
-    conf['time']                    = {}
-    conf['time']['start_time']      = start_time
-    conf['time']['end_time']        = end_time
-    conf['time']['output_interval'] = output_interval
 
     global output_path, output_file_type
     output_path = conf["storage"].get("output_path","")
@@ -623,6 +612,8 @@ def prep_ngen_data(conf):
                 Key=conf_path
             )
 
+    log_time("CONFIGURATION_END", log_file) 
+    log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Opening weight file...\n',flush=True) 
     if type(weight_file) is not list: weight_files = [weight_file]
     else: weight_files = weight_file
@@ -655,6 +646,7 @@ def prep_ngen_data(conf):
                 crosswalk_dict = crosswalk_dict | json.load(f)
                 jcatchment_dict[jname] = list(crosswalk_dict.keys())
     ncatchments = len(crosswalk_dict)
+    log_time("READWEIGHTS_END", log_file)    
 
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
@@ -687,6 +679,7 @@ def prep_ngen_data(conf):
     nloops      = int(np.ceil(nfiles / nfile_chunk))
     ii_append = False
     for jloop in range(nloops):
+        log_time("PROCESSING_START", log_file)
 
         t00 = time.perf_counter()
         start = jloop*nfile_chunk
@@ -703,6 +696,9 @@ def prep_ngen_data(conf):
         score = complexity / t_extract
         if ii_verbose: print(f'Data extract processs: {nprocs:.2f}\nExtract time: {t_extract:.2f}\nComplexity: {complexity:.2f}\nScore: {score:.2f}\n', end=None,flush=True)
 
+        log_time("PROCESSING_END", log_file)
+        log_time("FILEWRITING_START", log_file)
+
         t0 = time.perf_counter()
         if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
         # write_data(data_array,t_ax,crosswalk_dict.keys(),forcing_path,False,False)      
@@ -716,10 +712,12 @@ def prep_ngen_data(conf):
         loop_time = time.perf_counter() - t00
         if ii_verbose and nloops > 1: print(f'One loop took {loop_time:.2f} seconds. Estimated time to completion: {loop_time * (nloops - jloop):.2f}',flush=True)
 
+    log_time("FILEWRITING_END", log_file)
     runtime = time.perf_counter() - t_start
-
+    
     # Metadata        
     if ii_collect_stats:
+        log_time("METADATA_START", log_file)
         t000 = time.perf_counter()
         if ii_verbose: print(f'Data processing, now collecting metadata...',flush=True)
 
@@ -837,8 +835,10 @@ def prep_ngen_data(conf):
                 filename = Path(metaf_path, f"catchments_median.csv")
                 med_df.to_csv(filename, index=False)
         meta_time = time.perf_counter() - t000
+        log_time("METADATA_END", log_file)
 
     if "tar" in output_file_type:
+        log_time("TAR_START", log_file)
         if ii_verbose: print(f'\nWriting tarball...',flush=True)
         t0000 = time.perf_counter()
         multiprocess_write_tars(dfs,jcatchment_dict,filenames)
@@ -858,6 +858,17 @@ def prep_ngen_data(conf):
         #         os.remove(txt_file)
 
     tar_time = time.perf_counter() - t0000
+    log_time("TAR_END", log_file)
+
+    if storage_type == "s3": 
+        bucket, key  = convert_url2key(metaf_path,storage_type)
+        pro_path    = f"{key}/log_fp.txt"
+        s3.put_object(
+                Body='./log_fp.txt',
+                Bucket=bucket,
+                Key=conf_path
+            )
+
 
     if ii_verbose:
         print(f"\n\n--------SUMMARY-------")

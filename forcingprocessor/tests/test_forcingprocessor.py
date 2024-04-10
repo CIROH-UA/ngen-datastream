@@ -71,8 +71,6 @@ def test_processor(get_time, get_paths):
     conf = {
 
     "forcing"  : {
-        "start_date"   : pytest.date + pytest.hourminute,
-        "end_date"     : pytest.date + pytest.hourminute,
         "nwm_file"     : str(pytest.filenamelist),
         "weight_file"  : str(pytest.full_weight)
     },
