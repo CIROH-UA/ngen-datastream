@@ -46,26 +46,6 @@ def log_time(label, log_file):
     with open(log_file, 'a') as f:
         f.write(f"{label}: {timestamp}\n")
 
-def rho(temp): 
-    """
-        Calculate water density at temperature
-    """
-    return 999.99399 + 0.04216485*temp - 0.007097451*(temp**2) + 0.00003509571*(temp**3) - 9.9037785E-8*(temp**4) 
-
-def aorc_as_rate(dataFrame):
-    """
-        Convert kg/m^2 -> m/s
-    """
-    if isinstance(dataFrame.index, pd.MultiIndex):
-        interval = pd.Series(dataFrame.index.get_level_values(0))
-    else:
-        interval = pd.Series(dataFrame.index)
-    interval = ( interval.shift(-1) - interval ) / np.timedelta64(1, 's')
-    interval.index = dataFrame.index
-    precip_rate = ( dataFrame['APCP_surface'].shift(-1) / dataFrame['TMP_2maboveground'].apply(rho) ) / interval
-    precip_rate.name = 'precip_rate'
-    return precip_rate
-
 def convert_url2key(nwm_file,fs_type):
     bucket_key = ""
     _nc_file_parts = nwm_file.split('/')
@@ -225,7 +205,6 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
 
         topen += time.perf_counter() - t0
         t0 = time.perf_counter()  
-        print(f'made it 0',flush=True)
         with xr.open_dataset(file_obj, engine=eng) as nwm_data:
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()                     
@@ -387,25 +366,26 @@ def write_data(
         forcing_cat_ids.append(cat_id)
 
         t0 = time.perf_counter()
-        if ii_append:
-            if type(out_path) is str: key = out_path + f"/cat-{cat_id}.csv"
-            else: key = (out_path/f"cat-{cat_id}.csv").resolve()
-            
-            df_bucket = pd.read_csv(s3_client.get_object(Bucket = bucket, Key = key).get("Body"))
-            df = pd.concat([df_bucket,df])
-            del df_bucket              
 
         if "parquet" in output_file_type or "csv" in output_file_type :
             if storage_type == 's3':            
-                bucket, key_prefix = convert_url2key(out_path, storage_type)            
+                bucket, key_prefix = convert_url2key(out_path, storage_type)                            
                 if "parquet" in output_file_type:
                     buf = BytesIO()
                     filename = key_prefix + f"/cat-{cat_id}.parquet"
+                    if ii_append:
+                        df_bucket = pd.read_parquet(s3_client.get_object(Bucket = bucket, Key = filename).get("Body"))
+                        df = pd.concat([df_bucket,df])
+                        del df_bucket
                     df.to_parquet(buf, index=False)                
                 elif "csv" in output_file_type:
                     buf = BytesIO()
                     filename = key_prefix + f"/cat-{cat_id}.csv"
-                    df.to_csv(buf, index=False)                 
+                    if ii_append:
+                        df_bucket = pd.read_csv(s3_client.get_object(Bucket = bucket, Key = filename).get("Body"))
+                        df = pd.concat([df_bucket,df])
+                        del df_bucket    
+                    df.to_csv(buf, index=False)
 
                 t_buff += time.perf_counter() - t0
                 t0 = time.perf_counter()                
@@ -416,9 +396,17 @@ def write_data(
             elif storage_type == 'local':                
                 if "parquet" in output_file_type:
                     filename = str((out_path/Path(f"cat-{cat_id}.parquet" )).resolve())
+                    if ii_append:
+                        df_bucket = pd.read_parquet(filename)
+                        df = pd.concat([df_bucket,df])
+                        del df_bucket  
                     df.to_parquet(filename, index=False)                
                 elif "csv" in output_file_type:
                     filename = str((out_path/Path(f"cat-{cat_id}.csv" )).resolve())
+                    if ii_append:
+                        df_bucket = pd.read_csv(filename)
+                        df = pd.concat([df_bucket,df])
+                        del df_bucket  
                     df.to_csv(filename, index=False)      
         else: 
             filename = f"./cat-{cat_id}.csv"
@@ -701,8 +689,8 @@ def prep_ngen_data(conf):
 
         t0 = time.perf_counter()
         if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
-        # write_data(data_array,t_ax,crosswalk_dict.keys(),forcing_path,False,False)      
-        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append,)      
+        write_data(data_array,t_ax,crosswalk_dict.keys(),forcing_path,ii_append,False)      
+        # forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append,)      
 
         ii_append = True
         write_time += time.perf_counter() - t0    
@@ -711,8 +699,7 @@ def prep_ngen_data(conf):
 
         loop_time = time.perf_counter() - t00
         if ii_verbose and nloops > 1: print(f'One loop took {loop_time:.2f} seconds. Estimated time to completion: {loop_time * (nloops - jloop):.2f}',flush=True)
-
-    log_time("FILEWRITING_END", log_file)
+        log_time("FILEWRITING_END", log_file)
     runtime = time.perf_counter() - t_start
     
     # Metadata        
