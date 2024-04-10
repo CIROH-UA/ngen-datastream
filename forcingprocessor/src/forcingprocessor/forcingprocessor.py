@@ -689,8 +689,8 @@ def prep_ngen_data(conf):
 
         t0 = time.perf_counter()
         if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
-        write_data(data_array,t_ax,crosswalk_dict.keys(),forcing_path,ii_append,False)      
-        # forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append,)      
+        # write_data(data_array,t_ax,crosswalk_dict.keys(),forcing_path,ii_append,False)      
+        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append,)      
 
         ii_append = True
         write_time += time.perf_counter() - t0    
