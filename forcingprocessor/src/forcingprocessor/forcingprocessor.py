@@ -701,9 +701,6 @@ def prep_ngen_data(conf):
         if ii_verbose and nloops > 1: print(f'One loop took {loop_time:.2f} seconds. Estimated time to completion: {loop_time * (nloops - jloop):.2f}',flush=True)
         log_time("FILEWRITING_END", log_file)
 
-        if not "tar" in storage_type:
-            del forcing_cat_ids, dfs, filenames, data_array, t_ax
-
     runtime = time.perf_counter() - t_start
     
     # Metadata        
