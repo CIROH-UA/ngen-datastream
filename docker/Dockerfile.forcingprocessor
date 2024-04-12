@@ -1,6 +1,6 @@
 ARG TAG_NAME
 FROM datastream-deps:${TAG_NAME} as datastream_base
-RUN git clone --branch plot_datastream https://github.com/JordanLaserGit/ngen-datastream.git
+RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
 RUN pip install -r /ngen-datastream/forcingprocessor/requirements39.txt
 
 RUN groupadd -r mygroup && useradd -r -g mygroup myuser
