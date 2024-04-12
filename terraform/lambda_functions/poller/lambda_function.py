@@ -36,6 +36,7 @@ def lambda_handler(event, context):
             break
         elif output['Status'] == 'InProgress':
             ii_pass = False   
+            print(f'Commands are still in progress. Waiting a minute and checking again')
             time.sleep(60)                            
         else:
             raise Exception(f'Command failed {output}')         
