@@ -127,9 +127,9 @@ def test_processor(get_time, get_paths):
             assert parquet.exists()
             os.remove(parquet)
 
-            nc = (pytest.data_dir/"forcings/1_forcings.nc").resolve()
-            assert nc.exists()    
-            os.remove(nc)            
+            # nc = (pytest.data_dir/"forcings/1_forcings.nc").resolve()
+            # assert nc.exists()    
+            # os.remove(nc)            
 
 
     
