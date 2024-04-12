@@ -7,6 +7,7 @@ import re
 import copy
 from scipy.stats import linregress
 
+global VPUs, ncatchment_vpu
 VPUs = ["01","02","03N",
     "03S","03W","04",
     "05","06", "07",
@@ -24,7 +25,9 @@ ncatchment_vpu = [19194, 33779, 30052,
                     34201, 80040, 40803]  
 
 PRICING_DICT={}
+PRICING_DICT["t4g.xlarge"]=0.1344
 PRICING_DICT["t4g.2xlarge"]=0.2688
+
 
 plt.switch_backend('Agg')
 plt.style.use('dark_background')
@@ -35,7 +38,6 @@ def profile_txt2df(txt_file):
 
     out_dict = {}
     total = 0
-    total_lite = 0
     for jline in data:
         jline_parts = jline.strip().split("_")
         jtime_stamp = datetime.strptime(jline_parts[-1].split(": ")[-1],'%Y%m%d%H%M%S')
@@ -50,24 +52,15 @@ def profile_txt2df(txt_file):
             out_dict[step]["duration_seconds"] = (out_dict[step]["end_time"] - out_dict[step]["start_time"]).seconds
             if not np.isnan(out_dict[step]["duration_seconds"]): 
                 total+=out_dict[step]["duration_seconds"]
-                if step != "WEIGHTS" and step != "NGENCONFGEN":
-                    total_lite+=out_dict[step]["duration_seconds"]
-
 
     out_dict_tmp = copy.deepcopy(out_dict)
     for jstep in out_dict_tmp:
         if "end_time" not in out_dict[jstep]: out_dict.pop(jstep)
 
-    out_dict_lite = copy.deepcopy(out_dict)
-    out_dict_lite.pop("WEIGHTS")
-    out_dict_lite.pop("NGENCONFGEN")
-
     out_dict["total_runtime"] = total
-    out_dict_lite["total_runtime"] = total_lite
     pro_df = pd.DataFrame.from_dict(out_dict)
-    pro_df_lite = pd.DataFrame.from_dict(out_dict_lite)
 
-    return pro_df, pro_df_lite
+    return pro_df
 
 def get_steps_dict(profile_dict):
   
@@ -75,14 +68,12 @@ def get_steps_dict(profile_dict):
     VPU_list = []
     ncatchment_list = []
     steps = None
-    for jpro in profile_dict:
-        profile_name = jpro
-        for j,jVPU in enumerate(VPUs):
-            if jVPU in profile_dict[jpro]["file_name"]:
-                VPU_list.append(jVPU)
-                ncatchment_list.append(ncatchment_vpu[j])
-
-        jdf = profile_dict[jpro]["profile_df"]
+    for profile_name in profile_dict:
+        match = re.search(r'_(.+)', profile_name)
+        jvpu  = match.group(1)
+        VPU_list.append(jvpu)
+        ncatchment_list.append(ncatchment_vpu[VPUs.index(jvpu)])
+        jdf = profile_dict[profile_name]["profile_df"]
         if steps is None: steps = jdf.columns
         for j, jstep in enumerate(steps):
             jstep_duration = jdf[jstep]["duration_seconds"]/60
@@ -93,11 +84,10 @@ def get_steps_dict(profile_dict):
                 step_dfs[jstep] = pd.concat([pd.DataFrame({"profile":[profile_name],"duration_minutes":[jstep_duration]}),step_dfs[jstep]],ignore_index=True)
     return step_dfs, ncatchment_list
 
-def plot_group(profile_dict, profile_dict_lite,conf_dict,input_csv):
+def plot_group(profile_dict,conf_dict,input_csv):
     
     
     step_dfs, ncatchment_list = get_steps_dict(profile_dict)
-    step_dfs_lite, _          = get_steps_dict(profile_dict_lite)
 
     profile_list = []
     for jrow in step_dfs["GET_RESOURCES"]["profile"]:
@@ -113,39 +103,31 @@ def plot_group(profile_dict, profile_dict_lite,conf_dict,input_csv):
         
     step_dfs_sorted          = {}
     step_dfs_proportion      = {}
-    step_dfs_lite_sorted     = {}
-    step_dfs_lite_proportion = {}
     for jdf in step_dfs:
         step_dfs_sorted[jdf]          = step_dfs[jdf].reindex(order)        
         step_dfs_proportion[jdf]      = step_dfs[jdf].reindex(order)
-        if jdf != "WEIGHTS" and jdf != "NGENCONFGEN":
-            step_dfs_lite_sorted[jdf]     = step_dfs_lite[jdf].reindex(order)
-            step_dfs_lite_proportion[jdf] = step_dfs_lite[jdf].reindex(order)
         if jdf != "total_runtime": 
             step_dfs_proportion[jdf]["proportion"] = 100 * (step_dfs[jdf]["duration_minutes"].reindex(order) / step_dfs["total_runtime"]["duration_minutes"].reindex(order))
-            if jdf != "WEIGHTS" and jdf != "NGENCONFGEN":
-                step_dfs_lite_proportion[jdf]["proportion"] = 100 * (step_dfs_lite[jdf]["duration_minutes"].reindex(order) / step_dfs_lite["total_runtime"]["duration_minutes"].reindex(order))
         step_dfs_proportion[jdf] = step_dfs_proportion[jdf].drop(columns="duration_minutes")
-        if jdf != "WEIGHTS" and jdf != "NGENCONFGEN": 
-            step_dfs_lite_proportion[jdf] = step_dfs_lite_proportion[jdf].drop(columns="duration_minutes")
 
-    plot_cost_chart(step_dfs_sorted,step_dfs_lite_sorted,conf_dict)
+    # plot_cost_chart(step_dfs_sorted,conf_dict)
 
     for jrun in conf_dict:
         host = conf_dict[jrun]["host"]
         nprocs = conf_dict[jrun]['globals']['nprocs']
         cores = host["host_cores"]
         ram = host["host_RAM"]
-        host_type = host["host_type"].split(": ")[-1]
-        host_type = "t4g.2xlarge"
+        host_os = host["host_OS"]
+        host_type = host["host_type"]
         cost_per_hr = PRICING_DICT[host_type]
         host_arch = host["host_arch"]
         add_text  = "Run Info\n"        
         add_text += f"cores:    {cores}\n"
         add_text += f"nprocs:  {nprocs}\n"
         add_text += f"RAM:     {ram}\n"
-        add_text += f"type:     t4g.2xlarge\n"
+        add_text += f"type:     {host_type}\n"
         add_text += f"arch:     {host_arch}\n"
+        add_text += f"os:    {host_os}\n"
 
     ncatchment_list_sorted = sorted(np.array(ncatchment_list))
     vpu_n_catchments = []
@@ -153,20 +135,14 @@ def plot_group(profile_dict, profile_dict_lite,conf_dict,input_csv):
         idx = np.where(jcatch == ncatchment_vpu)[0][0]
         vpu_n_catchments.append(f"{jcatch}, {VPUs[idx]}")
 
-    write_to_csv(input_csv,ncatchment_list_sorted,step_dfs_lite_sorted,"duration_minutes",conf_dict,cost_per_hr)
+    write_to_csv(input_csv,ncatchment_list_sorted,step_dfs_sorted,"duration_minutes",conf_dict,cost_per_hr)
 
     step_dfs_sorted.pop("total_runtime")
     step_dfs_proportion.pop("total_runtime")
-    step_dfs_lite_sorted.pop("total_runtime")
-    step_dfs_lite_proportion.pop("total_runtime")
 
-    colors_lite = ['red', "blueviolet",         "cyan", "green",         "orange", 'indigo', "magenta","lime"]  
     colors      = ['red', "blueviolet", 'blue', "cyan", "green", "teal", "orange", 'indigo', "magenta","lime"]    
     plot_bar_chart(ncatchment_list_sorted,step_dfs_proportion,"ngen-datastream profiling",'profile_vpu_propotions.png','Proportion Total Runtime','proportion',add_text,colors)
     plot_bar_chart(ncatchment_list_sorted,step_dfs_sorted,"ngen-datastream profiling",'profile_vpu.png',"Minutes",'duration_minutes',add_text,colors)
-    plot_bar_chart(ncatchment_list_sorted,step_dfs_lite_sorted,"ngen-datastream-lite profiling",'profile_vpu_lite.png',"Minutes",'duration_minutes',add_text,colors_lite)
-    plot_bar_chart(ncatchment_list_sorted,step_dfs_lite_proportion,"ngen-datastream-lite profiling",'profile_vpu_lite_propotions.png','Proportion Total Runtime','proportion',add_text,colors_lite)
-
     plot_scaling(ncatchment_list_sorted,step_dfs_sorted,"ngen-datastream scaling",'scaling_vpu.png','Minutes','duration_minutes',add_text,colors)
     # write_to_csv(ncatchment_list_sorted,step_dfs_sorted)
 
@@ -199,16 +175,13 @@ def write_to_csv(benchmark,catchments,dfs,key,confs,cost_per_hr):
         jdict = {}
         jdict["Run ID"]        = last + j
         jdict["Provider"]      = "AWS"
-        # jdict["Instance Type"] = confs[jrun]['host']['host_type']
-        jdict["Instance Type"] = "t4g.2xlarge"
+        jdict["Instance Type"] = confs[jrun]['host']['host_type']
         jdict["Cores"]         = confs[jrun]['host']['host_cores']
-        # jdict["Memory (GB)"]        = confs[jrun]['host']['host_RAM']
-        jdict["Memory (GB)"]        = 32
+        jdict["Memory (GB)"]   = confs[jrun]['host']['host_RAM'][:-1]
         jdict["Hardware"]      = confs[jrun]['host']['host_arch']
-        # jdict["OS"]            = confs[jrun]['host']['host_os']
-        jdict["OS"]            = "AWS Linux 2023"
+        jdict["OS"]            = confs[jrun]['host']['host_OS']
         jdict["Cost/hr"]       = f"${cost_per_hr}"
-        # jdict["Domain Name"]   = confs[jrun]['globals']['domain_name']
+        jdict["Domain Name"]   = confs[jrun]['globals']['domain_name']
         jdict["Domain Name"]   = f"nextgen_{jrun}"
         jdict["Catchments"]    = catchments[j]
         jdict["Realization"]   = "CFE, PET, SLOTH, NOM"
@@ -257,14 +230,14 @@ def plot_scaling(xticklabelz,dfs,title,save_name,y_label,key,add_text,colors):
     plt.text(1.1, 0.07, add_text, transform=ax.transAxes, ha='left', va='bottom', fontsize=10, color='black')
     
     plt.subplots_adjust(right=0.52)
-
+    
     plt.title(title)
     plt.savefig(os.path.join(out_dir,save_name))
     
-def plot_cost_chart(dfs,dfs_lite,confs):
+# def plot_cost_chart(dfs,confs):
 
 
-    pass
+#     pass
 
 def plot_bar_chart(xticklabelz,dfs,title,save_name,y_label,key,add_text,colors):    
     combined_df = pd.concat(dfs.values(), keys=dfs.keys())
@@ -282,7 +255,7 @@ def plot_bar_chart(xticklabelz,dfs,title,save_name,y_label,key,add_text,colors):
 
     plt.subplots_adjust(right=0.65)
     plt.subplots_adjust(bottom=0.2)
-
+    if key != "proportion":plt.ylim(0,60)
     plt.title(title)
     plt.savefig(os.path.join(out_dir,save_name))
     plt.clf()
@@ -298,10 +271,11 @@ if __name__ == "__main__":
     global out_dir
     out_dir = args.out_dir
 
+    if not os.path.exists(out_dir): os.system(f"mkdir -p {out_dir}")
+
     input_csv = args.input_csv
     data_dir = args.data_dir
     all_profiles = {}
-    all_profiles_lite = {}
     all_confs = {}
     for path, _, files in os.walk(data_dir):
         for jfile in files:
@@ -309,14 +283,10 @@ if __name__ == "__main__":
             jname = jfile.split(".")[0]
             pattern = r"profile_.*\.txt"
             if re.search(pattern,jfile_path):    
-                jfile_df, jfile_df_lite = profile_txt2df(jfile_path)
+                jfile_df= profile_txt2df(jfile_path)
                 all_profiles[jname] = {}
                 all_profiles[jname]["file_name"] = jfile_path
                 all_profiles[jname]["profile_df"] = jfile_df
-
-                all_profiles_lite[jname] = {}
-                all_profiles_lite[jname]["file_name"] = jfile_path
-                all_profiles_lite[jname]["profile_df"] = jfile_df_lite
 
             pattern = r"conf_datastream.*\.json"
             if re.search(pattern,jfile_path):
@@ -324,4 +294,4 @@ if __name__ == "__main__":
                 with open(jfile_path,'r') as fp:
                     all_confs[jname] = json.load(fp)
 
-    plot_group(all_profiles,all_profiles_lite,all_confs,input_csv)
+    plot_group(all_profiles,all_confs,input_csv)

@@ -14,7 +14,7 @@ get_file() {
     if [[ "$FILE" == *"https://"* ]]; then
         curl -# -L -o "$OUTFILE" "$FILE"
     elif [[ "$FILE" == *"s3://"* ]]; then
-        aws s3 sync "$FILE" "$OUTFILE"
+        aws s3 cp "$FILE" "$OUTFILE"
     else
         if [ -e "$FILE" ]; then
             cp -r "$FILE" "$OUTFILE"
@@ -416,9 +416,9 @@ if [ ! -z $FORCINGS_TAR ]; then
     echo "Using $FORCINGS_TAR"
     FORCINGS_BASE=$(basename $FORCINGS_TAR)    
     mkdir -p $NGEN_FORCINGS_PATH
-    FORCINGS_NGEN_TAR="$NGEN_FORCINGS_PATH"/$FORCINGS_BASE
-    get_file "$FORCINGS_TAR" $FORCINGS_NGEN_TAR
-    tar -xf $FORCINGS_NGEN_TAR -C "${NGEN_RUN_PATH%/}"
+    get_file "$FORCINGS_TAR" "./$FORCINGS_BASE"
+    tar -xf $FORCINGS_BASE -C "${NGEN_FORCINGS_PATH%/}"
+    rm "./$FORCINGS_BASE"
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
