@@ -25,7 +25,7 @@
       {
           "DeviceName": "/dev/xvda",  
           "Ebs": {
-              "VolumeSize": 64,
+              "VolumeSize": 256,
               "VolumeType": "gp2"  
           }
       }
@@ -37,9 +37,12 @@
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
     "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/$DATE/datastream-metadata'",
-    "runuser -l ec2-user -c 'docker run --rm -v /home/ec2-user/$DATE:/mounted_dir datastream:latest python /ngen-datastream/python/src/datastream/configure-datastream.py --docker_mount /mounted_dir --start_date DAILY --data_path /home/ec2-user/$DATE --domain_name CONUS --forcing_split_vpu true'",
-    "runuser -l ec2-user -c 'docker run --rm -v  /home/ec2-user/$DATE:/mounted_dir -u $(id -u):$(id -g) -w /datastream-metadata forcingprocessor:latest python /ngen-datastream/forcingprocessor/src/forcingprocessor/forcingprocessor.py /mounted_dir/datastream-metadata/conf_fp.json'"
+    "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/$DATE/ngen-run/config'",
+    "runuser -l ec2-user -c 'cp /home/ec2-user/ngen-datastream/configs/ngen/realization_cfe_sloth.json /home/ec2-user/$DATE/ngen-run/config'",
+    "runuser -l ec2-user -c 'docker run --rm -v /home/ec2-user/$DATE:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata datastream:latest python /ngen-datastream/python/src/datastream/configure-datastream.py --docker_mount /mounted_dir --start_date DAILY --data_path /home/ec2-user/$DATE --domain_name CONUS --forcing_split_vpu true'",
+    "runuser -l ec2-user -c 'docker run --rm -v /home/ec2-user/$DATE:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata forcingprocessor:latest python /ngen-datastream/forcingprocessor/src/forcingprocessor/nwm_filenames_generator.py /mounted_dir/datastream-metadata/conf_nwmurl.json'",
+    "runuser -l ec2-user -c 'docker run --rm -e AWS_ACCESS_KEY_ID=$(echo $AWS_ACCESS_KEY_ID) -e AWS_SECRET_ACCESS_KEY=$(echo $AWS_SECRET_ACCESS_KEY) -v /home/ec2-user/$DATE:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata forcingprocessor:latest python /ngen-datastream/forcingprocessor/src/forcingprocessor/forcingprocessor.py /mounted_dir/datastream-metadata/conf_fp.json'"
   ],
   "bucket"   : "ngen-datastream",
-  "obj_key"  : "daily/$DATE/$INSTANCE_TYPE/VPU_$VPU/ngen-run.tar.gz"
+  "obj_key"  : "forcings/v20.1/$DATE/VPU_10U_forcings.tar.gz"
 }
