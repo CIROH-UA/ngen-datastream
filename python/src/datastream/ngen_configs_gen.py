@@ -1,7 +1,7 @@
 import geopandas as gpd
 import pandas as pd
 import argparse
-import re
+import re, os
 import pickle, copy
 from pathlib import Path
 gpd.options.io_engine = "pyogrio"
@@ -17,6 +17,9 @@ from ngen.config.realization import NgenRealization
 from ngen.config.configurations import Routing
 
 def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
+
+    if not os.path.exists(out_dir):
+        os.system(f"mkdir -p {out_dir}")
 
     with open(pkl_file, 'rb') as fp:
         nom_dict = pickle.load(fp)
@@ -71,6 +74,31 @@ def gen_petAORcfe(hf_file,hf_lnk_file,out,models):
         file_writer=file_writer,
     )
 
+# Austin's multiprocess example from chat 3/25
+# import concurrent.futures as cf
+# from functools import partial
+# def generate_configs_multiprocessing(
+#     hook_providers: Iterable["HookProvider"],
+#     hook_objects: Collection[BuilderVisitableFn],
+#     file_writer: FileWriter,
+#     pool: cf.ProcessPoolExecutor,
+# ):
+#     def capture(divide_id: str, bv: BuilderVisitableFn):
+#         bld_vbl = bv()
+#         bld_vbl.visit(hook_prov)
+#         model = bld_vbl.build()
+#         file_writer(divide_id, model)
+
+#     div_hook_obj = DivideIdHookObject()
+#     for hook_prov in hook_providers:
+#         # retrieve current divide id
+#         div_hook_obj.visit(hook_prov)
+#         divide_id = div_hook_obj.divide_id()
+#         assert divide_id is not None
+
+#         fn = partial(capture, divide_id=divide_id)
+#         pool.map(fn, hook_objects)
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -108,16 +136,18 @@ if __name__ == "__main__":
         type=str,
         help="Path to the ngen realization", 
         required=False
-    )       
+    )     
+    parser.add_argument(
+        "--ignore",
+        dest="ignore", 
+        type=str,
+        help="List of NextGen BMI modules to ignore config generation for", 
+        required=False
+    )    
 
     args = parser.parse_args()
-
-    if '.txt' in args.hf_lnk_file:
-        with open(args.hf_lnk_file,'r') as fp:
-            data=fp.readlines()
-            hf_lnk_file = data[0] 
-    else:
-        hf_lnk_file = args.hf_lnk_file
+    ignore = args.ignore.split(',')
+    hf_lnk_file = args.hf_lnk_file
 
     serialized_realization = NgenRealization.parse_file(args.realization)
     start = serialized_realization.time.start_time
@@ -140,19 +170,28 @@ if __name__ == "__main__":
         ii_cfe_or_pet = True            
 
     if "NoahOWP" in model_names:
-        if "pkl_file" in args:
-            print(f'Generating NoahOWP configs from pickle',flush = True)
-            gen_noah_owp_confs_from_pkl(args.pkl_file, args.outdir, start, end)
+        if "NoahOWP" in ignore:
+            print(f'ignoring NoahOWP')
         else:
-            raise Exception(f"Generating NoahOWP configs manually not implemented, create pkl.")            
+            if "pkl_file" in args:
+                print(f'Generating NoahOWP configs from pickle',flush = True)
+                gen_noah_owp_confs_from_pkl(args.pkl_file, args.outdir, start, end)
+            else:
+                raise Exception(f"Generating NoahOWP configs manually not implemented, create pkl.")            
 
     if ii_cfe_or_pet: 
-        print(f'Generating {include} configs from pydantic models',flush = True)
-        gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models)
+        if "CFE" in ignore or "PET" in ignore:
+            print(f'ignoring CFE and PET')
+        else:
+            print(f'Generating {include} configs from pydantic models',flush = True)
+            gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models)
 
     globals = [x[0] for x in serialized_realization]
     if serialized_realization.routing is not None:
-        print(f'Generating t-route config from template',flush = True)
-        generate_troute_conf(args.outdir,start,args.hf_file) 
+        if "routing" in ignore:
+            print(f'ignoring routing')
+        else:
+            print(f'Generating t-route config from template',flush = True)
+            generate_troute_conf(args.outdir,start,args.hf_file) 
 
     print(f'Done!',flush = True)

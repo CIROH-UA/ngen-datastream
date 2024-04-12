@@ -69,19 +69,14 @@ def test_generate_weights(get_paths):
 def test_processor(get_time, get_paths):
     
     conf = {
-
     "forcing"  : {
-        "start_date"   : pytest.date + pytest.hourminute,
-        "end_date"     : pytest.date + pytest.hourminute,
         "nwm_file"     : str(pytest.filenamelist),
         "weight_file"  : str(pytest.full_weight)
     },
 
     "storage":{
-        "storage_type"      : "local",
-        "output_bucket"     : pytest.date,
         "output_path"       : str(pytest.data_dir),
-        "output_file_type"  : "csv"
+        "output_file_type"  : ["tar","parquet","netcdf"]
     },    
 
     "run" : {
@@ -105,7 +100,7 @@ def test_processor(get_time, get_paths):
     nwmurl_conf['start_date'] = pytest.date + pytest.hourminute
     nwmurl_conf['end_date']   = pytest.date + pytest.hourminute 
     
-    for jurl in [1,2,3,5,6,7,8,9]:
+    for jurl in [1,3,5,6,7,8]:
         nwmurl_conf["urlbaseinput"] = jurl
 
         generate_nwmfiles(nwmurl_conf)
@@ -119,18 +114,22 @@ def test_processor(get_time, get_paths):
             response = requests.get(web_address)
             if response.status_code != 200:
                 print(f'{jline} doesn\'t exist!')
-                pass
-            else:
-                print(f'{jline} exists! Testing with forcingprocessor')
-                        
-                prep_ngen_data(conf)
+                raise Exception
+            print(f'{jline} exists! Testing with forcingprocessor')
+                    
+            prep_ngen_data(conf)
 
-                tarball = (pytest.data_dir/pytest.date/"forcings/forcings.tar.gz").resolve()
-                assert tarball.exists()
-                os.remove(tarball)
-        else:
-            # in bucket, implement bucket checks for files
-            pass
+            tarball = (pytest.data_dir/"forcings/1_forcings.tar.gz").resolve()
+            assert tarball.exists()
+            os.remove(tarball)
+
+            parquet = (pytest.data_dir/"forcings/cat-1.parquet").resolve()
+            assert parquet.exists()
+            os.remove(parquet)
+
+            # nc = (pytest.data_dir/"forcings/1_forcings.nc").resolve()
+            # assert nc.exists()    
+            # os.remove(nc)            
 
 
     

@@ -1,0 +1,43 @@
+{
+  "instance_parameters" :
+  {
+    "ImageId"            : "",
+    "InstanceType"       : "",
+    "KeyName"            : "Processor",
+    "MinCount"           : 1,
+    "MaxCount"           : 1,
+    "SecurityGroupIds"   : ["sg-066e56297c706ac84"],
+    "IamInstanceProfile" : {
+      "Name" : "EC2ForcingProcessor"
+    },
+    "TagSpecifications"   :[
+      {
+          "ResourceType": "instance",
+          "Tags": [
+              {
+                  "Key"   : "Name",
+                  "Value" : "ngendatastream_parallel_$VPU"
+              }
+          ]
+      }
+  ],
+    "BlockDeviceMappings":[
+      {
+          "DeviceName": "/dev/xvda",  
+          "Ebs": {
+              "VolumeSize": 64,
+              "VolumeType": "gp2"  
+          }
+      }
+    ]
+  },
+
+  "region"   : "us-east-2",
+  "commands"  : [
+    "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -G https://lynker-spatial.s3.amazonaws.com/v20.1/model_attributes/nextgen_$VPU.parquet -g https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_$VPU.gpkg -R  https://github.com/CIROH-UA/ngen-datastream/raw/main/configs/ngen/realization_cfe_sloth_nom.json -S /home/ec2-user/ngen-datastream/data/mount -o /daily/$DATE/$INSTANCE_TYPE/VPU_$VPU -n 8 -r /home/ec2-user/ngen-datastream/data/mount/daily/20240401/VPU_$VPU/datastream-resources > /home/ec2-user/ngen-datastream/log.txt'"
+  ],
+  "bucket"   : "ngen-datastream",
+  "obj_key"  : "daily/$DATE/$INSTANCE_TYPE/VPU_$VPU/ngen-run.tar.gz"
+}
