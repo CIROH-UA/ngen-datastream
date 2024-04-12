@@ -49,7 +49,14 @@ def lambda_handler(event, context):
     print(response)
     instance_id        = response['Instances'][0]['InstanceId']
 
-    client_ec2.start_instances(InstanceIds=[instance_id])   
+    while True:
+        try:
+            client_ec2.start_instances(InstanceIds=[instance_id])   
+            break
+        except:
+            print(f'Tried running {instance_id}, failed. Trying again.')
+            time.sleep(1)
+
     if not wait_for_instance_status(instance_id, 'Online'):
         raise Exception(f"EC2 instance {instance_id} did not reach 'Online' state")
     print(f'{instance_id} has been launched and running')
