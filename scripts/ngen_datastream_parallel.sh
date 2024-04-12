@@ -12,6 +12,7 @@ usage() {
 EXEC_DIR=""
 SM_ARN=""
 REGION=""
+OBJECT_KEY=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -27,12 +28,31 @@ check_s3_object() {
     return $?
 }
 
-exec_files=$(ls "$EXEC_DIR")
-# VPUs=("02" "03N" "03S" "03W" "04" "14")      # 175189
-# VPUs=("01" "05" "06" "07" "08" "09" "10L")   # 184435
-# VPUs=("10U" "11" "12" "13" "14")             # 183157
-# VPUs=("15" "16" "17" "18")                   # 194622
-VPUs=("14" "18") 
+exec_files=$(ls "$EXEC_DIR")              
+
+file=$(find $EXEC_DIR -type f -name '*_fp.json')
+
+echo "Executing state machine $SM_ARN with $file"
+aws stepfunctions start-execution \
+    --state-machine-arn $SM_ARN \
+    --name $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')\
+    --input "file://"$file"" --region $REGION 
+
+OBJECT_KEY=$(jq -r '.obj_key' "$file")
+BUCKET=$(jq -r '.bucket' "$file")
+OBJECT_KEY=$BUCKET/$OBJECT_KEY
+echo "state machine executed, awaiting "$OBJECT_KEY" existence"
+
+check_s3_object "$OBJECT_KEY"
+exists=$?
+while [ $exists -ne 0 ]; do
+    echo "$OBJECT_KEY does not exist. Waiting for a minute and checking again" $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
+    sleep 60
+    check_s3_object "$OBJECT_KEY"
+    exists=$?
+done
+echo "$OBJECT_KEY exists, launching next run in 10 seconds"    
+sleep 10
 
 for vpu in "${VPUs[@]}"; do
     file="execution_dailyrun_$vpu.json"
@@ -43,17 +63,5 @@ for vpu in "${VPUs[@]}"; do
         --name $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')\
         --input "file://"$EXEC_DIR""$file"" --region $REGION 
 
-    echo "state machine executed, awaiting key existence"
-    object_key="ngen-datastream/daily/20240326/VPU_$vpu/ngen-run.tar.gz"
-    
-    check_s3_object "$object_key"
-    exists=$?
-    while [ $exists -ne 0 ]; do
-        echo "$object_key does not exist. Waiting for a minute and checking again" $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
-        sleep 60
-        check_s3_object "$object_key"
-        exists=$?
-    done
-    echo "key exists, launching next run in 5 seconds"
-    sleep 5
+    sleep 10
 done
