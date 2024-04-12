@@ -1,9 +1,7 @@
 {
     "forcing"  : {
-        "start_date"   : "202311060000",
-        "end_date"     : "202311060000",
         "nwm_file"     : "/home/ec2-user/ngen-datastream/forcingprocessor/src/filenamelist.txt",
-        "weight_file"  : "https://ngenresourcesdev.s3.us-east-2.amazonaws.com/01_weights.json"
+        "weight_file"  : "https://ngen-datastream.s3.us-east-2.amazonaws.com/resources/v20.1/VPU_01/weights.json"
     },
 
     "storage":{

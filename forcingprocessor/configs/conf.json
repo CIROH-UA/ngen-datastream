@@ -1,7 +1,5 @@
 {
     "forcing"  : {
-        "start_date"   : "202311060000",
-        "end_date"     : "202311060000",
         "nwm_file"     : "/home/jlaser/code/CIROH/ngen-datastream/data/filenamelist.txt",
         "weight_file"  : ["s3://ngen-datastream/resources/v20.1/VPU_01/weights.json","s3://ngen-datastream/resources/v20.1/VPU_02/weights.json"]
     },
