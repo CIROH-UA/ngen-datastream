@@ -1,6 +1,6 @@
 {
     "forcing"  : {
-        "nwm_file"     : "/home/ec2-user/filenamelist.txt",
+        "nwm_file"     : "/mounted_dir/filenamelist.txt",
         "weight_file"  : [
             "s3://ngen-datastream/resources/v20.1/VPU_01/weights.json",
             "s3://ngen-datastream/resources/v20.1/VPU_02/weights.json",
@@ -23,18 +23,18 @@
             "s3://ngen-datastream/resources/v20.1/VPU_16/weights.json",
             "s3://ngen-datastream/resources/v20.1/VPU_17/weights.json",
             "s3://ngen-datastream/resources/v20.1/VPU_18/weights.json"
-    ]
+        ]
+        
     },
 
     "storage":{
-        "output_path"      : "s3://ngen-datastream/forcings/v20.1/2019",
+        "output_path"      : "s3://ngen-datastream/forcings/v20.1/20240408",
         "output_file_type" : ["tar"]
     },    
 
     "run" : {
         "verbose"       : true,
         "collect_stats" : true,
-        "nprocs"        : 32,
-        "nfile_chunk"   : 24
+        "nprocs"        : 2
     }
 }

@@ -1,7 +1,5 @@
 {
     "forcing"  : {
-        "start_date"   : "202311060000",
-        "end_date"     : "202311060000",
         "nwm_file"     : "/mounted_dir/filenamelist.txt",
         "weight_file"  : "/mounted_dir/forcingprocessor/data/weights/small_weights.json"
     },

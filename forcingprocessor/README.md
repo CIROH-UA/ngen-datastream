@@ -16,8 +16,6 @@ See the docker README for example run commands from the container.
 ```
 {
     "forcing"  : {
-        "start_date    : "",
-        "end_date"     : "",
         "nwm_file"     : "",
         "weight_file"  : ""
     },
@@ -39,8 +37,6 @@ See the docker README for example run commands from the container.
 ### 1. Forcing
 | Field             | Description              | Required |
 |-------------------|--------------------------|----------|
-| start_time        | Datetime of first nwm file (YYYYMMDDHHMM) |:white_check_mark: |
-| end_time          | Datetime of last nwm file  (YYYYMMDDHHMM) | :white_check_mark: |
 | nwm_file          | Path to a text file containing nwm file names. One filename per line. [Tool](#nwm_file) to create this file | :white_check_mark: |
 | weight_file       | Weight file for the run Accepts local absolute path, s3 URI or URL. [Tool](#weight_file) to create this file |  :white_check_mark: |
 
