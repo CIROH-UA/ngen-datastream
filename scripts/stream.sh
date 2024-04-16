@@ -21,7 +21,6 @@ get_file() {
             aws s3 cp "$FILE" "$OUTFILE"
         fi
     else
-        FILE=$(readlink -f "$FILE")
         if [ -e "$FILE" ]; then
             cp -r "$FILE" "$OUTFILE"
         else
@@ -175,14 +174,13 @@ else
         DATA_PATH="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
     fi
     if [[ -n "${S3_MOUNT}" ]]; then
-        S3_OUT="$S3_MOUNT/$START_DATE-$END_DATE"
+        S3_OUT="$S3_MOUNT$S3_PREFIX"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT
     fi
 fi
 
 # create directories
-DATA_PATH=$(readlink -f "$DATA_PATH")
 if [ -e "$DATA_PATH" ]; then
     echo "The path $DATA_PATH exists. Please delete it or set a different path."
     exit 1
@@ -422,7 +420,7 @@ if [ ! -z $FORCINGS_TAR ]; then
     FORCINGS_BASE=$(basename $FORCINGS_TAR)    
     mkdir -p $NGEN_FORCINGS_PATH
     get_file "$FORCINGS_TAR" "./$FORCINGS_BASE"
-    tar -xf $FORCINGS_BASE -C "${NGEN_FORCINGS_PATH%/}"
+    tar --use-compress-program=pigz -xf $FORCINGS_BASE -C "${NGEN_FORCINGS_PATH%/}"
     rm "./$FORCINGS_BASE"
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
 else
