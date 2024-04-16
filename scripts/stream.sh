@@ -10,12 +10,18 @@ get_file() {
     local OUTFILE="$2"
 
     echo "Retrieving "$FILE" and storing it here "$OUTFILE
-
     if [[ "$FILE" == *"https://"* ]]; then
         curl -# -L -o "$OUTFILE" "$FILE"
     elif [[ "$FILE" == *"s3://"* ]]; then
-        aws s3 cp "$FILE" "$OUTFILE"
+        BUCKET=$(echo "$FILE" | cut -d '/' -f 3)
+        KEY=$(echo "$FILE" | cut -d '/' -f 4-)
+        if [[ "$KEY" == */ ]]; then
+            aws s3 sync "$FILE" "$OUTFILE"
+        else
+            aws s3 cp "$FILE" "$OUTFILE"
+        fi
     else
+        FILE=$(readlink -f "$FILE")
         if [ -e "$FILE" ]; then
             cp -r "$FILE" "$OUTFILE"
         else
@@ -42,7 +48,7 @@ usage() {
     echo "  -d, --DATA_PATH           <Path to write to> "
     echo "  -R, --REALIZATION         <Path to realization file> "
     echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
-    echo "  -f, --FORCINGS_PATH       <Path to forcings tarball> "
+    echo "  -f, --FORCINGS_TAR        <Path to forcings tarball> "
     echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
     echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
@@ -213,7 +219,6 @@ DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
 if [ ! -z $RESOURCE_PATH ]; then
     echo "running in lite mode"
-    RESOURCE_PATH=$(readlink -f "$RESOURCE_PATH")
     get_file "$RESOURCE_PATH" $DATASTREAM_RESOURCES
 else
     echo "running in standard mode"
@@ -381,17 +386,13 @@ else
     log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 fi
 
-if [ ! -z $FORCINGS_TAR ]; then
-    NWMURL_CONF_PATH="FORCINGS_TAR"
-fi
-
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
 DOCKER_TAG="datastream:latest"
 echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 
