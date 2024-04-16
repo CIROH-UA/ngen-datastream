@@ -172,6 +172,13 @@ def create_confs(conf,args):
         nwmurl_file=conf['globals']['nwmurl_file']
         if nwmurl_file == "RETROSPECTIVE":
             nwm_conf = create_nwmurls_retro(start,end)
+            ii_retro = nwm_conf['forcing_type'] == 'retrospective'
+            fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu) 
+        elif nwmurl_file == "FORCING_TAR":
+            nwm_conf = {}
+            nwm_conf['forcing_type'] = 'retrospective'
+            fp_conf = {}
+            fp_conf['forcing'] = 'TARBALL'
         else:
             if os.path.exists(args.docker_mount):
                 rel=os.path.relpath(conf['globals']['nwmurl_file'],conf['globals']['data_path'])
@@ -180,9 +187,9 @@ def create_confs(conf,args):
                 nwm_conf = json.load(fp)
                 nwm_conf['start_date'] = start
                 nwm_conf['end_date']   = end
+            ii_retro = nwm_conf['forcing_type'] == 'retrospective'
+            fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu) 
 
-    ii_retro = nwm_conf['forcing_type'] == 'retrospective'
-    fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu)  
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
 

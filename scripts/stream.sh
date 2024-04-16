@@ -381,6 +381,10 @@ else
     log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 fi
 
+if [ ! -z $FORCINGS_TAR ]; then
+    NWMURL_CONF_PATH="FORCINGS_TAR"
+fi
+
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
 DOCKER_TAG="datastream:latest"
 echo "Generating ngen-datastream metadata"
