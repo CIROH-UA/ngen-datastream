@@ -33,6 +33,7 @@ def generate_config(args):
             "gpkg"          : args.gpkg,
             "gpkg_attr"     : args.gpkg_attr,
             "resource_path" : args.resource_path,
+            "forcings_tar"  : args.forcings_tar,
             "nwmurl_file"   : args.nwmurl_file,
             "nprocs"        : args.nprocs,
             "forcing_split_vpu"    : args.forcing_split_vpu
@@ -174,7 +175,7 @@ def create_confs(conf,args):
             nwm_conf = create_nwmurls_retro(start,end)
             ii_retro = nwm_conf['forcing_type'] == 'retrospective'
             fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu) 
-        elif nwmurl_file == "FORCING_TAR":
+        elif len(args.forcings_tar) > 0:
             nwm_conf = {}
             nwm_conf['forcing_type'] = 'retrospective'
             fp_conf = {}
@@ -233,6 +234,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
     parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file",default="")
     parser.add_argument("--resource_path", help="Set the resource directory",default="")
+    parser.add_argument("--forcings_tar", help="Set the end date",default="")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
     parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
