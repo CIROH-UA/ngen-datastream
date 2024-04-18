@@ -20,8 +20,3 @@ tar -xzvf hfsubset-linux_amd64.tar.gz
 rm hfsubset-linux_amd64.tar.gz mount-s3.rpm
 sudo mv hfsubset /usr/bin/hfsubset
 git clone https://github.com/CIROH-UA/ngen-datastream.git
-sudo $PKG_MNGR install docker -y
-sudo systemctl start docker
-sudo usermod -aG docker $USER
-sudo newgrp docker
-
