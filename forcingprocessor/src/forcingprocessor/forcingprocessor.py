@@ -532,7 +532,7 @@ def write_data(
 
     return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB], tar_list
 
-def write_tar(dfs,jcatchunk,catchments,filenames):
+def write_tar(tar_buffs,jcatchunk,catchments,filenames):
     """
     Write DataFrames to a tar archive and upload to S3 or save locally as a compressed tar file.
 
@@ -551,14 +551,11 @@ def write_tar(dfs,jcatchunk,catchments,filenames):
         buffer = BytesIO()
         with tarfile.open(fileobj=buffer, mode='w:gz') as jtar:
             for j, jcat in enumerate(catchments):
-                jdf  = dfs[j]
+                jbuff = tar_buffs[j]
                 jfilename = filenames[j]
-                with tempfile.NamedTemporaryFile() as tmpfile:
-                    if "parquet" in  output_file_type:
-                        jdf.to_parquet(tmpfile.name, index=False)
-                    else:
-                        jdf.to_csv(tmpfile.name, index=False)                        
-                    jtar.add(tmpfile.name, arcname=jfilename)
+                info = tarfile.TarInfo(name=jfilename)
+                info.size = len(jbuff.getbuffer())
+                jtar.addfile(info, jbuff) 
 
         print(f'Uploading {jcatchunk} tar to s3')
         buffer.seek(0)
@@ -569,16 +566,13 @@ def write_tar(dfs,jcatchunk,catchments,filenames):
         tar_name = Path(forcing_path,f'{jcatchunk}_forcings.tar.gz')
         with tarfile.open(tar_name, 'w:gz') as jtar:
             for j, jcat in enumerate(catchments):
-                jdf  = dfs[j]
+                jbuff = tar_buffs[j]
                 jfilename = filenames[j]
-                with tempfile.NamedTemporaryFile() as tmpfile:
-                    if "parquet" in  output_file_type:
-                        jdf.to_parquet(tmpfile.name, index=False)
-                    else:
-                        jdf.to_csv(tmpfile.name, index=False)                        
-                    jtar.add(tmpfile.name, arcname=jfilename)          
+                info = tarfile.TarInfo(name=jfilename)
+                info.size = len(jbuff.getbuffer())
+                jtar.addfile(info, jbuff)     
 
-def multiprocess_write_tars(dfs,catchments,filenames):  
+def multiprocess_write_tars(dfs,catchments,filenames,tar_buffs):  
     """
     Write DataFrames to tar archives using multiprocessing.
 
@@ -592,14 +586,14 @@ def multiprocess_write_tars(dfs,catchments,filenames):
     """
     i=0
     k=0
-    dfs_list = []
+    tar_buffs_list = []
     jcatchunk_list = []
     catchments_list = []
     filenames_list = []
     for j, jchunk in enumerate(catchments):  
         ncatchments = len(catchments[jchunk])
         k += ncatchments
-        dfs_list.append(dfs[i:k])
+        tar_buffs_list.append(tar_buffs[i:k])
         jcatchunk_list.append(jchunk)
         catchments_list.append(catchments[jchunk])
         filenames_list.append(filenames[i:k]) 
@@ -608,7 +602,7 @@ def multiprocess_write_tars(dfs,catchments,filenames):
     with cf.ProcessPoolExecutor(max_workers=min(len(catchments),nprocs)) as pool:
         for results in pool.map(
         write_tar,
-        dfs_list,
+        tar_buffs_list,
         jcatchunk_list,
         catchments_list,
         filenames_list      
@@ -1002,7 +996,7 @@ def prep_ngen_data(conf):
         log_time("TAR_START", log_file)
         if ii_verbose: print(f'\nWriting tarball...',flush=True)
         t0000 = time.perf_counter()
-        multiprocess_write_tars(dfs,jcatchment_dict,filenames)    
+        multiprocess_write_tars(dfs,jcatchment_dict,filenames,tar_buffs)    
         tar_time = time.perf_counter() - t0000
         log_time("TAR_END", log_file)
 
