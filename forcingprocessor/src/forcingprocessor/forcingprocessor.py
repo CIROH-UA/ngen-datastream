@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import psutil
 import gzip
 import tarfile, tempfile
+import multiprocessing as mp
 
 global nwm_variables
 nwm_variables = [
@@ -40,6 +41,31 @@ ngen_variables = [
     "PRES_surface",
     "DSWRF_surface",
 ] 
+
+def get_file_size(file):
+    if "https://" in file:
+        response = requests.head(file)
+        forcing_size = int(response.headers.get('Content-Length', 0))
+    if "s3://":
+        s3 = boto3.client('s3')
+        bucket, key = convert_url2key(file,'s3')
+        response = s3.head_object(Bucket=bucket, Key=key)
+        size_in_bytes = response['ContentLength']
+
+def memory_check(filenamelist,ncatchments):
+    estimated_load = 0
+    estimated_load += get_file_size(filenamelist[0])
+
+    datum_size_bytes = 4
+    data_cube_size = ncatchments * len(filenamelist) * len(ngen_variables) * datum_size_bytes
+    estimated_load += data_cube_size
+
+    usage_ram, percent_ram, percent_cpu = report_usage()
+
+    limit = 0.95
+    excess = 1-limit
+
+
 
 def log_time(label, log_file):
     timestamp = datetime.now(timezone.utc).astimezone().strftime('%Y%m%d%H%M%S')
@@ -115,7 +141,7 @@ def report_usage():
     percent_ram = psutil.virtual_memory()[2]
     percent_cpu = psutil.cpu_percent()
     if ii_verbose: print(f'\nCurrent RAM usage (GB): {usage_ram:.2f}, {percent_ram:.2f}%\nCurrent CPU usage : {percent_cpu:.2f}%')
-    return
+    return usage_ram, percent_ram, percent_cpu
 
 def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
     """
@@ -173,7 +199,7 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
 
 def forcing_grid2catchment(nwm_files: list, fs=None):
     """
-    General function to retrieve catchment level data from national water model files
+    Retrieve catchment level data from national water model files
 
     Inputs:
     nwm_files: list of filenames (urls for remote, local paths otherwise),
@@ -182,6 +208,9 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
     Outputs:
     df_by_t : (returned for local files) a list (in time) of forcing data. Note that this list may not be consistent in time
     t : model_output_valid_time for each
+
+    Globals:
+    weights_json : dictionary with catchment-ids as keys and values are a list of two items, indices and coverage
 
     """
     topen = 0
@@ -240,7 +269,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
         data_list.append(data_array)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
-        if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s', end=None,flush=True)
+        if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s\npercent complete {(j+1)/nfiles}', end=None,flush=True)
         report_usage()
 
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process',flush=True)
@@ -317,6 +346,7 @@ def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
     filenames = []
     file_sizes_MB = []
     file_sizes_zipped_MB = []
+    tar_list = []
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
          for results in pool.map(
         write_data,
@@ -332,16 +362,26 @@ def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
             filenames.append(results[2])
             file_sizes_MB.append(results[3])
             file_sizes_zipped_MB.append(results[4])
+            tar_list.append(results[5])
 
     print(f'\n\nGathering data from write processes...')
 
-    flat_ids  = [item for sublist in ids for item in sublist]
-    flat_dfs  = [item for sublist in dfs for item in sublist]
-    flat_filenames = [item for sublist in filenames for item in sublist]
-    flat_file_sizes = [item for sublist in file_sizes_MB for item in sublist]
-    flat_file_sizes_zipped = [item for sublist in file_sizes_zipped_MB for item in sublist]
+    flat_ids = []
+    flat_dfs = []
+    flat_filenames = []
+    flat_file_sizes = []
+    flat_file_sizes_zipped = []
+    flat_tar = []
 
-    return flat_ids, flat_dfs, flat_filenames, flat_file_sizes, flat_file_sizes_zipped
+    while ids:
+        flat_ids.extend(ids.pop(0))
+        flat_dfs.extend(dfs.pop(0))
+        flat_filenames.extend(filenames.pop(0))
+        flat_file_sizes.extend(file_sizes_MB.pop(0))
+        flat_file_sizes_zipped.extend(file_sizes_zipped_MB.pop(0))
+        flat_tar.extend(tar_list.pop(0))
+
+    return flat_ids, flat_dfs, flat_filenames, flat_file_sizes, flat_file_sizes_zipped, flat_tar
 
 def write_data(
         data,
@@ -377,6 +417,7 @@ def write_data(
     if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None, flush =True)
 
     forcing_cat_ids = []
+    tar_list = []
     dfs = []
     filenames = []
     filename  = ""
@@ -447,7 +488,13 @@ def write_data(
             filename = f"./cat-{cat_id}.csv"
 
         dfs.append(df)     
-        filenames.append(str(Path(filename).name))                                            
+        filenames.append(str(Path(filename).name))          
+
+        if "tar" in output_file_type:
+            buf = BytesIO()
+            df.to_csv(buf, index=False)
+            buf.seek(0)
+            tar_list.append(buf)
 
         if j == 0:
             if not os.path.exists(filename):
@@ -483,7 +530,7 @@ def write_data(
                 msg += f"Bandwidth (all processs)   {bandwidth_Mbps:.2f} Mbps"
                 print(msg,flush=True)
 
-    return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB]
+    return forcing_cat_ids, dfs, filenames, [file_size_MB], [file_zipped_size_MB], tar_list
 
 def write_tar(dfs,jcatchunk,catchments,filenames):
     """
@@ -775,6 +822,8 @@ def prep_ngen_data(conf):
             nwm_forcing_files.append(jline.strip())
     nfiles = len(nwm_forcing_files)
 
+    # memory_check(nwm_forcing_files, weight_files, ncatchments)
+
     global fs_type
     if 's3://' in nwm_forcing_files[0] or 's3.amazonaws' in nwm_forcing_files[0]:
         fs = s3fs.S3FileSystem(
@@ -819,7 +868,8 @@ def prep_ngen_data(conf):
         if "netcdf" in output_file_type:
             multiprocess_write_netcdf(data_array, jcatchment_dict, t_ax)
         if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
-        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append)      
+        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped, tar_buffs = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append)
+
         ii_append = True
         write_time += time.perf_counter() - t0    
         write_rate = ncatchments / write_time
@@ -855,7 +905,7 @@ def prep_ngen_data(conf):
         nwm_file_size_med = np.median(nwm_file_sizes)
         nwm_file_size_std = np.std(nwm_file_sizes)
 
-        catch_file_size_avg = np.average(file_sizes)
+        catch_file_size_avg = np.average(np.fromiter(file_sizes, dtype=float))
         catch_file_size_med = np.median(file_sizes)
         catch_file_size_std = np.std(file_sizes)    
 
@@ -959,7 +1009,7 @@ def prep_ngen_data(conf):
     if storage_type == "s3": 
         bucket, key  = convert_url2key(metaf_path,storage_type)
         s3.put_object(
-                Body='./log_fp.txt',
+                Body=f'./log_fp_{datentime}.txt',
                 Bucket=bucket,
                 Key=conf_path
             )
@@ -977,6 +1027,7 @@ def prep_ngen_data(conf):
             msg += f"\nWrite tar     : {tar_time:.2f}s"
         msg += f"\nRuntime       : {runtime:.2f}s\n"
         print(msg)
+    log_time("FORCINGPROCESSOR_END", log_file)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
