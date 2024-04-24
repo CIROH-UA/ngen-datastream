@@ -13,6 +13,7 @@ EXEC_DIR=""
 SM_ARN=""
 REGION=""
 OBJECT_KEY=""
+VPUs=("01" "02" "03N" "03S" "03W" "04" "05" "06" "07" "08" "09" "10L" "10U" "11" "12" "13" "14" "15" "16" "17" "18") 
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -55,13 +56,12 @@ echo "$OBJECT_KEY exists, launching next run in 10 seconds"
 sleep 10
 
 for vpu in "${VPUs[@]}"; do
-    file="execution_dailyrun_$vpu.json"
+    file="execution_$vpu.json"
     
     echo "Executing state machine $SM_ARN with $file"
     aws stepfunctions start-execution \
         --state-machine-arn $SM_ARN \
         --name $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')\
         --input "file://"$EXEC_DIR""$file"" --region $REGION 
-
     sleep 10
 done

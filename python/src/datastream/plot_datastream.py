@@ -6,8 +6,9 @@ import numpy as np
 import re
 import copy
 from scipy.stats import linregress
+import boto3
 
-global VPUs, ncatchment_vpu
+global VPUs, ncatchment_vpu, isntances
 VPUs = ["01","02","03N",
     "03S","03W","04",
     "05","06", "07",
@@ -24,13 +25,28 @@ ncatchment_vpu = [19194, 33779, 30052,
                     25482, 32760, 39578, 
                     34201, 80040, 40803]  
 
-PRICING_DICT={}
-PRICING_DICT["t4g.xlarge"]=0.1344
-PRICING_DICT["t4g.2xlarge"]=0.2688
-
-
 plt.switch_backend('Agg')
 plt.style.use('dark_background')
+
+def get_ec2_instance_price(instance_type):
+    client = boto3.client('pricing', region_name='us-east-1')
+    paginator = client.get_paginator('get_products')
+    response_iterator = paginator.paginate(ServiceCode='AmazonEC2')
+    for page in response_iterator:
+        for product in page['PriceList']:
+            product_data = json.loads(product)
+            if 'instanceType' in product_data['product']['attributes'] and \
+               product_data['product']['attributes']['instanceType'] == instance_type:
+                price_dimension = product_data['terms']['OnDemand'][next(iter(product_data['terms']['OnDemand']))]['priceDimensions']
+                price_info = next(iter(price_dimension.values()))
+                try:
+                    return float(price_info['pricePerUnit']['USD'])
+                except:
+                    if instance_type == "r7g.2xlarge":
+                        return 0.4284
+                    else:
+                        raise Exception(f'failure to locate price for instance {instance_type}')
+    raise Exception(f'Pricing for {instance_type} not found')
 
 def profile_txt2df(txt_file):
     with open(txt_file,'r') as fp:
@@ -62,32 +78,33 @@ def profile_txt2df(txt_file):
 
     return pro_df
 
-def get_steps_dict(profile_dict):
+def get_steps_dict(profile_dict,VPUs):
   
     step_dfs = {}
-    VPU_list = []
+    fp_dfs = {}
     ncatchment_list = []
     steps = None
     for profile_name in profile_dict:
-        match = re.search(r'_(.+)', profile_name)
-        jvpu  = match.group(1)
-        VPU_list.append(jvpu)
-        ncatchment_list.append(ncatchment_vpu[VPUs.index(jvpu)])
         jdf = profile_dict[profile_name]["profile_df"]
-        if steps is None: steps = jdf.columns
+        if profile_name != 'fp': 
+            ncatchment_list.append(ncatchment_vpu[VPUs.index(profile_name)])
+            loop_dict = step_dfs
+        else:
+            loop_dict = fp_dfs
+        steps = jdf.columns        
         for j, jstep in enumerate(steps):
             jstep_duration = jdf[jstep]["duration_seconds"]/60
             
-            if jstep not in step_dfs:
-                step_dfs[jstep] = pd.DataFrame({"profile":[profile_name],"duration_minutes":[jstep_duration]})
+            if jstep not in loop_dict:
+                loop_dict[jstep] = pd.DataFrame({"profile":[profile_name],"duration_minutes":[jstep_duration]})
             else:
-                step_dfs[jstep] = pd.concat([pd.DataFrame({"profile":[profile_name],"duration_minutes":[jstep_duration]}),step_dfs[jstep]],ignore_index=True)
-    return step_dfs, ncatchment_list
+                loop_dict[jstep] = pd.concat([pd.DataFrame({"profile":[profile_name],"duration_minutes":[jstep_duration]}),step_dfs[jstep]],ignore_index=True)
+    return step_dfs, ncatchment_list, fp_dfs
 
 def plot_group(profile_dict,conf_dict,input_csv):
     
     
-    step_dfs, ncatchment_list = get_steps_dict(profile_dict)
+    step_dfs, ncatchment_list, fp_step_dfs = get_steps_dict(profile_dict,VPUs)
 
     profile_list = []
     for jrow in step_dfs["GET_RESOURCES"]["profile"]:
@@ -119,7 +136,6 @@ def plot_group(profile_dict,conf_dict,input_csv):
         ram = host["host_RAM"]
         host_os = host["host_OS"]
         host_type = host["host_type"]
-        cost_per_hr = PRICING_DICT[host_type]
         host_arch = host["host_arch"]
         add_text  = "Run Info\n"        
         add_text += f"cores:    {cores}\n"
@@ -135,7 +151,7 @@ def plot_group(profile_dict,conf_dict,input_csv):
         idx = np.where(jcatch == ncatchment_vpu)[0][0]
         vpu_n_catchments.append(f"{jcatch}, {VPUs[idx]}")
 
-    write_to_csv(input_csv,ncatchment_list_sorted,step_dfs_sorted,"duration_minutes",conf_dict,cost_per_hr)
+    write_to_csv(input_csv,ncatchment_list_sorted,step_dfs_sorted,conf_dict,fp_step_dfs)
 
     step_dfs_sorted.pop("total_runtime")
     step_dfs_proportion.pop("total_runtime")
@@ -157,55 +173,83 @@ def plot_group(profile_dict,conf_dict,input_csv):
 
 #     pass    
 
-def write_to_csv(benchmark,catchments,dfs,key,confs,cost_per_hr):  
+def write_to_csv(benchmark,catchments,dfs,confs,fp_dfs):  
     steps = list(dfs.keys())
     benchmark_df = pd.read_csv(benchmark, index_col="Run ID")
-    combined_df = pd.concat(dfs.values(), keys=dfs.keys())
+    combined_df = pd.concat(dfs.values(), keys=dfs.keys())    
 
-    nts = 24
+    diff = datetime.strptime(confs['01']['globals']['end_date'],'%Y%m%d%H%M') - datetime.strptime(confs['01']['globals']['start_date'],'%Y%m%d%H%M')
+    nts = diff.days * 24
     idx = np.where(~np.isnan(benchmark_df.index))[0][-1]
     last = benchmark_df.index[idx]
 
     idx_combo = combined_df['profile']['total_runtime'].index
 
     df_append = []
-    for j, jprofile in enumerate(dfs['GET_RESOURCES'].profile):
-        jrun = jprofile.split("profile_")[-1]
-        runtime_min = dfs['total_runtime'].set_index('profile')['duration_minutes'][jprofile]
+    for j, jrun in enumerate(dfs['GET_RESOURCES'].profile):
+        runtime_min = dfs['total_runtime'].set_index('profile')['duration_minutes'][jrun]
         jdict = {}
         jdict["Run ID"]        = last + j
         jdict["Provider"]      = "AWS"
-        jdict["Instance Type"] = confs[jrun]['host']['host_type']
+        instance_type          = confs[jrun]['host']['host_type']
+        jdict["Instance Type"] = instance_type
         jdict["Cores"]         = confs[jrun]['host']['host_cores']
         jdict["Memory (GB)"]   = confs[jrun]['host']['host_RAM'][:-1]
         jdict["Hardware"]      = confs[jrun]['host']['host_arch']
         jdict["OS"]            = confs[jrun]['host']['host_OS']
+        cost_per_hr = get_ec2_instance_price(instance_type)   
+        for jstep in steps:
+            jdict[f"{jstep} Cost"] = combined_df['duration_minutes'][jstep][idx_combo[j]] * cost_per_hr / 60     
         jdict["Cost/hr"]       = f"${cost_per_hr}"
         jdict["Domain Name"]   = confs[jrun]['globals']['domain_name']
         jdict["Domain Name"]   = f"nextgen_{jrun}"
         jdict["Catchments"]    = catchments[j]
+        jdict['Timesteps']     = nts
         jdict["Realization"]   = "CFE, PET, SLOTH, NOM"
-        for jstep in steps:
-            jdict[f"{jstep} Yearly Cost"] = 365 * combined_df['duration_minutes'][jstep][idx_combo[j]] * cost_per_hr / 60
-        jdict["Total Runtime (minutes)"]           = runtime_min
-        jdict["Catchments/core/timestep/second"]   = catchments[j] / confs[jrun]['host']['host_cores'] / nts / (runtime_min / 60)
+        jdict["Total Runtime (minutes)"] = runtime_min
+        jdict["Catchments/core/second"]  = catchments[j] / confs[jrun]['host']['host_cores'] / (runtime_min / 60)
         jdict["CONUS equivalent concurrent vCPUs"] = len(ncatchment_vpu) * confs[jrun]['host']['host_cores']
-        jdict["Daily Operating Cost"]              = (runtime_min/60) * cost_per_hr 
-        jdict["Yearly Operating Cost"]       = 365 * (runtime_min/60) * cost_per_hr 
-        jdict["Daily Operating Cost/Timestep"]     = (runtime_min/60) * cost_per_hr / nts
+        jdict["Run Cost"]                = (runtime_min/60) * cost_per_hr 
+        jdict["Run Cost / Timestep"]     = jdict["Run Cost"] / nts
         df_append.append(jdict)
-        
+
     df_append = pd.DataFrame(df_append).set_index("Run ID")
     df_old = benchmark_df.drop(benchmark_df.index[np.arange(idx,len(benchmark_df))])
-
     benchmark_name = os.path.basename(benchmark).split('.csv')[0]
     today = datetime.now().strftime("%Y%m%d")
     benchmark_out  = os.path.join(os.path.dirname(benchmark),f"{benchmark_name}_{today}.xlsx")
-    with pd.ExcelWriter(benchmark_out) as writer: 
-        df_append.to_excel(writer,sheet_name=confs[jrun]['host']['host_type'].split(": ")[-1])
-        df_old.to_excel(writer,sheet_name="Old Runs")
 
-    pass  
+    fp_df_append = []
+    steps = list(fp_dfs.keys())
+    combined_df_fp = pd.concat(fp_dfs.values(), keys=fp_dfs.keys())
+    runtime_min = fp_dfs['total_runtime'].set_index('profile')['duration_minutes'].iloc[0]
+    jdict = {}
+    jdict["Run ID"]        = last + j
+    jdict["Provider"]      = "AWS"
+    instance_type          = "r7g.16xlarge"
+    jdict["Instance Type"] = instance_type
+    jdict["Cores"]         = 64
+    jdict["Memory (GB)"]   = 512
+    jdict["Hardware"]      = confs[jrun]['host']['host_arch']
+    jdict["OS"]            = confs[jrun]['host']['host_OS']
+    cost_per_hr = get_ec2_instance_price(instance_type)   
+    for jstep in steps:
+        jdict[f"{jstep} Cost"] = combined_df_fp['duration_minutes'][jstep] * cost_per_hr / 60     
+    jdict["Cost/hr"]       = f"${cost_per_hr}"
+    jdict["Domain Name"]   = f"CONUS"
+    jdict["Catchments"]    = np.sum(ncatchment_vpu)
+    jdict['Timesteps']     = nts
+    jdict["Total Runtime (minutes)"]           = runtime_min
+    jdict["Catchments/core/second"]   = catchments[j] / confs[jrun]['host']['host_cores'] / (runtime_min / 60)
+    jdict["CONUS equivalent concurrent vCPUs"] = len(ncatchment_vpu) * confs[jrun]['host']['host_cores']
+    jdict["Run Cost"]                = (runtime_min/60) * cost_per_hr 
+    jdict["Run Cost / Timestep"]     = jdict["Run Cost"] / nts
+    fp_df_append.append(jdict)      
+    fp_df_append = pd.DataFrame(fp_df_append).set_index("Run ID")
+    with pd.ExcelWriter(benchmark_out) as writer: 
+        fp_df_append.to_excel(writer,sheet_name=datetime.now().strftime('%Y%m%d')+"_fp")  
+        df_append.to_excel(writer,sheet_name=datetime.now().strftime('%Y%m%d'))
+        df_old.to_excel(writer,sheet_name="Old Runs")
 
 def plot_scaling(xticklabelz,dfs,title,save_name,y_label,key,add_text,colors):
     plt.clf()
@@ -255,7 +299,7 @@ def plot_bar_chart(xticklabelz,dfs,title,save_name,y_label,key,add_text,colors):
 
     plt.subplots_adjust(right=0.65)
     plt.subplots_adjust(bottom=0.2)
-    if key != "proportion":plt.ylim(0,60)
+    if key != "proportion":plt.ylim(0,420)
     plt.title(title)
     plt.savefig(os.path.join(out_dir,save_name))
     plt.clf()
@@ -277,20 +321,20 @@ if __name__ == "__main__":
     data_dir = args.data_dir
     all_profiles = {}
     all_confs = {}
+    conf_pattern    = r".*\.json"
+    profile_pattern = r"profile_.*\.txt"
     for path, _, files in os.walk(data_dir):
         for jfile in files:
-            jfile_path = os.path.join(path,jfile)
-            jname = jfile.split(".")[0]
-            pattern = r"profile_.*\.txt"
-            if re.search(pattern,jfile_path):    
+            jfile_path = os.path.join(path,jfile)            
+            if re.search(profile_pattern,jfile_path):   
+                jname = jfile.split(".txt")[0].split("_")[-1]
                 jfile_df= profile_txt2df(jfile_path)
                 all_profiles[jname] = {}
                 all_profiles[jname]["file_name"] = jfile_path
                 all_profiles[jname]["profile_df"] = jfile_df
 
-            pattern = r"conf_datastream.*\.json"
-            if re.search(pattern,jfile_path):
-                jname = jname.split("_")[2:][0]
+            if re.search(conf_pattern,jfile_path):
+                jname = jfile.split(".")[0].split("_")[2:][0]
                 with open(jfile_path,'r') as fp:
                     all_confs[jname] = json.load(fp)
 
