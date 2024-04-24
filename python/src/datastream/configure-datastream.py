@@ -34,7 +34,6 @@ def generate_config(args):
             "gpkg_attr"     : args.gpkg_attr,
             "resource_path" : args.resource_path,
             "forcings_tar"  : args.forcings_tar,
-            "nwmurl_file"   : args.nwmurl_file,
             "nprocs"        : args.nprocs,
             "forcing_split_vpu"    : args.forcing_split_vpu
         }, 
@@ -61,8 +60,8 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(start,end,ii_retro,nprocs,docker_mount,forcing_split_vpu):
-    if ii_retro:
+def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op):
+    if retro_or_op == "retrospective":
         filename = "retro_filenamelist.txt"
     else:
         filename = "filenamelist.txt"
@@ -118,25 +117,10 @@ def create_conf_fp(start,end,ii_retro,nprocs,docker_mount,forcing_split_vpu):
 
     return fp_conf
 
-def create_conf_nwm_daily(start,end):
+def create_conf_nwm(start, end, retro_or_op):
 
-    num_hrs = 24
-    nwm_conf = {
-        "forcing_type" : "operational_archive",
-        "start_date"   : start,
-        "end_date"     : end,
-        "runinput"     : 2,
-        "varinput"     : 5,
-        "geoinput"     : 1,
-        "meminput"     : 0,
-        "urlbaseinput" : 7,
-        "fcst_cycle"   : [0],
-        "lead_time"    : [x+1 for x in range(num_hrs)]
-    }
-    return nwm_conf  
-
-def create_nwmurls_retro(start,end):
-    nwm_conf = {
+    if retro_or_op == "retrospective":
+        nwm_conf = {
         "forcing_type" : "retrospective",
         "start_date"   : start,
         "end_date"     : end,
@@ -144,8 +128,30 @@ def create_nwmurls_retro(start,end):
         "selected_object_type" : [1],
         "selected_var_types"   : [6],
         "write_to_file"        : True
-    }
-    return nwm_conf
+        }   
+    else:
+        start_df = datetime.strptime(start,'%Y%m%d%H%M')
+        end_df   = datetime.strptime(end,'%Y%m%d%H%M')
+        diff_days = (end_df - start_df).days
+        if diff_days == 0:
+            num_hrs = int((end_df - start_df).seconds / 3600)
+        else:
+            num_hrs = 24
+
+        nwm_conf = {
+            "forcing_type" : "operational_archive",
+            "start_date"   : start,
+            "end_date"     : end,
+            "runinput"     : 2,
+            "varinput"     : 5,
+            "geoinput"     : 1,
+            "meminput"     : 0,
+            "urlbaseinput" : 7,
+            "fcst_cycle"   : [0],
+            "lead_time"    : [x+1 for x in range(num_hrs)]
+        }
+
+    return nwm_conf  
 
 def create_confs(conf,args,realization):
         
@@ -165,34 +171,26 @@ def create_confs(conf,args,realization):
         end = tomorrow.strftime('%Y%m%d%H%M')
         start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
         end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
-        nwm_conf = create_conf_nwm_daily(start, end)
-        fp_conf = create_conf_fp(start, end, 0, conf['globals']['nprocs'],args.docker_mount,0) 
-
+        nwm_conf = create_conf_nwm(start, end, retro_or_op)
+        fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,"operational") 
     else: 
         start = conf['globals']['start_date']
         end   = conf['globals']['end_date']
-        start_realization =  datetime.strptime(start,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
-        end_realization   =  datetime.strptime(end,'%Y%m%d%H%M').strftime('%Y-%m-%d %H:%M:%S')
-        nwmurl_file=conf['globals']['nwmurl_file']
-        if nwmurl_file == "RETROSPECTIVE":
-            nwm_conf = create_nwmurls_retro(start,end)
-            ii_retro = nwm_conf['forcing_type'] == 'retrospective'
-            fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu) 
-        elif len(args.forcings_tar) > 0:
+        start_realization_dt = datetime.strptime(start,'%Y%m%d%H%M')
+        end_realization_dt = datetime.strptime(end,'%Y%m%d%H%M')
+        start_realization =  start_realization_dt.strftime('%Y-%m-%d %H:%M:%S')
+        end_realization   = end_realization_dt.strftime('%Y-%m-%d %H:%M:%S')
+        if len(args.forcings_tar) > 0:
             nwm_conf = {}
-            nwm_conf['forcing_type'] = 'retrospective'
             fp_conf = {}
             fp_conf['forcing'] = 'TARBALL'
         else:
-            if os.path.exists(args.docker_mount):
-                rel=os.path.relpath(conf['globals']['nwmurl_file'],conf['globals']['data_path'])
-                nwmurl_file = os.path.join(args.docker_mount,rel)
-            with open(nwmurl_file,'r') as fp:
-                nwm_conf = json.load(fp)
-                nwm_conf['start_date'] = start
-                nwm_conf['end_date']   = end
-            ii_retro = nwm_conf['forcing_type'] == 'retrospective'
-            fp_conf = create_conf_fp(start, end, ii_retro,conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu) 
+            if (datetime.now() - start_realization_dt).days > 30:
+                retro_or_op = "retrospective"
+            else:
+                retro_or_op = "operational"
+            nwm_conf = create_conf_nwm(start,end, retro_or_op)
+            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op) 
 
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
@@ -234,7 +232,6 @@ if __name__ == "__main__":
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
     parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
-    parser.add_argument("--nwmurl_file", help="Provide an optional nwmurl file",default="")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use",default=os.cpu_count())
     parser.add_argument("--host_type", type=str,help="Type of host",default="")
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
