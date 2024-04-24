@@ -61,7 +61,7 @@ def test_generate_weights(get_paths):
 
     assert pytest.full_weight.exists()
 
-    os.system('curl -L -O https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_09.gpkg')
+    os.system('curl -L -O https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg')
 
     get_catchments_from_gpkg('./nextgen_09.gpkg')
 
