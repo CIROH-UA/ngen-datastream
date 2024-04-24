@@ -55,6 +55,8 @@ def generate_config(args):
 
 def write_json(conf, out_dir, name):
     conf_path = Path(out_dir,name)
+    if not os.path.exists(out_dir):
+        os.system(f'mkdir -p {out_dir}')
     with open(conf_path,'w') as fp:
         json.dump(conf, fp, indent=2)
     return conf_path
@@ -145,7 +147,7 @@ def create_nwmurls_retro(start,end):
     }
     return nwm_conf
 
-def create_confs(conf,args):
+def create_confs(conf,args,realization):
         
     if conf['globals']['start_date'] == "DAILY":
         if conf['globals']['end_date'] != "":
@@ -164,6 +166,7 @@ def create_confs(conf,args):
         start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
         end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
         nwm_conf = create_conf_nwm_daily(start, end)
+        fp_conf = create_conf_fp(start, end, 0, conf['globals']['nprocs'],args.docker_mount,0) 
 
     else: 
         start = conf['globals']['start_date']
@@ -201,24 +204,17 @@ def create_confs(conf,args):
     ngen_config_dir = Path(data_path,'ngen-run','config')
     datastream_meta_dir = Path(data_path,'datastream-metadata')    
 
+    if not os.path.exists(datastream_meta_dir):
+        os.system(f'mkdir -p {datastream_meta_dir}')
+
     write_json(nwm_conf,datastream_meta_dir,'conf_nwmurl.json')
     write_json(fp_conf,datastream_meta_dir,'conf_fp.json')
     write_json(conf,datastream_meta_dir,'conf_datastream.json')
 
     print(f'datastream metadata have been generated and placed here\n{datastream_meta_dir}')    
     
-    realization_file = None
-    for path, _, files in os.walk(ngen_config_dir):
-        for jfile in files:
-            jfile_path = os.path.join(path,jfile)
-            if jfile_path.find('realization') >= 0: 
-                realization_file = jfile_path
-
-    if not realization_file: raise Exception(f"Cannot find realization file in {ngen_config_dir}")
-
-    with open(realization_file,'r') as fp:
+    with open(realization,'r') as fp:
         data = json.load(fp)
-    os.remove(realization_file)
 
     data['time']['start_time'] = start_realization
     data['time']['end_time']   = end_realization
@@ -244,8 +240,8 @@ if __name__ == "__main__":
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
     parser.add_argument("--forcing_split_vpu", type=bool,help="true for forcingprocessor split",default=False)
-
+    parser.add_argument("--realization_file", type=str,help="ngen realization file",required=True)
 
     args = parser.parse_args()
     conf = generate_config(args)
-    create_confs(conf,args)
+    create_confs(conf,args,args.realization_file)

@@ -390,7 +390,7 @@ echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file $REALIZATION_NGENRUN_PATH
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 
@@ -432,7 +432,7 @@ else
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
         python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
         "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-    cp $DATASTREAM_RESOURCES/*filenamelist* $DATASTREAM_META_PATH/filenamelist.txt
+    cp $DATASTREAM_RESOURCES/*filenamelist.txt $DATASTREAM_META_PATH/filenamelist.txt
     echo "Creating forcing files"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
