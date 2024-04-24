@@ -1,0 +1,22 @@
+name: Datastream Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2   
+      
+    - name: Install dependencies
+      run: |
+        $(pwd)/scripts/install.sh
+        $(pwd)/scripts/docker_builds.sh -d $(pwd)
+        aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
+        aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
+        $(pwd)/tests/scripts/test_stream.sh
