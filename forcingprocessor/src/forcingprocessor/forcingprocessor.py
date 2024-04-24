@@ -174,6 +174,7 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
         fs_list.append(fs)
         start = end
 
+    ncatch = len(crosswalk_dict)
     def init_pool(the_data):
         global weights_json
         weights_json = the_data
@@ -181,15 +182,17 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
     data_ax = []
     t_ax_local = []
     with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(crosswalk_dict,)) as pool:
-        for results in pool.map(
+        for j, results in enumerate(pool.map(
         forcing_grid2catchment,
         files_list,
         fs_list
-        ):
+        )):
+            if j == 0: del crosswalk_dict
             data_ax.append(results[0])
             t_ax_local.append(results[1])
+            del results
 
-    gigs = nfiles * len(crosswalk_dict) * len(nwm_variables) * 4 / 1000000000
+    gigs = nfiles * ncatch * len(nwm_variables) * 4 / 1000000000
     if ii_verbose: print(f'Building data array - > {gigs:.2f} GB')
     data_array = np.concatenate(data_ax)
     del data_ax
@@ -266,10 +269,11 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             data_array[:,jcatch] = np.sum(coverage_mat * jcatch_data_mask ,axis=1) / weight_sum  
 
             jcatch += 1  
+        del data_allvars
         data_list.append(data_array)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
-        if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s\npercent complete {(j+1)/nfiles}', end=None,flush=True)
+        if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s\npercent complete {100*(j+1)/nfiles:.2f}', end=None,flush=True)
         report_usage()
 
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process',flush=True)
