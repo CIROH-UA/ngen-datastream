@@ -134,7 +134,7 @@ def create_conf_nwm(start, end, retro_or_op):
         end_df   = datetime.strptime(end,'%Y%m%d%H%M')
         diff_days = (end_df - start_df).days
         if diff_days == 0:
-            num_hrs = int((end_df - start_df).seconds / 3600)
+            num_hrs = int((end_df - start_df).seconds / 3600) + 1
         else:
             num_hrs = 24
 
