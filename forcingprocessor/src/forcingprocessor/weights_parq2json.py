@@ -24,7 +24,7 @@ def get_weight_json(catchments,version,nprocs):
     if version is None: version = "v20.1"
     print(f'Beginning weights query')
     w = pa.dataset.dataset(
-        f's3://lynker-spatial/{version}/forcing_weights.parquet', format='parquet'
+        f's3://lynker-spatial/hydrofabric/{version}/forcing_weights.parquet', format='parquet'
     ).filter(
         pc.field('divide_id').isin(catchments)
     ).to_batches()
