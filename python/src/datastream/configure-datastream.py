@@ -171,7 +171,7 @@ def create_confs(conf,args,realization):
         end = tomorrow.strftime('%Y%m%d%H%M')
         start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
         end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
-        nwm_conf = create_conf_nwm(start, end, retro_or_op)
+        nwm_conf = create_conf_nwm(start, end, "operational")
         fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,"operational") 
     else: 
         start = conf['globals']['start_date']
