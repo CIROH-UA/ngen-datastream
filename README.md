@@ -21,6 +21,7 @@ or run with cli args
   -d, --DATA_PATH           <Path to write to>
   -R, --REALIZATION         <Path to realization file>
   -r, --RESOURCE_PATH       <Path to resource directory>
+  -f, --FORCINGS_TAR        <Path to forcings tarball> 
   -g, --GEOPACAKGE          <Path to geopackage file>
   -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file>
   -S, --S3_MOUNT            <Path to mount s3 bucket to>
@@ -47,7 +48,8 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/examples) for e
 | REALIZATION | Path to NextGen realization file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
 | GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
 | GEOPACKAGE_ATTR     | Path to hydrofabric attributes, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
-| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it with this arg. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
+| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
+| FORCINGS_TAR            | Path to tarball that contains forcings csvs or parquets|  |
 | S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
 | S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
