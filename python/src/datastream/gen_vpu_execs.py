@@ -3,7 +3,7 @@ import json, re, copy
 import pandas as pd
 from datetime import datetime
 
-def edit_dict(execution_template,ami,instance_type,jvpu,instance_name,daily_date):
+def edit_dict(execution_template,ami,instance_type,jvpu,instance_name,daily_date,start,end):
     exec_jvpu = copy.deepcopy(execution_template)
     exec_jvpu['instance_parameters']['ImageId'] = ami
     exec_jvpu['instance_parameters']['InstanceType'] = instance_type
@@ -15,17 +15,30 @@ def edit_dict(execution_template,ami,instance_type,jvpu,instance_name,daily_date
         exec_jvpu['commands'][j] = re.sub(pattern_date, daily_date, stream_command)  
         stream_command = copy.deepcopy(exec_jvpu['commands'][j])      
         exec_jvpu['commands'][j] = re.sub(pattern_instance, instance_type, stream_command)     
+
+        stream_command = copy.deepcopy(exec_jvpu['commands'][j])      
+        exec_jvpu['commands'][j] = re.sub(pattern_start, start, stream_command)  
+        stream_command = copy.deepcopy(exec_jvpu['commands'][j])      
+        exec_jvpu['commands'][j] = re.sub(pattern_end, end, stream_command) 
+        stream_command = copy.deepcopy(exec_jvpu['commands'][j])      
+        exec_jvpu['commands'][j] = re.sub(pattern_nprocs, nprocs, stream_command) 
+
     stream_command = copy.deepcopy(exec_jvpu['obj_key'])
     exec_jvpu['obj_key'] = re.sub(pattern_vpu, jvpu, stream_command)
     stream_command = copy.deepcopy(exec_jvpu['obj_key'])
     exec_jvpu['obj_key'] = re.sub(pattern_date, daily_date, stream_command)        
     stream_command = copy.deepcopy(exec_jvpu['obj_key'])
-    exec_jvpu['obj_key'] = re.sub(pattern_instance, instance_type, stream_command)                
-    out_file = os.path.join(out_dir,f"execution_dailyrun_{jvpu}.json")        
+    exec_jvpu['obj_key'] = re.sub(pattern_instance, instance_type, stream_command)     
+
+    stream_command = copy.deepcopy(exec_jvpu['obj_key'])
+    exec_jvpu['obj_key'] = re.sub(pattern_start, start, stream_command)  
+    stream_command = copy.deepcopy(exec_jvpu['obj_key'])
+    exec_jvpu['obj_key'] = re.sub(pattern_end, end, stream_command)            
+    out_file = os.path.join(out_dir,f"execution_{jvpu}.json")        
     with open(out_file,'w') as fp:
         json.dump(exec_jvpu,fp,indent=2)
 
-def generate_vpu_execs(instance_types,conf,conf_fp,out_dir,arch,arch_file):
+def generate_vpu_execs(instance_types,conf,conf_fp,out_dir,arch,arch_file,start,end):
     if os.path.exists(out_dir):
         print(f'Delete {out_dir}')
         quit
@@ -49,14 +62,14 @@ def generate_vpu_execs(instance_types,conf,conf_fp,out_dir,arch,arch_file):
       
     for jvpu in VPUs:
         exec_jvpu = copy.deepcopy(execution_template)
-        edit_dict(exec_jvpu,ami,instance_types[jvpu],jvpu,instance_name,daily_date)
+        edit_dict(exec_jvpu,ami,instance_types[jvpu],jvpu,instance_name,daily_date,start,end)
 
     instance_type_fp = 'c7g.8xlarge'
     if conf_fp:
         with open(conf_fp,"r") as fp:
             execution_template = json.load(fp)
         instance_name = execution_template['instance_parameters']['TagSpecifications'][0]['Tags'][0]['Value']
-        edit_dict(execution_template,ami,instance_type_fp,'fp',instance_name,daily_date)    
+        edit_dict(execution_template,ami,instance_type_fp,'fp',instance_name,daily_date,start,end)    
                
 
 def generate_vpu_sizes():
@@ -76,6 +89,8 @@ if __name__ == "__main__":
     parser.add_argument("--ami_file", type=str, help="Text file that holds the AMIs for each architecture")
     parser.add_argument("--arch", type=str, help="x86 or arm")
     parser.add_argument("--out_dir", type=str, help="Path to write executions out to, must not exist")
+    parser.add_argument("--start", type=str, help="start time for retro",default=None)
+    parser.add_argument("--end", type=str, help="end time for retro",default=None)
 
     args      = parser.parse_args()
     conf_vpu  = args.exec_template_vpu
@@ -83,11 +98,16 @@ if __name__ == "__main__":
     out_dir   = args.out_dir
     ami_file  = args.ami_file
     arch      = args.arch
+    start     = args.start
+    end       = args.end
 
-    global VPUs, pattern_vpu, pattern_date
+    global VPUs, pattern_vpu, pattern_date, pattern_start, pattern_end, nprocs, pattern_nprocs
     pattern_vpu = r'\$VPU'
     pattern_date = r'\$DATE'
     pattern_instance = r'\$INSTANCE_TYPE'
+    pattern_start = r'\$START'
+    pattern_end = r'\$END'
+    pattern_nprocs = r'\$NPROCS'
     VPUs = ["01","02","03N",
             "03S","03W","04",
             "05","06", "07",
@@ -130,7 +150,7 @@ if __name__ == "__main__":
     # }
 
     ec2_types = {
-        "01":'t4g.2xlarge',
+        "01":'r7g.16xlarge',
         "02":'t4g.2xlarge',
         "03N":'t4g.2xlarge',
         "03S":'t4g.2xlarge',
@@ -153,5 +173,11 @@ if __name__ == "__main__":
         "18":'t4g.2xlarge'
     }    
 
-    generate_vpu_execs(ec2_types,conf_vpu,conf_fp,out_dir,arch,ami_file)
+    ec2_type = "m7g.16xlarge"
+    for jvpu in ec2_types:
+        ec2_types[jvpu] = ec2_type
+
+    nprocs = "64"
+
+    generate_vpu_execs(ec2_types,conf_vpu,conf_fp,out_dir,arch,ami_file,start,end)
 
