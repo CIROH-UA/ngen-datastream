@@ -224,26 +224,6 @@ else
     mkdir -p $DATASTREAM_RESOURCES_NGENCONF_PATH
 fi
 
-if [ -z $FORCINGS_TAR ]; then
-    if [ $START_DATE == "DAILY" ]; then
-        :
-    else
-        NWMURL_CONF_PATH=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*")
-        NNWMURL=$(find "$DATASTREAM_RESOURCES" -type f -name "*nwmurl*" | wc -l)
-        if [ "$NNWMURL" -eq "0" ]; then
-            echo "nwmurl_conf.json is missing from "$DATASTREAM_RESOURCES
-            echo "exiting..."
-            exit 1
-        fi    
-        if [ ${NNWMURL} -gt 1 ]; then
-            echo "At most one nwmurl file is allowed in "$DATASTREAM_RESOURCES
-        fi
-        if [ -e "$NWMURL_CONF_PATH" ]; then 
-            echo "Using $NWMURL_CONF_PATH"
-        fi
-    fi
-fi
-
 if [ ! -z $SUBSET_ID ]; then
     log_time "SUBSET_START" $DATASTREAM_PROFILING
     GEOPACKAGE="$SUBSET_ID.gpkg"
@@ -365,23 +345,25 @@ fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
 
 # begin calculations
-if [ -e "$WEIGHTS_PATH" ]; then
-    echo "Using $WEIGHTS_PATH"
-    if [[ $(basename $WEIGHTS_PATH) != "weights.json" ]]; then
-        echo "renaming $(basename $WEIGHTS_PATH) to weights.json" 
-        mv "$WEIGHTS_PATH" ""$DATASTREAM_RESOURCES"/weights.json"
+if [ -z $FORCINGS_TAR ]; then 
+    if [ -e "$WEIGHTS_PATH" ]; then
+        echo "Using $WEIGHTS_PATH"
+        if [[ $(basename $WEIGHTS_PATH) != "weights.json" ]]; then
+            echo "renaming $(basename $WEIGHTS_PATH) to weights.json" 
+            mv "$WEIGHTS_PATH" ""$DATASTREAM_RESOURCES"/weights.json"
+        fi
+    else
+        log_time "WEIGHTS_START" $DATASTREAM_PROFILING
+        echo "Weights file not found. Creating from" $GEO_BASE
+        GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/ngen-configs/$GEO_BASE"
+        WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
+        docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+            -u $(id -u):$(id -g) \
+            -w "$DOCKER_MOUNT" forcingprocessor \
+            python "$DOCKER_FP_PATH"weights_parq2json.py \
+            --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER --nprocs $NPROCS
+        log_time "WEIGHTS_END" $DATASTREAM_PROFILING
     fi
-else
-    log_time "WEIGHTS_START" $DATASTREAM_PROFILING
-    echo "Weights file not found. Creating from" $GEO_BASE
-    GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/ngen-configs/$GEO_BASE"
-    WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
-    docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
-        -u $(id -u):$(id -g) \
-        -w "$DOCKER_MOUNT" forcingprocessor \
-        python "$DOCKER_FP_PATH"weights_parq2json.py \
-        --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER --nprocs $NPROCS
-    log_time "WEIGHTS_END" $DATASTREAM_PROFILING
 fi
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
@@ -390,7 +372,7 @@ echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nwmurl_file "$NWMURL_CONF_PATH" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file $REALIZATION_NGENRUN_PATH
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file $DOCKER_MOUNT/ngen-run/config/realization.json
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 
@@ -432,7 +414,7 @@ else
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
         python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
         "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-    cp $DATASTREAM_RESOURCES/*filenamelist.txt $DATASTREAM_META_PATH/filenamelist.txt
+    cp -v -t $DATASTREAM_META_PATH $DATASTREAM_RESOURCES/*filenamelist.txt
     echo "Creating forcing files"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
@@ -450,7 +432,7 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     --data_dir $DOCKER_MOUNT
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
-
+exit 0
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
