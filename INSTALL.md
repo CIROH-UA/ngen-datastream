@@ -8,18 +8,17 @@ These steps are provided [scripted](#scripts) or [step-by-step](#step-by-step). 
 These instructions assume launching an instance from a blank Amazon 2023 Linux image. Steps may vary depending on your specific linux distribution.
 
 ## Scripted
-1) Create a shell script that will execute the install instructions. This will install the datastream and required packages.
+1) Clone this repository
 ```
-vi ./install.sh
+git clone https://github.com/CIROH-UA/ngen-datastream.git
 ```
-2) Copy the contents of this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/install.sh). `:wq` to save and close the file.
-Change permissions and execute the startup script
+2) Execute the startup script
 ```
-chmod +700 ./install.sh && ./install.sh
+cd ngen-datastream && ./scripts/install.sh
 ```
 4) Run the docker builds script
 ```
-./ngen-datastream/scripts/docker_builds.sh -d <path to ngen-datastream directory>
+./scripts/docker_builds.sh -d <path to ngen-datastream directory>
 ```
 `aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
 
