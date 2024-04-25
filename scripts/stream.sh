@@ -238,8 +238,14 @@ if [ ! -z $RESOURCE_PATH ]; then
     # Look for realization
     REALIZATION_RESOURCES_PATH=$(find "$DATASTREAM_RESOURCES_NGENCONF_PATH" -type f -name "*realization*")
     if [ ! -f $REALIZATION_RESOURCES_PATH ]; then
-        echo "realization file is required in RESOURCE_PATH/ngen-configs"
-        exit 1
+        if [ ! -z $REALIZATION ]; then
+            REAL_BASE=$(basename $REALIZATION)
+            REALIZATION_RESOURCES_PATH="$DATASTREAM_RESOURCES_NGENCONF_PATH$REAL_BASE"
+            get_file "$REALIZATION" $REALIZATION_RESOURCES_PATH        
+        else
+            echo "realization arg is required if not providing within the resource directory"
+            exit 1
+        fi
     else
         REAL_BASE=$(basename $REALIZATION_RESOURCES_PATH)
     fi
@@ -372,9 +378,8 @@ echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file $DOCKER_MOUNT/ngen-run/config/realization.json
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_PATH" --forcings_tar "$FORCINGS_TAR" --resource_path "$RESOURCE_PATH" --gpkg "$GEOPACKAGE_RESOURCES_PATH" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES_PATH" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
-
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
 # Look for pkl file
@@ -420,6 +425,7 @@ else
         -u $(id -u):$(id -g) \
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
         python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_META"/conf_fp.json
+    mv $DATASTREAM_RESOURCES/log_fp.txt $DATASTREAM_META_PATH 
     log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
 fi    
 
@@ -432,7 +438,6 @@ docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     --data_dir $DOCKER_MOUNT
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
-exit 0
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
