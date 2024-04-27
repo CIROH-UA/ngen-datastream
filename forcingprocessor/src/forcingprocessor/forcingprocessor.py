@@ -10,6 +10,8 @@ import time
 import boto3
 from io import BytesIO, TextIOWrapper
 import concurrent.futures as cf
+import multiprocessing as mp
+import ctypes
 from datetime import datetime, timezone
 import psutil
 import gzip
@@ -143,14 +145,14 @@ def report_usage():
     if ii_verbose: print(f'\nCurrent RAM usage (GB): {usage_ram:.2f}, {percent_ram:.2f}%\nCurrent CPU usage : {percent_cpu:.2f}%')
     return usage_ram, percent_ram, percent_cpu
 
-def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
+def multiprocess_data_extract(files,nprocs,weights_json,fs):
     """
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time.
 
     Parameters:
         files (list): List of files to be processed.
         nprocs (int): Number of processes to be used.
-        crosswalk_dict (dict): Dictionary containing catchment weights.
+        weights_json (dict): Dictionary containing catchment weights.
         fs (s3 filesystem): s3fs
 
     Returns:
@@ -166,41 +168,45 @@ def multiprocess_data_extract(files,nprocs,crosswalk_dict,fs):
 
     start  = 0
     nfiles = len(files)
-    files_list          = []
-    fs_list             = []
+    nvar   = len(nwm_variables)
+    ncatch = len(weights_json)
+    files_list = []
+    idx_list   = []    
+    fs_list    = []
     for i in range(nprocs):
         end = min(start + files_per_proc[i],nfiles)
         files_list.append(files[start:end])
+        idx_list.append(np.arange(start,end))
         fs_list.append(fs)
         start = end
 
-    ncatch = len(crosswalk_dict)
-    def init_pool(the_data):
-        global weights_json
-        weights_json = the_data
+    forcings_TxVxC_mem_size = nfiles * nvar * ncatch
+    forcings_TVC = mp.Array(ctypes.c_float, forcings_TxVxC_mem_size)
 
-    data_ax = []
+    ncatch = len(weights_json)
+    def init_pool(the_data, data_array):
+        global weights_json, forcings_TVC, t_ax_local
+        weights_json = the_data
+        forcings_TVC = data_array
+
     t_ax_local = []
-    with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(crosswalk_dict,)) as pool:
+    with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(weights_json,forcings_TVC)) as pool:
         for j, results in enumerate(pool.map(
         forcing_grid2catchment,
         files_list,
+        idx_list,
         fs_list
         )):
-            if j == 0: del crosswalk_dict
-            data_ax.append(results[0])
-            t_ax_local.append(results[1])
-            del results
+            t_ax_local.append(results)
 
-    gigs = nfiles * ncatch * len(nwm_variables) * 4 / 1000000000
-    if ii_verbose: print(f'Building data array - > {gigs:.2f} GB')
-    data_array = np.concatenate(data_ax)
-    del data_ax
+    del weights_json
+    forcings_TxVxC = np.array(forcings_TVC).reshape((nfiles,nvar,ncatch))
+    del forcings_TVC
     t_ax_local = [item for sublist in t_ax_local for item in sublist]
   
-    return data_array, t_ax_local
+    return forcings_TxVxC, t_ax_local
 
-def forcing_grid2catchment(nwm_files: list, fs=None):
+def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
     """
     Retrieve catchment level data from national water model files
 
@@ -220,7 +226,6 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
     txrds = 0
     tfill = 0    
     tdata = 0    
-    data_list = []
     t_list = []
     nfiles = len(nwm_files)
     nvar = len(nwm_variables)
@@ -267,17 +272,19 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             jcatch_data_mask = data_allvars[:,weights] 
             weight_sum = np.sum(coverage)
             data_array[:,jcatch] = np.sum(coverage_mat * jcatch_data_mask ,axis=1) / weight_sum  
-
             jcatch += 1  
+
         del data_allvars
-        data_list.append(data_array)
+        start = idx_list[j] * nvar * ncatch
+        stop = start + nvar * ncatch
+        forcings_TVC[start:stop] = data_array.reshape(nvar*ncatch)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
         if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s\npercent complete {100*(j+1)/nfiles:.2f}', end=None,flush=True)
         report_usage()
 
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process',flush=True)
-    return [data_list, t_list]
+    return t_list
 
 def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
     """
@@ -783,7 +790,7 @@ def prep_ngen_data(conf):
     if ii_verbose: print(f'Opening weight file...\n',flush=True) 
     if type(weight_file) is not list: weight_files = [weight_file]
     else: weight_files = weight_file
-    crosswalk_dict = {}
+    weights_json = {}
     jcatchment_dict = {}
     count = 0
     for jweight_file in weight_files:
@@ -805,13 +812,13 @@ def prep_ngen_data(conf):
                 jweight_file_key    = jweight_file.split('amazonaws.com/')[-1]
             jweight_file_obj = s3.get_object(Bucket=jweight_file_bucket, Key=jweight_file_key)
             new_dict = json.loads(jweight_file_obj["Body"].read().decode())
-            crosswalk_dict = crosswalk_dict | new_dict
+            weights_json = weights_json | new_dict
             jcatchment_dict[jname] = list(new_dict.keys())
         else:        
             with open(jweight_file, "r") as f:
-                crosswalk_dict = crosswalk_dict | json.load(f)
-                jcatchment_dict[jname] = list(crosswalk_dict.keys())
-    ncatchments = len(crosswalk_dict)
+                weights_json = weights_json | json.load(f)
+                jcatchment_dict[jname] = list(weights_json.keys())
+    ncatchments = len(weights_json)
     log_time("READWEIGHTS_END", log_file)    
 
     nwm_forcing_files = []
@@ -854,7 +861,7 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n',flush=True)
-        data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,crosswalk_dict,fs)
+        data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
         score = complexity / t_extract
@@ -866,7 +873,7 @@ def prep_ngen_data(conf):
         if "netcdf" in output_file_type:
             multiprocess_write_netcdf(data_array, jcatchment_dict, t_ax)
         if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
-        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped, tar_buffs = multiprocess_write(data_array,t_ax,crosswalk_dict.keys(),nprocs,forcing_path,ii_append)
+        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped, tar_buffs = multiprocess_write(data_array,t_ax,weights_json.keys(),nprocs,forcing_path,ii_append)
 
         ii_append = True
         write_time += time.perf_counter() - t0    
