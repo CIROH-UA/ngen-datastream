@@ -1,7 +1,9 @@
 # NextGen Water Modeling Framework Datastream
 `ngen-datastream` automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion.
 
-## [Install](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md) , [Usage Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/USAGE.md)
+## Getting Started
+* **Installation:** Follow the step-by-step instructions in the [Installation Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md) to set up `ngen-datastream` on your system.
+* **Usage:** Learn how to use `ngen-datastream` effectively by referring to the comprehensive [Usage Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/USAGE.md).
 
 ## Run it
 `ngen-datastream` can be executed using cli args or a configuration file. Not all arguments are requried. 
