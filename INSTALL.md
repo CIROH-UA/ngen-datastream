@@ -16,7 +16,7 @@ git clone https://github.com/CIROH-UA/ngen-datastream.git
 ```
 cd ngen-datastream && ./scripts/install.sh
 ```
-4) Run the docker builds script
+3) Run the docker builds script
 ```
 ./scripts/docker_builds.sh -d <path to ngen-datastream directory>
 ```
