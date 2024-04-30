@@ -36,7 +36,7 @@ This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLO
   -d $(pwd)/ngen-datastream/data/datastream_test \
   -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg \
   -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet \
-  -R https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/main/configs/ngen/realization_cfe_sloth_pet_nom.json
+  -R $(pwd)/ngen-datastream/configs/ngen/realization_cfe_sloth_pet_nom.json
   -n 8
 ```
 
