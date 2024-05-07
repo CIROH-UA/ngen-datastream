@@ -15,7 +15,9 @@ jobs:
       
     - name: Install dependencies
       run: |
-        sudo dnf install find
+        sudo dnf -y update && \
+          dnf install findutils && \
+          dnf clean all
         $(pwd)/scripts/install.sh
         aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
         aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
