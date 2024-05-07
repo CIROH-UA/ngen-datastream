@@ -1,5 +1,5 @@
 ARG TAG_NAME
-FROM datastream-deps:${TAG_NAME} as datastream_base
+FROM awiciroh/datastream-deps:${TAG_NAME} as datastream_base
 RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
 RUN pip3 install -e "/ngen-datastream/python"
 
