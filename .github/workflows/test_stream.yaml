@@ -16,7 +16,6 @@ jobs:
     - name: Install dependencies
       run: |
         $(pwd)/scripts/install.sh
-        $(pwd)/scripts/docker_builds.sh -d $(pwd)
         aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
         aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
         $(pwd)/tests/scripts/test_stream.sh -d $(pwd)
