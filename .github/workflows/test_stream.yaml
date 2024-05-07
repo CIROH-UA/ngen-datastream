@@ -6,9 +6,9 @@ on:
       - main
 
 jobs:
-  build:
+  fedora-job:
     runs-on: ubuntu-latest
-
+    container: fedora:35
     steps:
     - name: Checkout code
       uses: actions/checkout@v2   
