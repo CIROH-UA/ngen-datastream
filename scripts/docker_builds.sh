@@ -29,7 +29,7 @@ git submodule init
 git submodule update
 cd $NGIAB_DOCKER
 docker build -t awiciroh/ngen-deps:$TAG -f Dockerfile.ngen-deps --no-cache . && \
-    docker build -t awiciroh/t-route:$TAGG -f ./Dockerfile.t-route . --no-cache --build-arg TAG_NAME=$TAG && \
+    docker build -t awiciroh/t-route:$TAG -f ./Dockerfile.t-route . --no-cache --build-arg TAG_NAME=$TAG && \
     docker build -t awiciroh/ngen:$TAG-f ./Dockerfile.ngen . --no-cache --build-arg TAG_NAME=$TAG && \
     docker build -t awiciroh/ciroh-ngen-image:$TAG -f ./Dockerfile . --no-cache --build-arg TAG_NAME=$TAG
 
