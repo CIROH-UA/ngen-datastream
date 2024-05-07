@@ -14,10 +14,9 @@ done
 
 DATASTREAM_DOCKER="$DATASTREAM_PATH"/docker
 cd $DATASTREAM_DOCKER
-docker build -t datastream-deps:latest -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=latest --build-arg ARCH=$(uname -m) && \
-docker build -t forcingprocessor:latest -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=latest && \
-    docker build -t datastream:latest -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=latest 
-
+docker build -t awiciroh/datastream-deps:latest -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=latest --build-arg ARCH=$(uname -m) --platform linux/$(uname -m) && \
+docker build -t awiciroh/forcingprocessor:latest -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=latest --platform linux/$(uname -m) && \
+    docker build -t awiciroh/datastream:latest -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=latest --platform linux/$(uname -m)
 
 NGIAB_PATH="$DATASTREAM_PATH"/NGIAB-CloudInfra
 NGIAB_DOCKER="$NGIAB_PATH"/docker

@@ -362,8 +362,9 @@ if [ -z $FORCINGS_TAR ]; then
         log_time "WEIGHTS_START" $DATASTREAM_PROFILING
         echo "Weights file not found. Creating from" $GEO_BASE
         GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/ngen-configs/$GEO_BASE"
+        DOCKER_TAG="awiciroh/forcingprocessor:latest"
         WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
-        docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+        docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" $DOCKER_TAG\
             -u $(id -u):$(id -g) \
             -w "$DOCKER_MOUNT" forcingprocessor \
             python "$DOCKER_FP_PATH"weights_parq2json.py \
@@ -373,7 +374,7 @@ if [ -z $FORCINGS_TAR ]; then
 fi
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
-DOCKER_TAG="datastream:latest"
+DOCKER_TAG="awiciroh/datastream:latest"
 echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
@@ -413,7 +414,7 @@ if [ ! -z $FORCINGS_TAR ]; then
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
     echo "Creating nwm filenames file"
-    DOCKER_TAG="forcingprocessor:latest"
+    DOCKER_TAG="awiciroh/forcingprocessor:latest"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
@@ -431,7 +432,7 @@ fi
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
-DOCKER_TAG="datastream:latest"
+DOCKER_TAG="awiciroh/datastream:latest"
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     $DOCKER_TAG python $VALIDATOR \
