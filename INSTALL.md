@@ -16,10 +16,6 @@ git clone https://github.com/CIROH-UA/ngen-datastream.git
 ```
 cd ngen-datastream && ./scripts/install.sh
 ```
-3) Run the docker builds script
-```
-./scripts/docker_builds.sh -d <path to ngen-datastream directory>
-```
 `aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
 
 You're ready to run ngen-datastream!
@@ -52,22 +48,6 @@ sudo dnf ./mount-s3.rpm
 ```
 git clone https://github.com/CIROH-UA/ngen-datastream.git
 ```
-4) build docker containers
-```
-cd ./ngen-datastream/docker
-docker build -t datastream-deps:latest -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=latest --build-arg ARCH=$(uname -m) && \
-docker build -t forcingprocessor:latest -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=latest && \
-    docker build -t datastream:latest -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=latest 
-
-git submodule init
-git submodule update
-cd ./ngen-datastream/NGIAB-CloudInfra/docker
-docker build -t awiciroh/ngen-deps:latest -f Dockerfile.ngen-deps --no-cache . && \
-    docker build -t awiciroh/t-route:latest -f ./Dockerfile.t-route . --no-cache --build-arg TAG_NAME=latest && \
-    docker build -t awiciroh/ngen:latest -f ./Dockerfile.ngen . --no-cache --build-arg TAG_NAME=latest && \
-    docker build -t awiciroh/ciroh-ngen-image:latest -f ./Dockerfile . --no-cache --build-arg TAG_NAME=latest 
-```
-
 `aws_configure` if you intend to mount an s3 bucket or reference a bucket in the configuration.
 
 You're ready to run ngen-datastream!
