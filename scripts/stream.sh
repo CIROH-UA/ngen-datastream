@@ -89,6 +89,11 @@ HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
 HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
 echo "HOST_OS" $HOST_OS
 
+PLATORM_TAG=""
+if [ $(uname -m) = "x86_64" ]; then
+    PLATORM_TAG="-x86"
+fi
+
 # read cli args
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -362,11 +367,11 @@ if [ -z $FORCINGS_TAR ]; then
         log_time "WEIGHTS_START" $DATASTREAM_PROFILING
         echo "Weights file not found. Creating from" $GEO_BASE
         GEO_PATH_DOCKER=""$DOCKER_RESOURCES"/ngen-configs/$GEO_BASE"
-        DOCKER_TAG="awiciroh/forcingprocessor:latest"
         WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
-        docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" $DOCKER_TAG\
+        DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
+        docker run -v "$DATA_PATH:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
-            -w "$DOCKER_MOUNT" forcingprocessor \
+            -w "$DOCKER_MOUNT" $DOCKER_TAG \
             python "$DOCKER_FP_PATH"weights_parq2json.py \
             --gpkg $GEO_PATH_DOCKER --outname $WEIGHTS_DOCKER --nprocs $NPROCS
         log_time "WEIGHTS_END" $DATASTREAM_PROFILING
@@ -374,7 +379,7 @@ if [ -z $FORCINGS_TAR ]; then
 fi
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
-DOCKER_TAG="awiciroh/datastream:latest"
+DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
@@ -414,7 +419,7 @@ if [ ! -z $FORCINGS_TAR ]; then
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
     echo "Creating nwm filenames file"
-    DOCKER_TAG="awiciroh/forcingprocessor:latest"
+    DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
@@ -432,7 +437,7 @@ fi
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
-DOCKER_TAG="awiciroh/datastream:latest"
+DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Validating " $NGEN_RUN_PATH
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" \
     $DOCKER_TAG python $VALIDATOR \
@@ -441,7 +446,7 @@ log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
-docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest "$DOCKER_MOUNT" auto $NPROCS
+docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
 cp -r $NGEN_RUN_PATH/*partitions* $DATASTREAM_RESOURCES/
