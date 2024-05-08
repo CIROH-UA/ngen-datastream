@@ -184,27 +184,40 @@ def multiprocess_data_extract(files,nprocs,weights_json,fs):
     forcings_TVC = mp.Array(ctypes.c_float, forcings_TxVxC_mem_size)
 
     ncatch = len(weights_json)
-    def init_pool(the_data, data_array):
-        global weights_json, forcings_TVC, t_ax_local
-        weights_json = the_data
+    def init_pool(data_array):
+        global weights_json, forcings_TVC
         forcings_TVC = data_array
 
+    # t_ax_local = []
+    # with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(forcings_TVC)) as pool:
+    #     for j, results in enumerate(pool.map(
+    #     forcing_grid2catchment,
+    #     files_list,
+    #     idx_list,
+    #     fs_list
+    #     )):
+    #         t_ax_local.append(results)
+
+    data_ax = []
     t_ax_local = []
-    with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(weights_json,forcings_TVC)) as pool:
-        for j, results in enumerate(pool.map(
+    with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        for results in pool.map(
         forcing_grid2catchment,
         files_list,
         idx_list,
         fs_list
-        )):
-            t_ax_local.append(results)
+        ):
+            data_ax.append(results[0])
+            t_ax_local.append(results[1])            
 
+    print(f'Processes have returned')
     del weights_json
-    forcings_TxVxC = np.array(forcings_TVC).reshape((nfiles,nvar,ncatch))
-    del forcings_TVC
+    # forcings_TxVxC = np.array(forcings_TVC).reshape((nfiles,nvar,ncatch))
+    # del forcings_TVC
+    data_array = np.concatenate(data_ax)
     t_ax_local = [item for sublist in t_ax_local for item in sublist]
   
-    return forcings_TxVxC, t_ax_local
+    return data_array, t_ax_local
 
 def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
     """
@@ -229,9 +242,14 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
     t_list = []
     nfiles = len(nwm_files)
     nvar = len(nwm_variables)
+
+    dx = x_max - x_min + 1
+    dy = y_max - y_min + 1
+
     if fs_type == 'google' : fs = gcsfs.GCSFileSystem() 
     id = os.getpid()
     if ii_verbose: print(f'Process #{id} extracting data from {nfiles} files',end=None,flush=True)
+    data_list = []
     for j, nwm_file in enumerate(nwm_files):
         t0 = time.perf_counter()        
         eng    = "h5netcdf"
@@ -251,9 +269,9 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()                     
             shp = nwm_data["U2D"].shape   
-            data_allvars = np.zeros(shape=(nvar, shp[1], shp[2]), dtype=np.float32)       
+            data_allvars = np.zeros(shape=(nvar, dx, dy), dtype=np.float32)       
             for var_dx, jvar in enumerate(nwm_variables):                
-                data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar].values)   
+                data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar][:,x_min:x_max+1,y_min:y_max+1].values)   
             time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
             t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
@@ -261,7 +279,8 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
         tfill += time.perf_counter() - t0        
 
         t0 = time.perf_counter()
-        data_allvars = data_allvars.reshape(nvar, shp[1] * shp[2])
+        # data_allvars = data_allvars.reshape(nvar, shp[1] * shp[2])
+        data_allvars = data_allvars.reshape(nvar, dx*dy)
         ncatch = len(weights_json)
         data_array = np.zeros((nvar,ncatch), dtype=np.float32)
         jcatch = 0
@@ -269,22 +288,30 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
             weights = value[0]
             coverage = np.array(value[1])
             coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
-            jcatch_data_mask = data_allvars[:,weights] 
+
+            weights_dx, weights_dy = np.unravel_index(weights,(shp[1], shp[2]))
+            weights_dx_shifted = list(weights_dx - x_min)
+            weights_dy_shifted = list(weights_dy - y_min)
+            weights_window = np.ravel_multi_index(np.array([weights_dx_shifted,weights_dy_shifted]),(dx,dy))   
+            jcatch_data_mask = data_allvars[:,weights_window]     
+
+            # jcatch_data_mask = data_allvars[:,weights] 
             weight_sum = np.sum(coverage)
             data_array[:,jcatch] = np.sum(coverage_mat * jcatch_data_mask ,axis=1) / weight_sum  
             jcatch += 1  
 
         del data_allvars
-        start = idx_list[j] * nvar * ncatch
-        stop = start + nvar * ncatch
-        forcings_TVC[start:stop] = data_array.reshape(nvar*ncatch)
+        # start = idx_list[j] * nvar * ncatch
+        # stop = start + nvar * ncatch
+        data_list.append(data_array)
+        # forcings_TVC[start:stop] = data_array.reshape(nvar*ncatch)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
         if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s\npercent complete {100*(j+1)/nfiles:.2f}', end=None,flush=True)
         report_usage()
 
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process',flush=True)
-    return t_list
+    return [data_list, t_list]
 
 def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
     """
@@ -790,6 +817,7 @@ def prep_ngen_data(conf):
     if ii_verbose: print(f'Opening weight file...\n',flush=True) 
     if type(weight_file) is not list: weight_files = [weight_file]
     else: weight_files = weight_file
+    global weights_json
     weights_json = {}
     jcatchment_dict = {}
     count = 0
@@ -819,7 +847,25 @@ def prep_ngen_data(conf):
                 weights_json = weights_json | json.load(f)
                 jcatchment_dict[jname] = list(weights_json.keys())
     ncatchments = len(weights_json)
-    log_time("READWEIGHTS_END", log_file)    
+    log_time("READWEIGHTS_END", log_file)  
+
+    x_min_list = []
+    x_max_list = []
+    y_min_list = []
+    y_max_list = []
+    idx_2d = []
+    for jcat in weights_json:
+        indices = weights_json[jcat][0]
+        idx_2d=np.unravel_index(indices, (1, 3840, 4608), order='C')
+        x_min_list.append(np.min(idx_2d[1]))
+        x_max_list.append(np.max(idx_2d[1]))
+        y_min_list.append(np.min(idx_2d[2]))
+        y_max_list.append(np.max(idx_2d[2]))   
+    global x_min, x_max, y_min, y_max
+    x_min=np.min(x_min_list)   
+    x_max=np.max(x_max_list)   
+    y_min=np.min(y_min_list)   
+    y_max=np.max(y_max_list)          
 
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
@@ -860,7 +906,8 @@ def prep_ngen_data(conf):
         end   = min(start + nfile_chunk,nfiles)
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
-        if ii_verbose: print(f'Entering data extraction...\n',flush=True)
+        if ii_verbose: print(f'Entering data extraction...\n',flush=True)        
+        # forcing_grid2catchment(jnwm_files,[0],fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
