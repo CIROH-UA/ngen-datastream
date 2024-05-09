@@ -866,11 +866,16 @@ def prep_ngen_data(conf):
     x_max=np.max(x_max_list)   
     y_min=np.min(y_min_list)   
     y_max=np.max(y_max_list)          
-
+    
     nwm_forcing_files = []
-    with open(nwm_file,'r') as fp:
-        for jline in fp.readlines():
-            nwm_forcing_files.append(jline.strip())
+    if os.path.isdir(nwm_file):
+        rel_files = os.listdir(nwm_file)
+        for jfile in rel_files:
+            nwm_forcing_files.append(os.path.join(nwm_file,jfile))
+    else:
+        with open(nwm_file,'r') as fp:
+            for jline in fp.readlines():
+                nwm_forcing_files.append(jline.strip())
     nfiles = len(nwm_forcing_files)
 
     # memory_check(nwm_forcing_files, weight_files, ncatchments)
