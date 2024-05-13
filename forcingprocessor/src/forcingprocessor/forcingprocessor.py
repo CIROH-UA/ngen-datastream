@@ -245,6 +245,7 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
 
     dx = x_max - x_min + 1
     dy = y_max - y_min + 1
+    print(f'{x_min} {x_max} {y_min} {y_max} {dx} {dy}')
 
     if fs_type == 'google' : fs = gcsfs.GCSFileSystem() 
     id = os.getpid()
@@ -269,9 +270,9 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()                     
             shp = nwm_data["U2D"].shape   
-            data_allvars = np.zeros(shape=(nvar, dx, dy), dtype=np.float32)       
+            data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float32)       
             for var_dx, jvar in enumerate(nwm_variables):                
-                data_allvars[var_dx, :, :] = np.squeeze(nwm_data[jvar][:,x_min:x_max+1,y_min:y_max+1].values)   
+                data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
             time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
             t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
@@ -289,10 +290,10 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
             coverage = np.array(value[1])
             coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
 
-            weights_dx, weights_dy = np.unravel_index(weights,(shp[1], shp[2]))
+            weights_dx, weights_dy = np.unravel_index(weights, (shp[2], shp[1]), order='F')
             weights_dx_shifted = list(weights_dx - x_min)
             weights_dy_shifted = list(weights_dy - y_min)
-            weights_window = np.ravel_multi_index(np.array([weights_dx_shifted,weights_dy_shifted]),(dx,dy))   
+            weights_window = np.ravel_multi_index(np.array([weights_dx_shifted,weights_dy_shifted]),(dx,dy),order='F')   
             jcatch_data_mask = data_allvars[:,weights_window]     
 
             # jcatch_data_mask = data_allvars[:,weights] 
@@ -856,7 +857,7 @@ def prep_ngen_data(conf):
     idx_2d = []
     for jcat in weights_json:
         indices = weights_json[jcat][0]
-        idx_2d=np.unravel_index(indices, (1, 3840, 4608), order='C')
+        idx_2d=np.unravel_index(indices, (1, 4608, 3840), order='F')
         x_min_list.append(np.min(idx_2d[1]))
         x_max_list.append(np.max(idx_2d[1]))
         y_min_list.append(np.min(idx_2d[2]))
@@ -865,7 +866,7 @@ def prep_ngen_data(conf):
     x_min=np.min(x_min_list)   
     x_max=np.max(x_max_list)   
     y_min=np.min(y_min_list)   
-    y_max=np.max(y_max_list)          
+    y_max=np.max(y_max_list)   
 
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
