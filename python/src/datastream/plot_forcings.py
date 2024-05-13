@@ -6,37 +6,23 @@ import imageio.v2 as imageio
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-import cartopy.crs as ccrs
 mpl.use('Agg')
 
+cmin=265
+cmax=305
+
 def plot_nwm_forcings(netcdf_files, variable='T2D', output_gif='nwm_output.gif'):
-    cmin=265
-    cmax=305
+
     frames = []
     for j, file in enumerate(sorted(netcdf_files)):
         ds = xr.open_dataset(file)
-        # variable_data = ds['T2D']
-
         T2D = ds['T2D'].isel(x=slice(x_min, x_max + 1 ), y=slice(3840 - y_max, 3840 - y_min + 1))
-        # T2D = ds['T2D']
         T2D = np.flip(T2D[0,:,:], 0)
-
         fig = plt.figure(figsize=(6,6),dpi=200)
-        im = plt.imshow(T2D, vmin=265, vmax=305)
+        im = plt.imshow(T2D, vmin=cmin, vmax=cmax)
         cb = fig.colorbar(im, orientation='horizontal')
         cb.set_label('Surface runoff (mm)')
-        # plt.show()
-
-
-        # variable_data = ds[variable].isel(x=slice(x_min, x_max + 1), y=slice(y_min, y_max + 1))
-        # plt.figure()
-        # ax = plt.axes(projection=ccrs.PlateCarree())
-        
-        # variable_data.plot(transform=ccrs.PlateCarree(),vmin=cmin, vmax=cmax)
         plt.title(f'NWM {variable} - {ds.model_output_valid_time}')
-        # plt.xlabel('X')
-        # plt.ylabel('Y')
-        # plt.tight_layout()
         filename = f'temp_plot_{j}.png'
         plt.savefig(filename)
         plt.close()
@@ -45,36 +31,18 @@ def plot_nwm_forcings(netcdf_files, variable='T2D', output_gif='nwm_output.gif')
         ds.close()
     imageio.mimsave(output_gif, frames, fps=2)
 
-def plot_ngen_forcings(netcdf_files, geopackage, ngen_data, t_ax, catchment_ids, variable='T2D', output_gif='ngen_output.gif'):    
+def plot_ngen_forcings(geopackage, ngen_data, t_ax, catchment_ids, variable='T2D', output_gif='ngen_output.gif'):    
     gdf = gpd.read_file(geopackage, layer='divides')
     gdf = gdf.set_index('divide_id')
     gdf = gdf.reindex(catchment_ids)
     output_dir = 'output_plots'
     os.makedirs(output_dir, exist_ok=True)
-    # colormap = 'jet'
-    cmin=265
-    cmax=305
-    aspect_ratio = 1.0
     images = []
     for j, jtime in enumerate(t_ax):
-        # fig, axs = plt.subplots(ncols=2)
-        # nc_file = sorted(netcdf_files)[j]
-        # ds = xr.open_dataset(nc_file)
-        # # variable_data = ds['T2D']
-        # variable_data = ds['T2D'].isel(x=slice(x_min, x_max + 1), y=slice(y_min, y_max + 1))
-        # variable_plot = variable_data.plot(ax=axs[0],vmin=cmin, vmax=cmax)
-        # variable_plot.axes.set_aspect(aspect_ratio)
-
-        # axs[0].set_title(f'NWM {t_ax[j]}')
-        # axs[0].set_xlabel('X')
-        # axs[0].set_ylabel('Y')
-        # plt.tight_layout()
         plt.figure()
         gdf[variable] = ngen_data[:,j,5]
-        
         gdf.plot(column=variable, legend=True,vmin=cmin, vmax=cmax)
         plt.title(f'NGEN {variable} - {t_ax[j]}')
-        # axs.set_title(f'NGEN {t_ax[j]}')
         fig_name = f'{jtime}.png'
         plt.savefig(os.path.join(output_dir, fig_name))
         plt.tight_layout()
@@ -82,7 +50,7 @@ def plot_ngen_forcings(netcdf_files, geopackage, ngen_data, t_ax, catchment_ids,
         plt.close()
         jpng = os.path.join(output_dir, fig_name)
         images.append(imageio.imread(jpng))
-        # os.remove(jpng)
+        os.remove(jpng)
     imageio.mimsave(output_gif, images, fps=2)
 
 if __name__ == "__main__":
@@ -134,9 +102,7 @@ if __name__ == "__main__":
     x_max=np.max(x_max_list)   
     y_min=np.min(y_min_list)   
     y_max=np.max(y_max_list) 
-    # y_max=3840 - np.min(y_min_list)   
-    # y_min=3840 - np.max(y_max_list) 
 
     plot_nwm_forcings(nc_files, variable='T2D', output_gif='T2D_nwm_18.gif')
-    plot_ngen_forcings(nc_files, args.geopackage, ngen_data, t_ax, catchment_ids, variable='TMP_2maboveground', output_gif='T2D_ngen_18.gif')
+    plot_ngen_forcings(args.geopackage, ngen_data, t_ax, catchment_ids, variable='TMP_2maboveground', output_gif='T2D_ngen_18.gif')
     print(f'Gifs creation complete')
