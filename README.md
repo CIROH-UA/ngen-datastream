@@ -8,7 +8,7 @@
 ## Run it
 `ngen-datastream` can be executed using cli args or a configuration file. Not all arguments are requried. 
 ```
-> ./ngen-datastream/scripts/stream.sh --help
+> cd ngen-datastream && ./scripts/stream.sh --help
 
 Usage: ./ngen-datastream/scripts/stream.sh [options]
 Either provide a datastream configuration file
@@ -32,13 +32,13 @@ or run with cli args
 ```
 This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 8 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```
-./ngen-datastream/scripts/stream.sh \
+./scripts/stream.sh \
   -s 202404250100 \
   -e 202404260000 \
-  -d $(pwd)/ngen-datastream/data/datastream_test \
+  -d $(pwd)/data/datastream_test \
   -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg \
   -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet \
-  -R $(pwd)/ngen-datastream/configs/ngen/realization_cfe_sloth_pet_nom.json \
+  -R $(pwd)/configs/ngen/realization_cfe_sloth_pet_nom.json \
   -n 8
 ```
 
