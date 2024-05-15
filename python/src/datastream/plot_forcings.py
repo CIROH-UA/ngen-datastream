@@ -6,52 +6,78 @@ import imageio.v2 as imageio
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+plt.style.use('dark_background')
 mpl.use('Agg')
 
-cmin=265
-cmax=305
+nwm_variables = [
+    "U2D",
+    "V2D",
+    "LWDOWN",
+    "RAINRATE",
+    "RAINRATE",
+    "T2D",
+    "Q2D",
+    "PSFC",
+    "SWDOWN",
+]
+ngen_variables = [
+    "UGRD_10maboveground",
+    "VGRD_10maboveground",
+    "DLWRF_surface",
+    "APCP_surface",
+    "precip_rate",  # HACK RAINRATE * 3600
+    "TMP_2maboveground",        
+    "SPFH_2maboveground",
+    "PRES_surface",
+    "DSWRF_surface",
+] 
 
-def plot_nwm_forcings(netcdf_files, variable='T2D', output_gif='nwm_output.gif'):
-
-    frames = []
-    for j, file in enumerate(sorted(netcdf_files)):
-        ds = xr.open_dataset(file)
-        T2D = ds['T2D'].isel(x=slice(x_min, x_max + 1 ), y=slice(3840 - y_max, 3840 - y_min + 1))
-        T2D = np.flip(T2D[0,:,:], 0)
-        fig = plt.figure(figsize=(6,6),dpi=200)
-        im = plt.imshow(T2D, vmin=cmin, vmax=cmax)
-        cb = fig.colorbar(im, orientation='horizontal')
-        cb.set_label('Surface runoff (mm)')
-        plt.title(f'NWM {variable} - {ds.model_output_valid_time}')
-        filename = f'temp_plot_{j}.png'
-        plt.savefig(filename)
-        plt.close()
-        frames.append(imageio.imread(filename))
-        os.remove(filename)
-        ds.close()
-    imageio.mimsave(output_gif, frames, fps=2)
-
-def plot_ngen_forcings(geopackage, ngen_data, t_ax, catchment_ids, variable='T2D', output_gif='ngen_output.gif'):    
+def plot_ngen_forcings(netcdf_files, geopackage, ngen_data, t_ax, catchment_ids, nwm_variable, ngen_variable, var_idx, domain):    
     gdf = gpd.read_file(geopackage, layer='divides')
     gdf = gdf.set_index('divide_id')
     gdf = gdf.reindex(catchment_ids)
     output_dir = 'output_plots'
     os.makedirs(output_dir, exist_ok=True)
+    
     images = []
     for j, jtime in enumerate(t_ax):
-        plt.figure()
-        gdf[variable] = ngen_data[:,j,5]
-        gdf.plot(column=variable, legend=True,vmin=cmin, vmax=cmax)
-        plt.title(f'NGEN {variable} - {t_ax[j]}')
+        fig, axes = plt.subplots(1, 2, figsize=(8, 8), dpi=200)
+        jfile=netcdf_files[j]
+        ds = xr.open_dataset(jfile)
+        units = ds[nwm_variable].units
+        nwm_var = ds[nwm_variable].isel(x=slice(x_min, x_max + 1), y=slice(3840 - y_max, 3840 - y_min + 1))
+        if j==0:
+            cmin=np.min(nwm_var)
+            cmax=np.max(nwm_var)
+        nwm_var = np.flip(nwm_var[0,:,:], 0)
+        im = axes[0].imshow(nwm_var, vmin=cmin, vmax=cmax)
+        axes[0].axis('off')
+        axes[0].set_title(f'NWM')
+
+        gdf[ngen_variable] = ngen_data[:, j, var_idx]
+        image = gdf.plot(
+            column=ngen_variable,
+            ax=axes[1],
+            vmin=cmin, 
+            vmax=cmax
+            )
+        axes[1].set_title(f'NGEN')
+        axes[1].axis('off')
         fig_name = f'{jtime}.png'
+        plt.colorbar(im, 
+                    ax=axes,
+                    orientation='horizontal', 
+                    fraction=.1,
+                    label=f'{nwm_variable} -> {ngen_variable} {units}'
+                    )
+
+        plt.suptitle(f"{domain} {t_ax[j]}")
         plt.savefig(os.path.join(output_dir, fig_name))
-        plt.tight_layout()
-        plt.title(f"NWM {variable} Processed into NGEN")
         plt.close()
         jpng = os.path.join(output_dir, fig_name)
         images.append(imageio.imread(jpng))
         os.remove(jpng)
-    imageio.mimsave(output_gif, images, fps=2)
+    imageio.mimsave(os.path.join(output_dir, f'{nwm_variable}_2_{ngen_variable}.gif')mweq    , images, loop=0, fps=2)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -61,6 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--geopackage",  help="Path to a geopackage from which the weights were created",default="")
     args = parser.parse_args()
 
+    print(f'Collecting data...')
     with open(args.weights_json, "r") as f:
         weights_json = json.load(f)
 
@@ -103,6 +130,16 @@ if __name__ == "__main__":
     y_min=np.min(y_min_list)   
     y_max=np.max(y_max_list) 
 
-    plot_nwm_forcings(nc_files, variable='T2D', output_gif='T2D_nwm_18.gif')
-    plot_ngen_forcings(args.geopackage, ngen_data, t_ax, catchment_ids, variable='TMP_2maboveground', output_gif='T2D_ngen_18.gif')
+    for j, j_ngen_var in enumerate(ngen_variables):
+        j_nwm_var = nwm_variables[j]
+        print(f'creating gif for variables {j_nwm_var} -> {j_ngen_var}')
+        plot_ngen_forcings(sorted(nc_files), 
+            args.geopackage, 
+            ngen_data, t_ax, 
+            catchment_ids,
+            j_nwm_var, 
+            j_ngen_var,
+            j,
+            'VPU 18'
+            )
     print(f'Gifs creation complete')
