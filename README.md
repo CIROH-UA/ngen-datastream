@@ -122,8 +122,8 @@ RESOURCE_PATH/
 ├── nwm-forcings/
 |   ├── nwm.t00z.medium_range.forcing.f001.conus
 |   ├── ...
-  
 ```
+** nwm-forcings is only saved to `RESOURCE_PATH` if local nwm forcings files were provided during execution. `ngen-datastream` will not store forcings files that were accessed remotely.
 
 | File Type        |    Example link    | Description  | Naming |
 |-------------|--------|--------------------------|-----|
