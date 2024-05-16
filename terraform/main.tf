@@ -16,10 +16,6 @@ variable "lambda_policy_name" {}
 variable "lambda_role_name" {}
 variable "sm_name" {}
 variable "runtime" {}
-variable "schedule_name" {}
-variable "scheduler_policy_name" {}
-variable "scheduler_role_name" {}
-variable "execution_name" {}
 
 resource "aws_iam_policy" "datastreamlambda_policy" {
   name        = var.lambda_policy_name
@@ -398,70 +394,4 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
   }
 }
 EOF
-}
-
-resource "aws_iam_policy" "scheduler_policy" {
-  name        = var.scheduler_policy_name
-  description = "Policy with permissions for statemachine execution"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-            "Effect": "Allow",
-            Action = [
-                "states:StartExecution",
-                "events:PutTargets",
-                "events:PutRule",
-                "events:PutPermission"
-              ],
-            "Resource": ["*"]
-        }
-    ]
-  })
-}
-
-resource "aws_iam_role" "scheduler_role" {
-  name = var.scheduler_role_name
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow",
-      Principal = {
-        Service = "scheduler.amazonaws.com"
-      },
-      Action = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
-  name       = "datastream_scheduler_attachment"
-  roles      = [aws_iam_role.scheduler_role.name]
-  policy_arn = aws_iam_policy.scheduler_policy.arn
-}
-
-variable "vpu_execution_names" {
-  type    = list(string)
-  default = ["01","02","03N","03S","03W","04","05","06", "07","08","09",
-            "10L","10U","11","12","13","14","15","16","17","18",]
-}
-
-resource "aws_scheduler_schedule" "data_stream_schedule" {
-  for_each   = toset(var.vpu_execution_names)
-  name       = each.value
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 1 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input = file("${path.module}/executions/vpu_executions/${var.execution_name}_${each.value}.json")
-  }
-
 }
