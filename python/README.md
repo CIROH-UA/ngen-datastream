@@ -6,7 +6,7 @@ Note: see [noahowp_pkl](#noahowp_pklpy) before running this script. Currently, t
 The t-route config is also created from a template within this repository. Soon these will be generated with pydantic models within [ngen-cal](https://github.com/NOAA-OWP/ngen-cal)
 ```
 usage: ngen_configs_gen.py [-h] [--hf_file HF_FILE] [--hf_lnk_file HF_LNK_FILE] [--outdir OUTDIR]
-                           [--pkl_file PKL_FILE] [--realization REALIZATION]
+                           [--pkl_file PKL_FILE] [--realization REALIZATION] [--ignore IGNORE]
 options:
   -h, --help                 show this help message and exit
   --hf_file HF_FILE          Path to the .gpkg
@@ -14,6 +14,7 @@ options:
   --outdir OUTDIR            Path to write ngen configs
   --pkl_file PKL_FILE        Path to the noahowp pkl
   --realization REALIZATION  Path to the ngen realization
+  --ignore IGNORE            ngen bmi modules to ignore config generation
 ```
 
 
