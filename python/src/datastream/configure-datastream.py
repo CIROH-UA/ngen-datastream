@@ -99,8 +99,6 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op):
 
     fp_conf = {
         "forcing" : {
-            "start_date"   : start,
-            "end_date"     : end,
             "nwm_file"     : f"{docker_mount}/datastream-metadata/{filename}",
             "weight_file"  : weights,
         },

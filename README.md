@@ -12,23 +12,23 @@
 
 Usage: ./ngen-datastream/scripts/stream.sh [options]
 Either provide a datastream configuration file
-  -c, --CONF_FILE          <Path to datastream configuration file>
+  -c, --CONF_FILE           <Path to datastream configuration file> 
 or run with cli args
-  -s, --START_DATE          <YYYYMMDDHHMM or "DAILY">
-  -e, --END_DATE            <YYYYMMDDHHMM>
-  -d, --DATA_PATH           <Path to write to>
-  -R, --REALIZATION         <Path to realization file>
-  -r, --RESOURCE_PATH       <Path to resource directory>
-  -f, --FORCINGS_TAR        <Path to forcings tarball> 
-  -g, --GEOPACAKGE          <Path to geopackage file>
-  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file>
-  -S, --S3_MOUNT            <Path to mount s3 bucket to>
+  -s, --START_DATE          <YYYYMMDDHHMM or "DAILY"> 
+  -e, --END_DATE            <YYYYMMDDHHMM> 
+  -D, --DOMAIN_NAME         <Name for spatial domain> 
+  -g, --GEOPACAKGE          <Path to geopackage file> 
+  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> 
+  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
+  -I, --SUBSET_ID           <Hydrofabric id to subset>  
+  -v, --HYDROFABRIC_VERSION <Hydrofabric version> 
+  -R, --REALIZATION         <Path to realization file> 
+  -d, --DATA_PATH           <Path to write to> 
+  -r, --RESOURCE_PATH       <Path to resource directory> 
+  -f, --FORCINGS            <Path to forcings directory or tarball> 
+  -S, --S3_MOUNT            <Path to mount s3 bucket to>  
   -o, --S3_PREFIX           <File prefix within s3 mount>
-  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>
-  -I, --SUBSET_ID           <Hydrofabric id to subset>
-  -v, --HYDROFABRIC_VERSION <Hydrofabric version>
-  -n, --NPROCS              <Process limit>
-  -D, --DOMAIN_NAME         <Name for spatial domain>
+  -n, --NPROCS              <Process limit> 
 ```
 This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 8 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```
@@ -47,19 +47,19 @@ This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLO
 |---------------------|--------------------------|------|
 | START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
-| DATA_PATH           | Absolute local path to construct the datastream run. | :white_check_mark: |
-| REALIZATION         | Path to NextGen realization file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
+| DOMAIN_NAME         | Name for spatial domain in run, stripped from gpkg if not supplied |  |
 | GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
 | GEOPACKAGE_ATTR     | Path to hydrofabric attributes, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
-| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
-| FORCINGS_TAR            | Path to tarball that contains forcings csvs or parquets|  |
-| S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
-| S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | SUBSET_ID           | catchment id to subset [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) |   |
 | HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  |
+| REALIZATION         | Path to NextGen realization file | Required here or file exists in `RESOURCE_PATH/ngen-configs` |
+| DATA_PATH           | Absolute local path to construct the datastream run. | :white_check_mark: |
+| RESOURCE_PATH       | Path to directory that contains the datastream resources. This directory allows the user to place the several required files into a single directory and simply point `ngen-datastream` to it. This is folder is generated at `DATA_PATH/datastream-resources` during a `ngen-datastream` execution and can be reused in future runs. More explanation [here](#datastream-resources)|  |
+| FORCINGS            | Path to local directory containing nwm files or tarball that contains ngen forcings csvs/parquets|  |
+| S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
+| S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
 | NPROCS              | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
-| DOMAIN_NAME         | Name for spatial domain in run, stripped from gpkg if not supplied |  |
 
 
 
@@ -107,6 +107,8 @@ The easiest way to create a reusable resource directory is to execute `ngen-data
 ```
 RESOURCE_PATH/
 |
+├── weights.json
+|
 ├── ngen-configs/
 |   │
 |   ├── nextgen_01.gpkg
@@ -117,7 +119,9 @@ RESOURCE_PATH/
 |   │
 |   ├── ngen-bmi-configs.tar.gz
 |
-├── weights.json
+├── nwm-forcings/
+|   ├── nwm.t00z.medium_range.forcing.f001.conus
+|   ├── ...
   
 ```
 
