@@ -1,0 +1,43 @@
+{
+  "instance_parameters" :
+  {
+    "ImageId"            : "ami-0a5589320e3513254",
+    "InstanceType"       : "t4g.2xlarge",
+    "KeyName"            : "Processor",
+    "MinCount"           : 1,
+    "MaxCount"           : 1,
+    "SecurityGroupIds"   : ["sg-066e56297c706ac84"],
+    "IamInstanceProfile" : {
+      "Name" : "EC2ForcingProcessor"
+    },
+    "TagSpecifications"   :[
+      {
+          "ResourceType": "instance",
+          "Tags": [
+              {
+                  "Key"   : "Name",
+                  "Value" : "ngen_datastream_demo"
+              }
+          ]
+      }
+  ],
+    "BlockDeviceMappings":[
+      {
+          "DeviceName": "/dev/xvda",  
+          "Ebs": {
+              "VolumeSize": 32,
+              "VolumeType": "gp2"  
+          }
+      }
+    ]
+  },
+
+  "region"   : "us-east-2",
+  "commands"  : [
+    "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c 'mount-s3 ngen-datastream /home/ec2-user/ngen-datastream/data/mount'",
+    "runuser -l ec2-user -c 'cd ngen-datastream && ./scripts/stream.sh -s 202404250100 -e 202404260000 -d $(pwd)/data/datastream_demo -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet -R $(pwd)/configs/ngen/realization_cfe_sloth_pet_nom.json -n 8 -S /home/ec2-user/ngen-datastream/data/mount -o /dev_con_24_demo'"],
+  
+  "bucket"   : "ngen-datastream",
+  "obj_key"  : "dev_con_24_demo/ngen-run.tar.gz"
+}
