@@ -33,8 +33,8 @@ or run with cli args
 This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 8 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```
 ./scripts/stream.sh \
-  -s 202405250100 \
-  -e 202405260000 \
+  -s 202405200100 \
+  -e 202405210000 \
   -d $(pwd)/data/datastream_test \
   -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg \
   -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet \
