@@ -85,15 +85,23 @@ else
     HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
 fi
 echo "HOST_TYPE" $HOST_TYPE
-HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
-HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
+if [ -f "/etc/os-release" ]; then
+    HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
+    HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
+else 
+    echo "Warning: /etc/os-release file not found"
+fi
+
 echo "HOST_OS" $HOST_OS
 
 PLATORM_TAG=""
 if [ $(uname -m) = "x86_64" ]; then
     PLATORM_TAG="-x86"
+elif [ $(uname -m) = "arm64" ]; then
+    PLATORM_TAG=""
+else 
+  echo "Warning: Unsupported architecture $(uname -m)"
 fi
-
 # read cli args
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -459,7 +467,7 @@ else
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
             "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-        cp -v -t $DATASTREAM_META_PATH $DATASTREAM_RESOURCES/*filenamelist.txt
+        cp -v $DATASTREAM_RESOURCES/*filenamelist.txt $DATASTREAM_META_PATH
     fi
     echo "Creating forcing files"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
@@ -470,7 +478,7 @@ else
     log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
     if [ ! -z $FORCINGS_LOCAL_DIRECTORY ]; then
         rm $DATASTREAM_META_PATH/$FILENAMES
-        cp $DATASTREAM_RESOURCES/$LOCAL_FILENAMES $DATASTREAM_META_PATH
+        cp -v $DATASTREAM_RESOURCES/$LOCAL_FILENAMES $DATASTREAM_META_PATH
     fi
 fi    
 
@@ -490,8 +498,8 @@ log_time "NGEN_END" $DATASTREAM_PROFILING
 
 cp -r $NGEN_RUN_PATH/*partitions* $DATASTREAM_RESOURCES/
 
-# echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
-find $NGEN_RUN_PATH -type f -name "*.csv" -exec mv {} $NGEN_OUTPUT_PATH \;
+#echo "$NGEN_RUN_PATH"/*.csv | xargs mv $NGEN_OUTPUT_PATH --
+#find $NGEN_RUN_PATH -type f -name "*.csv" -exec mv {} $NGEN_OUTPUT_PATH \;
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
