@@ -459,6 +459,7 @@ else
         done
         mkdir -p $DATA_PATH$NWM_FORCINGS
         echo "Copying nwm files into "$DATA_PATH$NWM_FORCINGS
+        mkdir $DATASTREAM_RESOURCES$NWM_FORCINGS
         cp -r $FORCINGS_LOCAL_DIRECTORY/* $DATASTREAM_RESOURCES$NWM_FORCINGS
         cp $FILENAMES $DATASTREAM_META_PATH
     else
