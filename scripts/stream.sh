@@ -40,23 +40,23 @@ usage() {
     echo ""
     echo "Usage: $0 [options]"
     echo "Either provide a datastream configuration file"
-    echo "  -c, --CONF_FILE          <Path to datastream configuration file> "  
+    echo "  -c, --CONF_FILE           <Path to datastream configuration file> "  
     echo "or run with cli args"
     echo "  -s, --START_DATE          <YYYYMMDDHHMM or \"DAILY\"> "
     echo "  -e, --END_DATE            <YYYYMMDDHHMM> "
-    echo "  -d, --DATA_PATH           <Path to write to> "
-    echo "  -R, --REALIZATION         <Path to realization file> "
-    echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
-    echo "  -f, --FORCINGS_TAR        <Path to forcings tarball> "
+    echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "    
     echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
-    echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> "
-    echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
-    echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
+    echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> "  
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
-    echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "
+    echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "      
+    echo "  -R, --REALIZATION         <Path to realization file> "  
+    echo "  -d, --DATA_PATH           <Path to write to> "
+    echo "  -r, --RESOURCE_PATH       <Path to resource directory> "
+    echo "  -f, --FORCINGS            <Path to forcings directory or tarball> "
+    echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
+    echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
     echo "  -n, --NPROCS              <Process limit> "
-    echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "
     exit 1
 }
 
@@ -66,7 +66,7 @@ END_DATE=""
 DATA_PATH=""
 REALIZATION=""
 RESOURCE_PATH=""
-FORCINGS_TAR=""
+FORCINGS=""
 GEOPACKAGE=""
 GEOPACKAGE_ATTR=""
 S3_MOUNT=""
@@ -102,7 +102,7 @@ while [ "$#" -gt 0 ]; do
         -d|--DATA_PATH) DATA_PATH="$2"; shift 2;;
         -R|--REALIZATION) REALIZATION="$2"; shift 2;;
         -r|--RESOURCE_PATH) RESOURCE_PATH="$2"; shift 2;;
-        -f|--FORCINGS_TAR) FORCINGS_TAR="$2"; shift 2;;
+        -f|--FORCINGS) FORCINGS="$2"; shift 2;;
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
         -G|--GEOPACKAGE_ATTR) GEOPACKAGE_ATTR="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
@@ -219,6 +219,16 @@ DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
 DOCKER_META="${DOCKER_MOUNT%/}/datastream-metadata"
 DOCKER_FP_PATH="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 
+FORCINGS_TAR=""
+FORCINGS_LOCAL_DIRECTORY=""
+if [[ $FORCINGS =~ \.tar\.gz$ ]]; then
+    echo "Provided forcings tarball"
+    FORCINGS_TAR=$FORCINGS
+else
+    echo "Provided local forcings directory"
+    FORCINGS_LOCAL_DIRECTORY=$FORCINGS
+fi
+
 log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
 if [ ! -z $RESOURCE_PATH ]; then
     echo "running in lite mode"
@@ -275,6 +285,9 @@ if [ ! -z $RESOURCE_PATH ]; then
         echo "geopackage missing from resources"     
         exit 1   
     fi
+
+    # Look for local nwm forcings
+    FORCINGS_LOCAL_DIRECTORY=$(find $RESOURCE_PATH -type d -name "nwm-forcings")
 
     # Look for geopackage attributes file
     # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
@@ -422,12 +435,32 @@ else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
     echo "Creating nwm filenames file"
     DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
-    docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
-        -u $(id -u):$(id -g) \
-        -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-        python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
-        "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-    cp -v $DATASTREAM_RESOURCES/*filenamelist.txt $DATASTREAM_META_PATH
+    if [ ! -z $FORCINGS_LOCAL_DIRECTORY ]; then
+        FORCINGS_LOCAL_DIRECTORY=$(realpath "$FORCINGS_LOCAL_DIRECTORY")
+        LOCAL_FILENAMES="local_filenamelist.txt"
+        > "$LOCAL_FILENAMES"
+        find "$FORCINGS_LOCAL_DIRECTORY" -type f | sort >> "$LOCAL_FILENAMES"
+        mv $LOCAL_FILENAMES $DATASTREAM_RESOURCES
+
+        NWM_FORCINGS="/nwm-forcings"
+        FILENAMES="filenamelist.txt"
+        > "$FILENAMES"
+        find "$FORCINGS_LOCAL_DIRECTORY" -type f | sort | while read -r file; do
+            relative_path="${file#$FORCINGS_LOCAL_DIRECTORY}"
+            echo "$DOCKER_RESOURCES$NWM_FORCINGS$relative_path" >> "$FILENAMES"
+        done
+        mkdir -p $DATA_PATH$NWM_FORCINGS
+        echo "Copying nwm files into "$DATA_PATH$NWM_FORCINGS
+        cp -r $FORCINGS_LOCAL_DIRECTORY/* $DATASTREAM_RESOURCES$NWM_FORCINGS
+        cp $FILENAMES $DATASTREAM_META_PATH
+    else
+        docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
+            -u $(id -u):$(id -g) \
+            -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+            python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
+            "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
+        cp -v -t $DATASTREAM_META_PATH $DATASTREAM_RESOURCES/*filenamelist.txt
+    fi
     echo "Creating forcing files"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
@@ -435,6 +468,10 @@ else
         python "$DOCKER_FP_PATH"forcingprocessor.py "$DOCKER_META"/conf_fp.json
     mv $DATASTREAM_RESOURCES/log_fp.txt $DATASTREAM_META_PATH 
     log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
+    if [ ! -z $FORCINGS_LOCAL_DIRECTORY ]; then
+        rm $DATASTREAM_META_PATH/$FILENAMES
+        cp $DATASTREAM_RESOURCES/$LOCAL_FILENAMES $DATASTREAM_META_PATH
+    fi
 fi    
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
