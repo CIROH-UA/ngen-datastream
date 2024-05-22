@@ -95,7 +95,7 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op):
     else:
         weights = f"{docker_mount}/datastream-resources/weights.json"
         output_path = f"{docker_mount}/ngen-run"
-        output_file_type = ["csv"]
+        output_file_type = ["csv","tar"]
 
     fp_conf = {
         "forcing" : {
