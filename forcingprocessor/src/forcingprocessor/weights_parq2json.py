@@ -13,37 +13,43 @@ def get_catchment_idx(proc_pairs):
     ncatch_found = 0
     for tbl, catchments in proc_pairs:
         for jcatch in catchments:         
-            df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]           
+            df_jcatch = tbl.loc[tbl['divide_id'] == jcatch]      
             ncatch_found+=1
             idx_list = [int(x) for x in list(df_jcatch['cell'])]
             df_catch = list(df_jcatch['coverage_fraction'])
             weight_data[jcatch] = [idx_list,df_catch]
     return (weight_data)
 
-def get_weight_json(catchments,version,nprocs):
+def get_weight_json(catchments,version,nprocs,weights_parquet):
     if version is None: version = "v20.1"
     print(f'Beginning weights query')
-    w = pa.dataset.dataset(
-        f's3://lynker-spatial/hydrofabric/{version}/forcing_weights.parquet', format='parquet'
-    ).filter(
-        pc.field('divide_id').isin(catchments)
-    ).to_batches()
-    batch: pa.RecordBatch
-    t_weights = time.perf_counter()    
-    count = 0
     ncatchments = len(catchments)
-    print(f'Querying weights for {ncatchments} catchments',flush=True)
+    t_weights = time.perf_counter() 
     proc_pairs = []
-    for batch in w:
-        count += 1
-        tbl = batch.to_pandas()
-        if tbl.empty:
-            continue    
-        uni_cat = tbl.divide_id.unique()    
-        located = [x for x in catchments if x in uni_cat]  
-        if len(located) > 0:
-            proc_pairs.append([tbl,located])
-            print(f'found {len(located)} in batch {count}',flush=True)
+    if weights_parquet is None:
+        w = pa.dataset.dataset(
+            f's3://lynker-spatial/hydrofabric/{version}/forcing_weights.parquet', format='parquet'
+        ).filter(
+            pc.field('divide_id').isin(catchments)
+        ).to_batches()
+        batch: pa.RecordBatch
+        t_weights = time.perf_counter()    
+        count = 0
+        t_weights = 0
+        print(f'Querying weights for {ncatchments} catchments',flush=True)
+        
+        for batch in w:
+            count += 1
+            tbl = batch.to_pandas()
+            if tbl.empty:
+                continue    
+            uni_cat = tbl.divide_id.unique()    
+            located = [x for x in catchments if x in uni_cat]  
+            if len(located) > 0:
+                proc_pairs.append([tbl,located])
+                print(f'found {len(located)} in batch {count}',flush=True)
+    else:
+        proc_pairs.append([pd.read_parquet(weights_parquet),catchments])
 
     print(f'Weights have been retrieved, converting from tabular to per-catchment json for forcingprocessor',flush=True)
     npairs = len(proc_pairs)
@@ -63,7 +69,7 @@ def get_weight_json(catchments,version,nprocs):
 
     weights = {}
     for jweights in results:
-        weights = weights | jweights           
+        weights = weights | jweights     
     
     nweights = len(weights)
     assert nweights == ncatchments, f'nweights {nweights} does not equal ncatchments {ncatchments}!!'
@@ -84,7 +90,8 @@ if __name__ == "__main__":
     parser.add_argument('--catchment_list', dest="catchment_list", type=str, help="list of catchments",default = None)
     parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="maximum processes",default = os.cpu_count())
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
-    parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v20.1\"",default = "v20.1")
+    parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v20.1\"", default = "v20.1")
+    parser.add_argument('--weights_parquet', dest="weights_parquet", type=str, help="Local weights parquet file", default = None)
     args = parser.parse_args()
 
     version = args.version    
@@ -111,7 +118,7 @@ if __name__ == "__main__":
                 print(f'Extracting weights from gpkg')
                 catchment_list = get_catchments_from_gpkg(args.geopackage)
 
-    weights = get_weight_json(catchment_list,args.version,args.nprocs_max)
+    weights = get_weight_json(catchment_list,args.version,args.nprocs_max,args.weights_parquet)
 
     data = json.dumps(weights)
     with open(args.weights_filename,'w') as fp:
