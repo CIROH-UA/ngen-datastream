@@ -15,13 +15,15 @@ jobs:
       
     - name: Install dependencies
       run: |
-        sudo dnf -y update && \
-          dnf install findutils && \
-          dnf install find && \
-          dnf clean all
+        sudo dnf -y update
+        sudo dnf -y install findutils
+        sudo dnf clean all
+        find --version
         $(pwd)/scripts/install.sh
         aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
         aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
+
     - name: Test datastream
       run: |
+        find --version
         $(pwd)/tests/scripts/test_stream.sh -d $(pwd)
