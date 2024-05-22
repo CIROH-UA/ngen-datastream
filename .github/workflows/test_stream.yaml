@@ -17,6 +17,7 @@ jobs:
       run: |
         sudo dnf -y update && \
           dnf install findutils && \
+          dnf install find && \
           dnf clean all
         $(pwd)/scripts/install.sh
         aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
