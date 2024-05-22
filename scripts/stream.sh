@@ -404,8 +404,10 @@ NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
 docker run --rm -v "$NGEN_RUN_PATH":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $NGEN_CONFGEN \
     --hf_file "$DOCKER_MOUNT/config/datastream.gpkg" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
+TAR_NAME="ngen-bmi-configs.tar.gz"
+NGENCON_TAR_PATH="${DATASTREAM_RESOURCES_NGENCONF_PATH%/}/$TAR_NAME"
+tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
-
 
 if [ ! -z $FORCINGS_TAR ]; then
     log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
@@ -425,7 +427,7 @@ else
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
         python "$DOCKER_FP_PATH"nwm_filenames_generator.py \
         "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-    cp -v -t $DATASTREAM_META_PATH $DATASTREAM_RESOURCES/*filenamelist.txt
+    cp -v $DATASTREAM_RESOURCES/*filenamelist.txt $DATASTREAM_META_PATH
     echo "Creating forcing files"
     docker run --rm -v "$DATA_PATH:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
@@ -451,18 +453,14 @@ log_time "NGEN_END" $DATASTREAM_PROFILING
 
 cp -r $NGEN_RUN_PATH/*partitions* $DATASTREAM_RESOURCES/
 
-echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
+# echo "$NGEN_RUN_PATH"/*.csv | xargs mv -t $NGEN_OUTPUT_PATH --
+find $NGEN_RUN_PATH -type f -name "*.csv" -exec mv {} $NGEN_OUTPUT_PATH \;
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_PATH":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 log_time "MERKLE_END" $DATASTREAM_PROFILING
 
-
 log_time "TAR_START" $DATASTREAM_PROFILING
-TAR_NAME="ngen-bmi-configs.tar.gz"
-NGENCON_TAR_PATH="${DATASTREAM_RESOURCES_NGENCONF_PATH%/}/$TAR_NAME"
-tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGEN_CONFIG_PATH . | pigz > $NGENCON_TAR_PATH
-
 TAR_NAME="ngen-run.tar.gz"
 NGENRUN_TAR_PATH="${DATA_PATH%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN_PATH | pigz > $NGENRUN_TAR_PATH
@@ -480,7 +478,6 @@ if [ -e "$S3_OUT" ]; then
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
 fi
 echo "Data exists here: $DATA_PATH"
-
 
 echo "ngen-datastream run complete! Goodbye!"
 
