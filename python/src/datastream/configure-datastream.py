@@ -93,7 +93,7 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op):
         output_path  = f"s3://ngen-datastream/forcings/v20.1/{start}-{end}"
         output_file_type = ["tar"]
     else:
-        weights = f"{docker_mount}/datastream-resources/weights.json"
+        weights = f"{docker_mount}/datastream-resources/datastream/weights.json"
         output_path = f"{docker_mount}/ngen-run"
         output_file_type = ["csv","tar"]
 
