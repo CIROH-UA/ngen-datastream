@@ -8,6 +8,7 @@ DATASTREAM_PATH=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -d|--DATASTREAM_PATH) DATASTREAM_PATH="$2"; shift 2;;
+        -p|--PUSH_DOCKERHUB) PUSH_DOCKERHUB="$2"; shift 2;;
         *) usage;;
     esac
 done        
@@ -23,14 +24,10 @@ docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --
 docker build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
 docker build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
 
-NGIAB_PATH="$DATASTREAM_PATH"/NGIAB-CloudInfra
-NGIAB_DOCKER="$NGIAB_PATH"/docker
-git submodule init
-git submodule update
-cd $NGIAB_DOCKER
-docker build -t awiciroh/ngen-deps:$TAG -f Dockerfile.ngen-deps --no-cache . && \
-    docker build -t awiciroh/t-route:$TAG -f ./Dockerfile.t-route . --no-cache --build-arg TAG_NAME=$TAG && \
-    docker build -t awiciroh/ngen:$TAG-f ./Dockerfile.ngen . --no-cache --build-arg TAG_NAME=$TAG && \
-    docker build -t awiciroh/ciroh-ngen-image:$TAG -f ./Dockerfile . --no-cache --build-arg TAG_NAME=$TAG
+if [ -z $PUSH_DOCKERHUB ]; then
+    docker push awiciroh/datastream-deps:latest-x86
+    docker push awiciroh/datastream:latest-x86
+    docker push awiciroh/forcingprocessor:latest-x86
+fi
 
 echo "done!"    
