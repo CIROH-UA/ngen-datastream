@@ -308,13 +308,14 @@ if [ ! -z $RESOURCE_DIR ]; then
         echo "At most one hydrofabric weight file is allowed in "$DATASTREAM_RESOURCES
         exit 1
     fi
+
+    # HACK, remove when attributes files are renamed
     if [ ${HYDROFABRIC_NWEIGHTS} -gt 0 ]; then
         mv *weights*.parquet $DATASTREAM_RESOURCES
     fi
 
     # Look for geopackage attributes file
     # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
-    
     GEOPACKAGE_ATTR_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet")        
     NATTR=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet" | wc -l)
     if [ ${NATTR} -gt 1 ]; then
@@ -328,21 +329,27 @@ if [ ! -z $RESOURCE_DIR ]; then
         echo "geopackage attributes missing from resources"
         exit 1
     fi
+
+    # HACK, remove when attributes files are renamed
     if [ ${HYDROFABRIC_NWEIGHTS} -gt 0 ]; then
         mv $DATASTREAM_RESOURCES*weights*.parquet $DATASTREAM_RESOURCES_HYDROFABRIC
     fi    
 
     # Look for nwm forcings
     if [ -z $NWM_FORCINGS_DIR ]; then
+        NWM_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "nwm-forcings")
         NNWM_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "nwm-forcings" | wc -l)
-        if [ ${NNWM_FORCINGS_DIR} -gt 1 ]; then
-            NWM_FORCINGS_DIR=$(find "$DATASTREAM_RESOURCES_NWMFORCINGS" -type f -name "*.nc")
+        if [ ${NNWM_FORCINGS_DIR} -gt 0 ]; then
+            NWM_FORCINGS=$(find "$DATASTREAM_RESOURCES_NWMFORCINGS" -type f -name "*.nc")
         fi
     fi
 
     # Look for ngen forcings
     if [ -z $NGEN_FORCINGS ]; then
-        NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.tar.gz")
+        NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
+        if [ ${NNGEN_FORCINGS_DIR} -gt 1 ]; then
+            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.tar.gz")
+        fi
     fi
 
     # Look for weights file
@@ -371,6 +378,11 @@ else
     else
         echo "realization arg is required"
         exit 1
+    fi    
+
+    # Look for nwm forcings
+    if [ ! -z $NWM_FORCINGS_DIR ]; then
+        NWM_FORCINGS=$(find "$NWM_FORCINGS_DIR" -type f -name "*.nc")
     fi    
 
     if [ ! -z $SUBSET_ID ]; then
@@ -478,30 +490,36 @@ else
     echo "Creating nwm filenames file"
     DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
     if [ ! -z $NWM_FORCINGS_DIR ]; then
-        NWM_FORCINGS_DIR=$(realpath "$NWM_FORCINGS_DIR")
-        LOCAL_FILENAMES="local_filenamelist.txt"
+        LOCAL_FILENAMES="filenamelist.txt"
         > "$LOCAL_FILENAMES"
-        find "$NWM_FORCINGS_DIR" -type f | sort >> "$LOCAL_FILENAMES"
-        mv $LOCAL_FILENAMES $DATASTREAM_RESOURCES
+        for file in $NWM_FORCINGS; do
+            echo "$file"
+        done | sort >> "$LOCAL_FILENAMES"
+        cp $LOCAL_FILENAMES $DATASTREAM_META/filenamelist.txt
+        rm $LOCAL_FILENAMES
 
-        NWM_FORCINGS_DIR="/nwm-forcings"
         FILENAMES="filenamelist.txt"
         > "$FILENAMES"
-        find "$NWM_FORCINGS_DIR" -type f | sort | while read -r file; do
-            relative_path="${file#$NWM_FORCINGS_DIR}"
-            echo "$DOCKER_RESOURCES$NWM_FORCINGS_DIR$relative_path" >> "$FILENAMES"
+        for file in $NWM_FORCINGS; do
+            echo "$file"
+        done | sort | while read -r file; do
+            filebase=$(basename $file)
+            echo "$DOCKER_RESOURCES/nwm-forcings/$filebase" >> "$FILENAMES"
         done
-        mkdir -p $DATA_DIR$NWM_FORCINGS_DIR
-        echo "Copying nwm files into "$DATA_DIR$NWM_FORCINGS_DIR
-        cp -r $NWM_FORCINGS_DIR/* $DATASTREAM_RESOURCES$NWM_FORCINGS_DIR
-        cp $FILENAMES $DATASTREAM_META
+        
+        if [ ! -e $DATASTREAM_RESOURCES_NWMFORCINGS ]; then
+            mkdir -p $DATASTREAM_RESOURCES_NWMFORCINGS
+            echo "Copying nwm files into "$DATASTREAM_RESOURCES_NWMFORCINGS
+            cp -r $NWM_FORCINGS_DIR/* $DATASTREAM_RESOURCES_NWMFORCINGS
+        fi
+        mv $FILENAMES $DATASTREAM_RESOURCES_DATASTREAM
     else
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python "$DOCKER_FP"nwm_filenames_generator.py \
             "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-        cp -v $DATASTREAM_RESOURCES/*filenamelist.txt $DATASTREAM_META
+        cp $DATASTREAM_RESOURCES"*filenamelist*.txt" $DATASTREAM_META
     fi
     echo "Creating forcing files"
     docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
@@ -510,16 +528,11 @@ else
         python "$DOCKER_FP"forcingprocessor.py "$DOCKER_META"/conf_fp.json
     mv $DATASTREAM_RESOURCES/log_fp.txt $DATASTREAM_META 
     log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
-    if [ ! -z $NWM_FORCINGS_DIR ]; then
-        rm $DATASTREAM_META/$FILENAMES
-        cp -v $DATASTREAM_RESOURCES/$LOCAL_FILENAMES $DATASTREAM_META
-    fi
     if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
         mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
     fi
-    rm $DATASTREAM_RESOURCES"*filenamelist*"
+    rm $DATASTREAM_RESOURCES_DATASTREAM*filenamelist*.txt
     mv $NGEN_RUN/forcings/*forcings.tar.gz $DATASTREAM_RESOURCES_NGENFORCINGS"forcings.tar.gz"
-    mv $DATASTREAM_RESOURCES/*weights*.json $DATASTREAM_RESOURCES_DATASTREAM
 fi    
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
