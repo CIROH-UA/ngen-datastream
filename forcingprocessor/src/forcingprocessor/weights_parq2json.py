@@ -26,7 +26,7 @@ def get_weight_json(catchments,version,nprocs,weights_parquet):
     ncatchments = len(catchments)
     t_weights = time.perf_counter() 
     proc_pairs = []
-    if weights_parquet is None:
+    if len(weights_parquet) == 0:
         w = pa.dataset.dataset(
             f's3://lynker-spatial/hydrofabric/{version}/forcing_weights.parquet', format='parquet'
         ).filter(
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument('--nprocs', dest="nprocs_max", type=int, help="maximum processes",default = os.cpu_count())
     parser.add_argument('--outname', dest="weights_filename", type=str, help="Filename for the weight file")
     parser.add_argument('--version', dest="version", type=str, help="Hydrofabric version e.g. \"v20.1\"", default = "v20.1")
-    parser.add_argument('--weights_parquet', dest="weights_parquet", type=str, help="Local weights parquet file", default = None)
+    parser.add_argument('--weights_parquet', dest="weights_parquet", type=str, help="Local weights parquet file", default = "")
     args = parser.parse_args()
 
     version = args.version    
