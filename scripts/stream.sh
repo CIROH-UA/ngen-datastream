@@ -45,7 +45,7 @@ usage() {
     echo "  -s, --START_DATE          <YYYYMMDDHHMM or \"DAILY\"> "
     echo "  -e, --END_DATE            <YYYYMMDDHHMM> "
     echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "    
-    echo "  -g, --GEOPACAKGE          <Path to geopackage file> "
+    echo "  -g, --GEOPACKAGE          <Path to geopackage file> "
     echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> " 
     echo "  -w, --HYDROFABRIC_WEIGHTS <Path to hydrofabric weights parquet> "  
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
@@ -67,7 +67,7 @@ CONF_FILE=""
 START_DATE=""
 END_DATE=""
 DOMAIN_NAME=""
-GEOPACAKGE=""
+GEOPACKAGE=""
 GEOPACKAGE_ATTR=""
 HYDROFABRIC_WEIGHTS=""
 SUBSET_ID=""
@@ -79,8 +79,8 @@ RESOURCE_DIR=""
 NWM_FORCINGS_DIR=""
 NGEN_FORCINGS=""
 S3_MOUNT=""
-S3_PREFIX="$(( $(nproc) - 2 ))"
-NPROCS=""
+S3_PREFIX=""
+NPROCS="$(( $(nproc) - 2 ))"
 
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
@@ -263,18 +263,18 @@ fi
 if [ ! -z $RESOURCE_DIR ]; then  
 
     # Look for realization
-    REALIZATION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*realization*.json")
-    if [ ! -f $REALIZATION_RESOURCES ]; then
-        if [ ! -z $REALIZATION ]; then
-            REAL_BASE=$(basename $REALIZATION)
-            REALIZATION_RESOURCES="$DATASTREAM_RESOURCES_NGENCONF$REAL_BASE"
-            get_file "$REALIZATION" $REALIZATION_RESOURCES        
-        else
+    if [ -z $REALIZATION ]; then
+        REALIZATION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*realization*.json")
+        if [ -z $REALIZATION_RESOURCES ]; then
             echo "realization arg is required if not providing within the resource directory"
             exit 1
+        else
+            REAL_BASE=$(basename $REALIZATION_RESOURCES)                        
         fi
     else
-        REAL_BASE=$(basename $REALIZATION_RESOURCES)
+        REAL_BASE=$(basename $REALIZATION)
+        REALIZATION_RESOURCES="$DATASTREAM_RESOURCES_NGENCONF$REAL_BASE"
+        get_file "$REALIZATION" $REALIZATION_RESOURCES   
     fi
 
     # Untar ngen bmi module configs    
@@ -287,19 +287,26 @@ if [ ! -z $RESOURCE_DIR ]; then
     fi     
 
     # Look for geopackage file
-    GEOPACKAGE_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.gpkg")
-    NGEO=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.gpkg" | wc -l)
-    if [ ${NGEO} -gt 1 ]; then
-        echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES_HYDROFABRIC
-        exit 1
-    fi
-    if [ ${NGEO} -gt 0 ]; then
-        echo "Using" $GEOPACKAGE_RESOURCES
-        GEO_BASE=$(basename $GEOPACKAGE_RESOURCES)
+    if [ -z $GEOPACKAGE ]; then
+        GEOPACKAGE_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.gpkg")
+        NGEO=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.gpkg" | wc -l)
+        if [ ${NGEO} -gt 1 ]; then
+            echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES_HYDROFABRIC
+            exit 1
+        fi
+        if [ ${NGEO} -gt 0 ]; then
+            echo "Using" $GEOPACKAGE_RESOURCES
+            GEO_BASE=$(basename $GEOPACKAGE_RESOURCES)
+        else
+            echo "geopackage missing from resources"     
+            exit 1   
+        fi    
     else
-        echo "geopackage missing from resources"     
-        exit 1   
-    fi    
+        GEO_BASE=$(basename $GEOPACKAGE)
+        GEOPACKAGE_RESOURCES="$DATASTREAM_RESOURCES_HYDROFABRIC/$GEO_BASE"
+        get_file $GEOPACKAGE $GEOPACKAGE_RESOURCES
+        NGEO=1
+    fi
 
     # Look for hydrofabric weights file
     HYDROFABRIC_WEIGHTS=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*weights*.parquet")
@@ -316,18 +323,25 @@ if [ ! -z $RESOURCE_DIR ]; then
 
     # Look for geopackage attributes file
     # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
-    GEOPACKAGE_ATTR_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet")        
-    NATTR=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet" | wc -l)
-    if [ ${NATTR} -gt 1 ]; then
-        echo "At most one geopackage attributes is allowed in "$DATASTREAM_RESOURCES_HYDROFABRIC
-        exit 1
-    fi
-    if [ ${NATTR} -gt 0 ]; then
-        echo "Using" $GEOPACKAGE_ATTR_RESOURCES
-        GEO_ATTR_BASE=$(basename $GEOPACKAGE_ATTR_RESOURCES)
+    if [ -z $GEOPACKAGE_ATTR ]; then
+        GEOPACKAGE_ATTR_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet")        
+        NATTR=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet" | wc -l)
+        if [ ${NATTR} -gt 1 ]; then
+            echo "At most one geopackage attributes is allowed in "$DATASTREAM_RESOURCES_HYDROFABRIC
+            exit 1
+        fi
+        if [ ${NATTR} -gt 0 ]; then
+            echo "Using" $GEOPACKAGE_ATTR_RESOURCES
+            GEO_ATTR_BASE=$(basename $GEOPACKAGE_ATTR_RESOURCES)
+        else
+            echo "geopackage attributes missing from resources"
+            exit 1
+        fi
     else
-        echo "geopackage attributes missing from resources"
-        exit 1
+        GEO_ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
+        GEOPACKAGE_ATTR_RESOURCES="$DATASTREAM_RESOURCES_HYDROFABRIC/$GEO_ATTR_BASE"
+        get_file $GEOPACKAGE_ATTR $GEOPACKAGE_ATTR_RESOURCES
+        NATTR=1
     fi
 
     # HACK, remove when attributes files are renamed
@@ -347,7 +361,7 @@ if [ ! -z $RESOURCE_DIR ]; then
     # Look for ngen forcings
     if [ -z $NGEN_FORCINGS ]; then
         NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
-        if [ ${NNGEN_FORCINGS_DIR} -gt 1 ]; then
+        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then
             NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.tar.gz")
         fi
     fi
@@ -434,7 +448,7 @@ if [ -z $NGEN_FORCINGS ]; then
         log_time "WEIGHTS_START" $DATASTREAM_PROFILING
         echo "Datastream weights file not found. Creating from" $GEO_BASE
         GEO_DOCKER=""$DOCKER_RESOURCES"/hydrofabric/$GEO_BASE"
-        WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/weights.json"
+        WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/datastream/weights.json"
         DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
         docker run -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
@@ -519,7 +533,8 @@ else
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python "$DOCKER_FP"nwm_filenames_generator.py \
             "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-        cp $DATASTREAM_RESOURCES"*filenamelist*.txt" $DATASTREAM_META
+        cp $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_META
+        mv $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_RESOURCES_DATASTREAM
     fi
     echo "Creating forcing files"
     docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
@@ -551,7 +566,7 @@ log_time "NGEN_END" $DATASTREAM_PROFILING
 
 cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_DATASTREAM/
 
-find $NGEN_RUN -type f -name "*.csv" -exec mv {} $NGENRUN_OUTPUT \;
+find $NGEN_RUN -maxdepth 1 -type f -name "*.csv" -exec mv {} $NGENRUN_OUTPUT \;
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
