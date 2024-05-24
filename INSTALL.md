@@ -4,6 +4,7 @@ These steps are provided [scripted](#scripts) or [step-by-step](#step-by-step). 
 ## Prerequisites
 * Linux OS
 * Docker
+* git
 
 These instructions assume launching an instance from a blank Amazon 2023 Linux image. Steps may vary depending on your specific linux distribution.
 
