@@ -34,7 +34,7 @@ or run with cli args
   -o, --S3_PREFIX           <File prefix within s3 mount>
   -n, --NPROCS              <Process limit> 
 ```
-This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 8 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
+This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```
 ./scripts/stream.sh \
   -s 202405200100 \
