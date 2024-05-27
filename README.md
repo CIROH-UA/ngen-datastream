@@ -43,7 +43,7 @@ This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLO
   -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg \
   -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet \
   -R $(pwd)/configs/ngen/realization_cfe_sloth_pet_nom.json \
-  -n 8
+  -n 4
 ```
 
 ## Explanation of cli args (or variables in defined in `CONF_FILE`)
