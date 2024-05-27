@@ -29,7 +29,7 @@ A few quick notes before beginning
     ```
     ls $(pwd)/data/datastream_test_VPU09_0520
     ```
-    ![ngen-datastream](docs/CIROH_devcon_2024/screenshots/step2_data_dir.jpg)
+    ![ngen-datastream](screenshots/step2_data_dir.jpg)
 
     Make note of how long this run took. We will compare this runtime with the duration of the following runs.
 
@@ -50,7 +50,7 @@ A few quick notes before beginning
     -r $(pwd)/data/resources_VPU09_0520 \
     -n 4
     ```
-    ![datastream](docs/CIROH_devcon_2024/screenshots/step3_timing.jpg)
+    ![datastream](screenshots/step3_timing.jpg)
 
     Take note of the speed-up from the execution in step 2. In this case, `ngen-datastream` was provided just about everything it needs to run NextGen, so nearly all of the runtime is NextGen compute time. 
 
