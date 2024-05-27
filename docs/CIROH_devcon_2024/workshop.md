@@ -8,9 +8,9 @@ A few quick notes before beginning
 ## Start
 1) Install `ngen-datastream` by following [INSTALL.md](https://github.com/JordanLaserGit/ngen-datastream/blob/main/INSTALL.md)
 
-2) Now we can issue `ngen-datastream` commands. First, we will issue the command available in the repository's main [README.md](https://github.com/CIROH-UA/ngen-datastream?tab=readme-ov-file#run-it). If you downloaded files prior to the workshop, replace the arguement URLs in the commands below with local paths.
+2) Now we can issue `ngen-datastream` commands. First, we will issue the command available in the repository's main [README.md](https://github.com/CIROH-UA/ngen-datastream?tab=readme-ov-file#run-it). If you downloaded files prior to the workshop, replace the argument URLs in the commands below with local paths.
 
-   This command will execute a 24 hour NextGen simulation over VPU 09 (11,000 catchments) with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. The `time` command has been placed infront of `stream.sh` so that we will get the runtime following execution.
+   This command will execute a 24 hour NextGen simulation over VPU 09 (11,000 catchments) with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. The `time` command has been placed in front of `stream.sh` so that we will get the runtime following execution.
    ```
    time ./scripts/stream.sh \
     -s 202405200100 \
@@ -50,11 +50,11 @@ A few quick notes before beginning
     -r $(pwd)/data/resources_VPU09_0520 \
     -n 4
     ```
-    ![datastream](docs/CIROH_devcon_2024/screenshots/step2_data_dir.jpg)
+    ![datastream](docs/CIROH_devcon_2024/screenshots/step3_timing.jpg)
 
     Take note of the speed-up from the execution in step 2. In this case, `ngen-datastream` was provided just about everything it needs to run NextGen, so nearly all of the runtime is NextGen compute time. 
 
-    Researchers will often repeat simulations with small differences in model configuration. `ngen-datastream` allows users to effeciently repeat executions, which differ only in NextGen configuration. 
+    Researchers will often repeat simulations with small differences in model configuration. `ngen-datastream` allows users to efficiently repeat executions, which differ only in NextGen configuration. 
 
 4) To repeat the above simulation with a differing NextGen configuration, remove the realization file from the resource directory.
 
@@ -74,14 +74,14 @@ A few quick notes before beginning
         -n 4
     ```
 
-5) Next, imagine we have arrived at a "better" NextGen configuration by iterating over many NextGen simulations. We now want to apply that confiuration to a different day over the same spatial domain. If we want to continue to use our resources, we can create a new resource directory without the ngen-forcings tarball. The files contained in `forcings.tar.gz` are time dependent and will not match the new simulation time.
+5) Next, imagine we have arrived at a "better" NextGen configuration by iterating over many NextGen simulations. We now want to apply that configuration to a different day over the same spatial domain. If we want to continue to use our resources, we can create a new resource directory without the ngen-forcings tarball. The files contained in `forcings.tar.gz` are time dependent and will not match the new simulation time.
 
     ```
     cp -r $(pwd)/data/resources_VPU09_0520 $(pwd)/data/resources_VPU09    
     rm -rf $(pwd)/data/resources_VPU09/ngen-forcings
     ```
 
-    Now our resource directory contains only the time-indpendent files. 
+    Now our resource directory contains only the time-independent files. 
     
     Make sure to copy a valid realization file into the `config` subfolder in the resource directory. Feel free to try your own!
     ```
@@ -99,10 +99,10 @@ A few quick notes before beginning
     -n 4
     ```
 
-    Now we can do some real science! This functionality allows for effecient and reproducible NextGen simulations that can then be evaluated. See the TEEHR workshop tomorrow at 1:30 in room 6619 (same room)! 
+    Now we can do some real science! This functionality allows for efficient and reproducible NextGen simulations that can then be evaluated. See the TEEHR workshop tomorrow at 1:30 in room 6619 (same room)! 
 
 ## Validation
-6) Let's image we were very excited about our next NextGen configuration and hastily issued the command without having removed the ngen forcings from the resource directory. In other words, let's see what happens when we change the simulation time arguements, while supplying `ngen-datastream` with ngen-forcings for a different time period.
+6) Let's image we were very excited about our next NextGen configuration and hastily issued the command without having removed the ngen forcings from the resource directory. In other words, let's see what happens when we change the simulation time arguments, while supplying `ngen-datastream` with ngen-forcings for a different time period.
 
     Note that this command points to the 0520 execution's resource directory, but modifies the time.
 
