@@ -2,7 +2,7 @@
 
 A few quick notes before beginning
 * Each command assumes the user's working directory is the `ngen-datastream` top folder
-* `ngen-datastream` will not overwrite a `DATA_DIR`. If you attempt to write an already existing path, a message will alert you to either delete it, or set a different `DATA_DIR` with `-d`.
+* `ngen-datastream` will not overwrite a `DATA_DIR`. If you attempt to write to an already existing path, a message will alert you to either delete it, or set a different `DATA_DIR` with `-d`.
 * The commands in this workshop set the number of processes to 4. Feel free to use more if you have more cores, though increasing `-n` may contribute to network bottle neck if processing locally. Most commands with a resource directory won't suffer from network bottleneck. 
 
 ## Start
@@ -20,16 +20,15 @@ A few quick notes before beginning
     -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet \
     -R $(pwd)/configs/ngen/realization_cfe_sloth_pet_nom.json \
     -n 4
-
-    Use `-f` option to point to the directory of nwm-forcings if you have them saved locally.
     ```
+    Use `-f` option to point to the directory of nwm-forcings if you have them saved locally.
 
     Once the command has completed, look into `$(pwd)/data/datastream_test_VPU09_0520` and investigate the directory that was created. For an explaination of this directory, see [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/README.md#ngen-datastream-output-directory-structure).
 
     ```
     ls $(pwd)/data/datastream_test_VPU09_0520
     ```
-    ![ngen-datastream](docs/CIROH_devcon_2024/screenshots/step2_data_dir.jpg)
+    ![ngen-datastream](screenshots/step2_timing.jpg)
 
     Make note of how long this run took. We will compare this runtime with the duration of the following runs.
 
@@ -50,7 +49,7 @@ A few quick notes before beginning
     -r $(pwd)/data/resources_VPU09_0520 \
     -n 4
     ```
-    ![datastream](docs/CIROH_devcon_2024/screenshots/step3_timing.jpg)
+    ![datastream](screenshots/step3_timing.jpg)
 
     Take note of the speed-up from the execution in step 2. In this case, `ngen-datastream` was provided just about everything it needs to run NextGen, so nearly all of the runtime is NextGen compute time. 
 
@@ -142,6 +141,18 @@ A few quick notes before beginning
     ```
 
     Repeat the validator command. The validator should have identified the missing file.
+
+## Versioning
+8) `merkdir` allows us to prove that a NextGen configuration (realization), or any other file, was a component in an ngen-datastream execution. 
+
+```
+docker run --rm -v $(pwd)/data/datastream_test_VPU09_
+0520_with_resources_new_realization:/mounted_dir zwills/merkdir /merkdir/merkdir verify-file -t /mounted_dir/merkdir.file -n "ngen-run/config/realization.json"
+```
+
+![ngen-datastream](screenshots/merkdir_verifyfile.jpg)
+
+
 
 That's all folks! Thanks for attending and please don't hesitate to reach out to any of the development team with questions. Submit bugs to the repository if found!
 
