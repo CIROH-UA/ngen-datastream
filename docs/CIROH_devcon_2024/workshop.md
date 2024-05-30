@@ -22,13 +22,16 @@ A few quick notes before beginning
     -n 4
     ```
     Use `-f` option to point to the directory of nwm-forcings if you have them saved locally.
+  
 
     Once the command has completed, look into `$(pwd)/data/datastream_test_VPU09_0520` and investigate the directory that was created. For an explaination of this directory, see [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/README.md#ngen-datastream-output-directory-structure).
 
     ```
     ls $(pwd)/data/datastream_test_VPU09_0520
     ```
+
     ![ngen-datastream](screenshots/step2_timing.jpg)
+
 
     Make note of how long this run took. We will compare this runtime with the duration of the following runs.
 
@@ -84,7 +87,7 @@ A few quick notes before beginning
     
     Make sure to copy a valid realization file into the `config` subfolder in the resource directory. Feel free to try your own!
     ```
-    cp $(pwd)/configs/ngen/realization_cfe_sloth_pet_nom.json $(pwd)/data/resources_VPU09_0520 $(pwd)/data/resources_VPU09/config
+    cp $(pwd)/configs/ngen/realization_cfe_sloth_pet_nom.json  $(pwd)/data/resources_VPU09/config
     ```
     
     We now process over the next day (0521)
