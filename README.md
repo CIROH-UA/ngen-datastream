@@ -5,7 +5,7 @@
 
 ## Getting Started
 * **Installation:** Follow the step-by-step instructions in the [Installation Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md) to set up `ngen-datastream` on your system.
-* **Usage:** Learn how to use `ngen-datastream` effectively by referring to the comprehensive [Usage Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/USAGE.md).
+* **Usage:** Learn how to use `ngen-datastream` effectively by referring to the comprehensive [Usage Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/USAGE.md).
 
 ## Run it
 `ngen-datastream` can be executed using cli args or a configuration file. Not all arguments are requried. 
