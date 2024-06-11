@@ -80,5 +80,6 @@
         "end_time": "2023-10-03 6:00:00",
         "output_interval": 3600
     },
-    "catchments": {}
+    "catchments": {},
+    "output_root": "./outputs/ngen"
 }

@@ -228,10 +228,16 @@ echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
 NGENRUN_CONFIG="${NGEN_RUN%/}/config"
 NGENRUN_FORCINGS="${NGEN_RUN%/}/forcings"
 NGENRUN_OUTPUT="${NGEN_RUN%/}/outputs"
+NGENRUN_OUTPUT_NGEN="${NGEN_RUN%/}/outputs/ngen"
+NGENRUN_OUTPUT_PARQUET="${NGEN_RUN%/}/outputs/parquet"
+NGENRUN_OUTPUT_TROUTE="${NGEN_RUN%/}/outputs/troute"
 NGENRUN_RESTART="${NGEN_RUN%/}/restart"
 NGENRUN_LAKEOUT="${NGEN_RUN%/}/lakeout"
 mkdir -p $NGENRUN_CONFIG
 mkdir -p $NGENRUN_OUTPUT
+mkdir -p $NGENRUN_OUTPUT_NGEN
+mkdir -p $NGENRUN_OUTPUT_PARQUET
+mkdir -p $NGENRUN_OUTPUT_TROUTE
 mkdir -p $NGENRUN_RESTART
 mkdir -p $NGENRUN_LAKEOUT
 
@@ -565,8 +571,6 @@ docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
 cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_DATASTREAM/
-
-find $NGEN_RUN -maxdepth 1 -type f -name "*.csv" -exec mv {} $NGENRUN_OUTPUT \;
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
