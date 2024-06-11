@@ -99,25 +99,32 @@ def validate_data_dir(data_dir):
     print(f'Done\nValidating required individual catchment paths',flush = True)
     global forcing_dir, config_dir, validate_type_names
     forcing_dir    = os.path.join(relative_dir,serialized_realization.global_config.forcing.path)
-    config_dir     = os.path.join(data_dir,"config")
+    config_dir     = os.path.join(data_dir,"config","cat_config")
     forcing_files  = [x for _,_,x in os.walk(forcing_dir)]
     if len(forcing_files) == 0: raise Exception(f"No forcing files in {forcing_dir}")
-    forcing_files  = sorted(forcing_files[0])
-    config_files   = [os.path.join("config",x) for x in [x for _,_,x in os.walk(config_dir)][0]]
+    forcing_files  = sorted(forcing_files[0])    
+
+    jdir_dict = {"CFE":"CFE",
+                 "PET":"PET",
+                 "NoahOWP":"NOAH-OWP-M"}
 
     validate_files = {"forcing":{"pattern":serialized_realization.global_config.forcing.file_pattern,"files": forcing_files}}
     serialized_realization = NgenRealization.parse_file(realization_file)
     for jform in serialized_realization.global_config.formulations:
         for jmod in jform.params.modules:
-            try:
-                if jmod.params.model_name == "SLOTH": continue
-                pattern = str(jmod.params.config)
-                jcatch_pattern = pattern.replace('{{id}}',r'[^/]+')
-                compiled       = re.compile(jcatch_pattern) 
-                validate_files[jmod.params.model_name] = {"pattern":pattern,"files":sorted([x for x in config_files if bool(compiled.match(x))])}
-            except:
-               pass
-    
+            if jmod.params.model_name == "SLOTH": continue
+            jdir = jdir_dict[jmod.params.model_name]
+            jconfig_dir = os.path.join(config_dir,jdir)
+            config_files   = [os.path.join(f"config/cat_config/{jdir}",x) for x in [x for _,_,x in os.walk(jconfig_dir)][0]]
+            pattern = str(jmod.params.config)
+            jcatch_pattern = pattern.replace('{{id}}',r'[^/]+')
+            compiled       = re.compile(jcatch_pattern) 
+            validate_files[jmod.params.model_name] = {"pattern":pattern,"files":sorted([x for x in config_files if bool(compiled.match(x))])}
+
+    if serialized_realization.routing:
+        troute_path = os.path.join(data_dir,serialized_realization.routing.config)
+        assert os.path.exists(troute_path), "t-route specified in config, but not found in"
+
     nprocs = os.cpu_count()
     val_dict_list = []
     catchment_list_list = []
