@@ -9,8 +9,8 @@ compute_parameters:
         reservoir_persistence_usgs: false
       reservoir_rfc_da:
         reservoir_rfc_forecasts: false
-        reservoir_rfc_forecasts_lookback_hours: 1
-        reservoir_rfc_forecasts_offset_hours: 1
+        reservoir_rfc_forecasts_lookback_hours: 28
+        reservoir_rfc_forecasts_offset_hours: 28
         reservoir_rfc_forecasts_time_series_path: rfc_timeseries/
     streamflow_da:
       diffusive_streamflow_nudging: false
@@ -52,9 +52,9 @@ network_topology_parameters:
   waterbody_parameters:
     break_network_at_waterbodies: false
 output_parameters:
-  lakeout_output: lakeout/
+  lakeout_output: ./lakeout/
   lite_restart:
-    lite_restart_output_directory: restart/
+    lite_restart_output_directory: ./restart/
   stream_output:
     stream_output_directory: ./outputs/troute/
     stream_output_internal_frequency: 60
