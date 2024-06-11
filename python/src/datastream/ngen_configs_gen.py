@@ -37,42 +37,43 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
         with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
             fp.writelines(jcatch_str)
 
-def generate_troute_conf(out_dir,start,gpkg):
+def generate_troute_conf(out_dir,start,nts):
 
     template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
 
     with open(template,'r') as fp:
         conf_template = fp.readlines()
-
-    catchments     = gpd.read_file(gpkg, layer='divides')
-    catchment_list = sorted(list(catchments['divide_id']))
-    list_str=""
-    for jcatch in catchment_list:
-        list_str += (f"\n               - nex-{jcatch[4:]}_output.csv ")        
-    list_str = list_str.strip('\n')
+      
     troute_conf_str = conf_template
     for j,jline in enumerate(conf_template):
         if "start_datetime" in jline:
             pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
-            troute_conf_str[j] = re.sub(pattern, start.strftime('%Y-%m-%d %H:%M:%S'), jline)           
+            troute_conf_str[j] = re.sub(pattern, start.strftime('%Y-%m-%d %H:%M:%S'), jline)   
 
-        pattern = r'^\s*qlat_files\s*:\s*\[\]'
+        pattern = r'^\s*max_loop_size\s*:\s*\d+\.\d+'
         if re.search(pattern,jline):
-            troute_conf_str[j] = re.sub(pattern,  f"          qlat_files: {list_str}      ", jline)
+            troute_conf_str[j] = re.sub(pattern,  f"    max_loop_size: {nts}      ", jline)                    
+
+        pattern = r'^\s*nts\s*:\s*\d+\.\d+'
+        if re.search(pattern,jline):
+            troute_conf_str[j] = re.sub(pattern,  f"    nts: {nts}      ", jline)
 
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)  
 
-def gen_petAORcfe(hf_file,hf_lnk_file,out,models):
-    hf: gpd.GeoDataFrame = gpd.read_file(hf_file, layer="divides")
-    hf_lnk_data: pd.DataFrame = pd.read_parquet(hf_lnk_file)
-    hook_provider = DefaultHookProvider(hf=hf, hf_lnk_data=hf_lnk_data)
-    file_writer = DefaultFileWriter(out)
-    generate_configs(
-        hook_providers=hook_provider,
-        hook_objects=models,
-        file_writer=file_writer,
-    )
+def gen_petAORcfe(hf_file,hf_lnk_file,out,models,include):
+    for j, jmodel in enumerate(include):
+        hf: gpd.GeoDataFrame = gpd.read_file(hf_file, layer="divides")
+        hf_lnk_data: pd.DataFrame = pd.read_parquet(hf_lnk_file)
+        hook_provider = DefaultHookProvider(hf=hf, hf_lnk_data=hf_lnk_data)
+        jmodel_out = Path(out,'cat_config',jmodel)
+        os.system(f"mkdir -p {jmodel_out}")
+        file_writer = DefaultFileWriter(jmodel_out)
+        generate_configs(
+            hook_providers=hook_provider,
+            hook_objects=[models[j]],
+            file_writer=file_writer,
+        )
 
 # Austin's multiprocess example from chat 3/25
 # import concurrent.futures as cf
@@ -151,7 +152,8 @@ if __name__ == "__main__":
 
     serialized_realization = NgenRealization.parse_file(args.realization)
     start = serialized_realization.time.start_time
-    end   = serialized_realization.time.end_time
+    end   = serialized_realization.time.end_time    
+    nts = ((end - start).seconds / (3600)) * 12 # ASSUMES qlat_subdivisions is 12
     models = []
     include = []
     ii_cfe_or_pet = False
@@ -175,7 +177,9 @@ if __name__ == "__main__":
         else:
             if "pkl_file" in args:
                 print(f'Generating NoahOWP configs from pickle',flush = True)
-                gen_noah_owp_confs_from_pkl(args.pkl_file, args.outdir, start, end)
+                noah_dir = Path(args.outdir,'cat_config','NOAH-OWP-M')
+                os.system(f'mkdir -p {noah_dir}')
+                gen_noah_owp_confs_from_pkl(args.pkl_file, noah_dir, start, end)
             else:
                 raise Exception(f"Generating NoahOWP configs manually not implemented, create pkl.")            
 
@@ -184,7 +188,7 @@ if __name__ == "__main__":
             print(f'ignoring CFE and PET')
         else:
             print(f'Generating {include} configs from pydantic models',flush = True)
-            gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models)
+            gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models,include)
 
     globals = [x[0] for x in serialized_realization]
     if serialized_realization.routing is not None:
@@ -192,6 +196,6 @@ if __name__ == "__main__":
             print(f'ignoring routing')
         else:
             print(f'Generating t-route config from template',flush = True)
-            generate_troute_conf(args.outdir,start,args.hf_file) 
+            generate_troute_conf(args.outdir,start,nts) 
 
     print(f'Done!',flush = True)
