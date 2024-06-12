@@ -52,24 +52,7 @@
                 },
                 "uses_forcing_file": false
               }
-            },
-            {
-              "name": "bmi_c",
-              "params": {
-                  "name": "bmi_c",
-                  "model_type_name": "PET",
-                  "library_file": "/dmod/shared_libs/libpetbmi.so.1.0.0",
-                  "forcing_file": "",
-                  "init_config": "./config/cat_config/PET/PET_{{id}}.ini",
-                  "allow_exceed_end_time": true,
-                  "main_output_variable": "water_potential_evaporation_flux",
-                  "registration_function": "register_bmi_pet",
-                  "variables_names_map": {
-                      "water_potential_evaporation_flux": "potential_evapotranspiration"
-                  },
-                  "uses_forcing_file": false
-              }
-          },            
+            },           
             {
               "name": "bmi_c",
               "params": {
@@ -90,7 +73,24 @@
                 },
                 "library_file": "/dmod/shared_libs/libcfebmi.so.1.0.0"
               }
-            }
+            },
+            {
+              "name": "bmi_c",
+              "params": {
+                  "name": "bmi_c",
+                  "model_type_name": "PET",
+                  "library_file": "/dmod/shared_libs/libpetbmi.so.1.0.0",
+                  "forcing_file": "",
+                  "init_config": "./config/cat_config/PET/PET_{{id}}.ini",
+                  "allow_exceed_end_time": true,
+                  "main_output_variable": "water_potential_evaporation_flux",
+                  "registration_function": "register_bmi_pet",
+                  "variables_names_map": {
+                      "water_potential_evaporation_flux": "potential_evapotranspiration"
+                  },
+                  "uses_forcing_file": false
+              }
+          }
           ],
           "uses_forcing_file": false
         }
