@@ -488,10 +488,10 @@ fi
 
 echo "Generating NGEN configs"
 NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
-docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
-    python $NGEN_CONFGEN \
+docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+    -u $(id -u):$(id -g) \
+    $DOCKER_TAG python $NGEN_CONFGEN \
     --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
-chmod +755 $NGENRUN_CONFIG/*
 TAR_NAME="ngen-bmi-configs.tar.gz"
 NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
 tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
