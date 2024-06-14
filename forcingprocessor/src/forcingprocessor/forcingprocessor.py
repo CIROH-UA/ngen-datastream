@@ -1061,10 +1061,11 @@ def prep_ngen_data(conf):
 
     if storage_type == "s3": 
         bucket, key  = convert_url2key(metaf_path,storage_type)
-        s3.put_object(
-                Body=f'./log_fp_{datentime}.txt',
-                Bucket=bucket,
-                Key=conf_path
+        log_path = key + '/log_fp.txt'
+        s3.upload_file(
+                f'./log_fp.txt',
+                bucket,
+                log_path
             )
 
     if ii_verbose:
