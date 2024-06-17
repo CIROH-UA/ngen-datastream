@@ -94,6 +94,11 @@ vi ./executions/execution_test_1.json
   "bucket"   : "",
   "obj_key"  : ""
 ```
+3l) Finally, execute the state machine.
+```
+aws stepfunctions start-execution --state-machine-arn arn:aws:states:us-east-1:###:stateMachine:<sm_name> --name your-execution-name --input "file://$(pwd)/executions/execution_test_1.json" --region us-east-1
+```
+
 
 ## Build an AWS Machine Image (AMI)
 1) Launch any instance with a Linux OS.
