@@ -1,6 +1,7 @@
 from pathlib import Path
-import re, copy, pickle, argparse
-import pandas as pd
+import re, copy, pickle, argparse, os
+import geopandas as gpd
+gpd.options.io_engine = "pyogrio"
 
 def gen_noah_owp_pkl(attrs_path,out):
     print(f'Generating NoahOWP pkl',flush=True)
@@ -8,7 +9,7 @@ def gen_noah_owp_pkl(attrs_path,out):
     with open(template,'r') as fp:
         conf_template = fp.readlines()
     
-    attrs     = pd.read_parquet(attrs_path)
+    attrs     = gpd.read_file(attrs_path,layer = 'model-attributes')
     catchment_list = sorted(list(attrs['divide_id']))
 
     all_confs = {}
@@ -35,6 +36,7 @@ def gen_noah_owp_pkl(attrs_path,out):
 
         all_confs[jcatch] = jcatch_conf
 
+    if not os.path.exists(out): os.system(f"mkdir -p {out}")
     with open(Path(out,"noah-owp-modular-init.namelist.input.pkl"),'wb') as fp:
         pickle.dump(all_confs, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -42,27 +44,27 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--hf_lnk_file",
-        dest="hf_lnk_file", 
+        "--hf_file",
+        dest="hf_file", 
         type=str,
-        help="Path to the .gpkg attributes", 
+        help="Path to the .gpkg", 
         required=False
     )
     parser.add_argument(
         "--outdir",
         dest="outdir", 
         type=str,
-        help="Path to the .gpkg attributes", 
+        help="Directory to write file out to", 
         required=False
     )    
 
     args = parser.parse_args()
 
-    if '.txt' in args.hf_lnk_file:
-        with open(args.hf_lnk_file,'r') as fp:
+    if '.txt' in args.hf_file:
+        with open(args.hf_file,'r') as fp:
             data=fp.readlines()
-            hf_lnk_file = data[0] 
+            hf_file = data[0] 
     else:
-        hf_lnk_file = args.hf_lnk_file
+        hf_file = args.hf_file
 
-    gen_noah_owp_pkl(hf_lnk_file,args.outdir)        
+    gen_noah_owp_pkl(hf_file,args.outdir)        

@@ -1,0 +1,18 @@
+{
+    "forcing"  : {
+        "nwm_file"   : "/home/user/data/filenamelist.txt",
+        "gpkg_file"  : ["your-geopackage.gpkg"]
+    },
+
+    "storage":{
+        "storage_type"      : "local",
+        "output_path"       : "/home/user/data/forcings",
+        "output_file_type" : ["csv","tar"]
+    },    
+
+    "run" : {
+        "verbose"       : true,
+        "collect_stats" : true,
+        "nprocs"        : 8
+    }
+}
