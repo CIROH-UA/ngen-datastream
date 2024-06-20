@@ -46,8 +46,6 @@ usage() {
     echo "  -e, --END_DATE            <YYYYMMDDHHMM> "
     echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "    
     echo "  -g, --GEOPACKAGE          <Path to geopackage file> "
-    echo "  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> " 
-    echo "  -w, --HYDROFABRIC_WEIGHTS <Path to hydrofabric weights parquet> "  
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
     echo "  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  "   
     echo "  -v, --HYDROFABRIC_VERSION <Hydrofabric version> "      
@@ -68,8 +66,6 @@ START_DATE=""
 END_DATE=""
 DOMAIN_NAME=""
 GEOPACKAGE=""
-GEOPACKAGE_ATTR=""
-HYDROFABRIC_WEIGHTS=""
 SUBSET_ID=""
 SUBSET_ID_TYPE=""
 HYDROFABRIC_VERSION=""
@@ -85,21 +81,20 @@ NPROCS=4
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
 
-# BROKEN
-# if ! command -v ec2-metadata >/dev/null 2>&1; then
-#     HOST_TYPE="NON-AWS"
-# else
-#     HOST_TYPE=$(ec2-metadata --instance-type)
-#     HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
-# fi
-# echo "HOST_TYPE" $HOST_TYPE
-# if [ -f "/etc/os-release" ]; then
-#     HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
-#     HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
-# else 
-#     echo "Warning: /etc/os-release file not found"
-# fi
-# echo "HOST_OS" $HOST_OS
+if ! command -v ec2-metadata >/dev/null 2>&1; then
+    HOST_TYPE="NON-AWS"
+else
+    HOST_TYPE=$(ec2-metadata --instance-type)
+    HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
+fi
+echo "HOST_TYPE" $HOST_TYPE
+if [ -f "/etc/os-release" ]; then
+    HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
+    HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
+else 
+    echo "Warning: /etc/os-release file not found"
+fi
+echo "HOST_OS" $HOST_OS
 
 PLATORM_TAG=""
 if [ $(uname -m) = "x86_64" ]; then
@@ -118,8 +113,6 @@ while [ "$#" -gt 0 ]; do
         -e|--END_DATE) END_DATE="$2"; shift 2;;
         -D|--DOMAIN_NAME) DOMAIN_NAME="$2"; shift 2;;
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
-        -G|--GEOPACKAGE_ATTR) GEOPACKAGE_ATTR="$2"; shift 2;;
-        -w|--HYDROFABRIC_WEIGHTS) HYDROFABRIC_WEIGHTS="$2"; shift 2;;
         -I|--SUBSET_ID) SUBSET_ID="$2"; shift 2;;
         -i|--SUBSET_ID_TYPE) SUBSET_ID_TYPE="$2"; shift 2;;
         -v|--HYDROFABRIC_VERSION) HYDROFABRIC_VERSION="$2"; shift 2;;        
@@ -152,16 +145,6 @@ if [ ! -z $CONF_FILE ]; then
     fi
 else
     echo "No configuration file detected, using cli args"
-fi
-
-# force hydrofabric version for now
-if [ ! -z $SUBSET_ID ]; then    
-    if [ $HYDROFABRIC_VERSION == "v20.1" ]; then
-        :
-    else
-        echo "Subsetting and weight generation are not supported for hydrofabric versions less than v20.1, set to v20.1"
-        exit
-    fi
 fi
 
 # set paths for daily run
@@ -255,16 +238,7 @@ else
     echo "running in standard mode"
     mkdir -p $DATASTREAM_RESOURCES
     mkdir -p $DATASTREAM_RESOURCES_NGENCONF
-fi
-
-if [ ! -z $SUBSET_ID ]; then
-    log_time "SUBSET_START" $DATASTREAM_PROFILING
-    GEOPACKAGE="$SUBSET_ID.gpkg"
-    GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES%/}/$GEOPACKAGE"
-    hfsubset -o $GEOPACKAGE_RESOURCES -r $HYDROFABRIC_VERSION -t $SUBSET_ID_TYPE $SUBSET_ID
-    cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
-    log_time "SUBSET_END" $DATASTREAM_PROFILING
-fi   
+fi  
 
 if [ ! -z $RESOURCE_DIR ]; then  
 
@@ -314,47 +288,6 @@ if [ ! -z $RESOURCE_DIR ]; then
         NGEO=1
     fi
 
-    # Look for hydrofabric weights file
-    HYDROFABRIC_WEIGHTS=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*weights*.parquet")
-    HYDROFABRIC_NWEIGHTS=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*weights*.parquet" | wc -l)
-    if [ ${HYDROFABRIC_NWEIGHTS} -gt 1 ]; then
-        echo "At most one hydrofabric weight file is allowed in "$DATASTREAM_RESOURCES
-        exit 1
-    fi
-
-    # HACK, remove when attributes files are renamed
-    if [ ${HYDROFABRIC_NWEIGHTS} -gt 0 ]; then
-        mv *weights*.parquet $DATASTREAM_RESOURCES
-    fi
-
-    # Look for geopackage attributes file
-    # HACK: Should look for this in another way. Right now, this is the only parquet, but seems dangerous
-    if [ -z $GEOPACKAGE_ATTR ]; then
-        GEOPACKAGE_ATTR_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet")        
-        NATTR=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.parquet" | wc -l)
-        if [ ${NATTR} -gt 1 ]; then
-            echo "At most one geopackage attributes is allowed in "$DATASTREAM_RESOURCES_HYDROFABRIC
-            exit 1
-        fi
-        if [ ${NATTR} -gt 0 ]; then
-            echo "Using" $GEOPACKAGE_ATTR_RESOURCES
-            GEO_ATTR_BASE=$(basename $GEOPACKAGE_ATTR_RESOURCES)
-        else
-            echo "geopackage attributes missing from resources"
-            exit 1
-        fi
-    else
-        GEO_ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
-        GEOPACKAGE_ATTR_RESOURCES="$DATASTREAM_RESOURCES_HYDROFABRIC/$GEO_ATTR_BASE"
-        get_file $GEOPACKAGE_ATTR $GEOPACKAGE_ATTR_RESOURCES
-        NATTR=1
-    fi
-
-    # HACK, remove when attributes files are renamed
-    if [ ${HYDROFABRIC_NWEIGHTS} -gt 0 ]; then
-        mv $DATASTREAM_RESOURCES*weights*.parquet $DATASTREAM_RESOURCES_HYDROFABRIC
-    fi    
-
     # Look for nwm forcings
     if [ -z $NWM_FORCINGS_DIR ]; then
         NWM_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "nwm-forcings")
@@ -370,15 +303,7 @@ if [ ! -z $RESOURCE_DIR ]; then
         if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then
             NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.tar.gz")
         fi
-    fi
-
-    # Look for weights file
-    DATASTREAM_WEIGHTS=$(find "$DATASTREAM_RESOURCES_DATASTREAM" -type f -name "*weights*.json")
-    NWEIGHT=$(find "$DATASTREAM_RESOURCES_DATASTREAM" -type f -name "*weights*.json" | wc -l)
-    if [ ${NWEIGHT} -gt 1 ]; then
-        echo "At most one datastream weight file is allowed in "$DATASTREAM_RESOURCES
-        exit 1
-    fi    
+    fi 
 
     # Look for partitions file
     PARTITION_RESOURCES=$(find "$DATASTREAM_RESOURCES_DATASTREAM" -type f -name "*partitions*.json")
@@ -418,60 +343,38 @@ else
             echo "geopackage arg is required"
             exit 1
         fi
-
-        if [ ! -z $GEOPACKAGE_ATTR ]; then
-            GEO_ATTR_BASE=$(basename $GEOPACKAGE_ATTR)
-            GEOPACKAGE_ATTR_RESOURCES="$DATASTREAM_RESOURCES_HYDROFABRIC/$GEO_ATTR_BASE"
-            get_file "$GEOPACKAGE_ATTR" $GEOPACKAGE_ATTR_RESOURCES            
-        else
-            echo "geopackage attributes arg is required"
-            exit 1
-        fi   
     fi
 fi
+
+if [ ! -z $SUBSET_ID ]; then
+    log_time "SUBSET_START" $DATASTREAM_PROFILING
+    GEO_BASE="$SUBSET_ID.gpkg"
+    GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_HYDROFABRIC%/}/$GEO_BASE"
+    mkdir -p $DATASTREAM_RESOURCES_HYDROFABRIC
+    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE $SUBSET_ID
+    GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
+    cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
+    log_time "SUBSET_END" $DATASTREAM_PROFILING
+fi 
 
 # copy files from resources into ngen-run
 REALIZATION_NGENRUN=$NGENRUN_CONFIG/"realization.json"
 cp $REALIZATION_RESOURCES $REALIZATION_NGENRUN
 GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
 cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN
-GEOPACKAGE_ATTR_NGENRUN=$NGENRUN_CONFIG/$GEO_ATTR_BASE
-cp $GEOPACKAGE_ATTR_RESOURCES $GEOPACKAGE_ATTR_NGENRUN
 if [ -z "$DOMAIN_NAME" ]; then
     DOMAIN_NAME=${GEO_BASE%".gpkg"}
 fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
 
 # begin calculations
-if [ -z $NGEN_FORCINGS ]; then 
-    if [ -e "$DATASTREAM_WEIGHTS" ]; then
-        echo "Using $DATASTREAM_WEIGHTS"
-        if [[ $(basename $DATASTREAM_WEIGHTS) != "weights.json" ]]; then
-            echo "renaming $(basename $DATASTREAM_WEIGHTS) to weights.json" 
-            mv "$DATASTREAM_WEIGHTS" ""$DATASTREAM_RESOURCES"/weights.json"
-        fi
-    else
-        log_time "WEIGHTS_START" $DATASTREAM_PROFILING
-        echo "Datastream weights file not found. Creating from" $GEO_BASE
-        GEO_DOCKER=""$DOCKER_RESOURCES"/hydrofabric/$GEO_BASE"
-        WEIGHTS_DOCKER=""$DOCKER_RESOURCES"/datastream/weights.json"
-        DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
-        docker run -v "$DATA_DIR:"$DOCKER_MOUNT"" \
-            -u $(id -u):$(id -g) \
-            -w "$DOCKER_MOUNT" $DOCKER_TAG \
-            python "$DOCKER_FP"weights_parq2json.py \
-            --gpkg $GEO_DOCKER --outname $WEIGHTS_DOCKER --nprocs $NPROCS --weights_parquet "$HYDROFABRIC_WEIGHTS"
-        log_time "WEIGHTS_END" $DATASTREAM_PROFILING
-    fi
-fi
-
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
 DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings_tar "$NGEN_FORCINGS" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --gpkg_attr "$GEOPACKAGE_ATTR_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings_tar "$NGEN_FORCINGS" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
@@ -483,7 +386,7 @@ if [ ! -f "$PKL_FILE" ]; then
     NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
         python $NOAHOWPPKL_GENERATOR \
-        --hf_lnk_file "$DOCKER_MOUNT/config/$GEO_ATTR_BASE" --outdir $DOCKER_MOUNT"/config"   
+        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config"   
 fi
 
 echo "Generating NGEN configs"
@@ -491,7 +394,7 @@ NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
 docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
     -u $(id -u):$(id -g) \
     $DOCKER_TAG python $NGEN_CONFGEN \
-    --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --hf_lnk_file $DOCKER_MOUNT/config/$GEO_ATTR_BASE --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
+    --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
 TAR_NAME="ngen-bmi-configs.tar.gz"
 NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
 tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
@@ -547,7 +450,7 @@ else
     docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
         -u $(id -u):$(id -g) \
         -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-        python "$DOCKER_FP"forcingprocessor.py "$DOCKER_META"/conf_fp.json
+        python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
     mv $DATASTREAM_RESOURCES/log_fp.txt $DATASTREAM_META 
     log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
     if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then

@@ -10,14 +10,14 @@ cd /ngen-datastream/forcingprocessor/ && pip install -e .
 ```
 python ./src/forcingprocessor/processor.py ./configs/conf.json
 ```
-Prior to executing the processor, the user will need to obtain a geopackage file to define the spatial domain. [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) will provide a geopackage which contains a necessary layer,'forcing-weights', for `processor.py`. The user will define the time domain by generating the forcing filenames for `processor.py` via `nwm_filenames_generator.py`, which is explained [here](#nwm_file).
+Prior to executing the processor, the user will need to obtain a geopackage file to define the spatial domain. [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) will provide a geopackage which contains a necessary layer, `forcing-weights`, for `processor.py`. The user will define the time domain by generating the forcing filenames for `processor.py` via `nwm_filenames_generator.py`, which is explained [here](#nwm_file).
 
 ## Example `conf.json`
 ```
 {
     "forcing"  : {
         "nwm_file"     : "",
-        "gpkg_file"  : ""
+        "gpkg_file"    : ""
     },
 
     "storage":{
