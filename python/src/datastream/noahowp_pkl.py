@@ -1,6 +1,7 @@
 from pathlib import Path
 import re, copy, pickle, argparse, os
 import geopandas as gpd
+gpd.options.io_engine = "pyogrio"
 
 def gen_noah_owp_pkl(attrs_path,out):
     print(f'Generating NoahOWP pkl',flush=True)
