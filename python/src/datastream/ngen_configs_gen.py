@@ -4,6 +4,7 @@ import argparse
 import re, os
 import pickle, copy
 from pathlib import Path
+import datetime
 gpd.options.io_engine = "pyogrio"
 
 from ngen.config_gen.file_writer import DefaultFileWriter
@@ -37,12 +38,18 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
         with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
             fp.writelines(jcatch_str)
 
-def generate_troute_conf(out_dir,start,nts):
+def generate_troute_conf(out_dir,start,max_loop_size):
 
     template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
 
     with open(template,'r') as fp:
         conf_template = fp.readlines()
+
+    for j,jline in enumerate(conf_template):
+        if "qts_subdivisions" in jline:
+            qts_subdivisions = int(jline.strip().split(': ')[-1])
+
+    nts = max_loop_size * qts_subdivisions
       
     troute_conf_str = conf_template
     for j,jline in enumerate(conf_template):
@@ -52,7 +59,7 @@ def generate_troute_conf(out_dir,start,nts):
 
         pattern = r'^\s*max_loop_size\s*:\s*\d+\.\d+'
         if re.search(pattern,jline):
-            troute_conf_str[j] = re.sub(pattern,  f"    max_loop_size: {nts}      ", jline)                    
+            troute_conf_str[j] = re.sub(pattern,  f"    max_loop_size: {max_loop_size}      ", jline)                    
 
         pattern = r'^\s*nts\s*:\s*\d+\.\d+'
         if re.search(pattern,jline):
@@ -61,10 +68,10 @@ def generate_troute_conf(out_dir,start,nts):
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)  
 
-def gen_petAORcfe(hf_file,hf_lnk_file,out,models,include):
+def gen_petAORcfe(hf_file,out,models,include):
     for j, jmodel in enumerate(include):
         hf: gpd.GeoDataFrame = gpd.read_file(hf_file, layer="divides")
-        hf_lnk_data: pd.DataFrame = pd.read_parquet(hf_lnk_file)
+        hf_lnk_data: pd.DataFrame = gpd.read_file(hf_file,layer="model-attributes")
         hook_provider = DefaultHookProvider(hf=hf, hf_lnk_data=hf_lnk_data)
         jmodel_out = Path(out,'cat_config',jmodel)
         os.system(f"mkdir -p {jmodel_out}")
@@ -111,13 +118,6 @@ if __name__ == "__main__":
         required=False
     )
     parser.add_argument(
-        "--hf_lnk_file",
-        dest="hf_lnk_file", 
-        type=str,
-        help="Path to the .gpkg attributes", 
-        required=False
-    )
-    parser.add_argument(
         "--outdir",
         dest="outdir", 
         type=str,
@@ -148,12 +148,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     ignore = args.ignore.split(',')
-    hf_lnk_file = args.hf_lnk_file
 
     serialized_realization = NgenRealization.parse_file(args.realization)
     start = serialized_realization.time.start_time
     end   = serialized_realization.time.end_time    
-    nts = ((end - start).seconds / (3600)) * 12 # ASSUMES qlat_subdivisions is 12
+    max_loop_size = (end - start + datetime.timedelta(hours=1)).total_seconds() / (serialized_realization.time.output_interval)
     models = []
     include = []
     ii_cfe_or_pet = False
@@ -188,7 +187,7 @@ if __name__ == "__main__":
             print(f'ignoring CFE and PET')
         else:
             print(f'Generating {include} configs from pydantic models',flush = True)
-            gen_petAORcfe(args.hf_file,hf_lnk_file,args.outdir,models,include)
+            gen_petAORcfe(args.hf_file,args.outdir,models,include)
 
     globals = [x[0] for x in serialized_realization]
     if serialized_realization.routing is not None:
@@ -196,6 +195,6 @@ if __name__ == "__main__":
             print(f'ignoring routing')
         else:
             print(f'Generating t-route config from template',flush = True)
-            generate_troute_conf(args.outdir,start,nts) 
+            generate_troute_conf(args.outdir,start,max_loop_size) 
 
     print(f'Done!',flush = True)
