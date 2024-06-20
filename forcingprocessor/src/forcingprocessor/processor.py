@@ -17,6 +17,9 @@ import psutil
 import gzip
 import tarfile, tempfile
 import multiprocessing as mp
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+from forcingprocessor.weights_hf2ds import hydrofabric2datastream_weights
 
 global nwm_variables
 nwm_variables = [
@@ -43,31 +46,6 @@ ngen_variables = [
     "PRES_surface",
     "DSWRF_surface",
 ] 
-
-def get_file_size(file):
-    if "https://" in file:
-        response = requests.head(file)
-        forcing_size = int(response.headers.get('Content-Length', 0))
-    if "s3://":
-        s3 = boto3.client('s3')
-        bucket, key = convert_url2key(file,'s3')
-        response = s3.head_object(Bucket=bucket, Key=key)
-        size_in_bytes = response['ContentLength']
-
-def memory_check(filenamelist,ncatchments):
-    estimated_load = 0
-    estimated_load += get_file_size(filenamelist[0])
-
-    datum_size_bytes = 4
-    data_cube_size = ncatchments * len(filenamelist) * len(ngen_variables) * datum_size_bytes
-    estimated_load += data_cube_size
-
-    usage_ram, percent_ram, percent_cpu = report_usage()
-
-    limit = 0.95
-    excess = 1-limit
-
-
 
 def log_time(label, log_file):
     timestamp = datetime.now(timezone.utc).astimezone().strftime('%Y%m%d%H%M%S')
@@ -168,8 +146,6 @@ def multiprocess_data_extract(files,nprocs,weights_json,fs):
 
     start  = 0
     nfiles = len(files)
-    nvar   = len(nwm_variables)
-    ncatch = len(weights_json)
     files_list = []
     idx_list   = []    
     fs_list    = []
@@ -179,24 +155,6 @@ def multiprocess_data_extract(files,nprocs,weights_json,fs):
         idx_list.append(np.arange(start,end))
         fs_list.append(fs)
         start = end
-
-    forcings_TxVxC_mem_size = nfiles * nvar * ncatch
-    forcings_TVC = mp.Array(ctypes.c_float, forcings_TxVxC_mem_size)
-
-    ncatch = len(weights_json)
-    def init_pool(data_array):
-        global weights_json, forcings_TVC
-        forcings_TVC = data_array
-
-    # t_ax_local = []
-    # with cf.ProcessPoolExecutor(max_workers=nprocs, initializer=init_pool, initargs=(forcings_TVC)) as pool:
-    #     for j, results in enumerate(pool.map(
-    #     forcing_grid2catchment,
-    #     files_list,
-    #     idx_list,
-    #     fs_list
-    #     )):
-    #         t_ax_local.append(results)
 
     data_ax = []
     t_ax_local = []
@@ -212,8 +170,6 @@ def multiprocess_data_extract(files,nprocs,weights_json,fs):
 
     print(f'Processes have returned')
     del weights_json
-    # forcings_TxVxC = np.array(forcings_TVC).reshape((nfiles,nvar,ncatch))
-    # del forcings_TVC
     data_array = np.concatenate(data_ax)
     t_ax_local = [item for sublist in t_ax_local for item in sublist]
   
@@ -280,12 +236,11 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
         tfill += time.perf_counter() - t0        
 
         t0 = time.perf_counter()
-        # data_allvars = data_allvars.reshape(nvar, shp[1] * shp[2])
         data_allvars = data_allvars.reshape(nvar, dx*dy)
         ncatch = len(weights_json)
         data_array = np.zeros((nvar,ncatch), dtype=np.float32)
         jcatch = 0
-        for key, value in weights_json.items(): 
+        for _, value in weights_json.items(): 
             weights = value[0]
             coverage = np.array(value[1])
             coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
@@ -296,16 +251,12 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
             weights_window = np.ravel_multi_index(np.array([weights_dx_shifted,weights_dy_shifted]),(dx,dy),order='F')   
             jcatch_data_mask = data_allvars[:,weights_window]     
 
-            # jcatch_data_mask = data_allvars[:,weights] 
             weight_sum = np.sum(coverage)
             data_array[:,jcatch] = np.sum(coverage_mat * jcatch_data_mask ,axis=1) / weight_sum  
             jcatch += 1  
 
         del data_allvars
-        # start = idx_list[j] * nvar * ncatch
-        # stop = start + nvar * ncatch
         data_list.append(data_array)
-        # forcings_TVC[start:stop] = data_array.reshape(nvar*ncatch)
         tdata += time.perf_counter() - t0
         ttotal = topen + txrds + tfill + tdata
         if ii_verbose: print(f'\nAverage time for:\nfs open file: {topen/(j+1):.2f} s\nxarray open dataset: {txrds/(j+1):.2f} s\nfill array: {tfill/(j+1):.2f} s\ncalculate catchment values: {tdata/(j+1):.2f} s\ntotal {ttotal/(j+1):.2f} s\npercent complete {100*(j+1)/nfiles:.2f}', end=None,flush=True)
@@ -742,11 +693,11 @@ def prep_ngen_data(conf):
 
     datentime = datetime.utcnow().strftime("%m%d%y_%H%M%S")   
 
-    log_file = "./log_fp.txt"   
+    log_file = "./profile_fp.txt"   
     log_time("FORCINGPROCESSOR_START", log_file) 
     log_time("CONFIGURATION_START", log_file) 
 
-    weight_file = conf['forcing'].get("weight_file",None)
+    gpkg_file = conf['forcing'].get("gpkg_file",None)
     nwm_file = conf['forcing'].get("nwm_file","")
 
     global output_path, output_file_type
@@ -816,37 +767,43 @@ def prep_ngen_data(conf):
     log_time("CONFIGURATION_END", log_file) 
     log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Opening weight file...\n',flush=True) 
-    if type(weight_file) is not list: weight_files = [weight_file]
-    else: weight_files = weight_file
+    if type(gpkg_file) is not list: gpkg_files = [gpkg_file]
+    else: gpkg_files = gpkg_file
     global weights_json
     weights_json = {}
     jcatchment_dict = {}
     count = 0
-    for jweight_file in weight_files:
-        ii_weights_in_bucket = jweight_file.find('//') >= 0
+    for jgpkg in gpkg_files:
+        ii_json = jgpkg.split('.')[-1] == "json"
+        ii_weights_in_bucket = jgpkg.find('//') >= 0
         pattern = r'VPU_([^/]+)'
-        match = re.search(pattern, jweight_file)
+        match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
             count +=1
             jname = str(count)
         if ii_weights_in_bucket:
             s3 = boto3.client("s3")    
-            jweight_file_bucket = jweight_file.split('/')[2]
-            ii_uri = jweight_file.find('s3://') >= 0
+            jgpkg_bucket = jgpkg.split('/')[2]
+            ii_uri = jgpkg.find('s3://') >= 0
             if ii_uri:
-                jweight_file_key = jweight_file[jweight_file.find(jweight_file_bucket)+len(jweight_file_bucket)+1:]
+                jgpkg_key = jgpkg[jgpkg.find(jgpkg_bucket)+len(jgpkg_bucket)+1:]
             else:
-                jweight_file_bucket = jweight_file_bucket.split('.')[0]
-                jweight_file_key    = jweight_file.split('amazonaws.com/')[-1]
-            jweight_file_obj = s3.get_object(Bucket=jweight_file_bucket, Key=jweight_file_key)
-            new_dict = json.loads(jweight_file_obj["Body"].read().decode())
-            weights_json = weights_json | new_dict
-            jcatchment_dict[jname] = list(new_dict.keys())
-        else:        
-            with open(jweight_file, "r") as f:
-                weights_json = weights_json | json.load(f)
-                jcatchment_dict[jname] = list(weights_json.keys())
+                jgpkg_bucket = jgpkg_bucket.split('.')[0]
+                jgpkg_key    = jgpkg.split('amazonaws.com/')[-1]
+            jobj = s3.get_object(Bucket=jgpkg_bucket, Key=jgpkg_key)
+            if ii_json: 
+                new_dict = json.loads(jobj["Body"].read().decode())
+            else:
+                new_dict = hydrofabric2datastream_weights(jobj["Body"].read().decode())
+        else:     
+            if ii_json:
+                with open(jgpkg, "r") as f:
+                    new_dict = json.load(f)
+            else:
+                new_dict = hydrofabric2datastream_weights(jgpkg)
+        weights_json = weights_json | new_dict
+        jcatchment_dict[jname] = list(weights_json.keys())
     ncatchments = len(weights_json)
     log_time("READWEIGHTS_END", log_file)  
 
@@ -873,8 +830,6 @@ def prep_ngen_data(conf):
         for jline in fp.readlines():
             nwm_forcing_files.append(jline.strip())
     nfiles = len(nwm_forcing_files)
-
-    # memory_check(nwm_forcing_files, weight_files, ncatchments)
 
     global fs_type
     if 's3://' in nwm_forcing_files[0] or 's3.amazonaws' in nwm_forcing_files[0]:
@@ -908,7 +863,6 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n',flush=True)        
-        # forcing_grid2catchment(jnwm_files,[0],fs)
         data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
