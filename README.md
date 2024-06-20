@@ -20,8 +20,6 @@ or run with cli args
   -e, --END_DATE            <YYYYMMDDHHMM> 
   -D, --DOMAIN_NAME         <Name for spatial domain> 
   -g, --GEOPACAKGE          <Path to geopackage file> 
-  -G, --GEOPACKAGE_ATTR     <Path to geopackage attributes file> 
-  -w, --HYDROFABRIC_WEIGHTS <Path to hydrofabric weights parquet> 
   -I, --SUBSET_ID           <Hydrofabric id to subset>  
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
   -v, --HYDROFABRIC_VERSION <Hydrofabric version> 
@@ -41,7 +39,6 @@ This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLO
   -e 202405210000 \
   -d $(pwd)/data/datastream_test \
   -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg \
-  -G https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/model_attributes/nextgen_09.parquet \
   -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json \
   -n 4
 ```
@@ -52,9 +49,7 @@ This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLO
 | START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | DOMAIN_NAME         | Name for spatial domain in run, stripped from gpkg if not supplied |  |
-| GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_DIR/config` |
-| GEOPACKAGE_ATTR     | Path to hydrofabric attributes, can be s3URI, URL, or local file | Required here or file exists in `RESOURCE_DIR/config` |
-| HYDROFABRIC_WEIGHTS | Indices relative to the nwm forcings grid used to calculate catchment averaged values. Provided directly from the hydrofabric  | Required here or file exists in `RESOURCE_DIR/config`only if GEOPACKAGE and GEOPACKAGE_ATTR files were created manually via the hydrofabric. If processing over a VPU, the datastream will make queries itself to the CONUS weights in Lynker Spatial. |
+| GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file. Generate file with [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) or use SUBSET args. | Required here or file exists in `RESOURCE_DIR/config` |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) | Required here if user is not providing GEOPACKAGE and GEOPACKAGE_ATTR. |
 | SUBSET_ID           | catchment id to subset [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) | Required here if user is not providing GEOPACKAGE and GEOPACKAGE_ATTR.  |
 | HYDROFABRIC_VERSION | $\geq$ v20.1 [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option)  | Required here if user is not providing GEOPACKAGE and GEOPACKAGE_ATTR. | 
@@ -66,7 +61,6 @@ This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLO
 | S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
 | S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
 | NPROCS              | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
-
 
 
 ## `ngen-datastream` Output Directory Structure
@@ -131,16 +125,10 @@ RESOURCE_DIR/
 ├── datastream
 |   |
 |   ├── partitions.json
-|   │
-|   ├── weights.json
 |
 |── hydrofabric
 |   |
 |   |── nextgen_01.gpkg
-|   │
-|   ├── nextgen_01.parquet
-|   │
-|   ├── weights.parquet
 |
 ├── nwm-forcings/
 |   |
@@ -159,12 +147,9 @@ RESOURCE_DIR/
 | BMI CONFIGURATION | config/ngen-bmi-configs.tar.gz |  | tarball holding BMI module configuration files defined in realization file. | ngen-bmi-configs.tar.gz |
 | REALIZATION | config/realization.json | [link](https://github.com/CIROH-UA/ngen-datastream/blob/main/configs/ngen/realization_cfe_sloth_pet_nom.json) | NextGen configuration | \*realization\*.json |
 | GEOPACKAGE | hydrofabric/nextgen_01.gpkg | [link](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) | Hydrofabric file of version $\geq$ v20.1 Ignored if subset hydrofabric options are set in datastream config. See [Lynker-Spatial](https://www.lynker-spatial.com/#v20.1/gpkg/) for complete VPU geopackages or [hfsubset](https://github.com/LynkerIntel/hfsubset) for generating your own custom domain. `hfsubset` can be invoked indirectly through `ngen-datastream` through the subsetting args. | *.gpkg |
-| GEOPACKGE_ATTR | hydrofabric/nextgen_01.parquet | [link](https://lynker-spatial.s3.amazonaws.com/v20.1/model_attributes/nextgen_09.parquet) | See [Lynker-Spatial](https://www.lynker-spatial.com/#v20.1/model_attributes/) for geopackage attributes files. Necessary for the creation of ngen bmi module config files. | *.parquet |
-| WEIGHTS | hydrofabric/weights.parquet | [link](https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/forcing_weights.parquet) | Indices relative to the nwm forcings grid used to calculate catchment averaged values. | \*weights\*.parquet |
 | FORCINGS | nwm-forcings/*.nc | [link](https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/CONUS/netcdf/FORCING/2019/201901010000.LDASIN_DOMAIN1) | NetCDF National Water Model forcing files. These are not saved to the resource directory by default. | *.nc |
 | FORCINGS | ngen-forcings/*.tar.gz |  | tarball holding ngen forcing csv's. This is not saved to the resource directory by default, but will be located at `DATA_DIR/ngen-run/forcings/forcings.tar.gz`  | *.tar.gz |
 | PARTITIONS | datastream/patitions_$NPROCS.json | | File generated by the NextGen framework to distribute processing by spatial domain. | \*partitions\*.json |
-| WEIGHTS | datastream/weights.json | |  [weights file description](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#weight_file) | \*weights\*.json |
 
 
 ### `ngen-run/` 
@@ -196,7 +181,7 @@ The `ngen-run` directory contains the following subfolders:
 Model Configuration Example files: `config.ini`,`realization.json`
 The realization file serves as the primary model configuration for the ngen framework. Downloand an example realization file [here](https://ngenresourcesdev.s3.us-east-2.amazonaws.com/ngen-run-pass/config/realization.json). This file specifies which models/modules to run and with which parameters, run parameters like date and time, and hydrofabric specifications. If experiencing run-time errors, the realization file is the first place to check. Other files may be placed in this subdirectory that relate to internal-ngen-models/modules (`config.ini`). It is common to define variables like soil parameters in these files for ngen modules to use.
 
-Hydrofabric Example files: `nextgen_01.gpkg`,`nextgen_01.parquet`
+Hydrofabric Example files: `nextgen_01.gpkg`
 NextGen requires a single geopackage file. This fle is the [hydrofabric](https://mikejohnson51.github.io/hyAggregate/) (spatial data). An example geopackage can be found [here](https://lynker-spatial.s3.amazonaws.com/v20/gpkg/nextgen_01.gpkg). Tools to subset a geopackage into a smaller domain can be found at [Lynker's hfsubset](https://github.com/LynkerIntel/hfsubset). `ngen-datastream` requires a geopackage attributes file, `nextgen_01.parquet`, which is required for generating ngen bmi module configuration files.
 
 ## Versioning
