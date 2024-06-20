@@ -31,7 +31,6 @@ def generate_config(args):
             "end_date"      : args.end_date,
             "data_path"     : args.data_path,
             "gpkg"          : args.gpkg,
-            "gpkg_attr"     : args.gpkg_attr,
             "resource_path" : args.resource_path,
             "forcings_tar"  : args.forcings_tar,
             "nprocs"        : args.nprocs,
@@ -224,7 +223,6 @@ if __name__ == "__main__":
     parser.add_argument("--end_date", help="Set the end date",default="")
     parser.add_argument("--data_path", help="Set the data directory",default="")
     parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
-    parser.add_argument("--gpkg_attr",help="Path to geopackage attributes file",default="")
     parser.add_argument("--resource_path", help="Set the resource directory",default="")
     parser.add_argument("--forcings_tar", help="Set the end date",default="")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
