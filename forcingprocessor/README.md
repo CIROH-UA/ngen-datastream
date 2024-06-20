@@ -3,21 +3,21 @@ Forcingprocessor converts National Water Model (NWM) forcing data into Next Gene
 
 ## Install
 ```
-pip install -e /ngen-datastream/forcingprocessor
+cd /ngen-datastream/forcingprocessor/ && pip install -e .
 ```
 
 ## Run the forcingprocessor
 ```
-python forcingprocessor.py conf.json
+python ./src/forcingprocessor/processor.py ./configs/conf.json
 ```
-See the docker README for example run commands from the container.
+Prior to executing the processor, the user will need to obtain a geopackage file to define the spatial domain. [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) will provide a geopackage which contains a necessary layer,'forcing-weights', for `processor.py`. The user will define the time domain by generating the forcing filenames for `processor.py` via `nwm_filenames_generator.py`, which is explained [here](#nwm_file).
 
 ## Example `conf.json`
 ```
 {
     "forcing"  : {
         "nwm_file"     : "",
-        "weight_file"  : ""
+        "gpkg_file"  : ""
     },
 
     "storage":{
@@ -38,7 +38,7 @@ See the docker README for example run commands from the container.
 | Field             | Description              | Required |
 |-------------------|--------------------------|----------|
 | nwm_file          | Path to a text file containing nwm file names. One filename per line. [Tool](#nwm_file) to create this file | :white_check_mark: |
-| weight_file       | Weight file for the run Accepts local absolute path, s3 URI or URL. [Tool](#weight_file) to create this file |  :white_check_mark: |
+| gpkg_file       | Geopackage file to define spatial domain. Use [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) to generate a geopackage with a `forcing-weights` layer. Accepts local absolute path, s3 URI or URL. |  :white_check_mark: |
 
 ### 2. Storage
 
@@ -75,11 +75,4 @@ A text file given to forcingprocessor that contains each nwm forcing file name. 
     "fcst_cycle"   : [0],
     "lead_time"    : [1]
 }
- ```
-
-## weight_file
-In order to retrieve forcing data from a NWM grid for a given catchment, the indices (weights) of that catchment must be provided to the forcingprocessor in the weights file. The script will ingest every set of catchment weights and produce a corresponding forcings file. These weights can be generated manually from a [geopackage](https://lynker-spatial.s3.amazonaws.com/v20.1/gpkg/nextgen_01.gpkg) with the [weight generator](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/src/forcingprocessor/weights_parq2json.py). An example weight file has been provided [here](https://ngen-datastream.s3.us-east-2.amazonaws.com/resources_default/weights_w_cov.json). 
-
- ```
- python weights_parq2json.py --gpkg <path to geopackage> --outname <path to output weights to> --version <hydrofabric version>
  ```

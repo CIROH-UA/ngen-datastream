@@ -5,11 +5,11 @@ from datetime import datetime
 import requests
 from datetime import datetime
 
-from forcingprocessor.forcingprocessor import prep_ngen_data
+from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
-from forcingprocessor.weights_parq2json import get_weight_json, get_catchments_from_gpkg
+from forcingprocessor.weights_parq2json import hydrofabric2datastream_weights
 
-weight_name = "weights_01.json"
+weight_name = "weights_poudre.json"
 
 @pytest.fixture()
 def get_time():
@@ -53,7 +53,9 @@ def test_generate_filenames(get_paths, get_time):
 
 def test_generate_weights(get_paths):
 
-    weights = get_weight_json(["cat-1","cat-10","cat-100","cat-1000","cat-10000","cat-100000"],"v20.1",os.cpu_count())
+    os.system(f"hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes -o {pytest.data_dir}/palisade.gpkg -t hl \"Gages-09106150\"")
+
+    weights = hydrofabric2datastream_weights(f"{pytest.data_dir}/palisade.gpkg")
 
     data = json.dumps(weights)
     with open(pytest.full_weight,'w') as fp:
@@ -61,22 +63,19 @@ def test_generate_weights(get_paths):
 
     assert pytest.full_weight.exists()
 
-    os.system('curl -L -O https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg')
-
-    get_catchments_from_gpkg('./nextgen_09.gpkg')
-
 
 def test_processor(get_time, get_paths):
     
     conf = {
     "forcing"  : {
-        "nwm_file"     : str(pytest.filenamelist),
-        "weight_file"  : str(pytest.full_weight)
+        "nwm_file"   : str(pytest.filenamelist),
+        "gpkg_file"  : str(f"{pytest.data_dir}/palisade.gpkg")
     },
 
     "storage":{
+        "storage_type"      : "local",
         "output_path"       : str(pytest.data_dir),
-        "output_file_type"  : ["tar","parquet","netcdf"]
+        "output_file_type"  : ["parquet"]
     },    
 
     "run" : {
@@ -119,17 +118,9 @@ def test_processor(get_time, get_paths):
                     
             prep_ngen_data(conf)
 
-            tarball = (pytest.data_dir/"forcings/1_forcings.tar.gz").resolve()
-            assert tarball.exists()
-            os.remove(tarball)
-
-            parquet = (pytest.data_dir/"forcings/cat-1.parquet").resolve()
+            parquet = (pytest.data_dir/"forcings/cat-2586011.parquet").resolve()
             assert parquet.exists()
-            os.remove(parquet)
-
-            # nc = (pytest.data_dir/"forcings/1_forcings.nc").resolve()
-            # assert nc.exists()    
-            # os.remove(nc)            
+            os.remove(parquet)         
 
 
     
