@@ -59,7 +59,7 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op):
+def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op,geo_base):
     if retro_or_op == "retrospective":
         filename = "retro_filenamelist.txt"
     else:
@@ -92,14 +92,14 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op):
         output_path  = f"s3://ngen-datastream/forcings/v20.1/{start}-{end}"
         output_file_type = ["tar"]
     else:
-        weights = f"{docker_mount}/datastream-resources/datastream/weights.json"
+        weights = [f"{docker_mount}/datastream-resources/hydrofabric/{geo_base}"]
         output_path = f"{docker_mount}/ngen-run"
         output_file_type = ["csv","tar"]
 
     fp_conf = {
         "forcing" : {
             "nwm_file"     : f"{docker_mount}/datastream-resources/datastream/{filename}",
-            "weight_file"  : weights,
+            "gpkg_file"    : weights,
         },
         "storage" : {
             "output_path"      : output_path,
@@ -151,6 +151,8 @@ def create_conf_nwm(start, end, retro_or_op):
     return nwm_conf  
 
 def create_confs(conf,args,realization):
+
+    geo_base = args.gpkg.split('/')[-1]
         
     if conf['globals']['start_date'] == "DAILY":
         if conf['globals']['end_date'] != "":
@@ -169,7 +171,7 @@ def create_confs(conf,args,realization):
         start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
         end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
         nwm_conf = create_conf_nwm(start, end, "operational")
-        fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,"operational") 
+        fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,"operational",geo_base) 
     else: 
         start = conf['globals']['start_date']
         end   = conf['globals']['end_date']
@@ -187,7 +189,7 @@ def create_confs(conf,args,realization):
             else:
                 retro_or_op = "operational"
             nwm_conf = create_conf_nwm(start,end, retro_or_op)
-            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op) 
+            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
 
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
