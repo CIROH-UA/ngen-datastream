@@ -12,7 +12,7 @@ click-plugins==1.1.1
 cligj==0.7.2
 decorator==5.1.1
 fiona==1.9.6
--e git+https://github.com/CIROH-UA/ngen-datastream.git@27362d372da02fbd2e1e2939134663c19fd83dcc#egg=forcingprocessor&subdirectory=forcingprocessor
+-e git+https://github.com/CIROH-UA/ngen-datastream.git@9a5bf5d38680ccb0631d74c17b87cd21b23fd538#egg=forcingprocessor&subdirectory=forcingprocessor
 frozenlist==1.4.1
 fsspec==2024.2.0
 gcsfs==2024.2.0
