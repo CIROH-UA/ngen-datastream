@@ -1,10 +1,8 @@
-import json, os
+import json
 import concurrent.futures as cf
 import argparse, time
 import geopandas as gpd
-import pandas as pd
 gpd.options.io_engine = "pyogrio"
-import fiona
 
 def get_catchment_idx(weights_table,catchments):
     weight_data = {}
@@ -24,15 +22,9 @@ def get_catchments_from_gpkg(gpkg):
 
 def hydrofabric2datastream_weights(gpkg):
     t0 = time.perf_counter()
-    layers = fiona.listlayers(gpkg)
     catchments = get_catchments_from_gpkg(gpkg)
     ncatchment = len(catchments)
-    weights_layer = [x for x in layers if "weights" in x]
-    if len(weights_layer) == 0:
-        raise Exception('forcing weights not found in geopackage! Use hfsubset with appropriate options.')
-    else:
-        weights_layer = weights_layer[0]
-    weights_table    = gpd.read_file(gpkg, layer = weights_layer)
+    weights_table    = gpd.read_file(gpkg, layer = 'forcing-weights')
     weights_datastream = get_catchment_idx(weights_table, catchments)
     tf = time.perf_counter()
     dt = tf - t0
