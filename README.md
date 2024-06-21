@@ -32,15 +32,13 @@ or run with cli args
   -o, --S3_PREFIX           <File prefix within s3 mount>
   -n, --NPROCS              <Process limit> 
 ```
-This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
+First, obtain a hydrofabric file for the guage you wish to model. For example for Palisade, Colorado:
 ```
-./scripts/stream.sh \
-  -s 202405200100 \
-  -e 202405210000 \
-  -d $(pwd)/data/datastream_test \
-  -g https://lynker-spatial.s3.amazonaws.com/hydrofabric/v20.1/gpkg/nextgen_09.gpkg \
-  -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json \
-  -n 4
+hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o ./data/hydrofabric_2.1.1/palisade.gpkg -t hl "Gages-09106150"
+```
+Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
+```
+./scripts/stream.sh -s 202406200100 -e 202406210000 -d $(pwd)/data/datastream_test -g $(pwd)/data/hydrofabric_2.1.1/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json -n 4
 ```
 
 ## Explanation of cli args (or variables in defined in `CONF_FILE`)
