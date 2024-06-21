@@ -38,7 +38,7 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
         with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
             fp.writelines(jcatch_str)
 
-def generate_troute_conf(out_dir,start,max_loop_size):
+def generate_troute_conf(out_dir,start,max_loop_size,geo_file_path):
 
     template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
 
@@ -64,6 +64,10 @@ def generate_troute_conf(out_dir,start,max_loop_size):
         pattern = r'^\s*nts\s*:\s*\d+\.\d+'
         if re.search(pattern,jline):
             troute_conf_str[j] = re.sub(pattern,  f"    nts: {nts}      ", jline)
+
+        pattern = r'(geo_file_path:).*'
+        if re.search(pattern,jline):
+            troute_conf_str[j] = re.sub(pattern,  f'\\1 {geo_file_path}', jline)            
 
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)  
@@ -161,6 +165,8 @@ if __name__ == "__main__":
         for jmod in jform.params.modules:
             model_names.append(jmod.params.model_name)
 
+    geo_file_path = os.path.join("./config",os.path.basename(args.hf_file))
+
     if "PET" in model_names:
         models.append(Pet)
         include.append("PET")
@@ -195,6 +201,6 @@ if __name__ == "__main__":
             print(f'ignoring routing')
         else:
             print(f'Generating t-route config from template',flush = True)
-            generate_troute_conf(args.outdir,start,max_loop_size) 
+            generate_troute_conf(args.outdir,start,max_loop_size,geo_file_path) 
 
     print(f'Done!',flush = True)
