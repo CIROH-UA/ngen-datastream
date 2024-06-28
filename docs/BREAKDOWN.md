@@ -51,11 +51,11 @@ Some things to note about this command:
 * `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`model-attributes`
 * `-w` : Defines which grid the weights are calculated from. In this case, it's the medium_range forcing from the National Water Model
 * `-v` : Defines the hydrofabric version
-* The last arguement `"Gages-09106150"`, corresponds to the stream guage that hfsubset will use to trace the upstream network. This effectively defines the spatial domain. This is a guage on the Colorado River in Palisade, Colorado.
+* The last arguement `"Gages-09106150"`, corresponds to the stream gauge that hfsubset will use to trace the upstream network. This effectively defines the spatial domain. This is a gauge on the Colorado River in Palisade, Colorado.
 
 See [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) for more options.
 
-Use the [Lynker Spatial Hydrolocation Viewer](https://www.lynker-spatial.com/hydrolocations.html) to find the guage (`usgs_site_code`) you want. 
+Use the [Lynker Spatial Hydrolocation Viewer](https://www.lynker-spatial.com/hydrolocations.html) to find the gauge (`usgs_site_code`) you want. 
 
 ![ngen-datastream](images/lynker-spatial-palisade.jpg)
 
