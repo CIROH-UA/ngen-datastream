@@ -54,9 +54,11 @@ usage() {
     echo "  -r, --RESOURCE_DIR        <Path to resource directory> "
     echo "  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> "
     echo "  -F, --NGEN_FORCINGS       <Path to ngen forcings tarball> "
+    echo "  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
-    echo "  -o, --S3_PREFIX           <File prefix within s3 mount>"
+    echo "  -o, --S3_PREFIX           <File prefix within s3 mount> "
     echo "  -n, --NPROCS              <Process limit> "
+    echo "  -y, --DRYRUN              <True to skip calculations> "
     exit 1
 }
 
@@ -74,6 +76,7 @@ DATA_DIR=""
 RESOURCE_DIR=""
 NWM_FORCINGS_DIR=""
 NGEN_FORCINGS=""
+NGEN_BMI_CONFS=""
 S3_MOUNT=""
 S3_PREFIX=""
 NPROCS=4
@@ -122,6 +125,7 @@ while [ "$#" -gt 0 ]; do
         -r|--RESOURCE_DIR) RESOURCE_DIR="$2"; shift 2;;
         -f|--NWM_FORCINGS_DIR) NWM_FORCINGS_DIR="$2"; shift 2;;
         -F|--NGEN_FORCINGS) NGEN_FORCINGS="$2"; shift 2;;
+        -N|--NGEN_BMI_CONFS) NGEN_BMI_CONFS="$2"; shift 2;;
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -n|--NPROCS) NPROCS="$2"; shift 2;;
@@ -200,11 +204,8 @@ NGEN_RUN="${DATA_DIR%/}/ngen-run"
 DATASTREAM_META="${DATA_DIR%/}/datastream-metadata"
 DATASTREAM_RESOURCES="${DATA_DIR%/}/datastream-resources"
 DATASTREAM_RESOURCES_NGENCONF="${DATASTREAM_RESOURCES%/}/config/"
-DATASTREAM_RESOURCES_HYDROFABRIC="${DATASTREAM_RESOURCES%/}/hydrofabric/"
 DATASTREAM_RESOURCES_NWMFORCINGS="${DATASTREAM_RESOURCES%/}/nwm-forcings/"
 DATASTREAM_RESOURCES_NGENFORCINGS="${DATASTREAM_RESOURCES%/}/ngen-forcings/"
-DATASTREAM_RESOURCES_DATASTREAM="${DATASTREAM_RESOURCES%/}/datastream/"
-NGEN_BMI_CONFS="${DATASTREAM_RESOURCES_NGENCONF%/}/ngen-bmi-configs.tar.gz"
 DATASTREAM_PROFILING="${DATASTREAM_META%/}/profile.txt"
 mkdir -p $DATASTREAM_META
 touch $DATASTREAM_PROFILING
@@ -244,6 +245,12 @@ fi
 
 if [ ! -z $RESOURCE_DIR ]; then  
 
+    # Untar ngen bmi module configs    
+    if [ -f "$NGEN_BMI_CONFS" ]; then
+        echo "Using" $NGEN_BMI_CONFS
+        tar -xf $NGEN_BMI_CONFS -C "${NGENRUN_CONFIG%/}"
+    fi    
+
     # Look for realization
     if [ -z $REALIZATION ]; then
         REALIZATION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*realization*.json")
@@ -259,21 +266,12 @@ if [ ! -z $RESOURCE_DIR ]; then
         get_file "$REALIZATION" $REALIZATION_RESOURCES   
     fi
 
-    # Untar ngen bmi module configs    
-    if [ -f "$NGEN_BMI_CONFS" ]; then
-        echo "Using" $NGEN_BMI_CONFS
-        tar -xf $NGEN_BMI_CONFS -C "${NGENRUN_CONFIG%/}"
-
-        # HACK: this should look search for which files exist and ignore those modules
-        IGNORE_BMI=("PET,CFE")
-    fi     
-
     # Look for geopackage file
     if [ -z $GEOPACKAGE ]; then
-        GEOPACKAGE_RESOURCES=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.gpkg")
-        NGEO=$(find "$DATASTREAM_RESOURCES_HYDROFABRIC" -type f -name "*.gpkg" | wc -l)
+        GEOPACKAGE_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*.gpkg")
+        NGEO=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*.gpkg" | wc -l)
         if [ ${NGEO} -gt 1 ]; then
-            echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES_HYDROFABRIC
+            echo "At most one geopackage is allowed in "$DATASTREAM_RESOURCES_NGENCONF
             exit 1
         fi
         if [ ${NGEO} -gt 0 ]; then
@@ -285,7 +283,7 @@ if [ ! -z $RESOURCE_DIR ]; then
         fi    
     else
         GEO_BASE=$(basename $GEOPACKAGE)
-        GEOPACKAGE_RESOURCES="$DATASTREAM_RESOURCES_HYDROFABRIC/$GEO_BASE"
+        GEOPACKAGE_RESOURCES="$DATASTREAM_RESOURCES_NGENCONF/$GEO_BASE"
         get_file $GEOPACKAGE $GEOPACKAGE_RESOURCES
         NGEO=1
     fi
@@ -308,7 +306,7 @@ if [ ! -z $RESOURCE_DIR ]; then
     fi 
 
     # Look for partitions file
-    PARTITION_RESOURCES=$(find "$DATASTREAM_RESOURCES_DATASTREAM" -type f -name "*partitions*.json")
+    PARTITION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*partitions*.json")
     if [ -e "$PARTITION_RESOURCES" ]; then
         PARTITION_NGENRUN=$NGEN_RUN/$(basename $PARTITION_RESOURCES)
         echo "Found $PARTITION_RESOURCES, copying to $PARTITION_NGENRUN"
@@ -327,21 +325,23 @@ else
         exit 1
     fi    
 
+    # ngen bmi module configs    
+    if [ ! -z "$NGEN_BMI_CONFS" ]; then
+        echo "Using" $NGEN_BMI_CONFS
+        cp -r "$NGEN_BMI_CONFS"/* $NGENRUN_CONFIG
+    fi  
+
     # Look for nwm forcings
     if [ ! -z $NWM_FORCINGS_DIR ]; then
         NWM_FORCINGS=$(find "$NWM_FORCINGS_DIR" -type f -name "*.nc")
     fi    
 
     if [ ! -z $SUBSET_ID ]; then
-        echo "aquiring geospatial data from hfsubset"
-        mkdir -p $DATASTREAM_RESOURCES_DATASTREAM
-        
+        echo "aquiring geospatial data from hfsubset"        
     else
-        mkdir -p $DATASTREAM_RESOURCES_HYDROFABRIC
-        mkdir -p $DATASTREAM_RESOURCES_DATASTREAM
         if [ ! -z $GEOPACKAGE ]; then
             GEO_BASE=$(basename $GEOPACKAGE)
-            GEOPACKAGE_RESOURCES="$DATASTREAM_RESOURCES_HYDROFABRIC/$GEO_BASE"
+            GEOPACKAGE_RESOURCES="$DATASTREAM_RESOURCES_NGENCONF/$GEO_BASE"
             get_file "$GEOPACKAGE" $GEOPACKAGE_RESOURCES            
         else
             echo "geopackage arg is required"
@@ -353,9 +353,8 @@ fi
 if [ ! -z $SUBSET_ID ]; then
     log_time "SUBSET_START" $DATASTREAM_PROFILING
     GEO_BASE="$SUBSET_ID.gpkg"
-    GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_HYDROFABRIC%/}/$GEO_BASE"
-    mkdir -p $DATASTREAM_RESOURCES_HYDROFABRIC
-    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE $SUBSET_ID
+    GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_NGENCONF%/}/$GEO_BASE"
+    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE $SUBSET_ID
     GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
     cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
     log_time "SUBSET_END" $DATASTREAM_PROFILING
@@ -407,12 +406,12 @@ if [ "$DRYRUN" == "True" ]; then
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
         -u $(id -u):$(id -g) \
         $DOCKER_TAG python $NGEN_CONFGEN \
-        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI""
+        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json""
 else
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
         -u $(id -u):$(id -g) \
         $DOCKER_TAG python $NGEN_CONFGEN \
-        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
+        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json"
     TAR_NAME="ngen-bmi-configs.tar.gz"
     NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
     tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
@@ -438,7 +437,7 @@ else
         for file in $NWM_FORCINGS; do
             echo "$file"
         done | sort >> "$LOCAL_FILENAMES"
-        cp $LOCAL_FILENAMES $DATASTREAM_META/filenamelist.txt
+        cp $LOCAL_FILENAMES $DATASTREAM_META/filenamelist_local.txt
         rm $LOCAL_FILENAMES
 
         FILENAMES="filenamelist.txt"
@@ -449,21 +448,21 @@ else
             filebase=$(basename $file)
             echo "$DOCKER_RESOURCES/nwm-forcings/$filebase" >> "$FILENAMES"
         done
+        cp $LOCAL_FILENAMES $DATASTREAM_META/filenamelist.txt
+        rm $FILENAMES
         
         if [ ! -e $DATASTREAM_RESOURCES_NWMFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NWMFORCINGS
             echo "Copying nwm files into "$DATASTREAM_RESOURCES_NWMFORCINGS
             cp -r $NWM_FORCINGS_DIR/* $DATASTREAM_RESOURCES_NWMFORCINGS
         fi
-        mv $FILENAMES $DATASTREAM_RESOURCES_DATASTREAM
     else
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python "$DOCKER_FP"nwm_filenames_generator.py \
             "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
-        cp $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_META
-        mv $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_RESOURCES_DATASTREAM
+        mv $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_META
     fi
     echo "Creating forcing files"
     if [ "$DRYRUN" == "True" ]; then
@@ -482,7 +481,6 @@ else
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
-        rm $DATASTREAM_RESOURCES_DATASTREAM*filenamelist*.txt
         mv $NGEN_RUN/forcings/*forcings.tar.gz $DATASTREAM_RESOURCES_NGENFORCINGS"forcings.tar.gz"
     fi
 fi    
@@ -510,7 +508,7 @@ if [ "$DRYRUN" == "True" ]; then
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS"
 else
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS
-    cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_DATASTREAM/
+    cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_NGENCONF/
 fi
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
