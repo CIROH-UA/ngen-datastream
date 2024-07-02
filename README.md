@@ -31,6 +31,7 @@ or run with cli args
   -S, --S3_MOUNT            <Path to mount s3 bucket to>  
   -o, --S3_PREFIX           <File prefix within s3 mount>
   -n, --NPROCS              <Process limit> 
+  -y, --DRYRUN              <True to skip calculations>
 ```
 This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```
