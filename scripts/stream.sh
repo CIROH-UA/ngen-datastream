@@ -77,6 +77,7 @@ NGEN_FORCINGS=""
 S3_MOUNT=""
 S3_PREFIX=""
 NPROCS=4
+DRYRUN="False"
 
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
@@ -124,6 +125,7 @@ while [ "$#" -gt 0 ]; do
         -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -n|--NPROCS) NPROCS="$2"; shift 2;;
+        -y|--DRYRUN) DRYRUN="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -332,6 +334,8 @@ else
 
     if [ ! -z $SUBSET_ID ]; then
         echo "aquiring geospatial data from hfsubset"
+        mkdir -p $DATASTREAM_RESOURCES_DATASTREAM
+        
     else
         mkdir -p $DATASTREAM_RESOURCES_HYDROFABRIC
         mkdir -p $DATASTREAM_RESOURCES_DATASTREAM
@@ -384,20 +388,35 @@ PKL_FILE=$(find "$NGENRUN_CONFIG" -type f -name $PKL_NAME)
 if [ ! -f "$PKL_FILE" ]; then
     echo "Generating noah-owp pickle file"
     NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
-    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
-        python $NOAHOWPPKL_GENERATOR \
-        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config"   
+    if [ "$DRYRUN" == "True" ]; then
+        echo "DRYRUN - NOAH PKL CALCULATION SKIPPED"
+        echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
+            python $NOAHOWPPKL_GENERATOR \
+            --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config""
+    else
+        docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
+            python $NOAHOWPPKL_GENERATOR \
+            --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config"
+    fi
 fi
 
 echo "Generating NGEN configs"
 NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
-docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
-    -u $(id -u):$(id -g) \
-    $DOCKER_TAG python $NGEN_CONFGEN \
-    --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
-TAR_NAME="ngen-bmi-configs.tar.gz"
-NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
-tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
+if [ "$DRYRUN" == "True" ]; then
+    echo "DRYRUN - NGEN BMI CONFIGURATION FILE CREATION SKIPPED"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+        -u $(id -u):$(id -g) \
+        $DOCKER_TAG python $NGEN_CONFGEN \
+        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI""
+else
+    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+        -u $(id -u):$(id -g) \
+        $DOCKER_TAG python $NGEN_CONFGEN \
+        --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json" --ignore "$IGNORE_BMI"
+    TAR_NAME="ngen-bmi-configs.tar.gz"
+    NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
+    tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
+fi
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
 if [ ! -z $NGEN_FORCINGS ]; then
@@ -447,36 +466,63 @@ else
         mv $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_RESOURCES_DATASTREAM
     fi
     echo "Creating forcing files"
-    docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
-        -u $(id -u):$(id -g) \
-        -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-        python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
-    log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
-    if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
-        mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
+    if [ "$DRYRUN" == "True" ]; then
+        echo "DRYRUN - FORCINGPROCESSOR SKIPPED"
+        echo "COMMAND: docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
+            -u $(id -u):$(id -g) \
+            -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+            python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
+    else
+        docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
+            -u $(id -u):$(id -g) \
+            -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+            python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
+        mv $DATASTREAM_RESOURCES/log_fp.txt $DATASTREAM_META 
+        log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
+        if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
+            mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
+        fi
+        rm $DATASTREAM_RESOURCES_DATASTREAM*filenamelist*.txt
+        mv $NGEN_RUN/forcings/*forcings.tar.gz $DATASTREAM_RESOURCES_NGENFORCINGS"forcings.tar.gz"
     fi
-    rm $DATASTREAM_RESOURCES_DATASTREAM*filenamelist*.txt
-    mv $NGEN_RUN/forcings/*forcings.tar.gz $DATASTREAM_RESOURCES_NGENFORCINGS"forcings.tar.gz"
 fi    
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
 VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
 DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Validating " $NGEN_RUN
-docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
-    $DOCKER_TAG python $VALIDATOR \
-    --data_dir $DOCKER_MOUNT
+if [ "$DRYRUN" == "True" ]; then
+    echo "DRYRUN - VALIDATION SKIPPED"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+        $DOCKER_TAG python $VALIDATOR \
+        --data_dir $DOCKER_MOUNT"
+else
+    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+        $DOCKER_TAG python $VALIDATOR \
+        --data_dir $DOCKER_MOUNT
+fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
-docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS
+if [ "$DRYRUN" == "True" ]; then
+    echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS"
+else
+    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS
+    cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_DATASTREAM/
+fi
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
-cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_DATASTREAM/
+
 
 log_time "MERKLE_START" $DATASTREAM_PROFILING
-docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+if [ "$DRYRUN" == "True" ]; then
+    echo "DRYRUN - MERKDIR EXECUTION SKIPPED"
+    echo "COMMAND: docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT"
+else
+    docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+fi
 log_time "MERKLE_END" $DATASTREAM_PROFILING
 
 log_time "TAR_START" $DATASTREAM_PROFILING
