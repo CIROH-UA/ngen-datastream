@@ -814,6 +814,7 @@ def prep_ngen_data(conf):
     idx_2d = []
     for jcat in weights_json:
         indices = weights_json[jcat][0]
+        if len(indices) == 0: raise Exception(f"No weights found for catchment {jcat}")
         idx_2d=np.unravel_index(indices, (1, 4608, 3840), order='F')
         x_min_list.append(np.min(idx_2d[1]))
         x_max_list.append(np.max(idx_2d[1]))
