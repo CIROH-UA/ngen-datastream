@@ -92,13 +92,13 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op,g
         output_path  = f"s3://ngen-datastream/forcings/v20.1/{start}-{end}"
         output_file_type = ["tar"]
     else:
-        weights = [f"{docker_mount}/datastream-resources/hydrofabric/{geo_base}"]
+        weights = [f"{docker_mount}/datastream-resources/config/{geo_base}"]
         output_path = f"{docker_mount}/ngen-run"
         output_file_type = ["csv","tar"]
 
     fp_conf = {
         "forcing" : {
-            "nwm_file"     : f"{docker_mount}/datastream-resources/datastream/{filename}",
+            "nwm_file"     : f"{docker_mount}/datastream-metadata/{filename}",
             "gpkg_file"    : weights,
         },
         "storage" : {

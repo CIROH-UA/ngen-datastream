@@ -142,23 +142,14 @@ if __name__ == "__main__":
         help="Path to the ngen realization", 
         required=False
     )     
-    parser.add_argument(
-        "--ignore",
-        dest="ignore", 
-        type=str,
-        help="List of NextGen BMI modules to ignore config generation for", 
-        required=False
-    )    
 
     args = parser.parse_args()
-    ignore = args.ignore.split(',')
 
     serialized_realization = NgenRealization.parse_file(args.realization)
     start = serialized_realization.time.start_time
     end   = serialized_realization.time.end_time    
     max_loop_size = (end - start + datetime.timedelta(hours=1)).total_seconds() / (serialized_realization.time.output_interval)
     models = []
-    include = []
     ii_cfe_or_pet = False
     model_names = []
     for jform in serialized_realization.global_config.formulations:
@@ -167,14 +158,17 @@ if __name__ == "__main__":
 
     geo_file_path = os.path.join("./config",os.path.basename(args.hf_file))
 
-    if "PET" in model_names:
-        models.append(Pet)
-        include.append("PET")
-        ii_cfe_or_pet = True            
-    if "CFE" in model_names:
-        models.append(Cfe)    
-        include.append("CFE")
-        ii_cfe_or_pet = True            
+    dir_dict = {"CFE":"CFE",
+                "PET":"PET",
+                "NoahOWP":"NOAH-OWP-M",
+                "SLOTH":""}
+
+    ignore = []
+    for jmodel in model_names:
+        config_path = Path(args.outdir,"cat_config",dir_dict[jmodel])
+        if config_path.exists(): ignore.append(jmodel)
+    routing_path = Path(args.outdir,"ngen.yaml")
+    if routing_path.exists(): ignore.append("routing")        
 
     if "NoahOWP" in model_names:
         if "NoahOWP" in ignore:
@@ -188,12 +182,19 @@ if __name__ == "__main__":
             else:
                 raise Exception(f"Generating NoahOWP configs manually not implemented, create pkl.")            
 
-    if ii_cfe_or_pet: 
-        if "CFE" in ignore or "PET" in ignore:
-            print(f'ignoring CFE and PET')
+    if "CFE" in model_names: 
+        if "CFE" in ignore:
+            print(f'ignoring CFE')
         else:
-            print(f'Generating {include} configs from pydantic models',flush = True)
-            gen_petAORcfe(args.hf_file,args.outdir,models,include)
+            print(f'Generating CFE configs from pydantic models',flush = True)
+            gen_petAORcfe(args.hf_file,args.outdir,[Cfe],["CFE"])
+
+    if "PET" in model_names: 
+        if "PET" in ignore:
+            print(f'ignoring PET')
+        else:
+            print(f'Generating PET configs from pydantic models',flush = True)
+            gen_petAORcfe(args.hf_file,args.outdir,[Pet],["PET"])
 
     globals = [x[0] for x in serialized_realization]
     if serialized_realization.routing is not None:
