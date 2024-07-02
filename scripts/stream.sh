@@ -476,7 +476,7 @@ else
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
-        mv $DATASTREAM_RESOURCES/log_fp.txt $DATASTREAM_META 
+        mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
         log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
