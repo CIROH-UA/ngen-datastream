@@ -31,6 +31,7 @@ or run with cli args
   -S, --S3_MOUNT            <Path to mount s3 bucket to>  
   -o, --S3_PREFIX           <File prefix within s3 mount>
   -n, --NPROCS              <Process limit> 
+  -y, --DRYRUN              <True to skip calculations>
 ```
 First, obtain a hydrofabric file for the guage you wish to model. For example for Palisade, Colorado:
 ```
