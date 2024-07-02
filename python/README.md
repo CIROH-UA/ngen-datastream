@@ -5,16 +5,14 @@ Scripts to create ngen bmi module configuration files and validate ngen-run pack
 Note: see [noahowp_pkl](#noahowp_pklpy) before running this script. Currently, the datastream creates the noahowp config files from a template config within the repository. 
 The t-route config is also created from a template within this repository. Soon these will be generated with pydantic models within [ngen-cal](https://github.com/NOAA-OWP/ngen-cal)
 ```
-usage: ngen_configs_gen.py [-h] [--hf_file HF_FILE] [--hf_lnk_file HF_LNK_FILE] [--outdir OUTDIR]
-                           [--pkl_file PKL_FILE] [--realization REALIZATION] [--ignore IGNORE]
+usage: ngen_configs_gen.py [-h] [--hf_file HF_FILE] [--outdir OUTDIR]
+                           [--pkl_file PKL_FILE] [--realization REALIZATION] 
 options:
   -h, --help                 show this help message and exit
   --hf_file HF_FILE          Path to the .gpkg
-  --hf_lnk_file HF_LNK_FILE  Path to the .gpkg attributes
   --outdir OUTDIR            Path to write ngen configs
   --pkl_file PKL_FILE        Path to the noahowp pkl
   --realization REALIZATION  Path to the ngen realization
-  --ignore IGNORE            ngen bmi modules to ignore config generation
 ```
 
 
@@ -41,7 +39,6 @@ options:
   --end_date END_DATE                         Set the end date
   --data_path DATA_PATH                       Set the data directory
   --gpkg GPKG                                 Path to geopackage file
-  --gpkg_attr GPKG_ATTR                       Path to geopackage attributes file
   --resource_path RESOURCE_PATH               Set the resource directory
   --subset_id_type SUBSET_ID_TYPE             Set the subset ID type
   --subset_id SUBSET_ID                       Set the subset ID

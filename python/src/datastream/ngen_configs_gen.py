@@ -38,7 +38,7 @@ def gen_noah_owp_confs_from_pkl(pkl_file,out_dir,start,end):
         with open(Path(out_dir,f"noah-owp-modular-init-{jcatch}.namelist.input"),"w") as fp:
             fp.writelines(jcatch_str)
 
-def generate_troute_conf(out_dir,start,max_loop_size):
+def generate_troute_conf(out_dir,start,max_loop_size,geo_file_path):
 
     template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
 
@@ -64,6 +64,10 @@ def generate_troute_conf(out_dir,start,max_loop_size):
         pattern = r'^\s*nts\s*:\s*\d+\.\d+'
         if re.search(pattern,jline):
             troute_conf_str[j] = re.sub(pattern,  f"    nts: {nts}      ", jline)
+
+        pattern = r'(geo_file_path:).*'
+        if re.search(pattern,jline):
+            troute_conf_str[j] = re.sub(pattern,  f'\\1 {geo_file_path}', jline)            
 
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)  
@@ -138,37 +142,33 @@ if __name__ == "__main__":
         help="Path to the ngen realization", 
         required=False
     )     
-    parser.add_argument(
-        "--ignore",
-        dest="ignore", 
-        type=str,
-        help="List of NextGen BMI modules to ignore config generation for", 
-        required=False
-    )    
 
     args = parser.parse_args()
-    ignore = args.ignore.split(',')
 
     serialized_realization = NgenRealization.parse_file(args.realization)
     start = serialized_realization.time.start_time
     end   = serialized_realization.time.end_time    
     max_loop_size = (end - start + datetime.timedelta(hours=1)).total_seconds() / (serialized_realization.time.output_interval)
     models = []
-    include = []
     ii_cfe_or_pet = False
     model_names = []
     for jform in serialized_realization.global_config.formulations:
         for jmod in jform.params.modules:
             model_names.append(jmod.params.model_name)
 
-    if "PET" in model_names:
-        models.append(Pet)
-        include.append("PET")
-        ii_cfe_or_pet = True            
-    if "CFE" in model_names:
-        models.append(Cfe)    
-        include.append("CFE")
-        ii_cfe_or_pet = True            
+    geo_file_path = os.path.join("./config",os.path.basename(args.hf_file))
+
+    dir_dict = {"CFE":"CFE",
+                "PET":"PET",
+                "NoahOWP":"NOAH-OWP-M",
+                "SLOTH":""}
+
+    ignore = []
+    for jmodel in model_names:
+        config_path = Path(args.outdir,"cat_config",dir_dict[jmodel])
+        if config_path.exists(): ignore.append(jmodel)
+    routing_path = Path(args.outdir,"ngen.yaml")
+    if routing_path.exists(): ignore.append("routing")        
 
     if "NoahOWP" in model_names:
         if "NoahOWP" in ignore:
@@ -182,12 +182,19 @@ if __name__ == "__main__":
             else:
                 raise Exception(f"Generating NoahOWP configs manually not implemented, create pkl.")            
 
-    if ii_cfe_or_pet: 
-        if "CFE" in ignore or "PET" in ignore:
-            print(f'ignoring CFE and PET')
+    if "CFE" in model_names: 
+        if "CFE" in ignore:
+            print(f'ignoring CFE')
         else:
-            print(f'Generating {include} configs from pydantic models',flush = True)
-            gen_petAORcfe(args.hf_file,args.outdir,models,include)
+            print(f'Generating CFE configs from pydantic models',flush = True)
+            gen_petAORcfe(args.hf_file,args.outdir,[Cfe],["CFE"])
+
+    if "PET" in model_names: 
+        if "PET" in ignore:
+            print(f'ignoring PET')
+        else:
+            print(f'Generating PET configs from pydantic models',flush = True)
+            gen_petAORcfe(args.hf_file,args.outdir,[Pet],["PET"])
 
     globals = [x[0] for x in serialized_realization]
     if serialized_realization.routing is not None:
@@ -195,6 +202,6 @@ if __name__ == "__main__":
             print(f'ignoring routing')
         else:
             print(f'Generating t-route config from template',flush = True)
-            generate_troute_conf(args.outdir,start,max_loop_size) 
+            generate_troute_conf(args.outdir,start,max_loop_size,geo_file_path) 
 
     print(f'Done!',flush = True)
