@@ -12,6 +12,7 @@ Imagine we want to study the variation in NextGen configurations of retrospectiv
 * [NextGen BMI Configuration File Generation](#nextgen-bmi-configuration-file-generation)
 * [Validation](#validation)
 * [NextGen Execution](#nextgen-execution)
+* [Equivalent Command](#equivalent-command)
 
 Before proceeding, please review the [usage](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/USAGE.md) document and the [ngen-run](https://github.com/CIROH-UA/ngen-datastream/tree/main?tab=readme-ov-file#ngen-run) standard run directory portion of the repo's main [README](https://github.com/CIROH-UA/ngen-datastream/blob/main/README.md).
 
@@ -205,5 +206,18 @@ Let's do this thing! Feed the input data package to NextGen in a Box with auto m
 docker run --rm -v $(pwd)/palisade_2019/ngen-run:/ngen-run awiciroh/ciroh-ngen-image:latest /ngen-run auto 8
 ```
 In this command we mount the `./palisade_2019/ngen-run` directory to the docker container and execute on `/ngen-run` with 8 processes. When the execution completes, output data should be located in `/palisade_2019/ngen-run/outputs/`.
+
+## Equivalent Command
+Now that we have performed each component of the datastream individually, let's take a look at the single command that would have accomplished all of the steps we just went through.
+```
+./scripts/stream.sh \
+    -s 201901010000 \
+    -e 201912312300 \
+    -i hl \
+    -I Gages-09106150 \
+    -v 2.1.1 \
+    -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_troute.json \
+    -d $(pwd)/palisade_2019
+```
 
 
