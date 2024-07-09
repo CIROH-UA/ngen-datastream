@@ -2,11 +2,25 @@ import os, argparse
 from ngen.config.realization import NgenRealization
 from ngen.config.validate import validate_paths
 import re
+import xarray as xr
 import geopandas
 geopandas.options.io_engine = "pyogrio"
 import pandas as pd
 from datetime import datetime
 import concurrent.futures as cf
+
+def check_forcings(forcings_start,forcings_end,n):
+    start_time = serialized_realization.time.start_time
+    end_time   = serialized_realization.time.end_time
+    dt_s = serialized_realization.time.output_interval
+    if forcings_end == forcings_start:
+        dt_forcings_s = 3600
+    else:
+        dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (n - 1)
+    assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
+    assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
+    assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"    
+
 
 def validate_realization(realization_file):
     """
@@ -44,29 +58,30 @@ def validate_catchment_files(validations, catchments):
     for jval in validations:
         pattern     = validations[jval]['pattern']
         files       = validations[jval]['files']
+        if jval == "forcing":
+            if files[0].endswith(".nc"):
+                nc_file = files[0]
+                with xr.open_dataset(os.path.join(forcing_dir,nc_file)) as ngen_forcings:
+                    df = ngen_forcings['precip_rate']
+                    forcings_start = datetime.strptime(ngen_forcings.time.values[0],'%Y-%m-%d %H:%M:%S')
+                    forcings_end   = datetime.strptime(ngen_forcings.time.values[-1],'%Y-%m-%d %H:%M:%S')
+                    check_forcings(forcings_start,forcings_end,len(ngen_forcings.time.values))
+                    continue
+
         for j, jcatch in enumerate(catchments):    
             jcatch_pattern = pattern.replace('{{id}}',jcatch)
             compiled       = re.compile(jcatch_pattern)      
 
             jfile = files[j]     
-            assert bool(compiled.match(jfile)), f"{jcatch} -> Forcing file {jfile} does not match pattern specified {pattern}"            
+            assert bool(compiled.match(jfile)), f"{jcatch} -> File {jfile} does not match pattern specified {pattern}"            
 
             if jval == "forcing":
                 if j == 0:
-                    start_time = serialized_realization.time.start_time
-                    end_time   = serialized_realization.time.end_time
-                    dt_s = serialized_realization.time.output_interval
                     full_path = os.path.join(forcing_dir,files[0])
                     df = pd.read_csv(full_path)
                     forcings_start = datetime.strptime(df['time'].iloc[0],'%Y-%m-%d %H:%M:%S')
                     forcings_end   = datetime.strptime(df['time'].iloc[-1],'%Y-%m-%d %H:%M:%S')
-                    if forcings_end == forcings_start:
-                        dt_forcings_s = 3600
-                    else:
-                        dt_forcings_s = (forcings_end - forcings_start).total_seconds() / (len(df['time']) - 1)
-                    assert start_time == forcings_start, f"Realization start time {start_time} does not match forcing start time {forcings_start}"
-                    assert end_time == forcings_end, f"Realization end time {end_time} does not match forcing end time {forcings_end}"
-                    assert dt_s == dt_forcings_s, f"Realization output_interval {dt_s} does not match forcing time axis {dt_forcings_s}"
+                    check_forcings(forcings_start,forcings_end,len(df['time']))
 
 def validate_data_dir(data_dir):
 
@@ -144,13 +159,13 @@ def validate_data_dir(data_dir):
         jcatchments = catchment_list[i:k]
         catchment_list_list.append(jcatchments)
         i = k
-        
-    with cf.ProcessPoolExecutor() as pool:
-        for results in pool.map(
-            validate_catchment_files,
-            val_dict_list,
-            catchment_list_list):
-            pass    
+    validate_catchment_files(val_dict_list[0],catchment_list_list[0])
+    # with cf.ProcessPoolExecutor() as pool:
+    #     for results in pool.map(
+    #         validate_catchment_files,
+    #         val_dict_list,
+    #         catchment_list_list):
+    #         pass    
 
     print(f'\nNGen run folder is valid\n',flush = True)        
 

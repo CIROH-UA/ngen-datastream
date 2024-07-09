@@ -620,8 +620,6 @@ def write_netcdf(data, vpu, t_ax, catchments):
 
     ds = xr.Dataset(
         data_vars={
-            "ids" : list(catchments),
-            "Time" : t_ax,
             "UGRD_10maboveground": (["time", "catchment_id"], data[:, 0, :]),
             "VGRD_10maboveground": (["time", "catchment_id"], data[:, 1, :]),
             "DLWRF_surface": (["time", "catchment_id"], data[:, 2, :]),
