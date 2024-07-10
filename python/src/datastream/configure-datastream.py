@@ -183,6 +183,9 @@ def create_confs(conf,args,realization):
             nwm_conf = {}
             fp_conf = {}
             fp_conf['forcing'] = args.forcings
+        elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
+            nwm_conf = {}
+            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
         else:
             if (datetime.now() - start_realization_dt).days > 30:
                 retro_or_op = "retrospective"
