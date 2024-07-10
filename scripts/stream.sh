@@ -5,28 +5,55 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
 
-get_file() {
-    local FILE="$1"
-    local OUTFILE="$2"
+is_s3_key() {
+  [[ "$1" =~ ^s3:// ]]
+}
+is_tarball() {
+  [[ "$1" =~ \.tar\.gz$ || "$1" =~ \.tgz$ || "$1" =~ \.tar$ ]]
+}
+is_netcdf() {
+  [[ "$1" =~ \.nc$ ]]
+}
+is_directory() {
+  [[ -d "$1" ]]
+}
+is_url() {
+  [[ "$1" =~ ^(https?|ftp):// ]]
+}
+is_file() {
+  [[ -e "$1" ]]
+}
 
-    echo "Retrieving "$FILE" and storing it here "$OUTFILE
-    if [[ "$FILE" == *"https://"* ]]; then
-        curl -# -L -o "$OUTFILE" "$FILE"
-    elif [[ "$FILE" == *"s3://"* ]]; then
-        BUCKET=$(echo "$FILE" | cut -d '/' -f 3)
-        KEY=$(echo "$FILE" | cut -d '/' -f 4-)
-        if [[ "$KEY" == */ ]]; then
-            aws s3 sync "$FILE" "$OUTFILE"
+get_file() {
+    local IN_STRING="$1"
+    local OUT_STRING="$2"
+    
+    IN_STRING_BASE=$(basename $IN_STRING)
+    echo "Retrieving "$IN_STRING" and storing it here "$OUT_STRING
+    if is_directory "$IN_STRING"; then
+        cp -r $IN_STRING/* $OUT_STRING
+    elif is_s3_key "$IN_STRING"; then
+        OUTPUT=$(aws s3 ls $IN_STRING)
+        NUM_LINES=$(echo "$OUTPUT" | wc -l)
+        if [ $NUM_LINES -eq 0 ]; then
+            echo "Nothing found for $IN_STRING"
+        elif [ $NUM_LINES -eq 1 ]; then
+            aws s3 cp "$IN_STRING" "$(pwd)/$IN_STRING_BASE"
+            get_file "$(pwd)/$IN_STRING_BASE" $OUT_STRING
+            rm "$(pwd)/$IN_STRING_BASE"
         else
-            aws s3 cp "$FILE" "$OUTFILE"
-        fi
+            aws s3 --recursive $IN_STRING $OUT_STRING
+        fi 
+    elif is_tarball "$IN_STRING"; then
+        tar --use-compress-program=pigz -xf $IN_STRING -C "${OUT_STRING%/}"
+    elif is_netcdf "$IN_STRING"; then
+        cp $IN_STRING $OUT_STRING
+    elif is_url "$IN_STRING"; then
+        curl -# -L -o "$OUT_STRING" "$IN_STRING"
+    elif is_file "$IN_STRING"; then
+        cp $IN_STRING $OUT_STRING        
     else
-        if [ -e "$FILE" ]; then
-            cp -r "$FILE" "$OUTFILE"
-        else
-            echo "$FILE doesn't exist!"
-            exit 1
-        fi
+        echo "ngen-datastream doesn't know how to deal with $IN_STRING"
     fi
 }
 
@@ -53,7 +80,7 @@ usage() {
     echo "  -d, --DATA_DIR            <Path to write to> "
     echo "  -r, --RESOURCE_DIR        <Path to resource directory> "
     echo "  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> "
-    echo "  -F, --NGEN_FORCINGS       <Path to ngen forcings tarball> "
+    echo "  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> "
     echo "  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> "
     echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
     echo "  -o, --S3_PREFIX           <File prefix within s3 mount> "
@@ -220,6 +247,7 @@ NGENRUN_OUTPUT_TROUTE="${NGEN_RUN%/}/outputs/troute"
 NGENRUN_RESTART="${NGEN_RUN%/}/restart"
 NGENRUN_LAKEOUT="${NGEN_RUN%/}/lakeout"
 mkdir -p $NGENRUN_CONFIG
+mkdir -p $NGENRUN_FORCINGS
 mkdir -p $NGENRUN_OUTPUT
 mkdir -p $NGENRUN_OUTPUT_NGEN
 mkdir -p $NGENRUN_OUTPUT_PARQUET
@@ -301,7 +329,7 @@ if [ ! -z $RESOURCE_DIR ]; then
     if [ -z $NGEN_FORCINGS ]; then
         NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
         if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then
-            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.tar.gz")
+            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.")
         fi
     fi 
 
@@ -377,7 +405,7 @@ echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings_tar "$NGEN_FORCINGS" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
@@ -422,10 +450,7 @@ if [ ! -z $NGEN_FORCINGS ]; then
     log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
     echo "Using $NGEN_FORCINGS"
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
-    mkdir -p $NGENRUN_FORCINGS
-    get_file "$NGEN_FORCINGS" "./$FORCINGS_BASE"
-    tar --use-compress-program=pigz -xf $FORCINGS_BASE -C "${NGENRUN_FORCINGS%/}"
-    rm "./$FORCINGS_BASE"
+    get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
@@ -481,7 +506,7 @@ else
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
-        mv $NGEN_RUN/forcings/*forcings.tar.gz $DATASTREAM_RESOURCES_NGENFORCINGS"forcings.tar.gz"
+        cp $NGEN_RUN/forcings/*forcings* $DATASTREAM_RESOURCES_NGENFORCINGS
     fi
 fi    
 

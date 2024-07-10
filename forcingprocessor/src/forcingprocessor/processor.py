@@ -10,13 +10,10 @@ import time
 import boto3
 from io import BytesIO, TextIOWrapper
 import concurrent.futures as cf
-import multiprocessing as mp
-import ctypes
 from datetime import datetime, timezone
 import psutil
 import gzip
 import tarfile, tempfile
-import multiprocessing as mp
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 from forcingprocessor.weights_hf2ds import hydrofabric2datastream_weights
@@ -404,7 +401,6 @@ def write_data(
 
     nfiles = len(catchments)
     id = os.getpid()
-    if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None, flush =True)
 
     forcing_cat_ids = []
     tar_list = []
@@ -434,6 +430,8 @@ def write_data(
         t0 = time.perf_counter()
 
         if "parquet" in output_file_type or "csv" in output_file_type :
+            if j ==0: 
+                if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None, flush =True)
             if storage_type == 's3':            
                 bucket, key_prefix = convert_url2key(out_path, storage_type)                            
                 if "parquet" in output_file_type:
@@ -620,8 +618,6 @@ def write_netcdf(data, vpu, t_ax, catchments):
 
     ds = xr.Dataset(
         data_vars={
-            "ids" : list(catchments),
-            "Time" : t_ax,
             "UGRD_10maboveground": (["time", "catchment_id"], data[:, 0, :]),
             "VGRD_10maboveground": (["time", "catchment_id"], data[:, 1, :]),
             "DLWRF_surface": (["time", "catchment_id"], data[:, 2, :]),
@@ -639,6 +635,7 @@ def write_netcdf(data, vpu, t_ax, catchments):
         },
     )
 
+    
     if storage_type == 's3':
         bucket, key = convert_url2key(nc_filename,s3_client)
         with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
@@ -647,6 +644,7 @@ def write_netcdf(data, vpu, t_ax, catchments):
             s3_client.upload_file(tmpfile.name, bucket, key)
     else:
         ds.to_netcdf(nc_filename) 
+        print(f'netcdf has been written to {nc_filename}')    
 
 def multiprocess_write_netcdf(data, jcatchment_dict, t_ax):  
     """
