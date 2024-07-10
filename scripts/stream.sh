@@ -506,7 +506,7 @@ else
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
-        mv $NGEN_RUN/forcings/*forcings.tar.gz $DATASTREAM_RESOURCES_NGENFORCINGS"forcings.tar.gz"
+        cp $NGEN_RUN/forcings/*forcings* $DATASTREAM_RESOURCES_NGENFORCINGS
     fi
 fi    
 
