@@ -32,7 +32,7 @@ def generate_config(args):
             "data_path"     : args.data_path,
             "gpkg"          : args.gpkg,
             "resource_path" : args.resource_path,
-            "forcings_tar"  : args.forcings_tar,
+            "forcings"      : args.forcings,
             "nprocs"        : args.nprocs,
             "forcing_split_vpu"    : args.forcing_split_vpu
         }, 
@@ -94,7 +94,7 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op,g
     else:
         weights = [f"{docker_mount}/datastream-resources/config/{geo_base}"]
         output_path = f"{docker_mount}/ngen-run"
-        output_file_type = ["csv","tar"]
+        output_file_type = ["netcdf"]
 
     fp_conf = {
         "forcing" : {
@@ -179,10 +179,13 @@ def create_confs(conf,args,realization):
         end_realization_dt = datetime.strptime(end,'%Y%m%d%H%M')
         start_realization =  start_realization_dt.strftime('%Y-%m-%d %H:%M:%S')
         end_realization   = end_realization_dt.strftime('%Y-%m-%d %H:%M:%S')
-        if len(args.forcings_tar) > 0:
+        if args.forcings.endswith(".nc") or args.forcings.endswith(".tar.gz"):
             nwm_conf = {}
             fp_conf = {}
-            fp_conf['forcing'] = 'TARBALL'
+            fp_conf['forcing'] = args.forcings
+        elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
+            nwm_conf = {}
+            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
         else:
             if (datetime.now() - start_realization_dt).days > 30:
                 retro_or_op = "retrospective"
@@ -215,6 +218,13 @@ def create_confs(conf,args,realization):
 
     data['time']['start_time'] = start_realization
     data['time']['end_time']   = end_realization
+    data['global']['forcing']['path'] = "./forcings"
+    if args.forcings.endswith(".tar.gz"):
+        data['global']['forcing']['file_pattern'] = ".*{{id}}.*.csv"
+        data['global']['forcing']['provider'] = "CsvPerFeature"
+    else:
+        if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
+        data['global']['forcing']['provider'] = "NetCDF"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization.json')
 
@@ -226,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", help="Set the data directory",default="")
     parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
     parser.add_argument("--resource_path", help="Set the resource directory",default="")
-    parser.add_argument("--forcings_tar", help="Set the end date",default="")
+    parser.add_argument("--forcings", help="Set the forcings file or directory",default="")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
     parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
