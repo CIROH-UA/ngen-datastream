@@ -63,8 +63,8 @@ def validate_catchment_files(validations, catchments):
                 nc_file = files[0]
                 with xr.open_dataset(os.path.join(forcing_dir,nc_file)) as ngen_forcings:
                     df = ngen_forcings['precip_rate']
-                    forcings_start = datetime.strptime(ngen_forcings.time.values[0],'%Y-%m-%d %H:%M:%S')
-                    forcings_end   = datetime.strptime(ngen_forcings.time.values[-1],'%Y-%m-%d %H:%M:%S')
+                    forcings_start = datetime.fromtimestamp(ngen_forcings.Time.values[0,0])
+                    forcings_end   = datetime.fromtimestamp(ngen_forcings.Time.values[0,-1])
                     check_forcings(forcings_start,forcings_end,len(ngen_forcings.time.values))
                     continue
 
@@ -115,9 +115,12 @@ def validate_data_dir(data_dir):
     global forcing_dir, config_dir, validate_type_names
     forcing_dir    = os.path.join(relative_dir,serialized_realization.global_config.forcing.path)
     config_dir     = os.path.join(data_dir,"config","cat_config")
-    forcing_files  = [x for _,_,x in os.walk(forcing_dir)]
-    if len(forcing_files) == 0: raise Exception(f"No forcing files in {forcing_dir}")
-    forcing_files  = sorted(forcing_files[0])    
+    if os.path.isdir(forcing_dir):
+        forcing_files  = [x for _,_,x in os.walk(forcing_dir)]
+        if len(forcing_files) == 0: raise Exception(f"No forcing files in {forcing_dir}")
+        forcing_files  = sorted(forcing_files[0])                   
+    else:
+        forcing_files = [forcing_dir]
 
     jdir_dict = {"CFE":"CFE",
                  "PET":"PET",
@@ -159,13 +162,13 @@ def validate_data_dir(data_dir):
         jcatchments = catchment_list[i:k]
         catchment_list_list.append(jcatchments)
         i = k
-    validate_catchment_files(val_dict_list[0],catchment_list_list[0])
-    # with cf.ProcessPoolExecutor() as pool:
-    #     for results in pool.map(
-    #         validate_catchment_files,
-    #         val_dict_list,
-    #         catchment_list_list):
-    #         pass    
+    # validate_catchment_files(val_dict_list[0],catchment_list_list[0])
+    with cf.ProcessPoolExecutor() as pool:
+        for results in pool.map(
+            validate_catchment_files,
+            val_dict_list,
+            catchment_list_list):
+            pass    
 
     print(f'\nNGen run folder is valid\n',flush = True)        
 
