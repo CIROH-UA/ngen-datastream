@@ -616,34 +616,69 @@ def write_netcdf(data, vpu, t_ax, catchments):
     else:
         nc_filename = Path(forcing_path,f'{vpu}_forcings.nc')
 
-    ds = xr.Dataset(
-        data_vars={
-            "UGRD_10maboveground": (["time", "catchment_id"], data[:, 0, :]),
-            "VGRD_10maboveground": (["time", "catchment_id"], data[:, 1, :]),
-            "DLWRF_surface": (["time", "catchment_id"], data[:, 2, :]),
-            "APCP_surface": (["time", "catchment_id"], data[:, 3, :]),
-            "precip_rate": (["time", "catchment_id"], data[:, 4, :]),
-            "TMP_2maboveground": (["time", "catchment_id"], data[:, 5, :]),
-            "SPFH_2maboveground": (["time", "catchment_id"], data[:, 6, :]),
-            "PRES_surface": (["time", "catchment_id"], data[:, 7, :]),
-            "DSWRF_surface": (["time", "catchment_id"], data[:, 8, :]),
-        },
-        coords={
-            "time": t_ax,
-            "forcing_var": ngen_variables,
-            "catchment_id": list(catchments),
-        },
-    )
+    data = np.transpose(data,(2,1,0))
 
-    
+    t_utc = np.array([datetime.timestamp(datetime.strptime(jt,'%Y-%m-%d %H:%M:%S')) for jt in t_ax],dtype=np.float64)
+
+    catchments = np.array(catchments,dtype='str')
+    import netCDF4 as nc
+
     if storage_type == 's3':
         bucket, key = convert_url2key(nc_filename,s3_client)
         with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
-            ds.to_netcdf(tmpfile.name, format='NETCDF4')
-            tmpfile.seek(0)
-            s3_client.upload_file(tmpfile.name, bucket, key)
+            with nc.Dataset(tmpfile, 'w', format='NETCDF4') as ds:
+                catchment_dim = ds.createDimension('catchment-id', len(catchments))
+                time_dim = ds.createDimension('time', len(t_utc))
+                ids_var = ds.createVariable('ids', str, ('catchment-id',))
+                time_var = ds.createVariable('Time', 'f8', ('catchment-id', 'time'))
+                ugrd_var = ds.createVariable('UGRD_10maboveground', 'f4', ('catchment-id', 'time'))
+                vgrd_var = ds.createVariable('VGRD_10maboveground', 'f4', ('catchment-id', 'time'))
+                dlwrf_var = ds.createVariable('DLWRF_surface', 'f4', ('catchment-id', 'time'))
+                apcp_var = ds.createVariable('APCP_surface', 'f4', ('catchment-id', 'time'))
+                precip_var = ds.createVariable('precip_rate', 'f4', ('catchment-id', 'time'))
+                tmp_var = ds.createVariable('TMP_2maboveground', 'f4', ('catchment-id', 'time'))
+                spfh_var = ds.createVariable('SPFH_2maboveground', 'f4', ('catchment-id', 'time'))
+                pres_var = ds.createVariable('PRES_surface', 'f4', ('catchment-id', 'time'))
+                dswrf_var = ds.createVariable('DSWRF_surface', 'f4', ('catchment-id', 'time'))
+                ids_var[:] = catchments
+                time_var[:, :] = np.tile(t_utc, (len(catchments), 1))
+                ugrd_var[:, :] = data[:, 0, :]
+                vgrd_var[:, :] = data[:, 1, :]
+                dlwrf_var[:, :] = data[:, 2, :]
+                apcp_var[:, :] = data[:, 3, :]
+                precip_var[:, :] = data[:, 4, :]
+                tmp_var[:, :] = data[:, 5, :]
+                spfh_var[:, :] = data[:, 6, :]
+                pres_var[:, :] = data[:, 6, :]
+                dswrf_var[:, :] = data[:, 7, :]
+                tmpfile.seek(0)
+                s3_client.upload_file(tmpfile.name, bucket, key)
     else:
-        ds.to_netcdf(nc_filename) 
+        with nc.Dataset(nc_filename, 'w', format='NETCDF4') as ds:
+            catchment_dim = ds.createDimension('catchment-id', len(catchments))
+            time_dim = ds.createDimension('time', len(t_utc))
+            ids_var = ds.createVariable('ids', str, ('catchment-id',))
+            time_var = ds.createVariable('Time', 'f8', ('catchment-id', 'time'))
+            ugrd_var = ds.createVariable('UGRD_10maboveground', 'f4', ('catchment-id', 'time'))
+            vgrd_var = ds.createVariable('VGRD_10maboveground', 'f4', ('catchment-id', 'time'))
+            dlwrf_var = ds.createVariable('DLWRF_surface', 'f4', ('catchment-id', 'time'))
+            apcp_var = ds.createVariable('APCP_surface', 'f4', ('catchment-id', 'time'))
+            precip_var = ds.createVariable('precip_rate', 'f4', ('catchment-id', 'time'))
+            tmp_var = ds.createVariable('TMP_2maboveground', 'f4', ('catchment-id', 'time'))
+            spfh_var = ds.createVariable('SPFH_2maboveground', 'f4', ('catchment-id', 'time'))
+            pres_var = ds.createVariable('PRES_surface', 'f4', ('catchment-id', 'time'))
+            dswrf_var = ds.createVariable('DSWRF_surface', 'f4', ('catchment-id', 'time'))
+            ids_var[:] = catchments
+            time_var[:, :] = np.tile(t_utc, (len(catchments), 1))
+            ugrd_var[:, :] = data[:, 0, :]
+            vgrd_var[:, :] = data[:, 1, :]
+            dlwrf_var[:, :] = data[:, 2, :]
+            apcp_var[:, :] = data[:, 3, :]
+            precip_var[:, :] = data[:, 4, :]
+            tmp_var[:, :] = data[:, 5, :]
+            spfh_var[:, :] = data[:, 6, :]
+            pres_var[:, :] = data[:, 6, :]
+            dswrf_var[:, :] = data[:, 7, :]
         print(f'netcdf has been written to {nc_filename}')    
 
 def multiprocess_write_netcdf(data, jcatchment_dict, t_ax):  
