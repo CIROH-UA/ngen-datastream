@@ -9,7 +9,7 @@ certifi==2024.7.4
 cftime==1.6.4
 charset-normalizer==3.3.2
 decorator==5.1.1
--e git+https://github.com/JordanLaserGit/ngen-datastream.git@b984f79a95ad9118d5dfd45ba26fcefc29466d20#egg=forcingprocessor&subdirectory=forcingprocessor
+-e git+https://github.com/JordanLaserGit/ngen-datastream.git@0ee32ebcde2c5a79e938a000e3d4bf7b46c77d26#egg=forcingprocessor&subdirectory=forcingprocessor
 frozenlist==1.4.1
 fsspec==2024.6.1
 gcsfs==2024.6.1
@@ -27,6 +27,7 @@ h5py==3.11.0
 idna==3.7
 jmespath==1.0.1
 multidict==6.0.5
+netCDF4==1.7.1.post1
 numpy==2.0.0
 nwmurl==0.2.3
 oauthlib==3.2.2
