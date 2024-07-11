@@ -217,14 +217,15 @@ def create_confs(conf,args,realization):
         data = json.load(fp)
 
     data['time']['start_time'] = start_realization
-    data['time']['end_time']   = end_realization
-    data['global']['forcing']['path'] = "./forcings"
+    data['time']['end_time']   = end_realization    
     if args.forcings.endswith(".tar.gz"):
         data['global']['forcing']['file_pattern'] = ".*{{id}}.*.csv"
+        data['global']['forcing']['path'] = "./forcings"
         data['global']['forcing']['provider'] = "CsvPerFeature"
     else:
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         data['global']['forcing']['provider'] = "NetCDF"
+        data['global']['forcing']['path'] = "./forcings/1_forcings.nc"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization.json')
 
