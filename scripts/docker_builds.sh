@@ -19,7 +19,7 @@ while getopts "p:" opt; do
   esac
 done
 TAG="latest$PLATORM_TAG"
-DATASTREAM_DOCKER="$DATASTREAM_PATH"/docker_local
+DATASTREAM_DOCKER="$DATASTREAM_PATH"/docker
 cd $DATASTREAM_DOCKER
 echo "Building docker from "$DATASTREAM_DOCKER
 docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=$TAG --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM 
