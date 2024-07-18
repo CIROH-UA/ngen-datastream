@@ -19,7 +19,6 @@ else \
 fi
 sudo $PKG_MNGR update -y
 sudo $PKG_MNGR install ./mount-s3.rpm git pip pigz awscli python -y
-tar -xzvf hfsubset-linux_amd64.tar.gz
 rm hfsubset-linux_amd64.tar.gz mount-s3.rpm
 sudo mv hfsubset /usr/bin/hfsubset
 git clone https://github.com/CIROH-UA/ngen-datastream.git
