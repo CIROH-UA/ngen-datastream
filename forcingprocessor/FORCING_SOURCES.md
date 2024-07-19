@@ -15,4 +15,4 @@ Retrospective forcings sources
 * 1: "https://noaa-nwm-retrospective-2-1-pds.s3.amazonaws.com/" :white_check_mark:
 * 2: "s3://noaa-nwm-retrospective-2-1-pds/model_output/" :white_check_mark:
 * 3: "https://ciroh-nwm-zarr-retrospective-data-copy.s3.amazonaws.com/noaa-nwm-retrospective-2-1-zarr-pds/"
-* 4: "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/CONUS/netcdf/" (:white_check_mark: , [issue 52](https://github.com/CIROH-UA/nwmurl/issues/52))
+* 4: "https://noaa-nwm-retrospective-3-0-pds.s3.amazonaws.com/CONUS/netcdf/" ( :white_check_mark: , [issue 52](https://github.com/CIROH-UA/nwmurl/issues/52))
