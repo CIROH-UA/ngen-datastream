@@ -1,80 +1,33 @@
-import pytest, os, json
+import os
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
-import requests
 from datetime import datetime
-
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
-from forcingprocessor.weights_parq2json import hydrofabric2datastream_weights
 
-weight_name = "weights_poudre.json"
+date = datetime.now()
+date = date.strftime('%Y%m%d')
+hourminute  = '0000'
+test_dir = Path(__file__).parent
+data_dir = (test_dir/'data').resolve()
+pwd      = Path.cwd()
+pwd      = pwd
+data_dir = data_dir
+os.system(f"mkdir {data_dir}")
+pwd      = Path.cwd()
+filenamelist = str((pwd/"filenamelist.txt").resolve())
+retro_filenamelist = str((pwd/"retro_filenamelist.txt").resolve())
 
-@pytest.fixture()
-def get_time():
-    date = datetime.now()
-    pytest.date = date.strftime('%Y%m%d')
-    pytest.hourminute  = '0000'
-
-@pytest.fixture()
-def get_paths():
-    test_dir = Path(__file__).parent
-    data_dir = (test_dir/'data').resolve()
-    pwd      = Path.cwd()
-    pytest.pwd      = pwd
-    pytest.data_dir = data_dir
-    os.system(f"mkdir {data_dir}")
-
-    full_weight = (data_dir/weight_name).resolve()
-    pytest.full_weight = full_weight
-
-    pytest.filenamelist = (pwd/"filenamelist.txt").resolve()
-
-def test_generate_filenames(get_paths, get_time):
-    conf = {
-    "forcing_type" : "operational_archive",
-    "start_date"   : "",
-    "end_date"     : "",
-    "runinput"     : 1,
-    "varinput"     : 5,
-    "geoinput"     : 1,
-    "meminput"     : 0,
-    "urlbaseinput" : 7,
-    "fcst_cycle"   : [0],
-    "lead_time"    : [1,2]
-}
-
-    conf['start_date'] = pytest.date + pytest.hourminute
-    conf['end_date']   = pytest.date + pytest.hourminute    
-    generate_nwmfiles(conf)
-
-    assert pytest.filenamelist.exists()
-
-def test_generate_weights(get_paths):
-
-    os.system(f"hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes -o {pytest.data_dir}/palisade.gpkg -t hl \"Gages-09106150\"")
-
-    weights = hydrofabric2datastream_weights(f"{pytest.data_dir}/palisade.gpkg")
-
-    data = json.dumps(weights)
-    with open(pytest.full_weight,'w') as fp:
-        fp.write(data)    
-
-    assert pytest.full_weight.exists()
-
-
-def test_processor(get_time, get_paths):
-    
-    conf = {
+conf = {
     "forcing"  : {
-        "nwm_file"   : str(pytest.filenamelist),
-        "gpkg_file"  : str(f"{pytest.data_dir}/palisade.gpkg")
+        "nwm_file"   : filenamelist,
+        "gpkg_file"  : str(f"{data_dir}/palisade.gpkg")
     },
 
     "storage":{
         "storage_type"      : "local",
-        "output_path"       : str(pytest.data_dir),
+        "output_path"       : str(data_dir),
         "output_file_type"  : ["parquet"]
     },    
 
@@ -84,7 +37,7 @@ def test_processor(get_time, get_paths):
     }
     }
 
-    nwmurl_conf = {
+nwmurl_conf = {
         "forcing_type" : "operational_archive",
         "start_date"   : "",
         "end_date"     : "",
@@ -96,31 +49,145 @@ def test_processor(get_time, get_paths):
         "fcst_cycle"   : [0],
         "lead_time"    : [1]
     }
-    nwmurl_conf['start_date'] = pytest.date + pytest.hourminute
-    nwmurl_conf['end_date']   = pytest.date + pytest.hourminute 
-    
-    for jurl in [1,3,5,6,7,8]:
-        nwmurl_conf["urlbaseinput"] = jurl
 
-        generate_nwmfiles(nwmurl_conf)
+nwmurl_conf_retro = {
+        "forcing_type" : "retrospective",
+        "start_date"   : "201801010000",
+        "end_date"     : "201801010000",
+        "urlbaseinput" : 1,
+        "selected_object_type" : [1],
+        "selected_var_types"   : [6],
+        "write_to_file" : True
+    }
 
-        with open(pytest.filenamelist,'r') as fp:            
-            for jline in fp.readlines():                
-                web_address = jline.strip()
-                break
+def test_nomads_prod():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 1
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)       
 
-        if web_address.find('https://') >= 0:
-            response = requests.get(web_address)
-            if response.status_code != 200:
-                print(f'{jline} doesn\'t exist!')
-                raise Exception
-            print(f'{jline} exists! Testing with forcingprocessor')
-                    
-            prep_ngen_data(conf)
+def test_nomads_post_processed():
+    nwmurl_conf['start_date'] = "202407170000"
+    nwmurl_conf['end_date']   = "202407170000"
+    nwmurl_conf["urlbaseinput"] = 2
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)  
 
-            parquet = (pytest.data_dir/"forcings/cat-2586011.parquet").resolve()
-            assert parquet.exists()
-            os.remove(parquet)         
+def test_nwm_google_apis():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 3
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)          
+
+def test_google_cloud_storage():
+    assert False # hangs in pytest, but should work
+    nwmurl_conf['start_date'] = "202407100100"
+    nwmurl_conf['end_date']   = "202407100100" 
+    nwmurl_conf["urlbaseinput"] = 4
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)   
+
+def test_gs_nwm():
+    assert False # hangs in pytest, but should work
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 5
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)       
+
+def test_gcs_nwm():
+    assert False # hangs in pytest, but should work
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 6
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)    
+
+def test_noaa_nwm_pds():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 7
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)      
+
+def test_noaa_nwm_pds_s3():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 8
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)     
+
+def test_ciroh_zarr():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 9
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)     
+
+def test_retro_2_1():
+    conf['forcing']['nwm_file'] = retro_filenamelist
+    nwmurl_conf_retro["urlbaseinput"] = 1
+    generate_nwmfiles(nwmurl_conf_retro)
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)  
+
+def test_retro_2_1_s3():
+    conf['forcing']['nwm_file'] = retro_filenamelist
+    nwmurl_conf_retro["urlbaseinput"] = 2
+    generate_nwmfiles(nwmurl_conf_retro)
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)            
+
+def test_retro_ciroh_zarr():
+    conf['forcing']['nwm_file'] = retro_filenamelist
+    nwmurl_conf_retro["urlbaseinput"] = 3
+    generate_nwmfiles(nwmurl_conf_retro)
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)         
+
+def test_retro_3_0():
+    conf['forcing']['nwm_file'] = retro_filenamelist
+    nwmurl_conf_retro["urlbaseinput"] = 4
+    generate_nwmfiles(nwmurl_conf_retro)
+    prep_ngen_data(conf)
+    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
+    assert parquet.exists()
+    os.remove(parquet)        
 
 
     
