@@ -219,15 +219,19 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
 
         topen += time.perf_counter() - t0
         t0 = time.perf_counter()  
-        with xr.open_dataset(file_obj, engine=eng) as nwm_data:
+        with xr.open_dataset(file_obj) as nwm_data:
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()                     
             shp = nwm_data["U2D"].shape   
             data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float32)       
-            for var_dx, jvar in enumerate(nwm_variables):                
-                data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
-            time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
-            t = time_splt[0] + " " + time_splt[1]
+            for var_dx, jvar in enumerate(nwm_variables):  
+                if "retrospective-2-1" in nwm_file:
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max + 1), south_north=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
+                    t = datetime.strftime(datetime.strptime(nwm_file.split('/')[-1].split('.')[0],'%Y%m%d%H'),'%Y-%m-%d %H:%M:%S')
+                else:                            
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
+                    time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
+                    t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
         del nwm_data
         tfill += time.perf_counter() - t0        
@@ -649,8 +653,8 @@ def write_netcdf(data, vpu, t_ax, catchments):
                 precip_var[:, :] = data[:, 4, :]
                 tmp_var[:, :] = data[:, 5, :]
                 spfh_var[:, :] = data[:, 6, :]
-                pres_var[:, :] = data[:, 6, :]
-                dswrf_var[:, :] = data[:, 7, :]
+                pres_var[:, :] = data[:, 7, :]
+                dswrf_var[:, :] = data[:, 8, :]
                 tmpfile.seek(0)
                 s3_client.upload_file(tmpfile.name, bucket, key)
     else:
@@ -677,8 +681,8 @@ def write_netcdf(data, vpu, t_ax, catchments):
             precip_var[:, :] = data[:, 4, :]
             tmp_var[:, :] = data[:, 5, :]
             spfh_var[:, :] = data[:, 6, :]
-            pres_var[:, :] = data[:, 6, :]
-            dswrf_var[:, :] = data[:, 7, :]
+            pres_var[:, :] = data[:, 7, :]
+            dswrf_var[:, :] = data[:, 8, :]
         print(f'netcdf has been written to {nc_filename}')    
 
 def multiprocess_write_netcdf(data, jcatchment_dict, t_ax):  
@@ -866,7 +870,7 @@ def prep_ngen_data(conf):
     nfiles = len(nwm_forcing_files)
 
     global fs_type
-    if 's3://' in nwm_forcing_files[0] or 's3.amazonaws' in nwm_forcing_files[0]:
+    if 's3://' in nwm_forcing_files[0] in nwm_forcing_files[0]:
         fs = s3fs.S3FileSystem(
             anon=True,
             client_kwargs={'region_name': 'us-east-1'}
@@ -896,7 +900,7 @@ def prep_ngen_data(conf):
         end   = min(start + nfile_chunk,nfiles)
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
-        if ii_verbose: print(f'Entering data extraction...\n',flush=True)        
+        if ii_verbose: print(f'Entering data extraction...\n',flush=True)   
         data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
