@@ -5,7 +5,7 @@ Operational forcings sources
 * 2: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/post-processed/WMS/"
 * 3: "https://storage.googleapis.com/national-water-model/" :white_check_mark:
 * 4: "https://storage.cloud.google.com/national-water-model/" :white_check_mark:
-* 5: "gs://national-water-model/"
+* 5: "gs://national-water-model/" :white_check_mark:
 * 6: "gcs://national-water-model/" :white_check_mark:
 * 7: "https://noaa-nwm-pds.s3.amazonaws.com/" :white_check_mark:
 * 8: "s3://noaa-nwm-pds/" :white_check_mark:
