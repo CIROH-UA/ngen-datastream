@@ -1,0 +1,40 @@
+{
+    "forcing"  : {
+        "nwm_file"     : "/mounted_dir/filenamelist.txt",
+        "weight_file"  : [
+            "s3://ngen-datastream/resources/v20.1/VPU_01/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_02/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_03N/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_03S/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_03W/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_04/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_05/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_06/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_07/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_08/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_09/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_10L/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_10U/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_11/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_12/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_13/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_14/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_15/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_16/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_17/weights.json",
+            "s3://ngen-datastream/resources/v20.1/VPU_18/weights.json"
+        ]
+        
+    },
+
+    "storage":{
+        "output_path"      : "s3://ngen-datastream/forcings/v20.1/20240408",
+        "output_file_type" : ["tar"]
+    },    
+
+    "run" : {
+        "verbose"       : true,
+        "collect_stats" : true,
+        "nprocs"        : 2
+    }
+}
