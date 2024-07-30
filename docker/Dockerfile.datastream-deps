@@ -1,31 +1,40 @@
 FROM amazonlinux:2023 as datastream-base
 
-RUN dnf -y install pigz tar git python pip
-ARG ARCH
-RUN if [[ "${ARCH}" == "aarch64" ]]; then \
-        dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-pip \
-            python-devel openssl-devel tcl libtiff-devel libcurl-devel \
-            swig libpng-devel libjpeg-turbo-devel expat-devel \
-        && dnf clean all \
-        && pip3 install setuptools numpy \
-        && wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz \
-        && tar zxvf proj-9.3.1.tar.gz \
-        && cd proj-9.3.1/ \
-        && mkdir build  \
-        && cd build  \
-        && cmake .. \
-        && cmake --build . --parallel $(nproc)  \
-        && cmake --install . --prefix /usr  \
-        && cd ~  \
-        && wget https://github.com/OSGeo/gdal/releases/download/v3.8.3/gdal-3.8.3.tar.gz  \
-        && tar xvzf gdal-3.8.3.tar.gz  \
-        && cd gdal-3.8.3/  \
-        && mkdir build  \
-        && cd build  \
-        && cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF .. \
-        && cmake --build . --parallel $(nproc)  \
-        && cmake --install . --prefix /usr ; \
-        else \
-        echo ""; \
-        fi
+RUN dnf -y install pigz tar git python3 python3-pip
 
+ARG ARCH
+RUN if [ "${ARCH}" = "aarch64" ]; then \
+        dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
+        dnf clean all && \
+        pip3 install setuptools numpy && \
+        wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz && \
+        tar zxvf proj-9.3.1.tar.gz && \
+        cd proj-9.3.1 && \
+        mkdir build && \
+        cd build && \
+        cmake .. && \
+        cmake --build . --parallel $(nproc) && \
+        cmake --install . --prefix /usr && \
+        cd ../.. && \
+        rm -rf proj-9.3.1 proj-9.3.1.tar.gz && \
+        wget https://github.com/OSGeo/gdal/releases/download/v3.8.3/gdal-3.8.3.tar.gz && \
+        tar xvzf gdal-3.8.3.tar.gz && \
+        cd gdal-3.8.3 && \
+        mkdir build && \
+        cd build && \
+        cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF .. && \
+        cmake --build . --parallel $(nproc) && \
+        cmake --install . --prefix /usr && \
+        cd ../.. && \
+        rm -rf gdal-3.8.3 gdal-3.8.3.tar.gz && \
+        dnf -y install python3.11-devel python3-Cython && \
+        wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz && \
+        tar zxvf hdf5-1.14.3.tar.gz && \
+        cd hdf5-1.14.3 && \
+        ./configure --prefix=/usr && \
+        make -j$(nproc) && \
+        make install && \
+        cd .. && \
+        rm -rf hdf5-1.14.3 hdf5-1.14.3.tar.gz && \
+        HDF5_DIR=/usr pip3 install --no-binary=h5py h5py; \
+    fi
