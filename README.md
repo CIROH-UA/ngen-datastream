@@ -18,8 +18,9 @@ Either provide a datastream configuration file
 or run with cli args
   -s, --START_DATE          <YYYYMMDDHHMM or "DAILY"> 
   -e, --END_DATE            <YYYYMMDDHHMM> 
+  -C, --FORCING_SOURCE      <Forcing source option> 
   -D, --DOMAIN_NAME         <Name for spatial domain> 
-  -g, --GEOPACAKGE          <Path to geopackage file> 
+  -g, --GEOPACKAGE          <Path to geopackage file> 
   -I, --SUBSET_ID           <Hydrofabric id to subset>  
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
   -v, --HYDROFABRIC_VERSION <Hydrofabric version> 
@@ -27,12 +28,12 @@ or run with cli args
   -d, --DATA_DIR            <Path to write to> 
   -r, --RESOURCE_DIR        <Path to resource directory> 
   -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> 
-  -F, --NGEN_FORCINGS       <Path to ngen forcings directory/tarball/netcdf> 
+  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> 
   -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> 
   -S, --S3_MOUNT            <Path to mount s3 bucket to>  
-  -o, --S3_PREFIX           <File prefix within s3 mount>
+  -o, --S3_PREFIX           <File prefix within s3 mount> 
   -n, --NPROCS              <Process limit> 
-  -y, --DRYRUN              <True to skip calculations>
+  -y, --DRYRUN              <True to skip calculations> 
 ```
 First, obtain a hydrofabric file for the guage you wish to model. For example for Palisade, Colorado:
 ```
@@ -50,6 +51,7 @@ To see what's happening in `ngen-datastream` step-by-step, see the [breakdown do
 |---------------------|--------------------------|------|
 | START_DATE          | Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
 | END_DATE            | End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
+| FORCING_SOURCE | Select the forcings data provider. Options include NWM_RETRO_V2, NWM_RETRO_V3, NWM_OPERATIONAL_V3, NOMADS_OPERATIONAL| :white_check_mark: |
 | DOMAIN_NAME         | Name for spatial domain in run, stripped from gpkg if not supplied |  |
 | GEOPACKAGE          | Path to hydrofabric, can be s3URI, URL, or local file. Generate file with [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) or use SUBSET args. | Required here or file exists in `RESOURCE_DIR/config` |
 | SUBSET_ID_TYPE      | id type corresponding to "id" [See hfsubset for options](https://github.com/LynkerIntel/hfsubset?tab=readme-ov-file#cli-option) | Required here if user is not providing GEOPACKAGE and GEOPACKAGE_ATTR. |
