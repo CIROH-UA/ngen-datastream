@@ -114,14 +114,14 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op,g
 
     return fp_conf
 
-def create_conf_nwm(start, end, retro_or_op):
+def create_conf_nwm(start, end, retro_or_op,urlbaseinput):
 
     if retro_or_op == "retrospective":
         nwm_conf = {
         "forcing_type" : "retrospective",
         "start_date"   : start,
         "end_date"     : end,
-        "urlbaseinput" : 4,
+        "urlbaseinput" : urlbaseinput,
         "selected_object_type" : [1],
         "selected_var_types"   : [6],
         "write_to_file"        : True
@@ -143,7 +143,7 @@ def create_conf_nwm(start, end, retro_or_op):
             "varinput"     : 5,
             "geoinput"     : 1,
             "meminput"     : 0,
-            "urlbaseinput" : 7,
+            "urlbaseinput" : urlbaseinput,
             "fcst_cycle"   : [0],
             "lead_time"    : [x+1 for x in range(num_hrs)]
         }
@@ -170,7 +170,7 @@ def create_confs(conf,args,realization):
         end = tomorrow.strftime('%Y%m%d%H%M')
         start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
         end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
-        nwm_conf = create_conf_nwm(start, end, "operational")
+        nwm_conf = create_conf_nwm(start, end, "operational",7)
         fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,"operational",geo_base) 
     else: 
         start = conf['globals']['start_date']
@@ -187,11 +187,20 @@ def create_confs(conf,args,realization):
             nwm_conf = {}
             fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
         else:
-            if (datetime.now() - start_realization_dt).days > 30:
-                retro_or_op = "retrospective"
-            else:
-                retro_or_op = "operational"
-            nwm_conf = create_conf_nwm(start,end, retro_or_op)
+            if "OPERATIONAL" in args.forcing_source:    
+                retro_or_op = "operational"         
+                if "V3" in args.forcing_source:
+                    urlbaseinput = 7
+                if "NOMADS" in args.forcing_source:
+                    urlbaseinput = 1                   
+            elif "RETRO" in args.forcing_source:   
+                retro_or_op = "retrospective"          
+                if "V2" in args.forcing_source:
+                    urlbaseinput = 1
+                if "V3" in args.forcing_source:
+                    urlbaseinput = 4   
+            
+            nwm_conf = create_conf_nwm(start,end, retro_or_op,urlbaseinput)
             fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
 
     conf['nwmurl'] = nwm_conf 
@@ -238,6 +247,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
     parser.add_argument("--resource_path", help="Set the resource directory",default="")
     parser.add_argument("--forcings", help="Set the forcings file or directory",default="")
+    parser.add_argument("--forcing_source", help="Option for source of forcings",default="")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
     parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
