@@ -1,13 +1,11 @@
 certifi==2024.7.4
--e git+https://github.com/JordanLaserGit/ngen-datastream.git@b984f79a95ad9118d5dfd45ba26fcefc29466d20#egg=datastream&subdirectory=python
 f90nml==1.4.4
 geojson-pydantic==0.6.3
 geopandas==1.0.1
 h5netcdf==1.3.0
 h5py==3.11.0
-ngen.config @ git+https://github.com/noaa-owp/ngen-cal@adf01ef8738b43952e5465198a715db6abf749b0#subdirectory=python/ngen_conf
-ngen.config_gen @ git+https://github.com/noaa-owp/ngen-cal@adf01ef8738b43952e5465198a715db6abf749b0#subdirectory=python/ngen_config_gen
-ngen.init_config @ git+https://github.com/noaa-owp/ngen-cal@adf01ef8738b43952e5465198a715db6abf749b0#subdirectory=python/ngen_init_config
+ngen.config @ git+https://github.com/noaa-owp/ngen-cal@master#subdirectory=python/ngen_conf
+ngen.config_gen @ git+https://github.com/noaa-owp/ngen-cal@master#subdirectory=python/ngen_config_gen
 numpy==2.0.0
 packaging==24.1
 pandas==2.2.2

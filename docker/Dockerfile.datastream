@@ -1,7 +1,7 @@
 ARG TAG_NAME
 FROM awiciroh/datastream-deps:${TAG_NAME} as datastream_base
 RUN git clone https://github.com/CIROH-UA/ngen-datastream.git
-RUN pip3 install -e "/ngen-datastream/python"
+RUN pip3 install -r "/ngen-datastream/python/requirements39.txt"
 
 RUN groupadd -r mygroup && useradd -r -g mygroup myuser
 RUN chown -R myuser:mygroup /ngen-datastream
