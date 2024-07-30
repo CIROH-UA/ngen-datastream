@@ -37,7 +37,7 @@ or run with cli args
 ```
 First, obtain a hydrofabric file for the guage you wish to model. For example for Palisade, Colorado:
 ```
-hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o ./data/hydrofabric_2.1.1/palisade.gpkg -t hl "Gages-09106150"
+hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o ./palisade.gpkg -t hl "Gages-09106150"
 ```
 Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```

@@ -8,8 +8,7 @@ RUN if [[ "${ARCH}" == "aarch64" ]]; then \
             swig libpng-devel libjpeg-turbo-devel expat-devel \
         && dnf clean all \
         && pip3 install setuptools numpy \
-        && wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz \
-        && tar zxvf proj-9.3.1.tar.gz \
+        && wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz \        && tar zxvf proj-9.3.1.tar.gz \
         && cd proj-9.3.1/ \
         && mkdir build  \
         && cd build  \
@@ -24,8 +23,16 @@ RUN if [[ "${ARCH}" == "aarch64" ]]; then \
         && cd build  \
         && cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF .. \
         && cmake --build . --parallel $(nproc)  \
-        && cmake --install . --prefix /usr ; \
+        && cmake --install . --prefix /usr \
+        && dnf -y install python3.11-devel python3-Cython \
+        && wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz \
+        && tar zxvf hdf5-1.14.3.tar.gz \
+        && cd hdf5-1.14.3 \
+        && ./configure -prefix=/usr \
+        && make -j -l6 \
+        && make install \
+        && cd ~ \
+        && HDF5_DIR=/usr pip3 install --no-binary=h5py h5py ; \
         else \
         echo ""; \
         fi
-
