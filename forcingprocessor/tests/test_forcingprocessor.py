@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from datetime import datetime
@@ -91,7 +90,7 @@ def test_nwm_google_apis():
     os.remove(parquet)          
 
 def test_google_cloud_storage():
-    assert False # hangs in pytest, but should work
+    # assert False # hangs in pytest, but should work
     nwmurl_conf['start_date'] = "202407100100"
     nwmurl_conf['end_date']   = "202407100100" 
     nwmurl_conf["urlbaseinput"] = 4
@@ -102,7 +101,7 @@ def test_google_cloud_storage():
     os.remove(parquet)   
 
 def test_gs_nwm():
-    assert False # hangs in pytest, but should work
+    # assert False # hangs in pytest, but should work
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 5
@@ -113,7 +112,7 @@ def test_gs_nwm():
     os.remove(parquet)       
 
 def test_gcs_nwm():
-    assert False # hangs in pytest, but should work
+    # assert False # hangs in pytest, but should work
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 6
@@ -144,6 +143,7 @@ def test_noaa_nwm_pds_s3():
     os.remove(parquet)     
 
 def test_ciroh_zarr():
+    assert False, "Not implemented"
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 9
@@ -172,6 +172,7 @@ def test_retro_2_1_s3():
     os.remove(parquet)            
 
 def test_retro_ciroh_zarr():
+    assert False, "Not implemented"
     conf['forcing']['nwm_file'] = retro_filenamelist
     nwmurl_conf_retro["urlbaseinput"] = 3
     generate_nwmfiles(nwmurl_conf_retro)
