@@ -213,7 +213,11 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
             file_obj   = fs.open(bucket_key, mode='rb')
         elif 'https://' in nwm_file:
             response = requests.get(nwm_file)
-            file_obj = BytesIO(response.content)
+            
+            if response.status_code == 200:
+                file_obj = BytesIO(response.content)
+            else:
+                raise Exception(f"{nwm_file} does not exist")
         else:
             file_obj = nwm_file
 
