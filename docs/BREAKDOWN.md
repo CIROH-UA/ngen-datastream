@@ -216,7 +216,7 @@ Now that we have performed each component of the datastream individually, let's 
     -i hl \
     -I Gages-09106150 \
     -v 2.1.1 \
-    -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_troute.json \
+    -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json \
     -d $(pwd)/palisade_2019
 ```
 

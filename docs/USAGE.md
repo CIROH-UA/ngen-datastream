@@ -20,4 +20,4 @@ These are not hard contraints, but rather should provide the user with a rough i
 
 Assuming the user is running over a domain of 10,000 catchments
 1) For runs with simulation duration of days to weeks (months to year), each process should have access to around 1 (4) GB of RAM. For example, 8 processes would need access to 8 (32) GB RAM.
-2) The ratio of runtime minutes to simulation time steps is ~1:10. In other words, a simulation with 24 hourly time steps should a few minutes to complete. This ratio will vary with hardware and run configuration.
+2) The ratio of runtime minutes to simulation time steps is ~1:10. In other words, a simulation with 24 hourly time steps should take a few minutes to complete. This ratio will vary with hardware and run configuration.
