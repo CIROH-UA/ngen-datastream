@@ -57,6 +57,18 @@ get_file() {
     fi
 }
 
+is_in_list() {
+  local var="$1"
+  shift
+  local list=("$@")
+  for item in "${list[@]}"; do
+    if [[ "$item" == "$var" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 log_time() {
     local LABEL="$1"
     local LOG="$2"
@@ -71,6 +83,7 @@ usage() {
     echo "or run with cli args"
     echo "  -s, --START_DATE          <YYYYMMDDHHMM or \"DAILY\"> "
     echo "  -e, --END_DATE            <YYYYMMDDHHMM> "
+    echo "  -C, --FORCING_SOURCE      <Forcing source option> "
     echo "  -D, --DOMAIN_NAME         <Name for spatial domain> "    
     echo "  -g, --GEOPACKAGE          <Path to geopackage file> "
     echo "  -I, --SUBSET_ID           <Hydrofabric id to subset>  "
@@ -93,6 +106,7 @@ usage() {
 CONF_FILE=""
 START_DATE=""
 END_DATE=""
+FORCING_SOURCE="NWM_RETRO_V3"
 DOMAIN_NAME=""
 GEOPACKAGE=""
 SUBSET_ID=""
@@ -111,6 +125,13 @@ DRYRUN="False"
 
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
+
+FORCING_SOURCE_OPTIONS=("NWM_RETRO_V2" "NWM_RETRO_V3" "NWM_OPERATIONAL_V3" "NOMADS_OPERATIONAL")
+if is_in_list "$FORCING_SOURCE" "${FORCING_SOURCE_OPTIONS[@]}"; then
+  :
+else
+  echo "FORCING_SOURCE $FORCING_SOURCE not among options: $FORCING_SOURCE_OPTIONS"
+fi
 
 if ! command -v ec2-metadata >/dev/null 2>&1; then
     HOST_TYPE="NON-AWS"
@@ -142,6 +163,7 @@ while [ "$#" -gt 0 ]; do
         -c|--CONF_FILE) CONF_FILE="$2"; shift 2;;    
         -s|--START_DATE) START_DATE="$2"; shift 2;;
         -e|--END_DATE) END_DATE="$2"; shift 2;;
+        -C|--FORCING_SOURCE) FORCING_SOURCE="$2"; shift 2;;
         -D|--DOMAIN_NAME) DOMAIN_NAME="$2"; shift 2;;
         -g|--GEOPACKAGE) GEOPACKAGE="$2"; shift 2;;
         -I|--SUBSET_ID) SUBSET_ID="$2"; shift 2;;
@@ -234,6 +256,7 @@ DATASTREAM_RESOURCES_NGENCONF="${DATASTREAM_RESOURCES%/}/config/"
 DATASTREAM_RESOURCES_NWMFORCINGS="${DATASTREAM_RESOURCES%/}/nwm-forcings/"
 DATASTREAM_RESOURCES_NGENFORCINGS="${DATASTREAM_RESOURCES%/}/ngen-forcings/"
 DATASTREAM_PROFILING="${DATASTREAM_META%/}/profile.txt"
+mkdir -p $DATASTREAM_RESOURCES
 mkdir -p $DATASTREAM_META
 touch $DATASTREAM_PROFILING
 echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
@@ -266,8 +289,7 @@ if [ ! -z $RESOURCE_DIR ]; then
     echo "running in lite mode"
     get_file "$RESOURCE_DIR" $DATASTREAM_RESOURCES
 else
-    echo "running in standard mode"
-    mkdir -p $DATASTREAM_RESOURCES
+    echo "running in standard mode"    
     mkdir -p $DATASTREAM_RESOURCES_NGENCONF
 fi  
 
@@ -405,7 +427,7 @@ echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
