@@ -38,3 +38,4 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
         rm -rf hdf5-1.14.3 hdf5-1.14.3.tar.gz && \
         HDF5_DIR=/usr pip3 install --no-binary=h5py h5py; \
     fi
+
