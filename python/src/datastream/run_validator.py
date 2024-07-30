@@ -6,7 +6,7 @@ import xarray as xr
 import geopandas
 geopandas.options.io_engine = "pyogrio"
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 import concurrent.futures as cf
 
 def check_forcings(forcings_start,forcings_end,n):
@@ -63,8 +63,8 @@ def validate_catchment_files(validations, catchments):
                 nc_file = files[0]
                 with xr.open_dataset(os.path.join(forcing_dir,nc_file)) as ngen_forcings:
                     df = ngen_forcings['precip_rate']
-                    forcings_start = datetime.fromtimestamp(ngen_forcings.Time.values[0,0])
-                    forcings_end   = datetime.fromtimestamp(ngen_forcings.Time.values[0,-1])
+                    forcings_start = datetime.fromtimestamp(ngen_forcings.Time.values[0,0],timezone.utc)
+                    forcings_end   = datetime.fromtimestamp(ngen_forcings.Time.values[0,-1],timezone.utc)
                     check_forcings(forcings_start,forcings_end,len(ngen_forcings.time.values))
                     continue
 
@@ -128,6 +128,8 @@ def validate_data_dir(data_dir):
 
     validate_files = {"forcing":{"pattern":serialized_realization.global_config.forcing.file_pattern,"files": forcing_files}}
     serialized_realization = NgenRealization.parse_file(realization_file)
+    serialized_realization.time.start_time = serialized_realization.time.start_time.replace(tzinfo=timezone.utc)
+    serialized_realization.time.end_time = serialized_realization.time.end_time.replace(tzinfo=timezone.utc)
     for jform in serialized_realization.global_config.formulations:
         for jmod in jform.params.modules:
             if jmod.params.model_name == "SLOTH": continue
@@ -162,13 +164,13 @@ def validate_data_dir(data_dir):
         jcatchments = catchment_list[i:k]
         catchment_list_list.append(jcatchments)
         i = k
-    # validate_catchment_files(val_dict_list[0],catchment_list_list[0])
-    with cf.ProcessPoolExecutor() as pool:
-        for results in pool.map(
-            validate_catchment_files,
-            val_dict_list,
-            catchment_list_list):
-            pass    
+    validate_catchment_files(val_dict_list[0],catchment_list_list[0])
+    # with cf.ProcessPoolExecutor() as pool:
+    #     for results in pool.map(
+    #         validate_catchment_files,
+    #         val_dict_list,
+    #         catchment_list_list):
+    #         pass    
 
     print(f'\nNGen run folder is valid\n',flush = True)        
 
