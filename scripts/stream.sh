@@ -426,7 +426,7 @@ DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Generating ngen-datastream metadata"
 CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
-    python $CONFIGURER \
+    python3 $CONFIGURER \
     --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
@@ -440,11 +440,11 @@ if [ ! -f "$PKL_FILE" ]; then
     if [ "$DRYRUN" == "True" ]; then
         echo "DRYRUN - NOAH PKL CALCULATION SKIPPED"
         echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
-            python $NOAHOWPPKL_GENERATOR \
+            python3 $NOAHOWPPKL_GENERATOR \
             --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config""
     else
         docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
-            python $NOAHOWPPKL_GENERATOR \
+            python3 $NOAHOWPPKL_GENERATOR \
             --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config"
     fi
 fi
@@ -455,12 +455,12 @@ if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NGEN BMI CONFIGURATION FILE CREATION SKIPPED"
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
         -u $(id -u):$(id -g) \
-        $DOCKER_TAG python $NGEN_CONFGEN \
+        $DOCKER_TAG python3 $NGEN_CONFGEN \
         --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json""
 else
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
         -u $(id -u):$(id -g) \
-        $DOCKER_TAG python $NGEN_CONFGEN \
+        $DOCKER_TAG python3 $NGEN_CONFGEN \
         --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json"
     TAR_NAME="ngen-bmi-configs.tar.gz"
     NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
@@ -507,7 +507,7 @@ else
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-            python "$DOCKER_FP"nwm_filenames_generator.py \
+            python3 "$DOCKER_FP"nwm_filenames_generator.py \
             "$DOCKER_MOUNT"/datastream-metadata/conf_nwmurl.json
         mv $DATASTREAM_RESOURCES/*filenamelist*.txt $DATASTREAM_META
     fi
@@ -517,12 +517,12 @@ else
         echo "COMMAND: docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-            python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
+            python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
     else
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-            python "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
+            python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
         mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
         log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
@@ -539,11 +539,11 @@ echo "Validating " $NGEN_RUN
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - VALIDATION SKIPPED"
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
-        $DOCKER_TAG python $VALIDATOR \
+        $DOCKER_TAG python3 $VALIDATOR \
         --data_dir $DOCKER_MOUNT"
 else
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
-        $DOCKER_TAG python $VALIDATOR \
+        $DOCKER_TAG python3 $VALIDATOR \
         --data_dir $DOCKER_MOUNT
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
