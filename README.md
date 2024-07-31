@@ -41,7 +41,7 @@ hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,
 ```
 Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
 ```
-./scripts/stream.sh -s 202406200100 -e 202406210000 -d $(pwd)/data/datastream_test -g $(pwd)/data/hydrofabric_2.1.1/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json -n 4
+./scripts/stream.sh -s 202406200100 -e 202406210000 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json -n 4
 ```
 To see what's happening in `ngen-datastream` step-by-step, see the [breakdown document](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/BREAKDOWN.md).
 
