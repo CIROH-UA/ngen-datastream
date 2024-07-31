@@ -35,7 +35,7 @@ or run with cli args
   -n, --NPROCS              <Process limit> 
   -y, --DRYRUN              <True to skip calculations> 
 ```
-First, obtain a hydrofabric file for the guage you wish to model. For example for Palisade, Colorado:
+First, obtain a hydrofabric file for the gage you wish to model. For example for Palisade, Colorado:
 ```
 hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o palisade.gpkg -t hl "Gages-09106150"
 ```
