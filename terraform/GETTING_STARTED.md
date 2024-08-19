@@ -4,7 +4,7 @@ This document will step users through standing up the AWS State Machine and exec
 You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/terraform#Building-AWS-State-Machine)
 
 ## Build an Amazon Machine Image
-Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/tree/main/terraform/AWS_BASICS#AMI) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream.
+Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/tree/main/terraform/AWS_BASICS.md#amazon-machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream.
 
 ### Launch instance
 Pick a region to launch your instance in, here it is `us-east-2`. Also pick a name, here `terraform_demo`. Select the Amazon Linux 2023 AMI as seen below.
