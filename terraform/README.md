@@ -23,7 +23,7 @@ terraform apply -var-file=./variables.tfvars
 ```
 aws stepfunctions start-execution \
 --state-machine-arn arn:aws:states:us-east-1:###:stateMachine:<sm_name> \
---name your-execution-name \
---input "file://$(pwd)/executions/execution_test_1.json" \
+--name <your-execution-name> \
+--input "file://<path-to-execution-json>" \
 --region us-east-1
 ```
