@@ -1,0 +1,40 @@
+{  
+  "commands"  : [
+    "runuser -l ec2-user -c '<first_command>'",
+    "runuser -l ec2-user -c '<subsequent_commands....>'"
+],
+  "run_options":{
+    "ii_detach_volume": false,
+    "check_s3": false
+},
+  "instance_parameters" :
+  {
+    "ImageId"            : "",
+    "InstanceType"       : "",
+    "KeyName"            : "",
+    "SecurityGroupIds"   : [""],
+    "IamInstanceProfile": {
+      "Name": ""
+    },
+    "TagSpecifications"   :[
+      {
+          "ResourceType": "instance",
+          "Tags": [
+              {
+                  "Key"   : "Name",
+                  "Value" : ""
+              }
+          ]
+      }
+  ],
+    "BlockDeviceMappings":[
+      {
+          "DeviceName": "/dev/xvda",  
+          "Ebs": {
+              "VolumeSize": 64,
+              "VolumeType": "gp2"  
+          }
+      }
+    ]
+  }
+}
