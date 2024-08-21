@@ -24,4 +24,11 @@ sudo $PKG_MNGR update -y
 sudo $PKG_MNGR install ./mount-s3.rpm git pip pigz awscli python -y
 rm mount-s3.rpm
 sudo mv hfsubset /usr/bin/hfsubset
-git clone https://github.com/CIROH-UA/ngen-datastream.git
+REPO_URL=https://github.com/CIROH-UA/ngen-datastream.git
+IS_REPO=$(git remote -v | grep $REPO_URL)
+if [ -n "$IS_REPO" ]; then
+    echo "Cloning git repo: $REPO_URL"; 
+    git clone $REPO_URL
+else
+    echo "Already in local git repo."; 
+fi
