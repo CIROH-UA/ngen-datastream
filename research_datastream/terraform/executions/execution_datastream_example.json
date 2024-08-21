@@ -1,0 +1,47 @@
+{  
+  "datastream_command_options" : {
+    "start_time"          : "202006200100",
+    "end_time"            : "202006210000",
+    "forcing_source"      : "NWM_RETRO_V3",
+    "nprocs"              : "4",
+    "subset_id_type"      : "hl",
+    "subset_id"           : "Gages-09106150",
+    "hydrofabric_version" : "2.1.1",
+    "s3_bucket"           : "ngen_datstream",
+    "object_prefix"       : "datastream_cloud_test"
+},
+  "run_options":{
+    "ii_detach_volume" : false,
+    "ii_check_s3"      : true
+},
+  "instance_parameters" :
+  {
+    "ImageId"            : "ami-05c2c89dfbcce18a2",
+    "InstanceType"       : "t4g.xlarge",
+    "KeyName"            : "",
+    "SecurityGroupIds"   : ["sg-0a289f9193764c2cd"],
+    "IamInstanceProfile": {
+      "Name": "datastream_ec2_profile_test"
+    },
+    "TagSpecifications"   :[
+      {
+          "ResourceType": "instance",
+          "Tags": [
+              {
+                  "Key"   : "Name",
+                  "Value" : "ds_test"
+              }
+          ]
+      }
+  ],
+    "BlockDeviceMappings":[
+      {
+          "DeviceName": "/dev/xvda",  
+          "Ebs": {
+              "VolumeSize": 32,
+              "VolumeType": "gp2"  
+          }
+      }
+    ]
+  }
+}
