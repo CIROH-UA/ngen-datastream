@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 USER=$(whoami)
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then \
