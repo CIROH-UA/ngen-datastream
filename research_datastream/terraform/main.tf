@@ -18,30 +18,66 @@ variable "lambda_invoke_policy_name" {}
 variable "sm_name" {}
 variable "sm_role_name" {}
 variable "ec2_role" {}
+variable "ec2_policy_name" {}
 variable "profile_name" {}
 
-resource "aws_iam_instance_profile" "instance_profile" {
-  name = var.profile_name
-  role = aws_iam_role.ec2_role.name
-}
-
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
 resource "aws_iam_role" "ec2_role" {
-  name               = var.ec2_role
-  path               = "/"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+  name                = var.ec2_role
+    assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_policy" "ec2_policy" {
+  name        = var.ec2_policy_name
+  description = "Policy with permissions for datastream EC2"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",          
+          "ssm:DescribeInstanceInformation",
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation",
+          "ssm:PutComplianceItems",
+          "ssm:UpdateInstanceInformation"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "iam:PassRole"  
+        ],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeTags"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_role_custom_policy_attach" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "ssm_policy_attachment" {
@@ -49,111 +85,12 @@ resource "aws_iam_role_policy_attachment" "ssm_policy_attachment" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-resource "aws_iam_policy_attachment" "datastream_attachment2" {
-  name       = "datastream_attachment2"
-  roles      = [aws_iam_role.ec2_role.name]
-  policy_arn = aws_iam_policy.datastreamlambda_policy.arn
+resource "aws_iam_instance_profile" "instance_profile" {
+  name = var.profile_name
+  role = aws_iam_role.ec2_role.name
 }
 
-resource "aws_iam_policy" "datastreamlambda_policy" {
-  name        = var.lambda_policy_name
-  description = "Policy with permissions for datastreamlambda"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Effect = "Allow",
-        Action = [
-          "iam:GetRole",
-          "iam:PassRole"
-        ],
-        Resource = "*"
-      },
-      {
-      Effect = "Allow"
-      Action = [
-        "ec2:DescribeInstances",
-        "ec2:StartInstances",
-        "ec2:StopInstances",
-        "ec2:TerminateInstances",
-        "ec2:DescribeInstanceStatus",
-        "ec2:DescribeInstanceAttribute"
-      ],
-      Resource = "*"
-    },
-      {
-        Effect = "Allow",
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        Resource = "arn:aws:logs:*:*:*"
-      },      
-      {
-        Effect = "Allow",
-        Action = [
-          "ssm:SendCommand",
-          "ssm:DescribeInstanceInformation",
-          "ssm:GetCommandInvocation",
-          "ssm:GetDeployablePatchSnapshotForInstance",
-          "ssm:GetDocument",
-          "ssm:DescribeDocument",
-          "ssm:GetManifest",
-          "ssm:GetParameter",
-          "ssm:GetParameters",
-          "ssm:ListAssociations",
-          "ssm:ListInstanceAssociations",
-          "ssm:PutInventory",
-          "ssm:PutComplianceItems",
-          "ssm:PutConfigurePackageResult",
-          "ssm:UpdateAssociationStatus",
-          "ssm:UpdateInstanceAssociationStatus",
-          "ssm:UpdateInstanceInformation"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "s3:*"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "ec2messages:AcknowledgeMessage",
-          "ec2messages:DeleteMessage",
-          "ec2messages:FailMessage",
-          "ec2messages:GetEndpoint",
-          "ec2messages:GetMessages",
-          "ec2messages:SendReply"
-        ],
-        Resource = "*"
-      },
-      {
-        Effect = "Allow",
-        Action = [
-          "ssmmessages:CreateControlChannel",
-          "ssmmessages:CreateDataChannel",
-          "ssmmessages:OpenControlChannel",
-          "ssmmessages:OpenDataChannel"
-        ],
-        Resource = "*"
-      },
-       {
-        Effect   = "Allow"
-        Action   = [
-          "ec2:*"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role" "datastreamlambda_role" {
+resource "aws_iam_role" "lambda_role" {
   name = var.lambda_role_name
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -167,10 +104,62 @@ resource "aws_iam_role" "datastreamlambda_role" {
   })
 }
 
+resource "aws_iam_policy" "datastreamlambda_policy" {
+  name        = var.lambda_policy_name
+  description = "Policy with permissions for datastreamlambda"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ec2:RunInstances",
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:DescribeInstances",
+          "ec2:DescribeTags",
+          "ec2:CreateTags"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation",
+          "ssm:DescribeInstanceInformation"
+        ],
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow",
+        Action   = [
+          "iam:PassRole"  
+        ],
+        Resource = "*"
+      },
+      {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }    
+    ]
+  })
+}
+
 resource "aws_iam_policy_attachment" "datastream_attachment" {
   name       = "datastream_attachment"
-  roles      = [aws_iam_role.datastreamlambda_role.name]
+  roles      = [aws_iam_role.lambda_role.name]
   policy_arn = aws_iam_policy.datastreamlambda_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_policy_attachment2" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 data "archive_file" "python_lambda_starter" {  
@@ -205,7 +194,7 @@ data "archive_file" "python_lambda_stopper" {
 
 resource "aws_lambda_function" "starter_lambda" {
   function_name = var.starter_lambda_name
-  role          = aws_iam_role.datastreamlambda_role.arn
+  role          = aws_iam_role.lambda_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/starter_lambda.zip"
@@ -214,7 +203,7 @@ resource "aws_lambda_function" "starter_lambda" {
 
 resource "aws_lambda_function" "commander_lambda" {
   function_name = var.commander_lambda_name
-  role          = aws_iam_role.datastreamlambda_role.arn
+  role          = aws_iam_role.lambda_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/commander_lambda.zip"
@@ -223,7 +212,7 @@ resource "aws_lambda_function" "commander_lambda" {
 
 resource "aws_lambda_function" "poller_lambda" {
   function_name = var.poller_lambda_name
-  role          = aws_iam_role.datastreamlambda_role.arn
+  role          = aws_iam_role.lambda_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/poller_lambda.zip"
@@ -232,7 +221,7 @@ resource "aws_lambda_function" "poller_lambda" {
 
 resource "aws_lambda_function" "checker_lambda" {
   function_name = var.checker_lambda_name
-  role          = aws_iam_role.datastreamlambda_role.arn
+  role          = aws_iam_role.lambda_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/checker_lambda.zip"
@@ -241,7 +230,7 @@ resource "aws_lambda_function" "checker_lambda" {
 
 resource "aws_lambda_function" "stopper_lambda" {
   function_name = var.stopper_lambda_name
-  role          = aws_iam_role.datastreamlambda_role.arn
+  role          = aws_iam_role.lambda_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/stopper_lambda.zip"
