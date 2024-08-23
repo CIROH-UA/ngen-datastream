@@ -3,6 +3,7 @@
     "start_time"          : "",
     "end_time"            : "",
     "forcing_source"      : "",
+    "realization"         : "",
     "nprocs"              : "",
     "subset_id_type"      : "",
     "subset_id"           : "",
@@ -11,37 +12,41 @@
     "object_prefix"       : ""
 },
   "run_options":{
-    "ii_detach_volume" : false,
-    "ii_check_s3"      : false
+    "ii_detach_volume" : true,
+    "ii_check_s3"      : true
 },
-  "instance_parameters" :
-  {
-    "ImageId"            : "",
-    "InstanceType"       : "",
-    "KeyName"            : "",
-    "SecurityGroupIds"   : [""],
-    "IamInstanceProfile": {
-      "Name": ""
-    },
-    "TagSpecifications"   :[
-      {
-          "ResourceType": "instance",
-          "Tags": [
-              {
-                  "Key"   : "Name",
-                  "Value" : ""
-              }
-          ]
-      }
+"instance_parameters": {
+  "ImageId": "",
+  "InstanceType": "",
+  "KeyName": "",
+  "SecurityGroupIds": [
+    ""
   ],
-    "BlockDeviceMappings":[
-      {
-          "DeviceName": "/dev/xvda",  
-          "Ebs": {
-              "VolumeSize": 64,
-              "VolumeType": "gp2"  
-          }
+  "IamInstanceProfile": {
+    "Name": ""
+  },
+  "MetadataOptions": {
+    "HttpTokens": "required"
+  },
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": ""
+        }
+      ]
+    }
+  ],
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "/dev/xvda",
+      "Ebs": {
+        "VolumeSize": 32,
+        "VolumeType": "gp2"
       }
-    ]
-  }
+    }
+  ]
+}
 }

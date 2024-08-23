@@ -235,7 +235,7 @@ else
         DATA_DIR="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
     fi
     if [[ -n "${S3_MOUNT}" ]]; then
-        S3_OUT="$S3_MOUNT$S3_PREFIX"
+        S3_OUT="$S3_MOUNT/$S3_PREFIX"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT
     fi

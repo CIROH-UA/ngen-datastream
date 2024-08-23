@@ -81,6 +81,7 @@ Starting from execution_template_datastream. These options correspond directly t
     "start_time"          : "202006200100",
     "end_time"            : "202006210000",
     "forcing_source"      : "NWM_RETRO_V3",
+    "realization"         : "$(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json",
     "nprocs"              : "4",
     "subset_id_type"      : "hl",
     "subset_id"           : "Gages-09106150",
@@ -118,21 +119,17 @@ The state machine is capable of confirming a complete execution by checking for 
 ```
     "InstanceType"       : "t2g.xlarge",
 ```
-5) Define the key that authenticates the user when SSH'ing into the instance. 
+5) Define the key that authenticates the user when SSH'ing into the instance. Don't include the file extension (i.e. `.pem`).  
 ```
-    "KeyName"            : "your_key.pem",
+    "KeyName"            : "your_key",
 ```
-6) Define the security group. Make sure it allows for inbound traffic if you want to SSH.
-```
-    "SecurityGroupIds"   : ["sg-###"],
-```
-7) This must match `profile_name` in variables.tfvars
+6) This must match `profile_name` in variables.tfvars
 ```
     "IamInstanceProfile" : {
         "Name" : "name-of-instance-profile"
         },
 ```
-8) Name for the instance
+7) Name for the instance
 ```
     "TagSpecifications"   :[
       {
@@ -145,7 +142,7 @@ The state machine is capable of confirming a complete execution by checking for 
           ]
       }
 ```
-9) Define the disk size for the instance
+8) Define the disk size for the instance
 ```
     "BlockDeviceMappings":[
       {
@@ -158,7 +155,7 @@ The state machine is capable of confirming a complete execution by checking for 
     ]
 ```
 
-13) Finally, execute the state machine.
+9) Finally, execute the state machine.
 ```
 aws stepfunctions start-execution \
 --state-machine-arn <sm_ARN> \

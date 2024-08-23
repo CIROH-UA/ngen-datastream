@@ -19,11 +19,12 @@ def lambda_handler(event, context):
     response = client_ec2.describe_volumes(
         Filters=[
         {
-            'InstanceId': instance_id,
+            'Name': 'volume-id',
+            'Values': [event['volume_id']],
         },
     ],)
-
-    volume_id=response['Volumes']['Attachments']['VolumeId']
+    print(response)
+    volume_id=event['volume_id']
     if event["run_options"]["ii_detach_volume"]:
         print(f'Instance VolumeId {volume_id} located.')
         response = client_ec2.detach_volume(
