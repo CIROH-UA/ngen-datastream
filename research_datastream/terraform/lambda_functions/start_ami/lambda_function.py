@@ -36,7 +36,7 @@ def lambda_handler(event, context):
 
     event['region'] = os.environ['AWS_REGION']
     global client_ec2
-    client_ec2 = boto3.client('ec2',event['region'])
+    client_ec2 = boto3.client('ec2',region_name=event['region'])
 
     event['instance_parameters']['MaxCount'] = 1
     event['instance_parameters']['MinCount'] = 1

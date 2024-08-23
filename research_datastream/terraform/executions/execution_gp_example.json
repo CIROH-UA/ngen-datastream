@@ -1,0 +1,39 @@
+{  
+  "commands"  : [
+    "runuser -l ec2-user -c 'ls -la'"
+],
+"run_options":{
+  "ii_detach_volume" : false,
+  "ii_check_s3"      : true
+},
+"instance_parameters" :
+{
+  "ImageId"            : "ami-0fd0b3e0199927973",
+  "InstanceType"       : "t4g.large",
+  "KeyName"            : "jlaser_west2",
+  "SecurityGroupIds"   : ["sg-04365a4248fe126bc"],
+  "IamInstanceProfile": {
+    "Name": "datastream_ec2_role_lynkertest1"
+  },
+  "TagSpecifications"   :[
+    {
+        "ResourceType": "instance",
+        "Tags": [
+            {
+                "Key"   : "Name",
+                "Value" : "ds_test"
+            }
+        ]
+    }
+],
+  "BlockDeviceMappings":[
+    {
+        "DeviceName": "/dev/xvda",  
+        "Ebs": {
+            "VolumeSize": 32,
+            "VolumeType": "gp2"  
+        }
+    }
+  ]
+}
+}
