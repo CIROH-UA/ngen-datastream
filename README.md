@@ -39,7 +39,7 @@ First, obtain a hydrofabric file for the gage you wish to model. For example for
 ```
 hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o palisade.gpkg -t hl "Gages-09106150"
 ```
-Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. See more [examples](https://github.com/CIROH-UA/ngen-datastream/blob/main/examples).
+Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes.
 ```
 ./scripts/stream.sh -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json -n 4
 ```
