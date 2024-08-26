@@ -46,7 +46,7 @@ Prior to executing the processor, the user will need to obtain a geopackage file
 |-------------------|-----------------------------------|----------|
 | storage_type      | Type of storage (local or s3)     | :white_check_mark: |
 | output_path       | Path to write data to. Accepts local path or s3 | :white_check_mark: |
-| output_file_type  | List of output file types, e.g. ["tar","parquet"]  | :white_check_mark: |
+| output_file_type  | List of output file types, e.g. ["tar","parquet","csv","netcdf"]  | :white_check_mark: |
 
 ### 3. Run
 | Field             | Description                    | Required |
@@ -54,7 +54,6 @@ Prior to executing the processor, the user will need to obtain a geopackage file
 | verbose           | Get print statements, defaults to false           |  :white_check_mark: |
 | collect_stats     | Collect forcing metadata, defaults to true       |  :white_check_mark: |
 | nprocs      | Number of data processing processes, defaults to 50% available cores |   |
-| nfile_chunk       | Number of files to process each write, defaults to 1000000. Only set this if experiencing memory constraints due to large number of nwm forcing files |   |
 
 ## nwm_file
 A text file given to forcingprocessor that contains each nwm forcing file name. These can be URLs or local paths. This file can be generated with the [nwmurl tool](https://github.com/CIROH-UA/nwmurl) and a [generator script](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor/nwm_filenames_generator.py) has been provided within this repo. The config argument accepts an s3 URL. 
