@@ -164,13 +164,14 @@ def validate_data_dir(data_dir):
         jcatchments = catchment_list[i:k]
         catchment_list_list.append(jcatchments)
         i = k
-    validate_catchment_files(val_dict_list[0],catchment_list_list[0])
-    # with cf.ProcessPoolExecutor() as pool:
-    #     for results in pool.map(
-    #         validate_catchment_files,
-    #         val_dict_list,
-    #         catchment_list_list):
-    #         pass    
+        
+    # validate_catchment_files(val_dict_list[0],catchment_list_list[0])
+    with cf.ProcessPoolExecutor() as pool:
+        for results in pool.map(
+            validate_catchment_files,
+            val_dict_list,
+            catchment_list_list):
+            pass    
 
     print(f'\nNGen run folder is valid\n',flush = True)        
 
