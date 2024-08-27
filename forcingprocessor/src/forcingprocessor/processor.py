@@ -692,6 +692,9 @@ def prep_ngen_data(conf):
     gpkg_file = conf['forcing'].get("gpkg_file",None)
     nwm_file = conf['forcing'].get("nwm_file","")
 
+    if type(gpkg_file) is not list: gpkg_files = [gpkg_file]
+    else: gpkg_files = gpkg_file    
+
     global output_path, output_file_type
     output_path = conf["storage"].get("output_path","")
     output_file_type = conf["storage"].get("output_file_type","csv") 
@@ -750,6 +753,11 @@ def prep_ngen_data(conf):
         conf_path = Path
         with open(f"{metaf_path}/conf.json", 'w') as f:
             json.dump(conf, f)
+        cp_cmd = f'cp {nwm_file} {metaf_path}'
+        os.system(cp_cmd)
+        for jgpkg in gpkg_files:
+            cp_cmd = f'cp {jgpkg} {metaf_path}'
+            os.system(cp_cmd)
 
     elif storage_type == "s3":
         bucket_path  = output_path
@@ -758,19 +766,30 @@ def prep_ngen_data(conf):
         metaf_path   = bucket_path + '/metadata/forcings_metadata'
         bucket, key  = convert_url2key(metaf_path,storage_type)
         conf_path    = f"{key}/conf_fp.json"
+        filenamelist_path = f"{key}/{os.path.basename(nwm_file)}"
         s3 = boto3.client("s3")          
         s3.put_object(
                 Body=json.dumps(conf),
                 Bucket=bucket,
                 Key=conf_path
             )
+        s3.upload_file(
+                nwm_file,
+                bucket,
+                filenamelist_path
+            )
+        for jgpkg in gpkg_files:
+            gpkg_path = f"{key}/{os.path.basename(jgpkg)}"
+            s3.upload_file(
+                jgpkg,
+                bucket,
+                gpkg_path
+            )
 
     log_time("CONFIGURATION_END", log_file) 
 
     log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
-    if type(gpkg_file) is not list: gpkg_files = [gpkg_file]
-    else: gpkg_files = gpkg_file
     global weights_json
     weights_json, jcatchment_dict = gpkgs2weightsjson(gpkg_files)
     ncatchments = len(weights_json)
@@ -844,7 +863,14 @@ def prep_ngen_data(conf):
         if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one geopackage')
         cat_ids = ['cat-' + x for x in forcing_cat_ids]
         jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
-        plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, meta_path)
+        if storage_type == "s3":
+            gif_out = './GIFs'
+        else:
+            gif_out = Path(meta_path,'GIFs')
+        plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, gif_out)
+        if storage_type == "s3":
+            sync_cmd = f'aws s3 sync ./GIFs {meta_path}/GIFs'
+            os.system(sync_cmd)
     
     # Metadata        
     if ii_collect_stats:
@@ -974,9 +1000,9 @@ def prep_ngen_data(conf):
 
     if storage_type == "s3": 
         bucket, key  = convert_url2key(metaf_path,storage_type)
-        log_path = key + '/log_fp.txt'
+        log_path = key + '/profile_fp.txt'
         s3.upload_file(
-                f'./log_fp.txt',
+                f'./profile_fp.txt',
                 bucket,
                 log_path
             )
@@ -1006,7 +1032,7 @@ if __name__ == "__main__":
     if args.infile[0] == '{':
         conf = json.loads(args.infile)
     else:
-        if 's3' in args.infile:
+        if 's3://' in args.infile:
             os.system(f'wget {args.infile}')
             filename = args.infile.split('/')[-1]
             conf = json.load(open(filename))

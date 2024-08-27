@@ -1,6 +1,8 @@
 # Forcing Processor
 Forcingprocessor converts National Water Model (NWM) forcing data into Next Generation National Water Model (NextGen) forcing data. The motivation for this tool is NWM data is gridded and stored within netCDFs for each forecast hour. Ngen inputs this same forcing data, but in the format of per-catchment csv files that hold time series data. Forcingprocessor is driven by a configuration file that is explained, with an example, in detail below. The config argument accepts an s3 URL.
 
+![forcing_gif](../docs/gifs/T2D_2_TMP_2maboveground_cali.gif)
+
 ## Install
 ```
 cd /ngen-datastream/forcingprocessor/ && pip install -e .

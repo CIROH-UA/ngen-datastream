@@ -2,12 +2,12 @@
 This document serves as a guide to run `ngen-datastream` step-by-step, which essentially walks the user through an example execution of `ngen-datastream/scripts/stream.sh`
 
 ## Use Case
-Imagine we want to study the variation in NextGen configurations of retrospective streamflow forecasts for the Colorado River for the year 2019. We will use the steps below to prepare an input data package for NextGen, execute NextGen through NextGen in a Box, and then plot the results.
+Imagine we want to study the variation in NextGen configurations of retrospective streamflow forecasts for the Colorado River for the day of June 10th, 2019. We will use the steps below to prepare an input data package for NextGen, execute NextGen through NextGen in a Box, and then plot the results.
 
 ## Steps
 * [Prepare Directories](#prepare-directories)
 * [Spatial Domain](#spatial-domain)
-* [Time Domain](#time-domain)
+* [Forcings / Time Domain](#forcings--time-domain)
 * [NextGen Configuration](#nextgen-configuration)
 * [NextGen BMI Configuration File Generation](#nextgen-bmi-configuration-file-generation)
 * [Validation](#validation)
@@ -71,7 +71,7 @@ Use the [NGIA geopackage viewer](https://ngageoint.github.io/geopackage-viewer-j
   -v, --HYDROFABRIC_VERSION <Hydrofabric version>
   ```
 
-## Time Domain
+## Forcings / Time Domain
 Defining the time over which the simulation will run is essentially captured in the forcings (precipitation, wind speed, etc.). There are many sources of forcings that can be used in NextGen. While it is certainly possible to use forcings from a variety of sources (NWM, AORC, etc.) `ngen-datastream` integrates [nwmurl](https://github.com/CIROH-UA/nwmurl), which will provide National Water Model forcings filenames based on the time period the user provides. To generate these forcings independently, follow the steps below:
 
 First, we use [nwmurl](https://github.com/CIROH-UA/nwmurl) to generate a list of nwm forcing filenames that [forcingprocessor](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor) reads from. We define exactly which forcings files we want with the options in conf_nwmurl.json. 
@@ -109,8 +109,8 @@ Now let's generate the 2019 retrospective forcings. Let's make our own conf_nwmu
 ```
 {
     "forcing_type" : "retrospective",
-    "start_date"   : "201901010100",
-    "end_date"     : "201912312300",
+    "start_date"   : "201906100000",
+    "end_date"     : "201906102300",
     "urlbaseinput" : 4,
     "selected_object_type" : [1],
     "selected_var_types"   : [6],
@@ -151,10 +151,18 @@ Now that we have the forcing filenames in a text file, we can set up `forcingpro
         "verbose"       : true,
         "collect_stats" : true,
         "nprocs"        : 8
+    },
+
+    "plot":{
+        "ngen_vars"  : [
+            "TMP_2maboveground"
+        ] 
     }
 }
 ```
-Save this file as `./palisade_2019/datastream-metadata/conf_fp.json`
+Save this file as `./palisade_2019/datastream-metadata/conf_fp.json`. Note the `plot` field which will generate gifs of the nwm -> ngen forcings as shown below.
+
+![forcing_gif](gifs/T2D_2_TMP_2maboveground_palisade.gif)
 
 Execute `forcingprocessor` with the following command
 ```
