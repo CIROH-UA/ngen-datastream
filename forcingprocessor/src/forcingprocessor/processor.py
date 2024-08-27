@@ -10,59 +10,12 @@ import time
 import boto3
 from io import BytesIO, TextIOWrapper
 import concurrent.futures as cf
-from datetime import datetime, timezone
-import psutil
+from datetime import datetime
 import gzip
 import tarfile, tempfile
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-from forcingprocessor.weights_hf2ds import hydrofabric2datastream_weights
-
-global nwm_variables
-nwm_variables = [
-    "U2D",
-    "V2D",
-    "LWDOWN",
-    "RAINRATE",
-    "RAINRATE",
-    "T2D",
-    "Q2D",
-    "PSFC",
-    "SWDOWN",
-]
-
-global ngen_variables
-ngen_variables = [
-    "UGRD_10maboveground",
-    "VGRD_10maboveground",
-    "DLWRF_surface",
-    "APCP_surface",
-    "precip_rate",  # HACK RAINRATE * 3600
-    "TMP_2maboveground",        
-    "SPFH_2maboveground",
-    "PRES_surface",
-    "DSWRF_surface",
-] 
-
-def log_time(label, log_file):
-    timestamp = datetime.now(timezone.utc).astimezone().strftime('%Y%m%d%H%M%S')
-    with open(log_file, 'a') as f:
-        f.write(f"{label}: {timestamp}\n")
-
-def convert_url2key(nwm_file,fs_type):
-    bucket_key = ""
-    _nc_file_parts = nwm_file.split('/')
-    layers = _nc_file_parts[3:]
-    for jlay in layers:
-        bucket_key += "/" + jlay 
-
-    if fs_type == 's3':
-        bucket_key = _nc_file_parts[2][:-17] + bucket_key
-    elif fs_type == 'google':
-        bucket_key = "gs:/" + bucket_key
-    if "s3://" in nwm_file: bucket_key = bucket_key[1:]
-    bucket = _nc_file_parts[2]
-    return bucket, bucket_key
+from forcingprocessor.weights_hf2ds import gpkgs2weightsjson
+from forcingprocessor.plot_forcings import plot_ngen_forcings
+from forcingprocessor.utils import get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
 
 def distribute_work(items,nprocs):
     """
@@ -113,13 +66,6 @@ def load_balance(items_per_proc,launch_delay,single_ex, exec_count):
     if ii_verbose: print(f'item distribution {items_per_proc}')
     return items_per_proc
 
-def report_usage():
-    usage_ram   = psutil.virtual_memory()[3]/1000000000
-    percent_ram = psutil.virtual_memory()[2]
-    percent_cpu = psutil.cpu_percent()
-    if ii_verbose: print(f'\nCurrent RAM usage (GB): {usage_ram:.2f}, {percent_ram:.2f}%\nCurrent CPU usage : {percent_cpu:.2f}%')
-    return usage_ram, percent_ram, percent_cpu
-
 def multiprocess_data_extract(files,nprocs,weights_json,fs):
     """
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time.
@@ -144,35 +90,35 @@ def multiprocess_data_extract(files,nprocs,weights_json,fs):
     start  = 0
     nfiles = len(files)
     files_list = []
-    idx_list   = []    
     fs_list    = []
     for i in range(nprocs):
         end = min(start + files_per_proc[i],nfiles)
         files_list.append(files[start:end])
-        idx_list.append(np.arange(start,end))
         fs_list.append(fs)
         start = end
 
     data_ax = []
     t_ax_local = []
+    nwm_data = []
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
         for results in pool.map(
         forcing_grid2catchment,
         files_list,
-        idx_list,
         fs_list
         ):
             data_ax.append(results[0])
-            t_ax_local.append(results[1])            
+            t_ax_local.append(results[1])    
+            nwm_data.append(results[2])        
 
     print(f'Processes have returned')
     del weights_json
     data_array = np.concatenate(data_ax)
     t_ax_local = [item for sublist in t_ax_local for item in sublist]
+    nwm_data = np.concatenate(nwm_data)
   
-    return data_array, t_ax_local
+    return data_array, t_ax_local, nwm_data
 
-def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
+def forcing_grid2catchment(nwm_files: list, fs=None):
     """
     Retrieve catchment level data from national water model files
 
@@ -180,12 +126,16 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
     nwm_files: list of filenames (urls for remote, local paths otherwise),
     fs: an optional file system for cloud storage reads
 
-    Outputs:
-    df_by_t : (returned for local files) a list (in time) of forcing data. Note that this list may not be consistent in time
+    Outputs: [data_list, t_list, nwm_data]
+    data_list : list of ngen forcings ordered in time. ngen_forcings : 2d darray (forcing_variable x catchment)
     t : model_output_valid_time for each
+    nwm_data : nwm data saved for plotting. nwm_data : 3d array (forcing_variable x west_east x south_north)
 
     Globals:
     weights_json : dictionary with catchment-ids as keys and values are a list of two items, indices and coverage
+    ngen_variables
+    ngen_vars_plot
+    ii_plot, nts_plot
 
     """
     topen = 0
@@ -193,12 +143,13 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
     tfill = 0    
     tdata = 0    
     t_list = []
+    nwm_data_plot = []
+    jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
     nfiles = len(nwm_files)
     nvar = len(nwm_variables)
 
     dx = x_max - x_min + 1
     dy = y_max - y_min + 1
-    print(f'{x_min} {x_max} {y_min} {y_max} {dx} {dy}')
 
     if fs_type == 'google' : fs = gcsfs.GCSFileSystem() 
     id = os.getpid()
@@ -206,7 +157,6 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
     data_list = []
     for j, nwm_file in enumerate(nwm_files):
         t0 = time.perf_counter()        
-        eng    = "h5netcdf"
         if fs:
             if nwm_file.find('https://') >= 0: _, bucket_key = convert_url2key(nwm_file,fs_type)
             else: bucket_key = nwm_file
@@ -237,6 +187,7 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
                     time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
                     t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
+            if ii_plot and j < nts_plot: nwm_data_plot.append(data_allvars[jplot_vars,:,:])
         del nwm_data
         tfill += time.perf_counter() - t0        
 
@@ -268,7 +219,7 @@ def forcing_grid2catchment(nwm_files: list, idx_list: list, fs=None):
         report_usage()
 
     if ii_verbose: print(f'Process #{id} completed data extraction, returning data to primary process',flush=True)
-    return [data_list, t_list]
+    return [data_list, t_list, nwm_data_plot]
 
 def multiprocess_write(data,t_ax,catchments,nprocs,out_path,ii_append):
     """
@@ -723,7 +674,7 @@ def prep_ngen_data(conf):
     """
     Primary function to retrieve forcing data and convert it into files that can be ingested into ngen.
 
-    Inputs: forcingprocessor config file https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/configs/conf.json
+    Inputs: forcingprocessor config file https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/configs/conf_fp.json
 
     Outputs: ngen forcing files of file type csv, parquet, netcdf, or gzippped tar
 
@@ -750,6 +701,15 @@ def prep_ngen_data(conf):
     ii_collect_stats = conf["run"].get("collect_stats",True)
     nprocs = conf["run"].get("nprocs",int(os.cpu_count() * 0.5))
     nfile_chunk = conf["run"].get("nfile_chunk",100000)
+
+    global ii_plot, nts_plot, ngen_vars_plot
+    ii_plot = conf.get("plot",False)
+    if ii_plot: 
+        nts_plot = conf["plot"].get("nts_plot",10)
+        ngen_vars_plot = conf["plot"].get("ngen_vars",ngen_variables)
+    else:
+        nts_plot = 0
+        ngen_vars_plot = []
 
     if ii_verbose:
         msg = f"\nForcingProcessor has awoken. Let's do this."
@@ -806,66 +766,17 @@ def prep_ngen_data(conf):
             )
 
     log_time("CONFIGURATION_END", log_file) 
+
     log_time("READWEIGHTS_START", log_file) 
-    if ii_verbose: print(f'Opening weight file...\n',flush=True) 
+    if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
     if type(gpkg_file) is not list: gpkg_files = [gpkg_file]
     else: gpkg_files = gpkg_file
     global weights_json
-    weights_json = {}
-    jcatchment_dict = {}
-    count = 0
-    for jgpkg in gpkg_files:
-        ii_json = jgpkg.split('.')[-1] == "json"
-        ii_weights_in_bucket = jgpkg.find('//') >= 0
-        pattern = r'VPU_([^/]+)'
-        match = re.search(pattern, jgpkg)
-        if match: jname = "VPU_" + match.group(1)
-        else:
-            count +=1
-            jname = str(count)
-        if ii_weights_in_bucket:
-            s3 = boto3.client("s3")    
-            jgpkg_bucket = jgpkg.split('/')[2]
-            ii_uri = jgpkg.find('s3://') >= 0
-            if ii_uri:
-                jgpkg_key = jgpkg[jgpkg.find(jgpkg_bucket)+len(jgpkg_bucket)+1:]
-            else:
-                jgpkg_bucket = jgpkg_bucket.split('.')[0]
-                jgpkg_key    = jgpkg.split('amazonaws.com/')[-1]
-            jobj = s3.get_object(Bucket=jgpkg_bucket, Key=jgpkg_key)
-            if ii_json: 
-                new_dict = json.loads(jobj["Body"].read().decode())
-            else:
-                new_dict = hydrofabric2datastream_weights(jobj["Body"].read().decode())
-        else:     
-            if ii_json:
-                with open(jgpkg, "r") as f:
-                    new_dict = json.load(f)
-            else:
-                new_dict = hydrofabric2datastream_weights(jgpkg)
-        weights_json = weights_json | new_dict
-        jcatchment_dict[jname] = list(weights_json.keys())
+    weights_json, jcatchment_dict = gpkgs2weightsjson(gpkg_files)
     ncatchments = len(weights_json)
-    log_time("READWEIGHTS_END", log_file)  
-
-    x_min_list = []
-    x_max_list = []
-    y_min_list = []
-    y_max_list = []
-    idx_2d = []
-    for jcat in weights_json:
-        indices = weights_json[jcat][0]
-        if len(indices) == 0: raise Exception(f"No weights found for catchment {jcat}")
-        idx_2d=np.unravel_index(indices, (1, 4608, 3840), order='F')
-        x_min_list.append(np.min(idx_2d[1]))
-        x_max_list.append(np.max(idx_2d[1]))
-        y_min_list.append(np.min(idx_2d[2]))
-        y_max_list.append(np.max(idx_2d[2]))   
     global x_min, x_max, y_min, y_max
-    x_min=np.min(x_min_list)   
-    x_max=np.max(x_max_list)   
-    y_min=np.min(y_min_list)   
-    y_max=np.max(y_max_list)   
+    x_min, x_max, y_min, y_max = get_window(weights_json)
+    log_time("READWEIGHTS_END", log_file) 
 
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
@@ -905,7 +816,7 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n',flush=True)   
-        data_array, t_ax = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
+        data_array, t_ax, nwm_data = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
         score = complexity / t_extract
@@ -928,6 +839,12 @@ def prep_ngen_data(conf):
         log_time("FILEWRITING_END", log_file)
 
     runtime = time.perf_counter() - t_start
+
+    if ii_plot:
+        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one geopackage')
+        cat_ids = ['cat-' + x for x in forcing_cat_ids]
+        jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
+        plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, meta_path)
     
     # Metadata        
     if ii_collect_stats:
