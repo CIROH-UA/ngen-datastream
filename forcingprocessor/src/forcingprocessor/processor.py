@@ -866,7 +866,7 @@ def prep_ngen_data(conf):
         if storage_type == "s3":
             gif_out = './GIFs'
         else:
-            gif_out = meta_path + 'GIFs'
+            gif_out = Path(meta_path,'GIFs')
         plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, gif_out)
         if storage_type == "s3":
             sync_cmd = f'aws s3 sync ./GIFs {meta_path}/GIFs'
