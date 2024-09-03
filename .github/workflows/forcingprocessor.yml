@@ -1,0 +1,35 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Test Forcing Processor
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ./forcingprocessor
+        pip install pytest
+    - name: Test with pytest
+      run: |
+        python -m pytest -vv --deselect="forcingprocessor/tests/test_forcingprocessor.py::test_google_cloud_storage" --deselect="forcingprocessor/tests/test_forcingprocessor.py::test_gcs" --deselect="forcingprocessor/tests/test_forcingprocessor.py::test_gs" --deselect="forcingprocessor/tests/test_forcingprocessor.py::test_ciroh_zarr" --deselect="forcingprocessor/tests/test_forcingprocessor.py::test_nomads_post_processed" --deselect="forcingprocessor/tests/test_forcingprocessor.py::test_retro_ciroh_zarr"
+        python -m pytest -v -k test_google_cloud_storage 
+        python -m pytest -v -k test_gs 
+        python -m pytest -v -k test_gcs 

@@ -13,6 +13,8 @@ data_dir = (test_dir/'data').resolve()
 pwd      = Path.cwd()
 pwd      = pwd
 data_dir = data_dir
+if os.path.exists(data_dir):
+    os.system(f"rm -rf {data_dir}")
 os.system(f"mkdir {data_dir}")
 pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
@@ -34,7 +36,8 @@ conf = {
 
     "run" : {
         "verbose"       : False,
-        "collect_stats" : True
+        "collect_stats" : True,
+        "nprocs"         : 1
     }
     }
 
@@ -72,9 +75,7 @@ def test_nomads_prod():
     os.remove(parquet)       
 
 def test_nomads_post_processed():
-    print(f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/62')
-    assert False
-    return
+    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/62'
     nwmurl_conf['start_date'] = "202408240000"
     nwmurl_conf['end_date']   = "202408241700"
     nwmurl_conf["urlbaseinput"] = 2
@@ -92,11 +93,9 @@ def test_nwm_google_apis():
     prep_ngen_data(conf)
     parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
     assert parquet.exists()
-    os.remove(parquet)          
+    os.remove(parquet)    
 
 def test_google_cloud_storage():
-    print(f'hangs in pytest, but should work')
-    return
     nwmurl_conf['start_date'] = "202407100100"
     nwmurl_conf['end_date']   = "202407100100" 
     nwmurl_conf["urlbaseinput"] = 4
@@ -104,11 +103,9 @@ def test_google_cloud_storage():
     prep_ngen_data(conf)
     parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
     assert parquet.exists()
-    os.remove(parquet)   
+    os.remove(parquet)    
 
-def test_gs_nwm():
-    print(f'hangs in pytest, but should work')
-    return
+def test_gs():
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 5
@@ -116,19 +113,18 @@ def test_gs_nwm():
     prep_ngen_data(conf)
     parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
     assert parquet.exists()
-    os.remove(parquet)       
+    os.remove(parquet)    
 
-def test_gcs_nwm():
-    print(f'hangs in pytest, but should work')
-    return
-    nwmurl_conf['start_date'] = date + hourminute
-    nwmurl_conf['end_date']   = date + hourminute    
+def test_gcs():
+    # assert False, f'hangs in pytest, but should work'
+    nwmurl_conf['start_date'] = "202407100100"
+    nwmurl_conf['end_date']   = "202407100100" 
     nwmurl_conf["urlbaseinput"] = 6
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
     assert parquet.exists()
-    os.remove(parquet)    
+    os.remove(parquet)        
 
 def test_noaa_nwm_pds():
     nwmurl_conf['start_date'] = date + hourminute
@@ -200,6 +196,7 @@ def test_retro_3_0():
 
 def test_plotting():
     conf['forcing']['nwm_file'] = retro_filenamelist
+    conf['plot'] = {}
     conf['plot']['nts'] = 1
     conf['plot']['ngen_vars'] = [
             "TMP_2maboveground"
@@ -207,7 +204,7 @@ def test_plotting():
     nwmurl_conf_retro["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
-    GIF = (data_dir/"forcings/metadata/T2D_2_TMP_2maboveground.gif").resolve()
+    GIF = (data_dir/"metadata/GIFs/T2D_2_TMP_2maboveground.gif").resolve()
     assert GIF.exists()
     os.remove(GIF)         
 
