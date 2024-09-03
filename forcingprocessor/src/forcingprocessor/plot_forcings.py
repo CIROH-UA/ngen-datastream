@@ -103,13 +103,15 @@ def csvs_to_3darray(forcings_dir   : os.PathLike,
     forcings_dir : directory containing ngen forcings csvs
     '''
     catchment_ids = []
+    i = 0
     for (_, _, files) in os.walk(forcings_dir):
         for j, jfile in enumerate(files):
             if jfile[-3:] == "csv": 
                 catchment_id = jfile.split('.')[0] 
                 catchment_ids.append(catchment_id)
                 ngen_jdf = pd.read_csv(os.path.join(forcings_dir, jfile))            
-                if j == 0: 
+                if i == 0: 
+                    i += 1
                     t_ax = ngen_jdf['time']
                     ngen_jdf = ngen_jdf.drop(columns='time')
                     shp = ngen_jdf.shape
