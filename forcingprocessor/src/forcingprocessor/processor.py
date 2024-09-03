@@ -835,6 +835,10 @@ def prep_ngen_data(conf):
         jnwm_files = nwm_forcing_files[start:end]
         t0 = time.perf_counter()
         if ii_verbose: print(f'Entering data extraction...\n',flush=True)   
+        # data_array, t_ax, nwm_data = forcing_grid2catchment(jnwm_files, fs)
+        # data_array=data_array[0][None,:]
+        # t_ax = t_ax
+        # nwm_data=nwm_data[0][None,:]
         data_array, t_ax, nwm_data = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
