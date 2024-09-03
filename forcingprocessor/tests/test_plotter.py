@@ -12,14 +12,10 @@ date = date.strftime('%Y%m%d')
 hourminute  = '0000'
 test_dir = Path(__file__).parent
 data_dir = (test_dir/'data').resolve()
-if os.path.exists(data_dir):
-    os.system(f"rm -rf {data_dir}")
-os.system(f"mkdir {data_dir}")
 pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
 geopackage = str(f"{data_dir}/palisade.gpkg")
 geopackage_name = "palisade.gpkg"
-os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/{geopackage_name}")
 
 conf = {
     "forcing"  : {
@@ -64,10 +60,11 @@ nwmurl_conf = {
     }
 
 def test_forcings_plot():
-    os.system(f"mkdir {data_dir}")
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7    
+    os.system(f"rm -rf {data_dir}/forcings/*.parquet")
+
     generate_nwmfiles(nwmurl_conf)
     prep_ngen_data(conf)
 
