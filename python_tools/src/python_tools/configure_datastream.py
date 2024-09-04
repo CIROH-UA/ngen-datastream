@@ -21,9 +21,7 @@ def bytes2human(n):
             return '%.1f%s' % (value, s)
     return "%sB" % n
 
-def generate_config(args):
-    host_type = args.host_type
-
+def config_class2dict(args):
     config = {
         "globals": {
             "domain_name"   : args.domain_name,
@@ -42,11 +40,10 @@ def generate_config(args):
             "version"      : args.hydrofabric_version
         },
         "host":{
-            "host_cores"   : os.cpu_count(),
-            "host_RAM"     : bytes2human(psutil.virtual_memory()[0]),    
-            "host_OS"      : args.host_os,
-            "host_type"    : host_type,
-            "host_arch"    : platform.machine()
+            "host_cores"     : os.cpu_count(),
+            "host_RAM"       : bytes2human(psutil.virtual_memory()[0]),    
+            "host_OS"        : args.host_os,
+            "host_platform"  : platform.machine()
         }
     }
     return config
@@ -150,8 +147,9 @@ def create_conf_nwm(start, end, retro_or_op,urlbaseinput):
 
     return nwm_conf  
 
-def create_confs(conf,args,realization):
-
+def create_confs(args):
+    conf = config_class2dict(args)
+    realization = args.realization_file
     geo_base = args.gpkg.split('/')[-1]
         
     if conf['globals']['start_date'] == "DAILY":
@@ -210,11 +208,12 @@ def create_confs(conf,args,realization):
         data_path = Path(args.docker_mount)
     else:
         data_path = Path(conf['globals']['data_path'])
-    ngen_config_dir = Path(data_path,'ngen-run','config')
-    datastream_meta_dir = Path(data_path,'datastream-metadata')    
 
-    if not os.path.exists(datastream_meta_dir):
-        os.system(f'mkdir -p {datastream_meta_dir}')
+    ngen_config_dir = Path(data_path,'ngen-run','config')
+    if not os.path.exists(ngen_config_dir): os.system(f'mkdir -p {ngen_config_dir}')
+
+    datastream_meta_dir = Path(data_path,'datastream-metadata')    
+    if not os.path.exists(datastream_meta_dir):os.system(f'mkdir -p {datastream_meta_dir}')
 
     write_json(nwm_conf,datastream_meta_dir,'conf_nwmurl.json')
     write_json(fp_conf,datastream_meta_dir,'conf_fp.json')
@@ -224,6 +223,7 @@ def create_confs(conf,args,realization):
     
     with open(realization,'r') as fp:
         data = json.load(fp)
+    write_json(data,datastream_meta_dir,'realization_user.json')
 
     data['time']['start_time'] = start_realization
     data['time']['end_time']   = end_realization    
@@ -236,7 +236,7 @@ def create_confs(conf,args,realization):
         data['global']['forcing']['provider'] = "NetCDF"
         data['global']['forcing']['path'] = "./forcings/1_forcings.nc"
     write_json(data,ngen_config_dir,'realization.json')
-    write_json(data,datastream_meta_dir,'realization.json')
+    write_json(data,datastream_meta_dir,'realization_datastream.json')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -252,12 +252,11 @@ if __name__ == "__main__":
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
     parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use",default=os.cpu_count())
-    parser.add_argument("--host_type", type=str,help="Type of host",default="")
+    parser.add_argument("--host_platform", type=str,help="Type of host",default="")
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
     parser.add_argument("--forcing_split_vpu", type=bool,help="true for forcingprocessor split",default=False)
     parser.add_argument("--realization_file", type=str,help="ngen realization file",required=True)
 
-    args = parser.parse_args()
-    conf = generate_config(args)
-    create_confs(conf,args,args.realization_file)
+    args = parser.parse_args()    
+    create_confs(args)
