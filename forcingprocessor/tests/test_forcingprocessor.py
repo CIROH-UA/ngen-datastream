@@ -36,7 +36,7 @@ conf = {
 
     "run" : {
         "verbose"       : False,
-        "collect_stats" : True,
+        "collect_stats" : False,
         "nprocs"         : 1
     }
     }
@@ -68,7 +68,8 @@ def test_nomads_prod():
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 1
-    generate_nwmfiles(nwmurl_conf)          
+    generate_nwmfiles(nwmurl_conf)  
+    conf['run']['collect_stats'] = True # test metadata generation once
     prep_ngen_data(conf)
     parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
     assert parquet.exists()
