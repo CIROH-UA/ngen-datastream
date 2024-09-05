@@ -61,6 +61,8 @@ def validate_catchment_files(validations, catchments):
         if jval == "forcing":
             if files[0].endswith(".nc"):
                 nc_file = files[0]
+                if not os.path.exists(nc_file): 
+                    raise Exception(f"Forcings file not found!")
                 with xr.open_dataset(os.path.join(forcing_dir,nc_file)) as ngen_forcings:
                     df = ngen_forcings['precip_rate']
                     forcings_start = datetime.fromtimestamp(ngen_forcings.Time.values[0,0],timezone.utc)
@@ -73,7 +75,8 @@ def validate_catchment_files(validations, catchments):
             compiled       = re.compile(jcatch_pattern)      
 
             jfile = files[j]     
-            assert bool(compiled.match(jfile)), f"{jcatch} -> File {jfile} does not match pattern specified {pattern}"            
+            if not bool(compiled.match(jfile)):
+                raise Exception(f"{jcatch} -> File {jfile} does not match pattern specified {pattern}")
 
             if jval == "forcing":
                 if j == 0:
@@ -102,8 +105,12 @@ def validate_data_dir(data_dir):
                     else: 
                         raise Exception('This run directory contains more than a single geopackage file, remove all but one.')                    
 
-    if realization_file is None: raise Exception(f"Did not find realization file in ngen-run/config!!!")
+    if realization_file is None: 
+        raise Exception(f"Did not find realization file in ngen-run/config!!!")
     print(f'Realization found! Retrieving catchment data...',flush = True)
+
+    if geopackage_file is None: 
+        raise Exception(f"Did not find geopackage file in ngen-run/config!!!")    
 
     catchments     = geopandas.read_file(geopackage_file, layer='divides')
     catchment_list = sorted(list(catchments['divide_id']))
@@ -117,7 +124,8 @@ def validate_data_dir(data_dir):
     config_dir     = os.path.join(data_dir,"config","cat_config")
     if os.path.isdir(forcing_dir):
         forcing_files  = [x for _,_,x in os.walk(forcing_dir)]
-        if len(forcing_files) == 0: raise Exception(f"No forcing files in {forcing_dir}")
+        if len(forcing_files) == 0: 
+            raise Exception(f"No forcing files in {forcing_dir}")
         forcing_files  = sorted(forcing_files[0])                   
     else:
         forcing_files = [forcing_dir]
@@ -143,7 +151,7 @@ def validate_data_dir(data_dir):
 
     if serialized_realization.routing:
         troute_path = os.path.join(data_dir,serialized_realization.routing.config)
-        assert os.path.exists(troute_path), "t-route specified in config, but not found in"
+        assert os.path.exists(troute_path), "t-route specified in config, but not found"
 
     nprocs = os.cpu_count()
     val_dict_list = []
