@@ -72,7 +72,12 @@ def generate_troute_conf(out_dir,start,max_loop_size,geo_file_path):
     with open(Path(out_dir,"ngen.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)  
 
-def gen_petAORcfe(hf_file,out,models,include):
+def gen_petAORcfe(hf_file,out,include):
+    models = []
+    if 'PET' in include:
+        models.append(Pet)
+    if 'CFE' in include:
+        models.append(Cfe)        
     for j, jmodel in enumerate(include):
         hf: gpd.GeoDataFrame = gpd.read_file(hf_file, layer="divides")
         hf_lnk_data: pd.DataFrame = gpd.read_file(hf_file,layer="model-attributes")
@@ -187,14 +192,14 @@ if __name__ == "__main__":
             print(f'ignoring CFE')
         else:
             print(f'Generating CFE configs from pydantic models',flush = True)
-            gen_petAORcfe(args.hf_file,args.outdir,[Cfe],["CFE"])
+            gen_petAORcfe(args.hf_file,args.outdir,["CFE"])
 
     if "PET" in model_names: 
         if "PET" in ignore:
             print(f'ignoring PET')
         else:
             print(f'Generating PET configs from pydantic models',flush = True)
-            gen_petAORcfe(args.hf_file,args.outdir,[Pet],["PET"])
+            gen_petAORcfe(args.hf_file,args.outdir,["PET"])
 
     globals = [x[0] for x in serialized_realization]
     if serialized_realization.routing is not None:
