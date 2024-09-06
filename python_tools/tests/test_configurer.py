@@ -1,6 +1,6 @@
 import os, pytest, json
 from datetime import datetime
-from python_tools.configure_datastream import config_class2dict, create_confs
+from python_tools.configure_datastream import create_confs
 
 SCRIPT_DIR        = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR          = os.path.join(SCRIPT_DIR,'data')
@@ -71,12 +71,12 @@ inputs = Inputs(
 )
 
 @pytest.fixture
-def clean_dir():
+def clean_dir(autouse=True):
     if os.path.exists(DATA_DIR):
         os.system(f'rm -rf {str(DATA_DIR)}')
     os.system(f'mkdir {str(DATA_DIR)}')
 
-def test_conf_basic(clean_dir):
+def test_conf_basic():
     create_confs(inputs)
     assert os.path.exists(CONF_NWM)
     assert os.path.exists(CONF_FP)
@@ -85,7 +85,7 @@ def test_conf_basic(clean_dir):
     assert os.path.exists(REALIZATION_META_DS)   
     assert os.path.exists(REALIZATION_RUN) 
 
-def test_conf_daily(clean_dir):
+def test_conf_daily():
     inputs.start_date = "DAILY"
     inputs.end_date   = ""
     create_confs(inputs)
