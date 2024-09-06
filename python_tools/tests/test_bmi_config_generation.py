@@ -5,6 +5,9 @@ import datetime as dt
 
 TEST_DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = os.path.join(TEST_DIR,'data')
+if os.path.exists(DATA_DIR):
+    os.system(f'rm -rf {str(DATA_DIR)}')
+os.system(f'mkdir {str(DATA_DIR)}')
 CONF_DIR = os.path.join(DATA_DIR,'cat_config')
 NOAH_DIR = os.path.join(CONF_DIR,'NOAH-OWP-M')
 CFE_DIR  = os.path.join(CONF_DIR,'CFE')
@@ -15,6 +18,7 @@ os.system(f"curl -o {GEOPACKAGE_PATH} -L -O https://ngen-datastream.s3.us-east-2
 PKL_FILE = os.path.join(DATA_DIR,"noah-owp-modular-init.namelist.input.pkl")
 START    = dt.datetime.strptime("202006200100",'%Y%m%d%H%M')
 END      = dt.datetime.strptime("202006200100",'%Y%m%d%H%M')
+
 
 @pytest.fixture(autouse=True)
 def clean_dir():
