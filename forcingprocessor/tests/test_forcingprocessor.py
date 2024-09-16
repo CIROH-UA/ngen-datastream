@@ -117,7 +117,6 @@ def test_gs():
     os.remove(parquet)    
 
 def test_gcs():
-    # assert False, f'hangs in pytest, but should work'
     nwmurl_conf['start_date'] = "202407100100"
     nwmurl_conf['end_date']   = "202407100100" 
     nwmurl_conf["urlbaseinput"] = 6
@@ -127,7 +126,7 @@ def test_gcs():
     assert parquet.exists()
     os.remove(parquet)        
 
-def test_noaa_nwm_pds():
+def test_noaa_nwm_pds_https():
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7
@@ -158,7 +157,7 @@ def test_ciroh_zarr():
     assert parquet.exists()
     os.remove(parquet)     
 
-def test_retro_2_1():
+def test_retro_2_1_https():
     conf['forcing']['nwm_file'] = retro_filenamelist
     nwmurl_conf_retro["urlbaseinput"] = 1
     generate_nwmfiles(nwmurl_conf_retro)

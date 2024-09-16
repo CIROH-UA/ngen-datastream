@@ -4,18 +4,22 @@
 name: Test Datastream Python
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+    paths:
+      - 'python_tools/**'
+      - '.github/workflows/datastream_python.yml'
   pull_request:
-    branches: [ "main" ]
-
+    branches:
+      - main    
+    paths:      
+      - 'python_tools/**'
+      - '.github/workflows/datastream_python.yml'
 permissions:
   contents: read
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.10

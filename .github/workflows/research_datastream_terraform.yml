@@ -1,0 +1,34 @@
+name: Validate research datastream terraform
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'research_datastream/terraform/**'
+      - '.github/workflows/research_datastream_terraform.yml'
+  pull_request:
+    branches:
+      - main    
+    paths:      
+      - 'research_datastream/terraform/**'
+      - '.github/workflows/research_datastream_terraform.yml'
+jobs:
+  validate-terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+      - name: Configure AWS
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
+          aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
+          aws configure set region us-east-1        
+      - name: Validate Terraform
+        run: |
+          cd research_datastream/terraform
+          terraform init
+          terraform validate
+          terraform apply -var-file=./variables_gitactions.tfvars -auto-approve
+          terraform destroy -var-file=./variables_gitactions.tfvars -auto-approve

@@ -1,4 +1,4 @@
-region                = "us-west-2"
+region                = "us-east-1"
 sm_name               = "datastreamconductor_test"
 sm_role_name          = "datastreamconductor_role_test"
 starter_lambda_name   = "ec2start_ami_test"
