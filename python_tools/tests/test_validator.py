@@ -26,6 +26,16 @@ def test_missing_geopackage():
     except Exception as inst:
         assert inst.__str__() == "Did not find geopackage file in ngen-run/config!!!"
 
+def test_duplicate_geopackage():
+    geo_file = str(TEST_DATA_DIR) + '/config/*.gpkg'
+    geo_file2 = str(TEST_DATA_DIR) + '/config/extra.gpkg'
+    os.system(f"cp {geo_file} {geo_file2}")
+    try:
+        validate_data_dir(TEST_DATA_DIR)
+        assert False 
+    except Exception as inst:
+        assert inst.__str__() == "This run directory contains more than a single geopackage file, remove all but one."        
+
 def test_missing_realization():
     del_file = str(TEST_DATA_DIR) + '/config/*realization*.json'
     os.system(f"rm {del_file}")
@@ -34,6 +44,17 @@ def test_missing_realization():
         assert False 
     except Exception as inst:
         assert inst.__str__() == "Did not find realization file in ngen-run/config!!!"
+
+def test_duplicate_realization():
+    real_file = str(TEST_DATA_DIR) + '/config/*realization*.json'
+    real_file2 = str(TEST_DATA_DIR) + '/config/extra_realization.json'
+    os.system(f"cp {real_file} {real_file2}")
+    try:
+        validate_data_dir(TEST_DATA_DIR)
+        assert False 
+    except Exception as inst:
+        assert inst.__str__() == "This run directory contains more than a single realization file, remove all but one."        
+
 
 def test_missing_bmi_config():
     del_file = str(TEST_DATA_DIR) + '/config/cat_config/CFE/CFE_cat-2586011.ini'

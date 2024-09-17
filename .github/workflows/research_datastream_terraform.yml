@@ -30,5 +30,7 @@ jobs:
           cd research_datastream/terraform
           terraform init
           terraform validate
-          terraform apply -var-file=./variables_gitactions.tfvars -auto-approve
-          terraform destroy -var-file=./variables_gitactions.tfvars -auto-approve
+          terraform apply -var-file=./test/variables_gitactions.tfvars -auto-approve
+          sleep 60
+          terraform destroy -var-file=./test/variables_gitactions.tfvars -auto-approve
+          sleep 60

@@ -1,0 +1,56 @@
+name: Build and Test Datastream Docker Containers
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/datastream_python.yml'   
+
+  pull_request:
+    branches:
+      - main    
+    paths:      
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/datastream_python.yml'        
+
+jobs:
+  build-test-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2  
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
+        aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
+        aws configure set region us-east-1    
+        
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.deb && curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt install ./mount-s3.deb && sudo apt-get install git pip pigz awscli python3.9 -y        
+
+    - name: Build docker containers
+      run : |        
+        ./scripts/docker_builds.sh -b
+
+    - name: Test docker containers
+      run : |
+        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+        ./scripts/stream.sh -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4

@@ -58,6 +58,8 @@ def validate_catchment_files(validations, catchments):
     for jval in validations:
         pattern     = validations[jval]['pattern']
         files       = validations[jval]['files']
+        if pattern is None: 
+            continue
         if jval == "forcing":
             if files[0].endswith(".nc"):
                 nc_file = files[0]
@@ -93,17 +95,16 @@ def validate_data_dir(data_dir):
     for path, _, files in os.walk(data_dir):
         for jfile in files:
             jfile_path = os.path.join(path,jfile)
-            if jfile_path.find('config') >= 0:
-                if jfile_path.find('realization') >= 0: 
-                    if realization_file is None: 
-                        realization_file = jfile_path
-                    else: 
-                        raise Exception('This run directory contains more than a single realization file, remove all but one.')
-                if jfile_path.find('.gpkg') >= 0: 
-                    if geopackage_file is None: 
-                        geopackage_file = jfile_path
-                    else: 
-                        raise Exception('This run directory contains more than a single geopackage file, remove all but one.')                    
+            if jfile_path.find('realization') >= 0: 
+                if realization_file is None: 
+                    realization_file = jfile_path
+                else: 
+                    raise Exception('This run directory contains more than a single realization file, remove all but one.')
+            if jfile_path.find('.gpkg') >= 0: 
+                if geopackage_file is None: 
+                    geopackage_file = jfile_path
+                else: 
+                    raise Exception('This run directory contains more than a single geopackage file, remove all but one.')                    
 
     if realization_file is None: 
         raise Exception(f"Did not find realization file in ngen-run/config!!!")
@@ -129,6 +130,9 @@ def validate_data_dir(data_dir):
         forcing_files  = sorted(forcing_files[0])                   
     else:
         forcing_files = [forcing_dir]
+        nc_file = forcing_files[0]
+        if not os.path.exists(nc_file): 
+            raise Exception(f"Forcings file not found!")
 
     jdir_dict = {"CFE":"CFE",
                  "PET":"PET",

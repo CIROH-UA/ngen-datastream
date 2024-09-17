@@ -133,13 +133,13 @@ else
   echo "FORCING_SOURCE $FORCING_SOURCE not among options: $FORCING_SOURCE_OPTIONS"
 fi
 
-if ! command -v ec2-metadata >/dev/null 2>&1; then
-    HOST_TYPE="NON-AWS"
-else
-    HOST_TYPE=$(ec2-metadata --instance-type)
-    HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
-fi
-echo "HOST_TYPE" $HOST_TYPE
+# if ! command -v ec2-metadata >/dev/null 2>&1; then
+#     HOST_TYPE="NON-AWS"
+# else
+#     HOST_TYPE=$(ec2-metadata --instance-type)
+#     HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
+# fi
+# echo "HOST_TYPE" $HOST_TYPE
 if [ -f "/etc/os-release" ]; then
     HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
     HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
@@ -264,6 +264,7 @@ echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
 NGENRUN_CONFIG="${NGEN_RUN%/}/config"
 NGENRUN_FORCINGS="${NGEN_RUN%/}/forcings"
 NGENRUN_OUTPUT="${NGEN_RUN%/}/outputs"
+NGENRUN_METADATA="${NGEN_RUN%/}/metadata"
 NGENRUN_OUTPUT_NGEN="${NGEN_RUN%/}/outputs/ngen"
 NGENRUN_OUTPUT_PARQUET="${NGEN_RUN%/}/outputs/parquet"
 NGENRUN_OUTPUT_TROUTE="${NGEN_RUN%/}/outputs/troute"
@@ -283,6 +284,7 @@ DOCKER_MOUNT="/mounted_dir"
 DOCKER_RESOURCES="${DOCKER_MOUNT%/}/datastream-resources"
 DOCKER_META="${DOCKER_MOUNT%/}/datastream-metadata"
 DOCKER_FP="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
+DOCKER_PY="/ngen-datastream/python_tools/src/python_tools/"
 
 log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
 if [ ! -z $RESOURCE_DIR ]; then
@@ -404,7 +406,7 @@ if [ ! -z $SUBSET_ID ]; then
     log_time "SUBSET_START" $DATASTREAM_PROFILING
     GEO_BASE="$SUBSET_ID.gpkg"
     GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_NGENCONF%/}/$GEO_BASE"
-    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE $SUBSET_ID
+    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
     GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
     cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
     log_time "SUBSET_END" $DATASTREAM_PROFILING
@@ -424,10 +426,10 @@ log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
 DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Generating ngen-datastream metadata"
-CONFIGURER="/ngen-datastream/python/src/datastream/configure-datastream.py"
+CONFIGURER=$DOCKER_PY"configure_datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python3 $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_type "$HOST_TYPE" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
@@ -436,7 +438,7 @@ PKL_NAME="noah-owp-modular-init.namelist.input.pkl"
 PKL_FILE=$(find "$NGENRUN_CONFIG" -type f -name $PKL_NAME)
 if [ ! -f "$PKL_FILE" ]; then
     echo "Generating noah-owp pickle file"
-    NOAHOWPPKL_GENERATOR="/ngen-datastream/python/src/datastream/noahowp_pkl.py"
+    NOAHOWPPKL_GENERATOR=$DOCKER_PY"noahowp_pkl.py"
     if [ "$DRYRUN" == "True" ]; then
         echo "DRYRUN - NOAH PKL CALCULATION SKIPPED"
         echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
@@ -450,7 +452,7 @@ if [ ! -f "$PKL_FILE" ]; then
 fi
 
 echo "Generating NGEN configs"
-NGEN_CONFGEN="/ngen-datastream/python/src/datastream/ngen_configs_gen.py"
+NGEN_CONFGEN=$DOCKER_PY"ngen_configs_gen.py"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NGEN BMI CONFIGURATION FILE CREATION SKIPPED"
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
@@ -529,11 +531,12 @@ else
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
         cp $NGEN_RUN/forcings/*forcings* $DATASTREAM_RESOURCES_NGENFORCINGS
+        mv $NGENRUN_METADATA $DATASTREAM_META
     fi
 fi    
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING
-VALIDATOR="/ngen-datastream/python/src/datastream/run_validator.py"
+VALIDATOR=$DOCKER_PY"run_validator.py"
 DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Validating " $NGEN_RUN
 if [ "$DRYRUN" == "True" ]; then
