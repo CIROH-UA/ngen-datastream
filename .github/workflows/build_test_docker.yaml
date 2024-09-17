@@ -1,9 +1,27 @@
-name: Build, Test, and Push Datastream Docker Containers
+name: Build and Test Datastream Docker Containers
 
 on:
-  workflow_run:
-    workflows: [Test Forcing Processor]
-    types: [completed]     
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/datastream_python.yml'   
+
+  pull_request:
+    branches:
+      - main    
+    paths:      
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/datastream_python.yml'        
 
 jobs:
   build-test-docker:

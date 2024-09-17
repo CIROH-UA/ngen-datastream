@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/datastream_python.yml'  
 
 jobs:
   build-test-push-docker:
