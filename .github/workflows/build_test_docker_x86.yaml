@@ -1,4 +1,4 @@
-name: Build and Test Datastream Docker Containers
+name: Build and Test Datastream Docker Containers on x86
 
 on:
   push:
