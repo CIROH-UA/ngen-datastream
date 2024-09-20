@@ -1,17 +1,6 @@
 name: Build and Test Datastream Docker Containers on x86
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docker/**'
-      - 'forcingprocessor/**'
-      - 'scripts/**'  
-      - 'python_tools/**'
-      - '.github/workflows/forcingprocessor.yml'
-      - '.github/workflows/datastream_python.yml'   
-
   pull_request:
     branches:
       - main    
