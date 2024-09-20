@@ -13,12 +13,15 @@ TAG="latest$PLATORM_TAG"
 
 BUILD="no"
 PUSH="no"
-while getopts "bp" flag; do
+SKIP_DEPS="no"
+while getopts "bps" flag; do
  case $flag in
    b) BUILD="yes"
    ;;
    p) PUSH="yes"
    ;;
+   s) SKIP_DEPS="yes"
+   ;;   
    \?)
    ;;
  esac
@@ -28,8 +31,9 @@ if [ "$BUILD" = "yes" ]; then
 
   cd $DOCKER_DIR
   echo "Building docker from "$DOCKER_DIR
-
-  docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=$TAG --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
+  if [ "$SKIP_DEPS" = "no" ]; then
+    docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=$TAG --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
+  fi
 
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
@@ -50,9 +54,11 @@ fi
 
 if [ "$PUSH" = "yes" ]; then
     echo "Pushing docker containers"
-    docker push awiciroh/datastream-deps:latest$PLATORM_TAG
-    docker push awiciroh/datastream:latest$PLATORM_TAG
-    docker push awiciroh/forcingprocessor:latest$PLATORM_TAG
+    if [ "$SKIP_DEPS" = "no" ]; then
+      docker push awiciroh/datastream-deps:$TAG
+    fi
+    docker push awiciroh/datastream:$TAG
+    docker push awiciroh/forcingprocessor:$TAG
     echo "Docker containers have been pushed to awiciroh dockerhub!"
 fi
 
