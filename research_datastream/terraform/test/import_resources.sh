@@ -9,13 +9,13 @@ declare -A resource_map=(
   ["poller_lambda_name"]="lambda|aws_lambda_function.poller_lambda|get-function --function-name"
   ["checker_lambda_name"]="lambda|aws_lambda_function.checker_lambda|get-function --function-name"
   ["stopper_lambda_name"]="lambda|aws_lambda_function.stopper_lambda|get-function --function-name"
-  ["sm_role_name"]="iam|aws_iam_role.sm_role|get-role --role-name"
+  ["sm_role_name"]="iam|aws_iam_role.iam_for_sfn|get-role --role-name"
   ["lambda_role_name"]="iam|aws_iam_role.lambda_role|get-role --role-name"
   ["ec2_role"]="iam|aws_iam_role.ec2_role|get-role --role-name"
   ["lambda_policy_name"]="iam|aws_iam_policy.datastreamlambda_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
   ["lambda_invoke_policy_name"]="iam|aws_iam_policy.lambda_invoke_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
   ["ec2_policy_name"]="iam|aws_iam_policy.ec2_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\].Arn'"
-  ["profile_name"]="iam|aws_iam_instance_profile.ec2_profile|get-instance-profile --instance-profile-name"
+  ["profile_name"]="iam|aws_iam_instance_profile.instance_profile|get-instance-profile --instance-profile-name"
 )
 
 import_resource() {
