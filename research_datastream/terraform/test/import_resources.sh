@@ -12,9 +12,9 @@ declare -A resource_map=(
   ["sm_role_name"]="iam|aws_iam_role.sm_role|get-role --role-name"
   ["lambda_role_name"]="iam|aws_iam_role.lambda_role|get-role --role-name"
   ["ec2_role"]="iam|aws_iam_role.ec2_role|get-role --role-name"
-  ["lambda_policy_name"]="iam|aws_iam_policy.datastreamlambda_policy|list-policies --query 'Policies[?PolicyName==\`"
-  ["lambda_invoke_policy_name"]="iam|aws_iam_policy.lambda_invoke_policy|list-policies --query 'Policies[?PolicyName==\`"
-  ["ec2_policy_name"]="iam|aws_iam_policy.ec2_policy|list-policies --query 'Policies[?PolicyName==\`"
+  ["lambda_policy_name"]="iam|aws_iam_policy.datastreamlambda_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
+  ["lambda_invoke_policy_name"]="iam|aws_iam_policy.lambda_invoke_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
+  ["ec2_policy_name"]="iam|aws_iam_policy.ec2_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\].Arn'"
   ["profile_name"]="iam|aws_iam_instance_profile.ec2_profile|get-instance-profile --instance-profile-name"
 )
 
@@ -26,12 +26,23 @@ import_resource() {
 
   echo "Checking for existing resource: $import_id"
 
-  if aws $resource_type $query_command --region $region >/dev/null 2>&1; then
-    echo "Resource $import_id exists, importing into Terraform state..."
-    terraform import -var-file=$VAR_FILE $resource_name $import_id 
-  else
-    echo "Resource $import_id does not exist, skipping."
-  fi
+    if [[ "$resource_type" == "iam" && "$resource_name" == *"aws_iam_policy"* ]]; then
+        arn=$(aws $resource_type list-policies --query "Policies[?PolicyName==\`$resource_value\`].Arn" --output text --region "$region")
+        if [[ -n "$arn" ]]; then
+            echo "IAM Policy ARN found: $arn, importing into Terraform..."
+            terraform import -var-file=$VAR_FILE "$resource_name" "$arn"
+        else
+            echo "IAM Policy not found, skipping import."
+        fi
+        else
+        if aws $resource_type $query_command --region "$region" >/dev/null 2>&1; then
+            echo "Resource $import_id exists, importing into Terraform state..."
+            terraform import -var-file=$VAR_FILE "$resource_name" "$import_id"
+        else
+            echo "Resource $import_id does not exist, skipping."
+        fi        
+        echo "Resource $import_id does not exist, skipping."
+    fi
 }
 
 for var_name in "${!resource_map[@]}"; do
@@ -42,7 +53,7 @@ for var_name in "${!resource_map[@]}"; do
 
   if [[ -n "$resource_value" ]]; then
     if [[ $query_command == *"Policies"* ]]; then
-      query_command="$query_command$resource_value\`].Arn' --output text"
+      query_command=""
     else
       query_command="$query_command $resource_value"
     fi
