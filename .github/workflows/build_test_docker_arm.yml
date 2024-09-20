@@ -10,19 +10,7 @@ on:
       - 'python_tools/**'
       - '.github/workflows/forcingprocessor.yml'
       - '.github/workflows/datastream_python.yml'  
-      - '.github/workflows/build_test_docker_arm.yml'      
-
-  pull_request:
-    branches:
-      - main    
-    paths:      
-      - 'docker/**'
-      - 'forcingprocessor/**'
-      - 'scripts/**'  
-      - 'python_tools/**'
-      - '.github/workflows/forcingprocessor.yml'
-      - '.github/workflows/datastream_python.yml'    
-      - '.github/workflows/build_test_docker_arm.yml'      
+      - '.github/workflows/build_test_docker_arm.yml'           
 
 jobs:
   build-test-docker-arm:
