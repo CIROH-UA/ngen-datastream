@@ -1,6 +1,6 @@
 #!/bin/bash
-
-source "$1"
+VAR_FILE="$1"
+source $VAR_FILE
 
 declare -A resource_map=(
   ["sm_name"]="stepfunctions|aws_sfn_state_machine.sm|list-state-machines --state-machine-name"
@@ -28,7 +28,7 @@ import_resource() {
 
   if aws $resource_type $query_command --region $region >/dev/null 2>&1; then
     echo "Resource $import_id exists, importing into Terraform state..."
-    terraform import $resource_name $import_id
+    terraform import -var-file=$VAR_FILE $resource_name $import_id 
   else
     echo "Resource $import_id does not exist, skipping."
   fi
