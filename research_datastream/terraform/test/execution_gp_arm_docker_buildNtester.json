@@ -1,7 +1,7 @@
 {  
   "commands"  : [
     "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && git clone -b test_terraform https://github.com/CIROH-UA/ngen-datastream.git && cd ngen-datastream'",
-    "runuser -l ec2-user -c './research_datastream/terraform/test/docker_loginNpush.sh >> ./docker_login_log.txt'",
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/research_datastream/terraform/test/docker_loginNpush.sh >> ./docker_login_log.txt'",
     "runuser -l ec2-user -c 'aws s3 cp ./docker_login_log.txt s3://ngen-datastream/docker_login_log.txt'"
 ],
 "run_options":{
