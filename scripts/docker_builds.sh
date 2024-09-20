@@ -14,7 +14,7 @@ TAG="latest$PLATORM_TAG"
 BUILD="no"
 PUSH="no"
 SKIP_DEPS="no"
-while getopts "bp" flag; do
+while getopts "bps" flag; do
  case $flag in
    b) BUILD="yes"
    ;;
