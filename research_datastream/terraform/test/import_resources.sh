@@ -12,7 +12,7 @@ declare -A resource_map=(
   ["sm_role_name"]="iam|aws_iam_role.sm_role|get-role --role-name"
   ["lambda_role_name"]="iam|aws_iam_role.lambda_role|get-role --role-name"
   ["ec2_role"]="iam|aws_iam_role.ec2_role|get-role --role-name"
-  ["lambda_policy_name"]="iam|aws_iam_policy.lambda_policy|list-policies --query 'Policies[?PolicyName==\`"
+  ["lambda_policy_name"]="iam|aws_iam_policy.datastreamlambda_policy|list-policies --query 'Policies[?PolicyName==\`"
   ["lambda_invoke_policy_name"]="iam|aws_iam_policy.lambda_invoke_policy|list-policies --query 'Policies[?PolicyName==\`"
   ["ec2_policy_name"]="iam|aws_iam_policy.ec2_policy|list-policies --query 'Policies[?PolicyName==\`"
   ["profile_name"]="iam|aws_iam_instance_profile.ec2_profile|get-instance-profile --instance-profile-name"
