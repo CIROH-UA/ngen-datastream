@@ -1,9 +1,8 @@
 {  
   "commands"  : [
-    "runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && ./scripts/docker_builds.sh -b'",
-    "runuser -l ec2-user -c 'curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg'",
-    "runuser -l ec2-user -c './scripts/stream.sh -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4'",
-    "runuser -l ec2-user -c './scripts/docker_builds.sh -p'"
+    "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && git clone -b test_terraform https://github.com/CIROH-UA/ngen-datastream.git && cd ngen-datastream'",
+    "runuser -l ec2-user -c './research_datastream/terraform/test/docker_loginNpush.sh >> ./docker_login_log.txt'",
+    "runuser -l ec2-user -c 'aws s3 cp ./docker_login_log.txt s3://ngen-datastream/docker_login_log.txt'"
 ],
 "run_options":{
   "ii_detach_volume" : true,
@@ -13,10 +12,10 @@
 {
   "ImageId"            : "ami-09a301e4b1343c098",
   "InstanceType"       : "t4g.large",
-  "KeyName"            : "",
+  "KeyName"            : "actions_key_arm",
   "SecurityGroupIds"   : ["sg-0ab5f40d1eb97d163"],
   "IamInstanceProfile": {
-    "Name": "datastream_lambda_invoke_policy_github_actions"
+    "Name": "datastream_ec2_profile_github_actions_arm"
   },
   "TagSpecifications"   :[
     {

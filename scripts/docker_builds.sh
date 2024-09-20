@@ -50,9 +50,9 @@ fi
 
 if [ "$PUSH" = "yes" ]; then
     echo "Pushing docker containers"
-    docker push awiciroh/datastream-deps:latest$PLATORM_TAG
-    docker push awiciroh/datastream:latest$PLATORM_TAG
-    docker push awiciroh/forcingprocessor:latest$PLATORM_TAG
+    docker push awiciroh/datastream-deps:$TAG
+    docker push awiciroh/datastream:$TAG
+    docker push awiciroh/forcingprocessor:$TAG
     echo "Docker containers have been pushed to awiciroh dockerhub!"
 fi
 
