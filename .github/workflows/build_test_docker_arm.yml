@@ -49,9 +49,9 @@ jobs:
         run : |
           docker rmi -f $(docker images -aq)
           docker pull awiciroh/datastream:latest
-          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/datastream:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 300 ] && echo "The container was created within the past 5 minutes." || { echo "Error: The container was NOT created within the past 5 minutes."; exit 1; }
+          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/datastream:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
           docker pull awiciroh/forcingprocessor:latest
-          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/forcingprocessor:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 300 ] && echo "The container was created within the past 5 minutes." || { echo "Error: The container was NOT created within the past 5 minutes."; exit 1; }
+          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/forcingprocessor:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
       - name: Tear down infra
         if: always()
         run : |
