@@ -9,9 +9,10 @@ See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/terraform/ARCHI
 * Terraform
 * Linux
 
-## Building AWS State Machine
+## Build AWS Infrastructure
+Construct AWS State Machine, Lambdas, Policies, and Roles. See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/terraform/ARCHITECTURE.md) for a more indepth explanation of the infrastrucutre.
 1) Open a terminal, log into AWS account
-2) Customize resource names by editing `variables.tfvars`.
+2) Customize resource names by editing `variables.tfvars`. Names must be unqiue and not correspond to already existing resources.
 3) Build the state machine with Terraform
 ```
 cd terraform
@@ -19,11 +20,23 @@ terraform init
 terraform apply -var-file=./variables.tfvars
 ```
 
-## Execute
+## Execute AWS State Machine
+This command will start the aws state machine, which will start and manage an ec2 instance to run the datastream command. This step will
 ```
 aws stepfunctions start-execution \
 --state-machine-arn arn:aws:states:us-east-1:###:stateMachine:<sm_name> \
 --name <your-execution-name> \
 --input "file://<path-to-execution-json>" \
 --region us-east-1
+```
+
+## Tear Down AWS Infrastructure
+```
+terraform destroy -var-file=./variables.tfvars
+```
+
+## Partial Success (`terraform apply failure`)
+`terraform apply` will fail if some of the resources already exist with the names defined in `variables.tfvars`. These resources must be either manually destroyed or imported. A script exists [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/test/import_resources.sh) to automate importing any existing resources. Remove all spaces from variable file if using this script.
+```
+./test/import_resources.sh <path-to-variables.tfvars>
 ```
