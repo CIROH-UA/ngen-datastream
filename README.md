@@ -30,7 +30,7 @@ or run with cli args
   -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> 
   -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> 
   -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> 
-  -S, --S3_MOUNT            <Path to mount s3 bucket to>  
+  -S, --S3_BUCKET           <s3 bucket to write output to>
   -o, --S3_PREFIX           <File prefix within s3 mount> 
   -n, --NPROCS              <Process limit> 
   -y, --DRYRUN              <True to skip calculations> 
@@ -63,8 +63,8 @@ To see what's happening in `ngen-datastream` step-by-step, see the [breakdown do
 | NWM_FORCINGS_DIR | Path to local directory containing nwm files. Alternatively, these file could be stored in RESOURCE_DIR as nwm-forcings. |  |
 | NGEN_BMI_CONFS | Path to local directory containing NextGen BMI configuration files. Alternatively, these files could be stored in RESOURCE_DIR under `config/`.  See here for [directory structure](#configuration-directory-ngen-runconfig). |  |
 | NGEN_FORCINGS            | Path to local ngen forcings directory holding ngen forcing csv's or parquet's. Also accepts tarball or netcdf. Alternatively, this file(s) could  be stored in RESOURCE_DIR at `ngen-forcings/`. |  |
-| S3_MOUNT            | Path to mount S3 bucket to. `ngen-datastream` will copy outputs here. |  |
-| S3_PREFIX           | Prefix to prepend to all files when copying to s3 |
+| S3_BUCKET           | AWS S3 Bucket to write output to |  |
+| S3_PREFIX           | Path within S3 bucket to write to |
 | DRYRUN             | Set to "True" to skip all compute steps. |
 | NPROCS              | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
 

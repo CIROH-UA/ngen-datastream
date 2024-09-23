@@ -95,8 +95,8 @@ usage() {
     echo "  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> "
     echo "  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> "
     echo "  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> "
-    echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
-    echo "  -o, --S3_PREFIX           <File prefix within s3 mount> "
+    echo "  -S, --S3_BUCKET           <s3 bucket to write output to>  "
+    echo "  -o, --S3_PREFIX           <File prefix within s3 bucket> "
     echo "  -n, --NPROCS              <Process limit> "
     echo "  -y, --DRYRUN              <True to skip calculations> "
     exit 1
@@ -118,7 +118,7 @@ RESOURCE_DIR=""
 NWM_FORCINGS_DIR=""
 NGEN_FORCINGS=""
 NGEN_BMI_CONFS=""
-S3_MOUNT=""
+S3_BUCKET=""
 S3_PREFIX=""
 NPROCS=4
 DRYRUN="False"
@@ -175,7 +175,7 @@ while [ "$#" -gt 0 ]; do
         -f|--NWM_FORCINGS_DIR) NWM_FORCINGS_DIR="$2"; shift 2;;
         -F|--NGEN_FORCINGS) NGEN_FORCINGS="$2"; shift 2;;
         -N|--NGEN_BMI_CONFS) NGEN_BMI_CONFS="$2"; shift 2;;
-        -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
+        -S|--S3_BUCKET) S3_BUCKET="$2"; shift 2;;
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -n|--NPROCS) NPROCS="$2"; shift 2;;
         -y|--DRYRUN) DRYRUN="$2"; shift 2;;
@@ -204,6 +204,14 @@ fi
 
 # set paths for daily run
 DATE=$(env TZ=US/Eastern date +'%Y%m%d')
+S3_MOUNT="${DATA_DIR%/}/mount"
+if [[ -n "${S3_BUCKET}" ]]; then
+    echo "S3_BUCKET provided, mounting bucket..."
+    mkdir -p $S3_MOUNT
+    mount-s3 $S3_BUCKET $S3_MOUNT
+    echo "s3 mount successful"
+fi
+
 if [ $START_DATE == "DAILY" ]; then
     if [[ -z "$END_DATE" ]]; then
         if [[ -z "$DATA_DIR" ]]; then
@@ -213,7 +221,7 @@ if [ $START_DATE == "DAILY" ]; then
             if [[ -z "${S3_PREFIX}" ]]; then
                 S3_PREFIX="daily/$DATE" 
             fi
-            S3_OUT="$S3_MOUNT/$S3_PREFIX"
+            S3_OUT="${S3_MOUNT%/}/${S3_PREFIX%/}"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
         fi
@@ -225,7 +233,7 @@ if [ $START_DATE == "DAILY" ]; then
             if [[ -z "${S3_PREFIX}" ]]; then
                 S3_PREFIX="daily/${END_DATE::-4}"
             fi 
-            S3_OUT="$S3_MOUNT/$S3_PREFIX"
+            S3_OUT="${S3_MOUNT%/}/${S3_PREFIX%/}"
             echo "S3_OUT: " $S3_OUT
             mkdir -p $S3_OUT 
         fi
@@ -235,7 +243,7 @@ else
         DATA_DIR="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
     fi
     if [[ -n "${S3_MOUNT}" ]]; then
-        S3_OUT="$S3_MOUNT/$S3_PREFIX"
+        S3_OUT="${S3_MOUNT%/}/${S3_PREFIX%/}"
         echo "S3_OUT: " $S3_OUT
         mkdir -p $S3_OUT
     fi

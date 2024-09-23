@@ -1,0 +1,59 @@
+name: Test Datastream Options
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-push-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2  
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
+        aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
+        aws configure set region us-east-1    
+        
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://s3.amazonaws.com/mountpoint-s3-release/latest/x86_64/mount-s3.deb && curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt install ./mount-s3.deb && sudo apt-get install git pip pigz awscli python3.9 -y        
+
+    - name: Get geopackage from hfsubset
+      run: |
+        hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o palisade.gpkg -t hl "Gages-09106150"
+
+    - name: Base test
+      run: |        
+        rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+
+    - name: Cache resource directory
+      run: |
+        mkdir ./data/cache
+        cp -r ./data/datastream_test/datastream-resources ./data/cache
+
+    - name: Resource directory test
+      if: always()
+      run: |
+        rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -r ./data/cache/datastream-resources -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test
+
+    - name: Forcings sources option test
+      if: always()
+      run: |
+        rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -r ./data/cache/datastream-resources -s 202006200100 -e 202006210000 -C NWM_RETRO_V2 -d $(pwd)/data/datastream_test        
+        rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -r ./data/cache/datastream-resources -s 202006200100 -e 202006210000 -C NWM_OPERATIONAL_V3 -d $(pwd)/data/datastream_test      
+        rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -r ./data/cache/datastream-resources -s 202006200100 -e 202006210000 -C NOMADS_OPERATIONAL -d $(pwd)/data/datastream_test  
+        
+    - name: Test hfsubet options
+      if: always()
+      run: |
+        rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -I "Gages-09106150" -i hl -v 2.1.1 -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
