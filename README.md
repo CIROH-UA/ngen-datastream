@@ -8,34 +8,9 @@
 * **Usage:** Learn how to use `ngen-datastream` effectively by referring to the comprehensive [Usage Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/USAGE.md).
 
 ## Run it
-`ngen-datastream` can be executed using cli args or a configuration file. Not all arguments are requried. 
+This example will execute a 24 hour NextGen simulation over the Palisade, Colorado watershed with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. The forcings used are the National Water Model v3 Retrospective.
 ```
-> cd ngen-datastream && ./scripts/stream.sh --help
-
-Usage: ./scripts/stream.sh [options]
-Either provide a datastream configuration file
-  -c, --CONF_FILE           <Path to datastream configuration file> 
-or run with cli args
-  -s, --START_DATE          <YYYYMMDDHHMM or "DAILY"> 
-  -e, --END_DATE            <YYYYMMDDHHMM> 
-  -C, --FORCING_SOURCE      <Forcing source option> 
-  -D, --DOMAIN_NAME         <Name for spatial domain> 
-  -g, --GEOPACKAGE          <Path to geopackage file> 
-  -I, --SUBSET_ID           <Hydrofabric id to subset>  
-  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
-  -v, --HYDROFABRIC_VERSION <Hydrofabric version> 
-  -R, --REALIZATION         <Path to realization file> 
-  -d, --DATA_DIR            <Path to write to> 
-  -r, --RESOURCE_DIR        <Path to resource directory> 
-  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> 
-  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> 
-  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> 
-  -S, --S3_BUCKET           <s3 bucket to write output to>
-  -o, --S3_PREFIX           <s3 prefix for output> 
-  -n, --NPROCS              <Process limit> 
-  -y, --DRYRUN              <True to skip calculations> 
-```
-First, obtain a hydrofabric file for the gage you wish to model. For example for Palisade, Colorado:
+First, obtain a hydrofabric file for the gage you wish to model. Check out [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) for a handy cli tool for generating geopackages. For Palisade, Colorado:
 ```
 hfsubset -w medium_range \
           -s nextgen \
@@ -44,7 +19,7 @@ hfsubset -w medium_range \
           -o palisade.gpkg \
           -t hl "Gages-09106150"
 ```
-Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over the Palisade, Colorado watershed with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. The forcings used are the National Water Model v3 Retrospective.
+Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. 
 ```
 ./scripts/stream.sh -s 202006200100 \
                     -e 202006210000 \
@@ -54,7 +29,7 @@ Then feed the hydrofabric file to ngen-datastream along with a few cli args to d
                     -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json \
                     -n 4
 ```
-To see what's happening in `ngen-datastream` step-by-step, see the [breakdown document](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/BREAKDOWN.md).
+And that's it! Outputs will exist at `$(pwd)/data/datastream_test/ngen-run/outputs`. To see what's happening in `ngen-datastream` step-by-step, see the [breakdown document](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/BREAKDOWN.md).
 
 
 ## Explanation of cli args (or variables in defined in `CONF_FILE`)
