@@ -102,5 +102,33 @@ def test_conf_daily():
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
     assert start.day == datetime.today().day
 
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+
+    assert data['urlbaseinput'] == 7
+
+
+def test_conf_daily_pick():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = "202006200000"
+    create_confs(inputs)
+    assert os.path.exists(CONF_NWM)
+    assert os.path.exists(CONF_FP)
+    assert os.path.exists(CONF_DATASTREAM)
+    assert os.path.exists(REALIZATION_META_USER)   
+    assert os.path.exists(REALIZATION_META_DS)   
+    assert os.path.exists(REALIZATION_RUN)  
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.strptime(inputs.end_date,"%Y%m%d%H%M%S").day  
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)
+
+    assert data['urlbaseinput'] == 4  
+
 
 

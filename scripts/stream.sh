@@ -95,8 +95,8 @@ usage() {
     echo "  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> "
     echo "  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> "
     echo "  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> "
-    echo "  -S, --S3_MOUNT            <Path to mount s3 bucket to>  "
-    echo "  -o, --S3_PREFIX           <File prefix within s3 mount> "
+    echo "  -S, --S3_BUCKET           <s3 bucket to write output to>  "
+    echo "  -o, --S3_PREFIX           <File prefix within s3 bucket> "
     echo "  -n, --NPROCS              <Process limit> "
     echo "  -y, --DRYRUN              <True to skip calculations> "
     exit 1
@@ -118,7 +118,7 @@ RESOURCE_DIR=""
 NWM_FORCINGS_DIR=""
 NGEN_FORCINGS=""
 NGEN_BMI_CONFS=""
-S3_MOUNT=""
+S3_BUCKET=""
 S3_PREFIX=""
 NPROCS=4
 DRYRUN="False"
@@ -175,7 +175,7 @@ while [ "$#" -gt 0 ]; do
         -f|--NWM_FORCINGS_DIR) NWM_FORCINGS_DIR="$2"; shift 2;;
         -F|--NGEN_FORCINGS) NGEN_FORCINGS="$2"; shift 2;;
         -N|--NGEN_BMI_CONFS) NGEN_BMI_CONFS="$2"; shift 2;;
-        -S|--S3_MOUNT) S3_MOUNT="$2"; shift 2;;
+        -S|--S3_BUCKET) S3_BUCKET="$2"; shift 2;;
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -n|--NPROCS) NPROCS="$2"; shift 2;;
         -y|--DRYRUN) DRYRUN="$2"; shift 2;;
@@ -202,46 +202,6 @@ else
     echo "No configuration file detected, using cli args"
 fi
 
-# set paths for daily run
-DATE=$(env TZ=US/Eastern date +'%Y%m%d')
-if [ $START_DATE == "DAILY" ]; then
-    if [[ -z "$END_DATE" ]]; then
-        if [[ -z "$DATA_DIR" ]]; then
-            DATA_DIR="${PACAKGE_DIR%/}/data/$DATE"
-        fi
-        if [[ -n "${S3_MOUNT}" ]]; then     
-            if [[ -z "${S3_PREFIX}" ]]; then
-                S3_PREFIX="daily/$DATE" 
-            fi
-            S3_OUT="$S3_MOUNT/$S3_PREFIX"
-            echo "S3_OUT: " $S3_OUT
-            mkdir -p $S3_OUT 
-        fi
-    else
-        if [[ -z "$DATA_DIR" ]]; then
-            DATA_DIR="${PACAKGE_DIR%/}/data/${END_DATE::-4}"
-        fi
-        if [[ -n "${S3_MOUNT}" ]]; then
-            if [[ -z "${S3_PREFIX}" ]]; then
-                S3_PREFIX="daily/${END_DATE::-4}"
-            fi 
-            S3_OUT="$S3_MOUNT/$S3_PREFIX"
-            echo "S3_OUT: " $S3_OUT
-            mkdir -p $S3_OUT 
-        fi
-    fi
-else
-    if [[ -z "${DATA_DIR}" ]]; then
-        DATA_DIR="${PACAKGE_DIR%/}/data/$START_DATE-$END_DATE"
-    fi
-    if [[ -n "${S3_MOUNT}" ]]; then
-        S3_OUT="$S3_MOUNT/$S3_PREFIX"
-        echo "S3_OUT: " $S3_OUT
-        mkdir -p $S3_OUT
-    fi
-fi
-
-# create directories
 if [ -e "$DATA_DIR" ]; then
     echo "The path $DATA_DIR exists. Please delete it or set a different path."
     exit 1
@@ -562,8 +522,6 @@ else
 fi
 log_time "NGEN_END" $DATASTREAM_PROFILING
 
-
-
 log_time "MERKLE_START" $DATASTREAM_PROFILING
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - MERKDIR EXECUTION SKIPPED"
@@ -581,12 +539,23 @@ log_time "TAR_END" $DATASTREAM_PROFILING
 
 log_time "DATASTREAM_END" $DATASTREAM_PROFILING
 
-if [ -e "$S3_OUT" ]; then
+if [ -n "$S3_BUCKET" ]; then
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING
-    cp $NGENRUN_TAR $S3_OUT
-    cp $DATA_DIR/merkdir.file $S3_OUT
-    cp -r $DATASTREAM_META $S3_OUT
-    cp -r $DATASTREAM_RESOURCES $S3_OUT
+
+    echo "Writing data to S3" $S3_OUT $S3_BUCKET $S3_PREFIX 
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/$TAR_NAME"
+    aws s3 cp $NGENRUN_TAR $S3_OUT
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/merkdir.file"
+    aws s3 cp $DATA_DIR/merkdir.file $S3_OUT
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
+    aws s3 sync $DATASTREAM_META $S3_OUT
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-resources"
+    aws s3 sync $DATASTREAM_RESOURCES $S3_OUT
+
     echo "Data exists here: $S3_OUT"
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
 fi

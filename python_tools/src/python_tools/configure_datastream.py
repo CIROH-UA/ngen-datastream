@@ -151,6 +151,19 @@ def create_confs(args):
     conf = config_class2dict(args)
     realization = args.realization_file
     geo_base = args.gpkg.split('/')[-1]
+
+    if "OPERATIONAL" in args.forcing_source:    
+        retro_or_op = "operational"         
+        if "V3" in args.forcing_source:
+            urlbaseinput = 7
+        if "NOMADS" in args.forcing_source:
+            urlbaseinput = 1                   
+    elif "RETRO" in args.forcing_source:   
+        retro_or_op = "retrospective"          
+        if "V2" in args.forcing_source:
+            urlbaseinput = 1
+        if "V3" in args.forcing_source:
+            urlbaseinput = 4   
         
     if conf['globals']['start_date'] == "DAILY":
         if conf['globals']['end_date'] != "":
@@ -158,6 +171,8 @@ def create_confs(args):
             start_date = datetime.strptime(conf['globals']['end_date'],'%Y%m%d%H%M')
         else:
             start_date = datetime.now(tz.timezone('US/Eastern'))
+            retro_or_op="operational"
+            urlbaseinput=7
         today = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
         tomorrow = today + timedelta(hours=23)
 
@@ -168,8 +183,8 @@ def create_confs(args):
         end = tomorrow.strftime('%Y%m%d%H%M')
         start_realization =  today.strftime('%Y-%m-%d %H:%M:%S')
         end_realization =  tomorrow.strftime('%Y-%m-%d %H:%M:%S')
-        nwm_conf = create_conf_nwm(start, end, "operational",7)
-        fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,"operational",geo_base) 
+        nwm_conf = create_conf_nwm(start, end, retro_or_op, urlbaseinput)
+        fp_conf = create_conf_fp(start, end, conf['globals']['nprocs'],args.docker_mount,args.forcing_split_vpu,retro_or_op,geo_base) 
     else: 
         start = conf['globals']['start_date']
         end   = conf['globals']['end_date']
@@ -185,19 +200,6 @@ def create_confs(args):
             nwm_conf = {}
             fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
         else:
-            if "OPERATIONAL" in args.forcing_source:    
-                retro_or_op = "operational"         
-                if "V3" in args.forcing_source:
-                    urlbaseinput = 7
-                if "NOMADS" in args.forcing_source:
-                    urlbaseinput = 1                   
-            elif "RETRO" in args.forcing_source:   
-                retro_or_op = "retrospective"          
-                if "V2" in args.forcing_source:
-                    urlbaseinput = 1
-                if "V3" in args.forcing_source:
-                    urlbaseinput = 4   
-            
             nwm_conf = create_conf_nwm(start,end, retro_or_op,urlbaseinput)
             fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, args.forcing_split_vpu,retro_or_op,geo_base) 
 

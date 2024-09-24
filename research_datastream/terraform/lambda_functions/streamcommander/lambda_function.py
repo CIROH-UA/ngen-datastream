@@ -39,8 +39,6 @@ def lambda_handler(event, context):
         if "s3_bucket" in ds_options:
             bucket = ds_options["s3_bucket"]
             prefix = ds_options["object_prefix"]
-            event['commands'].append("runuser -l ec2-user -c 'mkdir -p /home/ec2-user/ngen-datastream/data/mount'")
-            event['commands'].append(f"runuser -l ec2-user -c 'mount-s3 {bucket} /home/ec2-user/ngen-datastream/data/mount'")
         nprocs = ds_options["nprocs"]
         start = ds_options["start_time"]
         end = ds_options["end_time"]
@@ -51,7 +49,7 @@ def lambda_handler(event, context):
         subset_type = ds_options["subset_id_type"]
         command_str = f"runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && ./scripts/stream.sh -s {start} -e {end} -C {forcing_source} -I {subset_id} -i {subset_type} -v {hf_version} -d $(pwd)/data/datastream -R {realization} -n {nprocs}"
         if "s3_bucket" in ds_options: 
-            command_str += f" -S $(pwd)/data/mount -o {prefix}"
+            command_str += f" -S {bucket} -o {prefix}"
         command_str += '\''
         event['commands'].append(command_str)    
 
