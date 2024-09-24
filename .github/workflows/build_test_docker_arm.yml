@@ -1,4 +1,4 @@
-name: Build and Test Datastream Docker Containers on ARM
+name: Build, Test, Push Datastream Docker Containers on ARM
 on:
   push:
     branches:
@@ -13,7 +13,7 @@ on:
       - '.github/workflows/build_test_docker_arm.yml'           
 
 jobs:
-  build-test-docker-arm:
+  build-test-push-docker-arm:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

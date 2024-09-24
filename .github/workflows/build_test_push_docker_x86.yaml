@@ -13,7 +13,7 @@ on:
       - '.github/workflows/datastream_python.yml'  
 
 jobs:
-  build-test-push-docker:
+  build-test-push-docker-x86:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code

@@ -1,5 +1,6 @@
 import os, pytest, json
 from datetime import datetime
+import pytz as tz
 from python_tools.configure_datastream import create_confs
 
 SCRIPT_DIR        = os.path.dirname(os.path.realpath(__file__))
@@ -100,7 +101,7 @@ def test_conf_daily():
         data = json.load(fp) 
 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.today().day
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
