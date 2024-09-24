@@ -4,8 +4,9 @@ from datetime import datetime
 from datetime import datetime
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
+import pytz as tz
 
-date = datetime.now()
+date = datetime.now(tz.timezone('US/Eastern'))
 date = date.strftime('%Y%m%d')
 hourminute  = '0000'
 test_dir = Path(__file__).parent
