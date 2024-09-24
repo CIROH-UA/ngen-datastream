@@ -44,7 +44,7 @@ hfsubset -w medium_range \
           -o palisade.gpkg \
           -t hl "Gages-09106150"
 ```
-Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over VPU 09 with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes.
+Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration. This command will execute a 24 hour NextGen simulation over the Palisade, Colorado watershed with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. The forcings used are the National Water Model v3 Retrospective.
 ```
 ./scripts/stream.sh -s 202006200100 \
                     -e 202006210000 \
