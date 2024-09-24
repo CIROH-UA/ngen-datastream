@@ -18,8 +18,7 @@ on:
 permissions:
   contents: read
 jobs:
-  build:
-
+  test-forcingprocessor:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
