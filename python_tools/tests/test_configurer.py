@@ -33,7 +33,7 @@ class Inputs:
                  nprocs=None,
                  host_os="",
                  domain_name="Not Specified",
-                 forcing_split_vpu=False,
+                 forcing_split_vpu="",
                  realization_file=""):
         self.docker_mount = docker_mount
         self.start_date = start_date
@@ -67,7 +67,7 @@ inputs = Inputs(
     nprocs = 2,
     host_os = "Linux",
     domain_name = "",
-    forcing_split_vpu = False,
+    forcing_split_vpu = "",
     realization_file = str(REALIZATION_ORIG)
 )
 
@@ -99,15 +99,12 @@ def test_conf_daily():
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
-
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
     assert start.day == datetime.now(tz.timezone('US/Eastern')).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
-
     assert data['urlbaseinput'] == 7
-
 
 def test_conf_daily_pick():
     inputs.start_date = "DAILY"
@@ -122,14 +119,81 @@ def test_conf_daily_pick():
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
-
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
     assert start.day == datetime.strptime(inputs.end_date,"%Y%m%d%H%M%S").day  
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)
+    assert data['urlbaseinput'] == 7
+    assert data['runinput']     == 2
 
-    assert data['urlbaseinput'] == 4  
+def test_conf_daily_short_range():
+    inputs.start_date = "DAILY_SHORT_RANGE"
+    inputs.end_date   = ""
+    create_confs(inputs)
+    assert os.path.exists(CONF_NWM)
+    assert os.path.exists(CONF_FP)
+    assert os.path.exists(CONF_DATASTREAM)
+    assert os.path.exists(REALIZATION_META_USER)   
+    assert os.path.exists(REALIZATION_META_DS)   
+    assert os.path.exists(REALIZATION_RUN)  
 
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 1   
+
+def test_conf_daily_medium_range():
+    inputs.start_date = "DAILY_MEDIUM_RANGE"
+    inputs.end_date   = ""
+    create_confs(inputs)
+    assert os.path.exists(CONF_NWM)
+    assert os.path.exists(CONF_FP)
+    assert os.path.exists(CONF_DATASTREAM)
+    assert os.path.exists(REALIZATION_META_USER)   
+    assert os.path.exists(REALIZATION_META_DS)   
+    assert os.path.exists(REALIZATION_RUN)  
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 2     
+
+     
+def test_conf_daily_short_range_split_vpu():
+    inputs.start_date = "DAILY_SHORT_RANGE"
+    inputs.end_date   = ""
+    inputs.forcing_split_vpu = "01,02,03W,16"
+    create_confs(inputs)
+    assert os.path.exists(CONF_NWM)
+    assert os.path.exists(CONF_FP)
+    assert os.path.exists(CONF_DATASTREAM)
+    assert os.path.exists(REALIZATION_META_USER)   
+    assert os.path.exists(REALIZATION_META_DS)   
+    assert os.path.exists(REALIZATION_RUN)  
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 1  
+
+    with open(CONF_FP,'r') as fp:
+        data = json.load(fp)   
+    assert len(data['forcing']['gpkg_file']) == 4
 
 
