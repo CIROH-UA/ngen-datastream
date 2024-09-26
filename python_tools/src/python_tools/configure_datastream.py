@@ -251,7 +251,7 @@ if __name__ == "__main__":
     parser.add_argument("--forcing_source", help="Option for source of forcings",default="")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
-    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
+    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="v2.1.1")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use",default=os.cpu_count())
     parser.add_argument("--host_platform", type=str,help="Type of host",default="")
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
