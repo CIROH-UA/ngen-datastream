@@ -13,7 +13,7 @@ import concurrent.futures as cf
 from datetime import datetime
 import gzip
 import tarfile, tempfile
-from forcingprocessor.weights_hf2ds import gpkgs2weightsjson
+from forcingprocessor.weights_hf2ds import hf2ds
 from forcingprocessor.plot_forcings import plot_ngen_forcings
 from forcingprocessor.utils import get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
 
@@ -791,7 +791,7 @@ def prep_ngen_data(conf):
     log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
     global weights_json
-    weights_json, jcatchment_dict = gpkgs2weightsjson(gpkg_files)
+    weights_json, jcatchment_dict = hf2ds(gpkg_files)
     ncatchments = len(weights_json)
     global x_min, x_max, y_min, y_max
     x_min, x_max, y_min, y_max = get_window(weights_json)
@@ -865,6 +865,7 @@ def prep_ngen_data(conf):
 
     if ii_plot:
         if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one geopackage')
+        if gpkg_files[0].endswith('.parquet'): raise Warning(f'Plotting currently not implemented for parquet, need geopackage')
         cat_ids = ['cat-' + x for x in forcing_cat_ids]
         jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
         if storage_type == "s3":
