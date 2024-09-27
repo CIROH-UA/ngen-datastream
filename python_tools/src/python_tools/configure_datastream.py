@@ -58,7 +58,7 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op,geo_base,hf_version):
+def create_conf_fp(date,nprocs,docker_mount,forcing_split_vpu,retro_or_op,geo_base,hf_version,run_type):
     if retro_or_op == "retrospective":
         filename = "retro_filenamelist.txt"
     else:
@@ -71,7 +71,7 @@ def create_conf_fp(start,end,nprocs,docker_mount,forcing_split_vpu,retro_or_op,g
             tmpl_cpy = copy.deepcopy(template)
             gpkg_file.append(re.sub(PATTERN_VPU, jvpu, tmpl_cpy))
 
-        output_path  = f"s3://ngen-datastream/forcings/{hf_version}/{start}-{end}"
+        output_path  = f"s3://ciroh-community-ngen-datastream/{date}/forcing_{run_type}"
         output_file_type = ["netcdf"]
     else:
         gpkg_file = [f"{docker_mount}/datastream-resources/config/{geo_base}"]
@@ -149,25 +149,30 @@ def create_confs(args):
             # allows for a "daily" run that is not the current date
             start_date = datetime.strptime(conf['globals']['end_date'],'%Y%m%d%H%M')
         retro_or_op="operational"
+        run_type='daily'
 
         if "SHORT_RANGE" in conf['globals']['start_date']: 
             duration = 18
             runinput = 1
+            run_type='short_range'
         if "MEDIUM_RANGE" in conf['globals']['start_date']: 
             duration = 240
             runinput = 2
+            run_type='medium_range'
 
         start_datetime0   = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
         end_datetime      = start_datetime0 + timedelta(hours=duration-1)     
         start_str         = start_datetime0.strftime('%Y%m%d%H%M')
+        date_str          = start_datetime0.strftime('%Y%m%d')
         start_realization = start_datetime0.strftime('%Y-%m-%d %H:%M:%S')        
         end_str           = end_datetime.strftime('%Y%m%d%H%M')
         end_realization   = end_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
         nwm_conf = create_conf_nwm(start_str, end_str, retro_or_op, runinput, urlbaseinput)
-        fp_conf  = create_conf_fp(start_str, end_str, conf['globals']['nprocs'],args.docker_mount,forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version) 
+        fp_conf  = create_conf_fp(date_str, conf['globals']['nprocs'],args.docker_mount,forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
 
     else: 
+        run_type='non-daily'
         if "OPERATIONAL" in args.forcing_source:    
             retro_or_op = "operational"   
             runinput = 2      
@@ -197,10 +202,10 @@ def create_confs(args):
             fp_conf['forcing'] = args.forcings
         elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
             nwm_conf = {}
-            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version) 
+            fp_conf  = create_conf_fp(start, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
         else:
             nwm_conf = create_conf_nwm(start,end, retro_or_op,runinput,urlbaseinput)
-            fp_conf  = create_conf_fp(start, end, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version) 
+            fp_conf  = create_conf_fp(start, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
 
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
