@@ -18,25 +18,12 @@ def test_parquet():
     weights,_ = hf2ds([parq_path])
     assert len(weights) > 0
 
+def test_parquet_lynker_spatial():
+    weights,_ = hf2ds(["https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet"])
+    assert len(weights) > 0    
+
 def test_gpkg():
     weights,_ = hf2ds([gpkg_path])
-    assert len(weights) > 0
-
-    weights_prep = []
-    for jweight in weights:
-        cell = weights[jweight][0]
-        cov  = weights[jweight][1]
-        jdict = {}
-        jdict['divide_id'] = jweight
-        jdict['cell'] = cell
-        jdict['coverage_fraction'] = cov
-        weights_prep.append(jdict)
-
-    df = pd.DataFrame.from_records(weights_prep)
-    df.to_parquet(out_parq)    
-
-def test_ds_parquet():
-    weights,_ = hf2ds([out_parq])
     assert len(weights) > 0
 
 

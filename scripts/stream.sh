@@ -389,7 +389,7 @@ echo "Generating ngen-datastream metadata"
 CONFIGURER=$DOCKER_PY"configure_datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python3 $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING

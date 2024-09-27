@@ -864,7 +864,7 @@ def prep_ngen_data(conf):
     runtime = time.perf_counter() - t_start
 
     if ii_plot:
-        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one geopackage')
+        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one file')
         if gpkg_files[0].endswith('.parquet'): raise Warning(f'Plotting currently not implemented for parquet, need geopackage')
         cat_ids = ['cat-' + x for x in forcing_cat_ids]
         jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
