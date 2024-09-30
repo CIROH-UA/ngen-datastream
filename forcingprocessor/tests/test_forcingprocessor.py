@@ -5,7 +5,9 @@ from datetime import datetime
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 import pytz as tz
+import pytest
 
+HF_VERSION="v2.1.1"
 date = datetime.now(tz.timezone('US/Eastern'))
 date = date.strftime('%Y%m%d')
 hourminute  = '0000'
@@ -21,7 +23,10 @@ pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
 retro_filenamelist = str((pwd/"retro_filenamelist.txt").resolve())
 geopackage_name = "palisade.gpkg"
-os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/{geopackage_name}")
+os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://ngen-datastream/palisade.gpkg")
+weights_name = "01_weights.parquet"
+os.system(f"curl -o {os.path.join(data_dir,weights_name)} -L -O https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{HF_VERSION}/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet")
+assert_file=(data_dir/f"forcings/cat-2586011.parquet").resolve()
 
 conf = {
     "forcing"  : {
@@ -72,9 +77,9 @@ def test_nomads_prod():
     generate_nwmfiles(nwmurl_conf)  
     conf['run']['collect_stats'] = True # test metadata generation once
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)       
+    conf['run']['collect_stats'] = False
+    assert assert_file.exists()
+    os.remove(assert_file)       
 
 def test_nomads_post_processed():
     assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/62'
@@ -83,9 +88,8 @@ def test_nomads_post_processed():
     nwmurl_conf["urlbaseinput"] = 2
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)  
+    assert assert_file.exists()
+    os.remove(assert_file)    
 
 def test_nwm_google_apis():
     nwmurl_conf['start_date'] = date + hourminute
@@ -93,9 +97,8 @@ def test_nwm_google_apis():
     nwmurl_conf["urlbaseinput"] = 3
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)    
+    assert assert_file.exists()
+    os.remove(assert_file)       
 
 def test_google_cloud_storage():
     nwmurl_conf['start_date'] = "202407100100"
@@ -103,9 +106,8 @@ def test_google_cloud_storage():
     nwmurl_conf["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)    
+    assert assert_file.exists()
+    os.remove(assert_file)       
 
 def test_gs():
     nwmurl_conf['start_date'] = date + hourminute
@@ -113,9 +115,8 @@ def test_gs():
     nwmurl_conf["urlbaseinput"] = 5
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)    
+    assert assert_file.exists()
+    os.remove(assert_file)       
 
 def test_gcs():
     nwmurl_conf['start_date'] = "202407100100"
@@ -123,9 +124,8 @@ def test_gcs():
     nwmurl_conf["urlbaseinput"] = 6
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)        
+    assert assert_file.exists()
+    os.remove(assert_file)         
 
 def test_noaa_nwm_pds_https():
     nwmurl_conf['start_date'] = date + hourminute
@@ -133,9 +133,8 @@ def test_noaa_nwm_pds_https():
     nwmurl_conf["urlbaseinput"] = 7
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)      
+    assert assert_file.exists()
+    os.remove(assert_file)     
 
 def test_noaa_nwm_pds_s3():
     nwmurl_conf['start_date'] = date + hourminute
@@ -143,9 +142,8 @@ def test_noaa_nwm_pds_s3():
     nwmurl_conf["urlbaseinput"] = 8
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)     
+    assert assert_file.exists()
+    os.remove(assert_file)       
 
 def test_ciroh_zarr():
     assert False, "Not implemented"
@@ -154,27 +152,24 @@ def test_ciroh_zarr():
     nwmurl_conf["urlbaseinput"] = 9
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)     
+    assert assert_file.exists()
+    os.remove(assert_file)        
 
 def test_retro_2_1_https():
     conf['forcing']['nwm_file'] = retro_filenamelist
     nwmurl_conf_retro["urlbaseinput"] = 1
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)  
+    assert assert_file.exists()
+    os.remove(assert_file)     
 
 def test_retro_2_1_s3():
     conf['forcing']['nwm_file'] = retro_filenamelist
     nwmurl_conf_retro["urlbaseinput"] = 2
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)            
+    assert assert_file.exists()
+    os.remove(assert_file)               
 
 def test_retro_ciroh_zarr():
     assert False, "Not implemented"
@@ -182,18 +177,16 @@ def test_retro_ciroh_zarr():
     nwmurl_conf_retro["urlbaseinput"] = 3
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)         
+    assert assert_file.exists()
+    os.remove(assert_file)          
 
 def test_retro_3_0():
     conf['forcing']['nwm_file'] = retro_filenamelist
     nwmurl_conf_retro["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
-    parquet = (data_dir/"forcings/cat-2586011.parquet").resolve()
-    assert parquet.exists()
-    os.remove(parquet)        
+    assert assert_file.exists()
+    os.remove(assert_file)          
 
 def test_plotting():
     conf['forcing']['nwm_file'] = retro_filenamelist
@@ -209,7 +202,24 @@ def test_plotting():
     assert GIF.exists()
     os.remove(GIF)         
 
+def test_s3_output():
+    test_bucket = "ciroh-community-ngen-datastream"
+    conf['forcing']['nwm_file'] = retro_filenamelist
+    conf['storage']['storage_type'] = 's3'
+    conf['storage']['output_path'] = f's3://{test_bucket}/pytest_fp/'
+    nwmurl_conf_retro["urlbaseinput"] = 4
+    generate_nwmfiles(nwmurl_conf_retro)
+    prep_ngen_data(conf)   
+    os.system(f"aws s3api wait object-exists --bucket {test_bucket} --key {test_bucket}/pytest_fp/forcings/1_forcings.nc")
+    os.system(f"aws s3api delete-object --bucket {test_bucket} --key {test_bucket}/pytest_fp/forcings/1_forcings.nc")   
+    conf['storage']['storage_type'] = 'local'
+    conf['storage']['output_path'] = str(data_dir)
 
-    
-    
+def test_muliple_weights():
+    conf['forcing']['nwm_file'] = retro_filenamelist
+    nwmurl_conf_retro["urlbaseinput"] = 4
+    conf['forcing']['gpkg_file'] = ["https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet","https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D02/part-0.parquet"]
+    generate_nwmfiles(nwmurl_conf_retro)
+    prep_ngen_data(conf)   
+
     

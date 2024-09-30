@@ -65,7 +65,7 @@ def create_conf_fp(date,nprocs,docker_mount,forcing_split_vpu,retro_or_op,geo_ba
         filename = "filenamelist.txt"
     
     if len(forcing_split_vpu) > 0:
-        template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/${hf_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
+        template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{hf_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
         gpkg_file = []
         for jvpu in forcing_split_vpu:
             tmpl_cpy = copy.deepcopy(template)

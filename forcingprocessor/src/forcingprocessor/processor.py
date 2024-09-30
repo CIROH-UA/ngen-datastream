@@ -778,13 +778,6 @@ def prep_ngen_data(conf):
                 bucket,
                 filenamelist_path
             )
-        for jgpkg in gpkg_files:
-            gpkg_path = f"{key}/{os.path.basename(jgpkg)}"
-            s3.upload_file(
-                jgpkg,
-                bucket,
-                gpkg_path
-            )
 
     log_time("CONFIGURATION_END", log_file) 
 
