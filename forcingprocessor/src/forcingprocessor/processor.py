@@ -731,7 +731,7 @@ def prep_ngen_data(conf):
             jtype in file_types
         ), f"{jtype} for output_file_type is not accepted! Accepted: {file_types}"
     global storage_type
-    if "s3" in output_path:
+    if "s3://" in output_path:
         storage_type = "s3"
     elif "google" in output_path:
         storage_type = "google"

@@ -64,7 +64,7 @@ def create_conf_fp(date,nprocs,docker_mount,forcing_split_vpu,retro_or_op,geo_ba
     else:
         filename = "filenamelist.txt"
     
-    if len(forcing_split_vpu) > 0:
+    if len(forcing_split_vpu[0]) > 0:
         template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{hf_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
         gpkg_file = []
         for jvpu in forcing_split_vpu:
@@ -169,7 +169,14 @@ def create_confs(args):
         end_realization   = end_datetime.strftime('%Y-%m-%d %H:%M:%S')
 
         nwm_conf = create_conf_nwm(start_str, end_str, retro_or_op, runinput, urlbaseinput)
-        fp_conf  = create_conf_fp(date_str, conf['globals']['nprocs'],args.docker_mount,forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
+        fp_conf  = create_conf_fp(date_str, 
+                                  conf['globals']['nprocs'],
+                                  args.docker_mount,
+                                  forcing_split_vpu,
+                                  retro_or_op,
+                                  geo_base,
+                                  args.hydrofabric_version,
+                                  run_type) 
 
     else: 
         run_type='non-daily'
@@ -205,7 +212,14 @@ def create_confs(args):
             fp_conf  = create_conf_fp(start, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
         else:
             nwm_conf = create_conf_nwm(start,end, retro_or_op,runinput,urlbaseinput)
-            fp_conf  = create_conf_fp(start, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
+            fp_conf  = create_conf_fp(start,
+                                      conf['globals']['nprocs'],
+                                      args.docker_mount, 
+                                      forcing_split_vpu,
+                                      retro_or_op,
+                                      geo_base,
+                                      args.hydrofabric_version,
+                                      run_type) 
 
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    

@@ -86,6 +86,10 @@ def test_conf_basic():
     assert os.path.exists(REALIZATION_META_DS)   
     assert os.path.exists(REALIZATION_RUN) 
 
+    with open(CONF_FP,'r') as fp:
+        data = json.load(fp)   
+    assert data['storage']['output_path'] == "/mounted_dir/ngen-run"  
+
 def test_conf_daily():
     inputs.start_date = "DAILY"
     inputs.end_date   = ""
@@ -195,5 +199,6 @@ def test_conf_daily_short_range_split_vpu():
     with open(CONF_FP,'r') as fp:
         data = json.load(fp)   
     assert len(data['forcing']['gpkg_file']) == 4
+    assert data['storage']['output_path'].startswith("s3://ciroh-community-ngen-datastream/")
 
 
