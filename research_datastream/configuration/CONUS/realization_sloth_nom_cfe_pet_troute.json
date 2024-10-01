@@ -7,7 +7,6 @@
           "name": "bmi_multi",
           "model_type_name": "bmi_multi",
           "main_output_variable": "Q_OUT",
-          "forcing_file": "",
           "init_config": "",
           "allow_exceed_end_time": true,
           "modules": [
