@@ -7,6 +7,27 @@ import psutil
 
 PATTERN_VPU = r'\$VPU'
 
+NWMURL_RUN_INPUT_MAPPING = {
+    "SHORT_RANGE": 1,
+    "MEDIUM_RANGE": 2,
+    "MEDIUM_RANGE_NO_DA": 3,
+    "LONG_RANGE": 4,
+    "ANALYSIS_ASSIM": 5,
+    "ANALYSIS_ASSIM_EXTEND": 6,
+    "ANALYSIS_ASSIM_EXTEND_NO_DA": 7,
+    "ANALYSIS_ASSIM_LONG": 8,
+    "ANALYSIS_ASSIM_LONG_NO_DA": 9,
+    "ANALYSIS_ASSIM_NO_DA": 10,
+    "SHORT_RANGE_NO_DA": 11
+}
+
+NWMURL_NUM_HRS_MAPPING = {
+    "SHORT_RANGE": 18,
+    "MEDIUM_RANGE": 240,
+    "ANALYSIS_ASSIM": 3,
+    "ANALYSIS_ASSIM_EXTEND": 28,
+}
+
 def bytes2human(n):
     # http://code.activestate.com/recipes/578019
     # >>> bytes2human(10000)
@@ -58,47 +79,30 @@ def write_json(conf, out_dir, name):
         json.dump(conf, fp, indent=2)
     return conf_path
 
-def create_conf_fp(date,nprocs,docker_mount,forcing_split_vpu,retro_or_op,geo_base,hf_version,run_type):
-    if retro_or_op == "retrospective":
-        filename = "retro_filenamelist.txt"
+def create_conf_nwm(args):    
+    start = args.start_date
+    end   = args.end_date  
+
+    if "DAILY" in start:
+        if end == "":
+            start_dt = datetime.now(tz.timezone('US/Eastern'))
+        else:
+            start_dt = datetime.strptime(end,'%Y%m%d%H%M') 
+        end_dt = start_dt
     else:
-        filename = "filenamelist.txt"
-    
-    if len(forcing_split_vpu[0]) > 0:
-        template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{hf_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
-        gpkg_file = []
-        for jvpu in forcing_split_vpu:
-            tmpl_cpy = copy.deepcopy(template)
-            gpkg_file.append(re.sub(PATTERN_VPU, jvpu, tmpl_cpy))
+        start_dt = datetime.strptime(start,'%Y%m%d%H%M')
+        end_dt   = datetime.strptime(end,'%Y%m%d%H%M')  
 
-        output_path  = f"s3://ciroh-community-ngen-datastream/{date}/forcing_{run_type}"
-        output_file_type = ["netcdf"]
-    else:
-        gpkg_file = [f"{docker_mount}/datastream-resources/config/{geo_base}"]
-        output_path = f"{docker_mount}/ngen-run"
-        output_file_type = ["netcdf"]
-
-    fp_conf = {
-        "forcing" : {
-            "nwm_file"     : f"{docker_mount}/datastream-metadata/{filename}",
-            "gpkg_file"    : gpkg_file,
-        },
-        "storage" : {
-            "output_path"      : output_path,
-            "output_file_type" : output_file_type,
-        },
-        "run" : {
-            "verbose"        : True,
-            "collect_stats"  : True,
-            "nprocs"         : min(os.cpu_count(),nprocs),
-        }
-    }
-
-    return fp_conf
-
-def create_conf_nwm(start, end, retro_or_op,runinput,urlbaseinput):
-
-    if retro_or_op == "retrospective":
+    start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
+    end_dt   = end_dt.replace(hour=1,minute=0,second=0,microsecond=0)
+    start_str = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
+    end_str   = end_dt.strftime('%Y-%m-%d %H:%M:%S')            
+                           
+    if "RETRO" in args.forcing_source:                    
+        if "V2" in args.forcing_source:
+            urlbaseinput = 1
+        if "V3" in args.forcing_source:
+            urlbaseinput = 4         
         nwm_conf = {
         "forcing_type" : "retrospective",
         "start_date"   : start,
@@ -109,117 +113,119 @@ def create_conf_nwm(start, end, retro_or_op,runinput,urlbaseinput):
         "write_to_file"        : True
         }   
     else:
-        start_df = datetime.strptime(start,'%Y%m%d%H%M')
-        end_df   = datetime.strptime(end,'%Y%m%d%H%M')
-        diff_days = (end_df - start_df).days
-        if diff_days == 0:
-            num_hrs = int((end_df - start_df).seconds / 3600) + 1
-        else:
-            num_hrs = 24
+        varinput = 5
+        num_hrs = (end_dt - start_dt).seconds // 3600
 
+        if "HAWAII" in args.forcing_source:
+            geoinput=2
+        elif "PUERTORICO" in args.forcing_source:
+            geoinput=3 
+        else:
+            geoinput=1
+
+        if "NOMADS" in args.forcing_source:
+            urlbaseinput = 1
+            if "POSTPROCESSED" in args.forcing_source:
+                urlbaseinput = 2         
+        elif "NWM" in args.forcing_source: 
+            urlbaseinput = 7
+        else:
+            raise Exception(f'Forcing source {args.forcing_source} not understood')
+        
+        dt = 1
+        if "SHORT_RANGE" in args.forcing_source:
+            runinput=1
+            num_hrs=18
+        elif "MEDIUM_RANGE" in args.forcing_source:
+            runinput=2
+            num_hrs=240   
+        elif "ANALYSIS_ASSIM" in args.forcing_source:
+            if "EXTEND" in args.forcing_source:
+                runinput=6
+                num_hrs=28
+                dt=0 
+            else:
+                runinput=5
+                num_hrs=3
+        else:
+            runinput=2
+    
         nwm_conf = {
             "forcing_type" : "operational_archive",
             "start_date"   : start,
             "end_date"     : end,
             "runinput"     : runinput,
-            "varinput"     : 5,
-            "geoinput"     : 1,
+            "varinput"     : varinput,
+            "geoinput"     : geoinput,
             "meminput"     : 0,
             "urlbaseinput" : urlbaseinput,
             "fcst_cycle"   : [0],
-            "lead_time"    : [x+1 for x in range(num_hrs)]
+            "lead_time"    : [x+dt for x in range(num_hrs)]
         }
 
-    return nwm_conf  
+    return nwm_conf, start_str, end_str
+
+def create_conf_fp(args):
+    geo_base = args.gpkg.split('/')[-1]      
+    if "RETRO" in args.forcing_source:
+        filename = "retro_filenamelist.txt"
+    else:
+        filename = "filenamelist.txt"
+
+    output_file_type = ["netcdf"]
+    if len(args.s3_bucket) > 0:
+        output_path  = f"s3://{args.s3_bucket}/{args.s3_prefix}"
+    elif len(args.docker_mount) > 0:
+        gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
+        output_path = f"{args.docker_mount}/ngen-run"  
+    
+    if len(args.forcing_split_vpu) > 0:
+        template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{args.hydrofabric_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
+        gpkg_file = []
+        for jvpu in args.forcing_split_vpu.split(','):
+            tmpl_cpy = copy.deepcopy(template)
+            gpkg_file.append(re.sub(PATTERN_VPU, jvpu, tmpl_cpy))
+    else:
+        gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
+
+    fp_conf = {
+        "forcing" : {
+            "nwm_file"     : f"{args.docker_mount}/datastream-metadata/{filename}",
+            "gpkg_file"    : gpkg_file,
+        },
+        "storage" : {
+            "output_path"      : output_path,
+            "output_file_type" : output_file_type,
+        },
+        "run" : {
+            "verbose"        : True,
+            "collect_stats"  : True,
+            "nprocs"         : min(os.cpu_count(),args.nprocs),
+        }
+    }
+
+    return fp_conf 
 
 def create_confs(args):
-    forcing_split_vpu = args.forcing_split_vpu.split(',')  
     conf = config_class2dict(args)
     realization = args.realization_file
-    geo_base = args.gpkg.split('/')[-1]      
-        
-    if "DAILY" in conf['globals']['start_date']:
-        retro_or_op = "operational" 
-        urlbaseinput = 7
-        duration     = 24
-        runinput     = 2
-        if conf['globals']['end_date'] == "":
-            start_date = datetime.now(tz.timezone('US/Eastern'))
-        else:
-            # allows for a "daily" run that is not the current date
-            start_date = datetime.strptime(conf['globals']['end_date'],'%Y%m%d%H%M')
-        retro_or_op="operational"
-        run_type='daily'
 
-        if "SHORT_RANGE" in conf['globals']['start_date']: 
-            duration = 18
-            runinput = 1
-            run_type='short_range'
-        if "MEDIUM_RANGE" in conf['globals']['start_date']: 
-            duration = 240
-            runinput = 2
-            run_type='medium_range'
+    if args.start_date != 'DAILY':
+        start_dt = datetime.strptime(args.start_date,'%Y%m%d%H%M')
+        end_dt   = datetime.strptime(args.end_date,'%Y%m%d%H%M')  
+        start_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
+        end_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S')  
 
-        start_datetime0   = start_date.replace(hour=1, minute=0, second=0, microsecond=0)
-        end_datetime      = start_datetime0 + timedelta(hours=duration-1)     
-        start_str         = start_datetime0.strftime('%Y%m%d%H%M')
-        date_str          = start_datetime0.strftime('%Y%m%d')
-        start_realization = start_datetime0.strftime('%Y-%m-%d %H:%M:%S')        
-        end_str           = end_datetime.strftime('%Y%m%d%H%M')
-        end_realization   = end_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-        nwm_conf = create_conf_nwm(start_str, end_str, retro_or_op, runinput, urlbaseinput)
-        fp_conf  = create_conf_fp(date_str, 
-                                  conf['globals']['nprocs'],
-                                  args.docker_mount,
-                                  forcing_split_vpu,
-                                  retro_or_op,
-                                  geo_base,
-                                  args.hydrofabric_version,
-                                  run_type) 
-
-    else: 
-        run_type='non-daily'
-        if "OPERATIONAL" in args.forcing_source:    
-            retro_or_op = "operational"   
-            runinput = 2      
-            if "V3" in args.forcing_source:
-                urlbaseinput = 7
-            if "NOMADS" in args.forcing_source:
-                urlbaseinput = 1                   
-        elif "RETRO" in args.forcing_source:   
-            retro_or_op = "retrospective"   
-            runinput = None       
-            if "V2" in args.forcing_source:
-                urlbaseinput = 1
-            if "V3" in args.forcing_source:
-                urlbaseinput = 4 
-        else:
-            raise Exception(f'forcing_source not understood, lacks either OPERATIONAL or RETRO')
-
-        start = conf['globals']['start_date']
-        end   = conf['globals']['end_date']
-        start_realization_dt = datetime.strptime(start,'%Y%m%d%H%M')
-        end_realization_dt = datetime.strptime(end,'%Y%m%d%H%M')
-        start_realization =  start_realization_dt.strftime('%Y-%m-%d %H:%M:%S')
-        end_realization   = end_realization_dt.strftime('%Y-%m-%d %H:%M:%S')
-        if args.forcings.endswith(".nc") or args.forcings.endswith(".tar.gz"):
-            nwm_conf = {}
-            fp_conf = {}
-            fp_conf['forcing'] = args.forcings
-        elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
-            nwm_conf = {}
-            fp_conf  = create_conf_fp(start, conf['globals']['nprocs'], args.docker_mount, forcing_split_vpu,retro_or_op,geo_base,args.hydrofabric_version,run_type) 
-        else:
-            nwm_conf = create_conf_nwm(start,end, retro_or_op,runinput,urlbaseinput)
-            fp_conf  = create_conf_fp(start,
-                                      conf['globals']['nprocs'],
-                                      args.docker_mount, 
-                                      forcing_split_vpu,
-                                      retro_or_op,
-                                      geo_base,
-                                      args.hydrofabric_version,
-                                      run_type) 
+    if args.forcings.endswith(".nc") or args.forcings.endswith(".tar.gz"):
+        nwm_conf = {}
+        fp_conf = {}
+        fp_conf['forcing'] = args.forcings
+    elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
+        nwm_conf = {}
+        fp_conf  = create_conf_fp(args) 
+    else:
+        nwm_conf, start_real, end_real = create_conf_nwm(args)
+        fp_conf  = create_conf_fp(args) 
 
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
@@ -245,8 +251,8 @@ def create_confs(args):
         data = json.load(fp)
     write_json(data,datastream_meta_dir,'realization_user.json')
 
-    data['time']['start_time'] = start_realization
-    data['time']['end_time']   = end_realization    
+    data['time']['start_time'] = start_real
+    data['time']['end_time']   = end_real    
     if args.forcings.endswith(".tar.gz"):
         data['global']['forcing']['file_pattern'] = ".*{{id}}.*.csv"
         data['global']['forcing']['path'] = "./forcings"
@@ -267,7 +273,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
     parser.add_argument("--resource_path", help="Set the resource directory",default="")
     parser.add_argument("--forcings", help="Set the forcings file or directory",default="")
-    parser.add_argument("--forcing_source", help="Option for source of forcings",default="")
+    parser.add_argument("--forcing_source", type=str,help="Option for source of forcings",default="NWM_V3")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
     parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="v2.1.1")
@@ -275,8 +281,10 @@ if __name__ == "__main__":
     parser.add_argument("--host_platform", type=str,help="Type of host",default="")
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
-    parser.add_argument("--forcing_split_vpu", type=str,help="true for forcingprocessor split",default="")
+    parser.add_argument("--forcing_split_vpu", type=str,help="list of vpus",default="")
     parser.add_argument("--realization_file", type=str,help="ngen realization file",required=True)
+    parser.add_argument("--s3_bucket", type=str,help="s3 bucket to write to",default="")
+    parser.add_argument("--s3_prefix", type=str,help="s3 prefix to prepend to files",required="")    
 
     args = parser.parse_args()      
     create_confs(args)

@@ -467,7 +467,7 @@ def write_data(
                 bandwidth_Mbps = rate * file_size_MB * ntasked * bytes2bits
                 estimate_total_time = nfiles * ntasked / rate
                 report_usage()
-                msg = f"\n{(j+1)*ntasked} files written out of {nfiles*ntasked}\n"
+                msg = f"\n{(j+1)*ntasked} dataframes converted out of {nfiles*ntasked}\n"
                 msg += f"rate             {rate:.2f} files/s\n"
                 msg += f"df conversion    {t_df:.2f}s\n"
                 if storage_type == "s3": msg += f"buff             {t_buff:.2f}s\n"
@@ -755,9 +755,6 @@ def prep_ngen_data(conf):
             json.dump(conf, f)
         cp_cmd = f'cp {nwm_file} {metaf_path}'
         os.system(cp_cmd)
-        for jgpkg in gpkg_files:
-            cp_cmd = f'cp {jgpkg} {metaf_path}'
-            os.system(cp_cmd)
 
     elif storage_type == "s3":
         bucket_path  = output_path

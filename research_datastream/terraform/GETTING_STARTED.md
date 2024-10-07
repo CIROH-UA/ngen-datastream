@@ -33,7 +33,7 @@ This will set your user to `root`. Type `exit` to return back to `ec2-user`. The
 
 Second, install required packages
 ```
-curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_arm64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_arm64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo dnf install git pip pigz awscli python -y
+curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_arm64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_arm64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo dnf install git pip pigz awscli -y
 ```
 
 Next, clone this repository

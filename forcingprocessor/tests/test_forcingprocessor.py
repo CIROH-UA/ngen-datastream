@@ -13,6 +13,7 @@ date = date.strftime('%Y%m%d')
 hourminute  = '0000'
 test_dir = Path(__file__).parent
 data_dir = (test_dir/'data').resolve()
+forcings_dir = (data_dir/'forcings').resolve()
 pwd      = Path.cwd()
 pwd      = pwd
 data_dir = data_dir
@@ -23,7 +24,7 @@ pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
 retro_filenamelist = str((pwd/"retro_filenamelist.txt").resolve())
 geopackage_name = "palisade.gpkg"
-os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://ngen-datastream/palisade.gpkg")
+os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg")
 weights_name = "01_weights.parquet"
 os.system(f"curl -o {os.path.join(data_dir,weights_name)} -L -O https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{HF_VERSION}/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet")
 assert_file=(data_dir/f"forcings/cat-2586011.parquet").resolve()
@@ -69,6 +70,11 @@ nwmurl_conf_retro = {
         "selected_var_types"   : [6],
         "write_to_file" : True
     }
+
+@pytest.fixture
+def clean_dir(autouse=True):
+    if os.path.exists(forcings_dir):
+        os.system(f'rm -rf {str(forcings_dir)}')
 
 def test_nomads_prod():
     nwmurl_conf['start_date'] = date + hourminute
@@ -198,6 +204,7 @@ def test_plotting():
     nwmurl_conf_retro["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
+    del conf['plot']
     GIF = (data_dir/"metadata/GIFs/T2D_2_TMP_2maboveground.gif").resolve()
     assert GIF.exists()
     os.remove(GIF)         
@@ -205,15 +212,16 @@ def test_plotting():
 def test_s3_output():
     test_bucket = "ciroh-community-ngen-datastream"
     conf['forcing']['nwm_file'] = retro_filenamelist
-    conf['storage']['storage_type'] = 's3'
-    conf['storage']['output_path'] = f's3://{test_bucket}/pytest_fp/'
+    conf['storage']['output_path'] = f's3://{test_bucket}/pytest_fp'
+    conf['storage']['output_file_type'] = ["netcdf"]
     nwmurl_conf_retro["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf_retro)
-    prep_ngen_data(conf)   
-    os.system(f"aws s3api wait object-exists --bucket {test_bucket} --key {test_bucket}/pytest_fp/forcings/1_forcings.nc")
-    os.system(f"aws s3api delete-object --bucket {test_bucket} --key {test_bucket}/pytest_fp/forcings/1_forcings.nc")   
-    conf['storage']['storage_type'] = 'local'
+    prep_ngen_data(conf)     
     conf['storage']['output_path'] = str(data_dir)
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/forcings/1_forcings.nc')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/conf_fp.json')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/retro_filenamelist.txt')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/profile_fp.txt')
 
 def test_muliple_weights():
     conf['forcing']['nwm_file'] = retro_filenamelist
@@ -221,5 +229,6 @@ def test_muliple_weights():
     conf['forcing']['gpkg_file'] = ["https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet","https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D02/part-0.parquet"]
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)   
+    os.system(f"rm -rf {data_dir}")
 
     

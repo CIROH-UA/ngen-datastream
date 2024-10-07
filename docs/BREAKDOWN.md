@@ -14,7 +14,7 @@ Imagine we want to study the variation in NextGen configurations of retrospectiv
 * [NextGen Execution](#nextgen-execution)
 * [Equivalent Command](#equivalent-command)
 
-Before proceeding, please review the [usage](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/USAGE.md) document and the [ngen-run](https://github.com/CIROH-UA/ngen-datastream/tree/main?tab=readme-ov-file#ngen-run) standard run directory portion of the repo's main [README](https://github.com/CIROH-UA/ngen-datastream/blob/main/README.md).
+Before proceeding, please review the [usage](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/USAGE.md) document and the [standard directions](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/STANDARD_DIRECTORIES.md) with special attention to the [ngen-run](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/STANDARD_DIRECTORIES.md#ngen-run) standard run directory portion.
 
 ## Prepare Directories
 As you've now read, NextGen in a Box requires a standard directory structure. In this step we prepare that directory and will write data to it in the following steps.
@@ -196,7 +196,7 @@ python ./python/src/datastream/ngen_configs_gen.py \
 Inspect `./palisade_2019/ngen-run/config` to see what BMI model configuration files were created.
 
 ## Validation
-We have now completed the required steps to generate the input data package for a NextGen simulation. As you can tell by now, there are many steps and thus many places to make a mistake. The `run-validator.py` script provides a quick way to check that the input data package contains the required files and that they are consistent to one another. See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/python#run_validatorpy) for an explanation of the validation. 
+We have now completed the required steps to generate the input data package for a NextGen simulation. As you can tell by now, there are many steps and thus many places to make a mistake. The `run-validator.py` script provides a quick way to check that the input data package contains the required files and that they are consistent to one another. See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/python_tools#run_validatorpy) for an explanation of the validation. 
 
 Execute the validator on the `ngen-run` package we have created.
 ```

@@ -34,7 +34,9 @@ class Inputs:
                  host_os="",
                  domain_name="Not Specified",
                  forcing_split_vpu="",
-                 realization_file=""):
+                 realization_file="",
+                 s3_bucket="",
+                 s3_prefix=""):
         self.docker_mount = docker_mount
         self.start_date = start_date
         self.end_date = end_date
@@ -51,6 +53,8 @@ class Inputs:
         self.domain_name = domain_name
         self.forcing_split_vpu = forcing_split_vpu
         self.realization_file = realization_file
+        self.s3_bucket = s3_bucket
+        self.s3_prefix = s3_prefix
 
 inputs = Inputs(
     docker_mount = "/mounted_dir",
@@ -68,7 +72,9 @@ inputs = Inputs(
     host_os = "Linux",
     domain_name = "",
     forcing_split_vpu = "",
-    realization_file = str(REALIZATION_ORIG)
+    realization_file = str(REALIZATION_ORIG),
+    s3_bucket="",
+    s3_prefix=""
 )
 
 @pytest.fixture
@@ -77,8 +83,7 @@ def clean_dir(autouse=True):
         os.system(f'rm -rf {str(DATA_DIR)}')
     os.system(f'mkdir {str(DATA_DIR)}')
 
-def test_conf_basic():
-    create_confs(inputs)
+def check_paths():
     assert os.path.exists(CONF_NWM)
     assert os.path.exists(CONF_FP)
     assert os.path.exists(CONF_DATASTREAM)
@@ -86,20 +91,21 @@ def test_conf_basic():
     assert os.path.exists(REALIZATION_META_DS)   
     assert os.path.exists(REALIZATION_RUN) 
 
+def test_conf_basic():
+    create_confs(inputs)
+    check_paths()
+
     with open(CONF_FP,'r') as fp:
         data = json.load(fp)   
     assert data['storage']['output_path'] == "/mounted_dir/ngen-run"  
+    assert data['forcing']['gpkg_file'][0] == "/mounted_dir/datastream-resources/config/palisade.gpkg"
 
 def test_conf_daily():
     inputs.start_date = "DAILY"
     inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3"
     create_confs(inputs)
-    assert os.path.exists(CONF_NWM)
-    assert os.path.exists(CONF_FP)
-    assert os.path.exists(CONF_DATASTREAM)
-    assert os.path.exists(REALIZATION_META_USER)   
-    assert os.path.exists(REALIZATION_META_DS)   
-    assert os.path.exists(REALIZATION_RUN)  
+    check_paths()
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
@@ -113,13 +119,9 @@ def test_conf_daily():
 def test_conf_daily_pick():
     inputs.start_date = "DAILY"
     inputs.end_date   = "202006200000"
+    inputs.forcing_source = "NWM_RETRO_V3"
     create_confs(inputs)
-    assert os.path.exists(CONF_NWM)
-    assert os.path.exists(CONF_FP)
-    assert os.path.exists(CONF_DATASTREAM)
-    assert os.path.exists(REALIZATION_META_USER)   
-    assert os.path.exists(REALIZATION_META_DS)   
-    assert os.path.exists(REALIZATION_RUN)  
+    check_paths()
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
@@ -128,19 +130,14 @@ def test_conf_daily_pick():
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)
-    assert data['urlbaseinput'] == 7
-    assert data['runinput']     == 2
+    assert data['urlbaseinput'] == 4
 
 def test_conf_daily_short_range():
-    inputs.start_date = "DAILY_SHORT_RANGE"
+    inputs.start_date = "DAILY"
     inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_SHORT_RANGE"
     create_confs(inputs)
-    assert os.path.exists(CONF_NWM)
-    assert os.path.exists(CONF_FP)
-    assert os.path.exists(CONF_DATASTREAM)
-    assert os.path.exists(REALIZATION_META_USER)   
-    assert os.path.exists(REALIZATION_META_DS)   
-    assert os.path.exists(REALIZATION_RUN)  
+    check_paths()
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
@@ -153,15 +150,11 @@ def test_conf_daily_short_range():
     assert data['runinput']     == 1   
 
 def test_conf_daily_medium_range():
-    inputs.start_date = "DAILY_MEDIUM_RANGE"
+    inputs.start_date = "DAILY"
     inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_MEDIUM_RANGE"
     create_confs(inputs)
-    assert os.path.exists(CONF_NWM)
-    assert os.path.exists(CONF_FP)
-    assert os.path.exists(CONF_DATASTREAM)
-    assert os.path.exists(REALIZATION_META_USER)   
-    assert os.path.exists(REALIZATION_META_DS)   
-    assert os.path.exists(REALIZATION_RUN)  
+    check_paths()
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
@@ -171,20 +164,51 @@ def test_conf_daily_medium_range():
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
     assert data['urlbaseinput'] == 7 
-    assert data['runinput']     == 2     
+    assert data['runinput']     == 2    
 
-     
-def test_conf_daily_short_range_split_vpu():
-    inputs.start_date = "DAILY_SHORT_RANGE"
+def test_conf_daily_noamds():
+    inputs.start_date = "DAILY"
     inputs.end_date   = ""
+    inputs.forcing_source = "NOMADS_MEDIUM_RANGE"
+    create_confs(inputs)
+    check_paths()
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 1 
+    assert data['runinput']     == 2      
+
+def test_conf_daily_noamds_postprocessed():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = ""
+    inputs.forcing_source = "NOMADS_POSTPROCESSED_MEDIUM_RANGE"
+    create_confs(inputs)
+    check_paths()
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 2
+    assert data['runinput']     == 2  
+
+def test_conf_daily_assim_split_vpu_s3out():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_ANALYSIS_ASSIM"
     inputs.forcing_split_vpu = "01,02,03W,16"
+    inputs.s3_bucket = "ciroh-community-ngen-datastream"
+    inputs.s3_prefix = "pytest"
     create_confs(inputs)
-    assert os.path.exists(CONF_NWM)
-    assert os.path.exists(CONF_FP)
-    assert os.path.exists(CONF_DATASTREAM)
-    assert os.path.exists(REALIZATION_META_USER)   
-    assert os.path.exists(REALIZATION_META_DS)   
-    assert os.path.exists(REALIZATION_RUN)  
+    check_paths()
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
@@ -194,11 +218,39 @@ def test_conf_daily_short_range_split_vpu():
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
     assert data['urlbaseinput'] == 7 
-    assert data['runinput']     == 1  
+    assert data['runinput']     == 5 
+    assert len(data['lead_time'] ) == 3
 
     with open(CONF_FP,'r') as fp:
         data = json.load(fp)   
     assert len(data['forcing']['gpkg_file']) == 4
-    assert data['storage']['output_path'].startswith("s3://ciroh-community-ngen-datastream/")
+    assert data['storage']['output_path'].startswith("s3://ciroh-community-ngen-datastream/pytest")    
+
+     
+def test_conf_daily_assim_extend_split_vpu_s3out():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_ANALYSIS_ASSIM_EXTEND"
+    inputs.forcing_split_vpu = "01,02,03W,16"
+    inputs.s3_bucket = "ciroh-community-ngen-datastream"
+    inputs.s3_prefix = "pytest"
+    create_confs(inputs)
+    check_paths()
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 6
+    assert len(data['lead_time'] ) == 28
+
+    with open(CONF_FP,'r') as fp:
+        data = json.load(fp)   
+    assert len(data['forcing']['gpkg_file']) == 4
+    assert data['storage']['output_path'].startswith("s3://ciroh-community-ngen-datastream/pytest")
 
 

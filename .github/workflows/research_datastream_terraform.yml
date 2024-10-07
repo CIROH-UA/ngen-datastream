@@ -33,7 +33,7 @@ jobs:
           cd research_datastream/terraform
           terraform init
           terraform validate
-          ./test/import_resources.sh ./test/variables_gitactions.tfvars
+          ../scripts/import_resources.sh ./test/variables_gitactions.tfvars
           terraform apply -var-file=./test/variables_gitactions.tfvars -auto-approve
           sleep 60
 

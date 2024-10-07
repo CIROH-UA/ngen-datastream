@@ -23,7 +23,7 @@ def hf2ds(files : list):
     jcatchment_dict = {}
     count = 0
     for jgpkg in files:
-        pattern = r'VPU_([^/]+)'
+        pattern = r'vpuid%3D([^/]+)'
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
@@ -31,7 +31,7 @@ def hf2ds(files : list):
             jname = str(count)    
         new_dict = hydrofabric2datastream_weights(jgpkg)
         weights_json = weights_json | new_dict
-        jcatchment_dict[jname] = list(weights_json.keys())
+        jcatchment_dict[jname] = list(new_dict.keys())
 
     return weights_json, jcatchment_dict
 

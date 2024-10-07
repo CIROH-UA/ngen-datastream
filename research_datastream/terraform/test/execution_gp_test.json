@@ -8,10 +8,10 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-041f4ef35649c11b0",
+  "ImageId"            : "ami-00e73ddc3a6fc7dfe",
   "InstanceType"       : "t4g.nano",
   "KeyName"            : "actions_key",
-  "SecurityGroupIds"   : ["sg-049e002d41bce813c"],
+  "SecurityGroupIds"   : ["sg-06f57f883e902d7bc"],
   "IamInstanceProfile": {
     "Name": "datastream_ec2_profile_github_actions"
   },

@@ -38,7 +38,10 @@ jobs:
 
     - name: Get geopackage from hfsubset
       run: |
-        hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o palisade.gpkg -t hl "Gages-09106150"
+        # HFSUBSET IS BROKEN
+        # hfsubset -w medium_range -s nextgen -v 2.1.1 -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o palisade.gpkg -t hl "Gages-09106150"
+        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+
 
     - name: Base test and NWM_RETRO_V3
       run: |        
@@ -73,26 +76,32 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/stream.sh -r ./data/cache/datastream-resources-no-forcings -s 201906200100 -e 201906200200 -C NWM_RETRO_V2 -d $(pwd)/data/datastream_test        
         
+    - name: Forcings sources option test NWM_RETRO_V3
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -r ./data/cache/datastream-resources-no-forcings -s 201906200100 -e 201906200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test        
+                  
     
-    - name: Forcings sources option test NWM_OPERATIONAL_V3
+    - name: Forcings sources option test NWM_V3
       if: always()
       run: |
         sudo rm -rf $(pwd)/data/datastream_test
         TODAY=$(env TZ=US/Eastern date +'%Y%m%d')
-        ./scripts/stream.sh -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NWM_OPERATIONAL_V3 -d $(pwd)/data/datastream_test   
+        ./scripts/stream.sh -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NWM_V3 -d $(pwd)/data/datastream_test   
         
-    - name: Forcings sources option test NOMADS_OPERATIONAL
+    - name: Forcings sources option test NOMADS
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
         TODAY=$(env TZ=US/Eastern date +'%Y%m%d')
-        ./scripts/stream.sh -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NOMADS_OPERATIONAL -d $(pwd)/data/datastream_test  
+        ./scripts/stream.sh -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NOMADS -d $(pwd)/data/datastream_test  
         
-    - name: Test hfsubset options
-      if: always()
-      run: |
-        sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -I "Gages-09106150" -i hl -v 2.1.1 -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+    # - name: Test hfsubset options
+    #   if: always()
+    #   run: |
+    #     sudo rm -rf $(pwd)/data/datastream_test
+    #     ./scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -I "Gages-09106150" -i hl -v 2.1.1 -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
     - name: S3 write out test
       if: always()
@@ -106,13 +115,30 @@ jobs:
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s DAILY -C NWM_OPERATIONAL_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+        ./scripts/stream.sh -s DAILY -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
     - name: DAILY pick day test
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s DAILY -e 202006200000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
+        ./scripts/stream.sh -s DAILY -e 202006200000 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
         
-        
+    - name: DAILY short_range today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -s DAILY -C NWM_SHORT_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+
+    - name: DAILY medium_range today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -s DAILY -C NWM_MEDIUM_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+          
+    - name: DAILY analysis assim extend today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+           
   
