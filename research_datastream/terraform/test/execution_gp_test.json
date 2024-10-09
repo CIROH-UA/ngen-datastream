@@ -11,7 +11,7 @@
   "ImageId"            : "ami-00e73ddc3a6fc7dfe",
   "InstanceType"       : "t4g.nano",
   "KeyName"            : "actions_key",
-  "SecurityGroupIds"   : ["sg-0ab5f40d1eb97d163"],
+  "SecurityGroupIds"   : ["sg-06f57f883e902d7bc"],
   "IamInstanceProfile": {
     "Name": "datastream_ec2_profile_github_actions"
   },

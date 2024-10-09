@@ -8,7 +8,7 @@ import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from datetime import datetime
-from forcingprocessor.weights_hf2ds import gpkgs2weightsjson
+from forcingprocessor.weights_hf2ds import hf2ds
 from forcingprocessor.utils import get_window, nwm_variables, ngen_variables
 from forcingprocessor.utils import nwm_variables
 plt.style.use('dark_background')
@@ -137,7 +137,7 @@ def get_nwm_data_array(
     Outputs a windowed array of national water model data for the domain and forcing variables specified.
     nwm_data  : 4d array (time x nwm_forcing_variable x west_east x south_north)
     """
-    weights_json, _ = gpkgs2weightsjson([geopackage])
+    weights_json, _ = hf2ds([geopackage])
     x_min, x_max, y_min, y_max = get_window(weights_json)     
 
     for path, _, files in os.walk(nwm_folder):
