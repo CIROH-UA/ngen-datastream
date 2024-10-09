@@ -37,7 +37,7 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -b
+        ./scripts/docker_builds.sh -f -d
 
     - name: Test docker containers
       run : |

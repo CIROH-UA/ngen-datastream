@@ -115,13 +115,13 @@ jobs:
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s DAILY -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+        ./scripts/stream.sh -s DAILY -C NWM_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
     - name: DAILY pick day test
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s DAILY -e 202006200000 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
+        ./scripts/stream.sh -s DAILY -C NWM_V3 -e 202006200000 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
         
     - name: DAILY short_range today test
       if: always()
@@ -135,10 +135,11 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/stream.sh -s DAILY -C NWM_MEDIUM_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
           
-    - name: DAILY analysis assim extend today test
-      if: always()
-      run: |        
-        sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+    
+    # - name: DAILY analysis assim extend today test
+    #   if: always()
+    #   run: |        
+    #     sudo rm -rf $(pwd)/data/datastream_test
+    #     ./scripts/stream.sh -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
            
   
