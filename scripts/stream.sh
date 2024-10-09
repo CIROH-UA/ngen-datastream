@@ -511,8 +511,8 @@ else
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
-# NIGAB_TAG="latest$PLATORM_TAG"
-NIGAB_TAG="1.2.1"
+NIGAB_TAG="latest$PLATORM_TAG"
+# NIGAB_TAG="1.2.1"
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
