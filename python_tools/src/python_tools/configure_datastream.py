@@ -95,8 +95,10 @@ def create_conf_nwm(args):
 
     start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
     end_dt   = end_dt.replace(hour=1,minute=0,second=0,microsecond=0)
-    start_str = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
-    end_str   = end_dt.strftime('%Y-%m-%d %H:%M:%S')            
+    start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
+    end_str_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S')      
+    start_str_nwm = start_dt.strftime('%Y%m%d%H%M') 
+    end_str_nwm = start_dt.strftime('%Y%m%d%H%M')   
                            
     if "RETRO" in args.forcing_source:                    
         if "V2" in args.forcing_source:
@@ -149,11 +151,12 @@ def create_conf_nwm(args):
                 num_hrs=3
         else:
             runinput=2
+            num_hrs = 24
     
         nwm_conf = {
             "forcing_type" : "operational_archive",
-            "start_date"   : start,
-            "end_date"     : end,
+            "start_date"   : start_str_nwm,
+            "end_date"     : end_str_nwm,
             "runinput"     : runinput,
             "varinput"     : varinput,
             "geoinput"     : geoinput,
@@ -163,7 +166,7 @@ def create_conf_nwm(args):
             "lead_time"    : [x+dt for x in range(num_hrs)]
         }
 
-    return nwm_conf, start_str, end_str
+    return nwm_conf, start_str_real, end_str_real
 
 def create_conf_fp(args):
     geo_base = args.gpkg.split('/')[-1]      
@@ -286,5 +289,10 @@ if __name__ == "__main__":
     parser.add_argument("--s3_bucket", type=str,help="s3 bucket to write to",default="")
     parser.add_argument("--s3_prefix", type=str,help="s3 prefix to prepend to files",required="")    
 
-    args = parser.parse_args()      
+    args = parser.parse_args() 
+    
+    if args.forcing_source == "": args.forcing_source="NWM_V3"
+    if args.hydrofabric_version == "": args.hydrofabric_version="v2.1.1"
+    if args.nprocs == "": args.nprocs=os.cpu_count()
+
     create_confs(args)

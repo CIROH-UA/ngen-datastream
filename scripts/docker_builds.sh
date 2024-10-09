@@ -11,45 +11,48 @@ if [ $PLATFORM = "x86_64" ]; then
 fi
 TAG="latest$PLATORM_TAG"
 
-BUILD="no"
+BUILD_FORCINGPROCESSOR="no"
+BUILD_DATASTREAM="no"
 PUSH="no"
-SKIP_DEPS="no"
-while getopts "bps" flag; do
+BUILD_DEPS="no"
+while getopts "pefd" flag; do
  case $flag in
-   b) BUILD="yes"
-   ;;
    p) PUSH="yes"
    ;;
-   s) SKIP_DEPS="yes"
-   ;;   
+   e) BUILD_DEPS="yes"
+   ;; 
+   f) BUILD_FORCINGPROCESSOR="yes"
+   ;; 
+   d) BUILD_DATASTREAM="yes"
+   ;;         
    \?)
    ;;
  esac
 done
 
-if [ "$BUILD" = "yes" ]; then
-
-  cd $DOCKER_DIR
-  echo "Building docker from "$DOCKER_DIR
-  if [ "$SKIP_DEPS" = "no" ]; then
-    docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=$TAG --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
-  fi
-
+cd $DOCKER_DIR
+if [ "$BUILD_DEPS" = "yes" ]; then
+  docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=$TAG --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
+fi
+if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/forcingprocessor $DOCKER_DATASTREAM/forcingprocessor
   docker build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
-
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
+fi
+if [ "$BUILD_DATASTREAM" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/python_tools $DOCKER_DATASTREAM/python_tools
   cp -r $DATASTREAM_PATH/configs $DOCKER_DATASTREAM/configs
   docker build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
-  echo "Docker containers have been built!"
+  if [ -d "$DOCKER_DATASTREAM" ]; then
+    rm -rf $DOCKER_DATASTREAM
+  fi
 fi
 
 if [ "$PUSH" = "yes" ]; then

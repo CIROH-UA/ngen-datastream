@@ -511,13 +511,15 @@ else
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
+# NIGAB_TAG="latest$PLATORM_TAG"
+NIGAB_TAG="1.2.1"
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:$NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS"
 else
-    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:latest$PLATORM_TAG "$DOCKER_MOUNT" auto $NPROCS
+    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:$NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS
     cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_NGENCONF/
 fi
 log_time "NGEN_END" $DATASTREAM_PROFILING

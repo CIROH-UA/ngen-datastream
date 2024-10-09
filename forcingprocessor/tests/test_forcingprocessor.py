@@ -142,14 +142,57 @@ def test_noaa_nwm_pds_https():
     assert assert_file.exists()
     os.remove(assert_file)     
 
-def test_noaa_nwm_pds_s3():
+def test_noaa_nwm_pds_https_short_range():
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 7
+    nwmurl_conf["runinput"] = 1
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    assert assert_file.exists()
+    os.remove(assert_file) 
+
+def test_noaa_nwm_pds_https_medium_range():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 7
+    nwmurl_conf["runinput"] = 2
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    assert assert_file.exists()
+    os.remove(assert_file)         
+
+def test_noaa_nwm_pds_https_analysis_assim():
+    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/36'
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 7
+    nwmurl_conf["runinput"] = 5
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    assert assert_file.exists()
+    os.remove(assert_file)  
+
+def test_noaa_nwm_pds_https_analysis_assim_extend():
+    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/36'
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute    
+    nwmurl_conf["urlbaseinput"] = 7
+    nwmurl_conf["runinput"] = 7
+    generate_nwmfiles(nwmurl_conf)          
+    prep_ngen_data(conf)
+    assert assert_file.exists()
+    os.remove(assert_file)    
+
+def test_noaa_nwm_pds_s3():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute   
+    nwmurl_conf["runinput"] = 1 
     nwmurl_conf["urlbaseinput"] = 8
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     assert assert_file.exists()
-    os.remove(assert_file)       
+    os.remove(assert_file)            
 
 def test_ciroh_zarr():
     assert False, "Not implemented"
