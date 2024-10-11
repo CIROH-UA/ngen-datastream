@@ -37,8 +37,8 @@
     {
         "DeviceName": "/dev/xvda",  
         "Ebs": {
-            "VolumeSize": 32,
-            "VolumeType": "gp2"  
+            "VolumeSize": 16,
+            "VolumeType": "sc1"  
         }
     }
   ]

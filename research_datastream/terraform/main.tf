@@ -125,6 +125,7 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
           "ec2:StopInstances",
           "ec2:DescribeInstances",
           "ec2:DescribeVolumes",
+          "ec2:DeleteVolume",
           "ec2:DetachVolume",
           "ec2:DescribeTags",
           "ec2:CreateTags"
