@@ -482,8 +482,6 @@ else
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
     else
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
-            -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
-            -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json

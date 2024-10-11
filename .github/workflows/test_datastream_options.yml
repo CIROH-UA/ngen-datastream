@@ -111,9 +111,9 @@ jobs:
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -S ciroh-community-ngen-datastream -o git_actions_test/
-        aws s3api wait object-exists --bucket ngen-datastream --key git_actions_test/ngen-run.tar.gz   
-        aws s3api delete-object --bucket ngen-datastream --key git_actions_test/ngen-run.tar.gz
+        ./scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -S ciroh-community-ngen-datastream -o git_actions_test
+        aws s3api wait object-exists --bucket ciroh-community-ngen-datastream --key git_actions_test/ngen-run.tar.gz   
+        aws s3 rm s3://ciroh-community-ngen-datastream/git_actions_test --recursive
 
     - name: DAILY today test
       if: always()
