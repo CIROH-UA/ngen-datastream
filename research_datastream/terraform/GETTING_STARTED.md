@@ -103,7 +103,7 @@ Starting from execution_template_general_purpose. Make sure to wrap commands in 
 The state machine is capable of confirming a complete execution by checking for the existence output data in the form of an s3 object. Set booleans here. If `s3_bucket` and `object_prefix` are provided in `datastream_command_options`, `ngen-datastream` will create a `ngen-run.tar.gz` file that can be found at `s3://<s3_bucket>/<object_prefix>/ngen-run.tar.gz`
 ```
   "run_options":{
-    "ii_detach_volume" : false,
+    "ii_delete_volume" : false,
     "ii_check_s3"      : true
 },
 ```

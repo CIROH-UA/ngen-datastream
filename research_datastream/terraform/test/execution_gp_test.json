@@ -3,7 +3,7 @@
     "runuser -l ec2-user -c 'ls -la'"
 ],
 "run_options":{
-  "ii_detach_volume" : true,
+  "ii_delete_volume" : true,
   "check_s3"         : false
 },
 "instance_parameters" :

@@ -12,7 +12,7 @@
     "object_prefix"       : "test_directory"
 },
   "run_options":{
-    "ii_detach_volume" : true,
+    "ii_delete_volume" : true,
     "ii_check_s3"      : true
 },
 "instance_parameters": {

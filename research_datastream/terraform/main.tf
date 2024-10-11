@@ -62,7 +62,14 @@ resource "aws_iam_policy" "ec2_policy" {
           "iam:PassRole"  
         ],
         Resource = "*"
-      },
+      },      
+      {
+        Effect   = "Allow",
+        Action   = [
+          "s3:*"  
+        ],
+        Resource = "*"
+      },  
       {
         Effect   = "Allow",
         Action   = [
