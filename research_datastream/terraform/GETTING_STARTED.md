@@ -149,7 +149,7 @@ The state machine is capable of confirming a complete execution by checking for 
           "DeviceName": "/dev/xvda",  
           "Ebs": {
               "VolumeSize": 64,
-              "VolumeType": "sc1"  
+              "VolumeType": "gp3"  
           }
       }
     ]
