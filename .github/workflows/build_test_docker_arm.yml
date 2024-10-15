@@ -37,7 +37,6 @@ jobs:
         run : |
           cd research_datastream/terraform
           aws iam attach-role-policy --role-name datastream_ec2_role_github_actions_arm --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
-          aws secretsmanager put-resource-policy --secret-id docker_awiciroh_creds --resource-policy file://test/secret-policy.json --block-public-policy --region us-east-1
           if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text && echo "Key pair 'actions_key_arm' created in AWS"; else echo "Key pair 'actions_key_arm' already exists"; fi
           sleep 60          
       - name: Build and Test arm docker containers with AWS infra
