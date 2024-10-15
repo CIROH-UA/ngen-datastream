@@ -1,7 +1,9 @@
 {  
   "commands"  : [
-    "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && docker rmi -f $(docker images -aq)'",
+    "runuser -l ec2-user -c 'sudo dnf install git'",
     "runuser -l ec2-user -c 'git clone https://github.com/CIROH-UA/ngen-datastream.git'",
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/research_datastream/scripts/user_data.sh'",   
+    "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && docker rmi -f $(docker images -aq)'",     
     "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/docker_builds.sh -f -d'",
     "runuser -l ec2-user -c 'curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg'",
     "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d /home/ec2-user/ngen-datastream/data/datastream_test -g /home/ec2-user/palisade.gpkg -R /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4'",
