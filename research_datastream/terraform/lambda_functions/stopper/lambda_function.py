@@ -1,6 +1,22 @@
 import boto3
+import time
 
 client_ec2 = boto3.client('ec2')
+
+def confirm_detach(volume_id):
+    while True:
+        response = client_ec2.describe_volumes(
+            Filters=[
+            {
+                'Name': 'volume-id',
+                'Values': [volume_id],
+            },
+        ],)
+        if response['Volumes'][0]['State'] != "available":
+            print(f'Volume not yet available')
+            time.sleep(1)
+        else:
+            return
 
 def lambda_handler(event, context):
     """
@@ -32,6 +48,7 @@ def lambda_handler(event, context):
             VolumeId=volume_id,
             DryRun=False
         )
+        confirm_detach(volume_id)
         print(f'EBS volume {instance_id} has been successfully detached.')
         response = client_ec2.delete_volume(
             VolumeId=volume_id,
