@@ -33,8 +33,8 @@ jobs:
 
     - name: Configure AWS
       run: |
-        aws configure set aws_access_key_id ${{ secrets.aws_access_key_id }}
-        aws configure set aws_secret_access_key ${{ secrets.aws_secret_access_key }}
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws configure set region us-east-1
         
     - name: Install packages for datastream
@@ -43,9 +43,9 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -b
+        ./scripts/docker_builds.sh -f -d
 
     - name: Test docker containers
       run : |
         curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
-        ./scripts/stream.sh -s 202006200100 -e 202006210000 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+        ./scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json

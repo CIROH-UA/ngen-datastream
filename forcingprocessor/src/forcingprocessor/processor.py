@@ -13,7 +13,7 @@ import concurrent.futures as cf
 from datetime import datetime
 import gzip
 import tarfile, tempfile
-from forcingprocessor.weights_hf2ds import gpkgs2weightsjson
+from forcingprocessor.weights_hf2ds import hf2ds
 from forcingprocessor.plot_forcings import plot_ngen_forcings
 from forcingprocessor.utils import get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
 
@@ -467,7 +467,7 @@ def write_data(
                 bandwidth_Mbps = rate * file_size_MB * ntasked * bytes2bits
                 estimate_total_time = nfiles * ntasked / rate
                 report_usage()
-                msg = f"\n{(j+1)*ntasked} files written out of {nfiles*ntasked}\n"
+                msg = f"\n{(j+1)*ntasked} dataframes converted out of {nfiles*ntasked}\n"
                 msg += f"rate             {rate:.2f} files/s\n"
                 msg += f"df conversion    {t_df:.2f}s\n"
                 if storage_type == "s3": msg += f"buff             {t_buff:.2f}s\n"
@@ -731,7 +731,7 @@ def prep_ngen_data(conf):
             jtype in file_types
         ), f"{jtype} for output_file_type is not accepted! Accepted: {file_types}"
     global storage_type
-    if "s3" in output_path:
+    if "s3://" in output_path:
         storage_type = "s3"
     elif "google" in output_path:
         storage_type = "google"
@@ -755,9 +755,6 @@ def prep_ngen_data(conf):
             json.dump(conf, f)
         cp_cmd = f'cp {nwm_file} {metaf_path}'
         os.system(cp_cmd)
-        for jgpkg in gpkg_files:
-            cp_cmd = f'cp {jgpkg} {metaf_path}'
-            os.system(cp_cmd)
 
     elif storage_type == "s3":
         bucket_path  = output_path
@@ -778,20 +775,13 @@ def prep_ngen_data(conf):
                 bucket,
                 filenamelist_path
             )
-        for jgpkg in gpkg_files:
-            gpkg_path = f"{key}/{os.path.basename(jgpkg)}"
-            s3.upload_file(
-                jgpkg,
-                bucket,
-                gpkg_path
-            )
 
     log_time("CONFIGURATION_END", log_file) 
 
     log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
     global weights_json
-    weights_json, jcatchment_dict = gpkgs2weightsjson(gpkg_files)
+    weights_json, jcatchment_dict = hf2ds(gpkg_files)
     ncatchments = len(weights_json)
     global x_min, x_max, y_min, y_max
     x_min, x_max, y_min, y_max = get_window(weights_json)
@@ -864,7 +854,8 @@ def prep_ngen_data(conf):
     runtime = time.perf_counter() - t_start
 
     if ii_plot:
-        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one geopackage')
+        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one file')
+        if gpkg_files[0].endswith('.parquet'): raise Warning(f'Plotting currently not implemented for parquet, need geopackage')
         cat_ids = ['cat-' + x for x in forcing_cat_ids]
         jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
         if storage_type == "s3":

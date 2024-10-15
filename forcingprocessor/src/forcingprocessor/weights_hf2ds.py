@@ -2,15 +2,17 @@ import json
 import argparse, time
 import geopandas as gpd
 import boto3
-import re
-gpd.options.io_engine = "pyogrio"
+import re, os
+import concurrent.futures as cf
+import pandas as pd
+gpd.options.io_engine = "pyogrio"   
 
-def gpkgs2weightsjson(gpkg_files : list):
+def hf2ds(files : list):
     """
-    Extracts the weights from a list of geopackages
+    Extracts the weights from a list of files
 
-    input : gpkg_files
-    gpkg_files : list of geooackage files
+    input : files
+    gpkg_files : list of geopackage or parquet files
 
     returns : weights_json, jcatchment_dict
     weights_json : a dictionary where keys are catchment ids and the values are a list of weights
@@ -20,71 +22,61 @@ def gpkgs2weightsjson(gpkg_files : list):
     weights_json = {}
     jcatchment_dict = {}
     count = 0
-    for jgpkg in gpkg_files:
-        ii_json = jgpkg.split('.')[-1] == "json"
-        ii_weights_in_bucket = jgpkg.find('//') >= 0
-        pattern = r'VPU_([^/]+)'
+    for jgpkg in files:
+        pattern = r'vpuid%3D([^/]+)'
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
             count +=1
-            jname = str(count)
-        if ii_weights_in_bucket:
-            s3 = boto3.client("s3")    
-            jgpkg_bucket = jgpkg.split('/')[2]
-            ii_uri = jgpkg.find('s3://') >= 0
-            if ii_uri:
-                jgpkg_key = jgpkg[jgpkg.find(jgpkg_bucket)+len(jgpkg_bucket)+1:]
-            else:
-                jgpkg_bucket = jgpkg_bucket.split('.')[0]
-                jgpkg_key    = jgpkg.split('amazonaws.com/')[-1]
-            jobj = s3.get_object(Bucket=jgpkg_bucket, Key=jgpkg_key)
-            if ii_json: 
-                new_dict = json.loads(jobj["Body"].read().decode())
-            else:
-                new_dict = hydrofabric2datastream_weights(jobj["Body"].read().decode())
-        else:     
-            if ii_json:
-                with open(jgpkg, "r") as f:
-                    new_dict = json.load(f)
-            else:
-                new_dict = hydrofabric2datastream_weights(jgpkg)
+            jname = str(count)    
+        new_dict = hydrofabric2datastream_weights(jgpkg)
         weights_json = weights_json | new_dict
-        jcatchment_dict[jname] = list(weights_json.keys())
+        jcatchment_dict[jname] = list(new_dict.keys())
 
     return weights_json, jcatchment_dict
 
-def get_catchment_idx(weights_table,catchments):
-    weight_data = {}
-    ncatch_found = 0
-    for jcatch in catchments:         
-        df_jcatch = weights_table.loc[weights_table['divide_id'] == jcatch]      
-        ncatch_found+=1
-        idx_list = [int(x) for x in list(df_jcatch['cell'])]
-        df_catch = list(df_jcatch['coverage_fraction'])
-        weight_data[jcatch] = [idx_list,df_catch]
-    return (weight_data)
-
-def get_catchments_from_gpkg(gpkg):
-    catchments     = gpd.read_file(gpkg, layer='divides')
-    catchment_list = sorted(list(catchments['divide_id']))  
-    return catchment_list
-
-def hydrofabric2datastream_weights(gpkg : gpd.GeoDataFrame) -> dict:
+def hydrofabric2datastream_weights(weights_file : str) -> dict:
     """
     Converts tabular weights to a dictionary where keys are catchment ids and the values are a list of weights
     
-    input gpkg
+    input gpkg or path to weights parquet
     gpkg : gpd.Dataframe
 
     returns weights_json : a dictionary where keys are catchment ids and the values are a list of weights
 
     """
-    t0 = time.perf_counter()
-    catchments = get_catchments_from_gpkg(gpkg)
-    ncatchment = len(catchments)
-    weights_table    = gpd.read_file(gpkg, layer = 'forcing-weights')
-    weights_json = get_catchment_idx(weights_table, catchments)
+    t0 = time.perf_counter()    
+
+    if weights_file.endswith('.json'):
+        with open(weights_file,'r') as fp:
+            weights_json = json.load(fp)
+        ncatchment = len(weights_json) 
+    else:
+        if weights_file.endswith('.gpkg'):
+            catchments     = gpd.read_file(weights_file, layer='divides')
+            weights_table  = gpd.read_file(weights_file, layer = 'forcing-weights')
+        elif weights_file.endswith('parquet'):            
+            weights_table     = pd.read_parquet(weights_file)
+        else:
+            raise Exception(f'Dont know how to deal with {weights_file}')
+                    
+        weights_table_unqiue_ids = weights_table.groupby('divide_id').agg(tuple).map(list).reset_index()
+        catchments        = weights_table_unqiue_ids['divide_id']
+        catchment_list    = sorted(set(list(catchments)))
+        weights_table_unqiue_ids = weights_table_unqiue_ids.set_index('divide_id')
+        weights_json = json.loads(weights_table_unqiue_ids.to_json(orient="index"))
+        out_dict = {}
+        for jcatch in weights_json:
+            jlist = []
+            jlist.append([int(x) for x in weights_json[jcatch]['cell']])
+            jlist.append(weights_json[jcatch]['coverage_fraction'])
+            out_dict[jcatch] = jlist
+        tf = time.perf_counter()
+        dt = tf - t0             
+        ncatchment = len(catchment_list)   
+        print(f'{ncatchment} catchment weights converted from tabular to json in {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
+        return out_dict
+
     tf = time.perf_counter()
     dt = tf - t0
     print(f'{ncatchment} catchment weights converted from tabular to json in {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
@@ -93,13 +85,13 @@ def hydrofabric2datastream_weights(gpkg : gpd.GeoDataFrame) -> dict:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpkg', dest="gpkg", type=str, help="Path to geopackage file",default = None)
-    parser.add_argument('--outname', dest="outname", type=str, help="Filename for the weight file")
+    parser.add_argument('--input_file', dest="input_file", type=str, help="Path to geopackage or weights parquet file",default = None)
+    parser.add_argument('--outname', dest="outname", type=str, help="Filename for the datastream weights file")
     args = parser.parse_args()
 
-    weights = hydrofabric2datastream_weights(args.gpkg)
+    weights, jcatchments = hf2ds(args.input_file.split(','))
 
-    data = json.dumps(weights)
-    with open(args.outname,'w') as fp:
-        fp.write(data)
+    df = pd.DataFrame.from_dict(weights, orient='index',columns=['cell','coverage_fraction'])
+    df = df.assign(divide_id=weights.keys()).set_index('divide_id')
+    df.to_parquet(args.outname)
     

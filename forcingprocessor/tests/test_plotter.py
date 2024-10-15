@@ -11,11 +11,16 @@ date = datetime.now()
 date = date.strftime('%Y%m%d')
 hourminute  = '0000'
 test_dir = Path(__file__).parent
-data_dir = (test_dir/'data').resolve()
+DATA_DIR = (test_dir/'data').resolve()
 pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
-geopackage = str(f"{data_dir}/palisade.gpkg")
+geopackage = str(f"{DATA_DIR}/palisade.gpkg")
+if os.path.exists(DATA_DIR):
+    os.system(f"rm -rf {DATA_DIR}")
+os.system(f"mkdir {DATA_DIR}")
+
 geopackage_name = "palisade.gpkg"
+os.system(f"curl -o {os.path.join(DATA_DIR,geopackage_name)} -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg")
 
 conf = {
     "forcing"  : {
@@ -24,8 +29,7 @@ conf = {
     },
 
     "storage":{
-        "storage_type"      : "local",
-        "output_path"       : str(data_dir),
+        "output_path"       : str(DATA_DIR),
         "output_file_type"  : ["netcdf","csv"]
     },    
 
@@ -59,16 +63,21 @@ nwmurl_conf = {
         "lead_time"    : [1]
     }
 
+# @pytest.fixture
+# def clean_dir(autouse=True):
+#     if os.path.exists(DATA_DIR):
+#         os.system(f'rm -rf {str(DATA_DIR)}')
+#     os.system(f'mkdir {str(DATA_DIR)}')
+
 def test_forcings_plot():
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7    
-    os.system(f"rm -rf {data_dir}/forcings/*.parquet")
 
     generate_nwmfiles(nwmurl_conf)
     prep_ngen_data(conf)
 
-    nwm_dir = os.path.join(data_dir,'nwm_forcings')
+    nwm_dir = os.path.join(DATA_DIR,'nwm_forcings')
     if not os.path.exists(nwm_dir):
         os.system(f"mkdir {nwm_dir}")    
     
@@ -87,7 +96,7 @@ def test_forcings_plot():
 
     nwm_data = get_nwm_data_array(nwm_dir,geopackage)             
 
-    forcings_nc = os.path.join(data_dir,"forcings/1_forcings.nc")
+    forcings_nc = os.path.join(DATA_DIR,"forcings/1_forcings.nc")
     ngen_data, t_ax, catchment_ids = nc_to_3darray(forcings_nc)            
 
     plot_ngen_forcings(
@@ -97,11 +106,12 @@ def test_forcings_plot():
         t_ax, 
         catchment_ids,
         ["TMP_2maboveground"],
-        os.path.join(data_dir,'metadata/GIFs')
+        os.path.join(DATA_DIR,'metadata/GIFs')
         )
     
-    os.system(f'rm {forcings_nc}')
-    ngen_data, t_ax, catchment_ids = csvs_to_3darray(os.path.join(data_dir,'forcings')) 
+    os.remove(forcings_nc)
+    os.system(f'rm -rf {str(DATA_DIR)}forcings/*.parquet')
+    ngen_data, t_ax, catchment_ids = csvs_to_3darray(os.path.join(DATA_DIR,'forcings')) 
     plot_ngen_forcings(
         nwm_data, 
         ngen_data, 
@@ -109,5 +119,5 @@ def test_forcings_plot():
         t_ax, 
         catchment_ids,
         ["TMP_2maboveground"],
-        os.path.join(data_dir,'metadata/GIFs')
+        os.path.join(DATA_DIR,'metadata/GIFs')
         )

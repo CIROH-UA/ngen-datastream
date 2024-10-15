@@ -69,12 +69,13 @@ def convert_url2key(nwm_file,fs_type):
     _nc_file_parts = nwm_file.split('/')
     layers = _nc_file_parts[3:]
     for jlay in layers:
-        bucket_key += "/" + jlay 
-
-    if fs_type == 's3':
-        bucket_key = _nc_file_parts[2][:-17] + bucket_key
-    elif fs_type == 'google':
-        bucket_key = "gs:/" + bucket_key
-    if "s3://" in nwm_file: bucket_key = bucket_key[1:]
-    bucket = _nc_file_parts[2]
+        if jlay == layers[-1]:
+            bucket_key += jlay
+        else:
+            bucket_key += jlay + "/"
+    if fs_type == "google":
+        bucket = _nc_file_parts[3]
+    elif fs_type == 's3':
+        bucket = _nc_file_parts[2]
+    
     return bucket, bucket_key
