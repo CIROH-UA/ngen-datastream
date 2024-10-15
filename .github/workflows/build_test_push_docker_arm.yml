@@ -1,4 +1,4 @@
-name: Build, Test, Push Datastream Docker Containers on ARM
+name: Build, Test, and Push Datastream Docker Containers on ARM
 on:
   push:
     branches:
