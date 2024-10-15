@@ -15,10 +15,10 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-09a301e4b1343c098",
+  "ImageId"            : "ami-02801556a781a4499",
   "InstanceType"       : "t4g.large",
   "KeyName"            : "actions_key_arm",
-  "SecurityGroupIds"   : ["sg-0ab5f40d1eb97d163"],
+  "SecurityGroupIds"   : ["sg-0fcbe0c6d6faa0117"],
   "IamInstanceProfile": {
     "Name": "datastream_ec2_profile_github_actions_arm"
   },
