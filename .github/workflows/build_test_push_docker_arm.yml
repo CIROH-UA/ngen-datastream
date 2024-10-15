@@ -8,10 +8,11 @@ on:
       - 'forcingprocessor/**'
       - 'scripts/**'  
       - 'python_tools/**'
+      - 'research_datastream/test/execution_gp_arm_docker_buildNtester.json'    
       - '.github/workflows/forcingprocessor.yml'
       - '.github/workflows/datastream_python.yml'  
-      - '.github/workflows/build_test_push_docker_arm.yml'           
-
+      - '.github/workflows/build_test_push_docker_arm.yml'    
+  
 jobs:
   build-test-push-docker-arm:
     runs-on: ubuntu-latest
