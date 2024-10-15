@@ -1,9 +1,7 @@
 {  
   "commands"  : [
-    "runuser -l ec2-user -c 'sudo dnf install git -y'",
-    "runuser -l ec2-user -c 'git clone https://github.com/CIROH-UA/ngen-datastream.git'",
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/research_datastream/scripts/user_data.sh'",   
     "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && docker rmi -f $(docker images -aq)'",     
+    "runuser -l ec2-user -c 'git clone https://github.com/CIROH-UA/ngen-datastream.git'",    
     "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/docker_builds.sh -f -d'",
     "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d /home/ec2-user/ngen-datastream/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json'",
     "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/research_datastream/terraform/test/docker_loginNpush.sh >> /home/ec2-user/ngen-datastream/docker_login_log.txt'",
@@ -16,7 +14,7 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-02801556a781a4499",
+  "ImageId"            : "ami-0e736ffb1704fec16",
   "InstanceType"       : "t4g.large",
   "KeyName"            : "actions_key_arm",
   "SecurityGroupIds"   : ["sg-0fcbe0c6d6faa0117"],
