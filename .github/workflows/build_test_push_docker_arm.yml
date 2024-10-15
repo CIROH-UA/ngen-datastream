@@ -36,10 +36,7 @@ jobs:
       - name: Set permissions
         run : |
           cd research_datastream/terraform
-<<<<<<< Updated upstream
           aws iam attach-role-policy --role-name datastream_ec2_role_github_actions_arm --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
-=======
->>>>>>> Stashed changes
           if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text && echo "Key pair 'actions_key_arm' created in AWS"; else echo "Key pair 'actions_key_arm' already exists"; fi
           sleep 60          
       - name: Build and Test arm docker containers with AWS infra
@@ -53,6 +50,7 @@ jobs:
           CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/datastream:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
           docker pull awiciroh/forcingprocessor:latest
           CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/forcingprocessor:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
+          sleep 5
       - name: Tear down infra
         if: always()
         run : |
