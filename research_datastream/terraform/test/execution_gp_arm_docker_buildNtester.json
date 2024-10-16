@@ -14,7 +14,7 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-0e736ffb1704fec16",
+  "ImageId"            : "ami-072c0bf854be9b9ff",
   "InstanceType"       : "t4g.large",
   "KeyName"            : "actions_key_arm",
   "SecurityGroupIds"   : ["sg-0fcbe0c6d6faa0117"],
