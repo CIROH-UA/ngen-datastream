@@ -15,7 +15,7 @@
 "instance_parameters" :
 {
   "ImageId"            : "ami-0e736ffb1704fec16",
-  "InstanceType"       : "t4g.large",
+  "InstanceType"       : "t4g.2xlarge",
   "KeyName"            : "actions_key_arm",
   "SecurityGroupIds"   : ["sg-0fcbe0c6d6faa0117"],
   "IamInstanceProfile": {
@@ -36,7 +36,7 @@
     {
         "DeviceName": "/dev/xvda",  
         "Ebs": {
-            "VolumeSize": 16,
+            "VolumeSize": 32,
             "VolumeType": "gp3"  
         }
     }
