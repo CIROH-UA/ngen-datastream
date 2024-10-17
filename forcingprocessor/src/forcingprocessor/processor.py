@@ -614,7 +614,7 @@ def write_netcdf(data, vpu, t_ax, catchments):
             tmpfile.seek(0)
             print(f"Uploading netcdf forcings to S3: bucket={bucket}, key={key}")
             s3_client.upload_file(tmpfile.name, bucket, key)
-            os.system('rm -rf ./<tempfile*')
+
     else:
         with nc.Dataset(nc_filename, 'w', format='NETCDF4') as ds:
             catchment_dim = ds.createDimension('catchment-id', len(catchments))
