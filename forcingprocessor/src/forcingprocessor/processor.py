@@ -180,10 +180,10 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float32)       
             for var_dx, jvar in enumerate(nwm_variables):  
                 if "retrospective-2-1" in nwm_file:
-                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max + 1), south_north=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max + 1), south_north=slice(shp[1] - y_max, shp[1] - y_min + 1)).values),axis=0)
                     t = datetime.strftime(datetime.strptime(nwm_file.split('/')[-1].split('.')[0],'%Y%m%d%H'),'%Y-%m-%d %H:%M:%S')
                 else:                            
-                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1)).values),axis=0)
                     time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
                     t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
