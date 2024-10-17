@@ -180,10 +180,10 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float32)       
             for var_dx, jvar in enumerate(nwm_variables):  
                 if "retrospective-2-1" in nwm_file:
-                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max + 1), south_north=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max + 1), south_north=slice(shp[1] - y_max, shp[1] - y_min + 1)).values),axis=0)
                     t = datetime.strftime(datetime.strptime(nwm_file.split('/')[-1].split('.')[0],'%Y%m%d%H'),'%Y-%m-%d %H:%M:%S')
                 else:                            
-                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1))),0)
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1)).values),axis=0)
                     time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
                     t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
@@ -583,9 +583,9 @@ def write_netcdf(data, vpu, t_ax, catchments):
     import netCDF4 as nc
 
     if storage_type == 's3':
-        bucket, key = convert_url2key(nc_filename,s3_client)
+        bucket, key = convert_url2key(nc_filename,'s3')
         with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
-            with nc.Dataset(tmpfile, 'w', format='NETCDF4') as ds:
+            with nc.Dataset(tmpfile.name, 'w', format='NETCDF4') as ds:
                 catchment_dim = ds.createDimension('catchment-id', len(catchments))
                 time_dim = ds.createDimension('time', len(t_utc))
                 ids_var = ds.createVariable('ids', str, ('catchment-id',))
@@ -610,8 +610,11 @@ def write_netcdf(data, vpu, t_ax, catchments):
                 spfh_var[:, :] = data[:, 6, :]
                 pres_var[:, :] = data[:, 7, :]
                 dswrf_var[:, :] = data[:, 8, :]
-                tmpfile.seek(0)
-                s3_client.upload_file(tmpfile.name, bucket, key)
+            tmpfile.flush()
+            tmpfile.seek(0)
+            print(f"Uploading netcdf forcings to S3: bucket={bucket}, key={key}")
+            s3_client.upload_file(tmpfile.name, bucket, key)
+            os.system('rm -rf ./<tempfile*')
     else:
         with nc.Dataset(nc_filename, 'w', format='NETCDF4') as ds:
             catchment_dim = ds.createDimension('catchment-id', len(catchments))
