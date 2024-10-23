@@ -16,7 +16,7 @@
     "ii_check_s3"      : true
 },
 "instance_parameters": {
-  "ImageId": "ami-05c2c89efbcce18a2",
+  "ImageId": "ami-062bdcbb454b8d833",
   "InstanceType": "t4g.xlarge",
   "KeyName": "made_up_key",
   "SecurityGroupIds": [
