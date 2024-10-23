@@ -178,7 +178,7 @@ def create_conf_fp(args):
     output_file_type = ["netcdf"]
     if len(args.s3_bucket) > 0:
         if "DAILY" in args.start_date: 
-            args.s3_prefix = re.sub(r"\$DAILY",datetime.now(tz.timezone('US/Eastern')).strftime('%Y%m%d'),args.s3_prefix)
+            args.s3_prefix = re.sub(r"\DAILY",datetime.now(tz.timezone('US/Eastern')).strftime('%Y%m%d'),args.s3_prefix)
         output_path  = f"s3://{args.s3_bucket}/{args.s3_prefix}"
     elif len(args.docker_mount) > 0:
         gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
