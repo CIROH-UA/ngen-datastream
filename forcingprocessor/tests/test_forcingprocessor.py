@@ -176,7 +176,7 @@ def test_noaa_nwm_pds_https_analysis_assim_extend():
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7
     nwmurl_conf["runinput"] = 6
-    nwmurl_conf["fcst_cycle"] = 16
+    nwmurl_conf["fcst_cycle"] = [16]
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     assert assert_file.exists()
@@ -187,6 +187,7 @@ def test_noaa_nwm_pds_s3():
     nwmurl_conf['end_date']   = date + hourminute   
     nwmurl_conf["runinput"] = 1 
     nwmurl_conf["urlbaseinput"] = 8
+    nwmurl_conf["fcst_cycle"] = [0]
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     assert assert_file.exists()
