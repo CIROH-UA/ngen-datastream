@@ -83,6 +83,8 @@ def create_conf_nwm(args):
     start = args.start_date
     end   = args.end_date  
 
+    fcst_cycle = 0
+
     if "DAILY" in start:
         if end == "":
             start_dt = datetime.now(tz.timezone('US/Eastern'))
@@ -146,6 +148,7 @@ def create_conf_nwm(args):
                 runinput=6
                 num_hrs=28
                 dt=0 
+                fcst_cycle = 16
             else:
                 runinput=5
                 num_hrs=3
@@ -162,7 +165,7 @@ def create_conf_nwm(args):
             "geoinput"     : geoinput,
             "meminput"     : 0,
             "urlbaseinput" : urlbaseinput,
-            "fcst_cycle"   : [0],
+            "fcst_cycle"   : [fcst_cycle],
             "lead_time"    : [x+dt for x in range(num_hrs)]
         }
 
