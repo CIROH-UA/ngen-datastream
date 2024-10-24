@@ -162,7 +162,6 @@ def test_noaa_nwm_pds_https_medium_range():
     os.remove(assert_file)         
 
 def test_noaa_nwm_pds_https_analysis_assim():
-    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/36'
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7
@@ -173,11 +172,10 @@ def test_noaa_nwm_pds_https_analysis_assim():
     os.remove(assert_file)  
 
 def test_noaa_nwm_pds_https_analysis_assim_extend():
-    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/36'
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7
-    nwmurl_conf["runinput"] = 7
+    nwmurl_conf["runinput"] = 6
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     assert assert_file.exists()
