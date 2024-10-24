@@ -37,7 +37,7 @@ def lambda_handler(event, context):
         if bucket is None or prefix is None:
             raise Exception(f'User specified ii_check_s3, but no s3_bucket or s3_prefix were not found in commands')
         if "DAILY" in prefix: 
-            prefix = re.sub(r"\DAILY",datetime.now(timezone.utc).strftime('%Y%m%d'),prefix)
+            prefix = re.sub(r"\DAILY",datetime.datetime.now(timezone.utc).strftime('%Y%m%d'),prefix)
         print(f'Checking if any objects with prefix {prefix} exists in {bucket}')
         wait_for_object_existence(bucket, prefix)
     else:
