@@ -1,14 +1,13 @@
 import os
 from pathlib import Path
 from datetime import datetime
-from datetime import datetime
+from datetime import timezone
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
-import pytz as tz
 import pytest
 
 HF_VERSION="v2.1.1"
-date = datetime.now(tz.timezone('US/Eastern'))
+date = datetime.now(timezone.utc)
 date = date.strftime('%Y%m%d')
 hourminute  = '0000'
 test_dir = Path(__file__).parent

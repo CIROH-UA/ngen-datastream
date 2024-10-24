@@ -1,6 +1,5 @@
 import os, pytest, json
-from datetime import datetime
-import pytz as tz
+from datetime import datetime, timezone
 from python_tools.configure_datastream import create_confs
 
 SCRIPT_DIR        = os.path.dirname(os.path.realpath(__file__))
@@ -110,7 +109,7 @@ def test_conf_daily():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -142,7 +141,7 @@ def test_conf_daily_short_range():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -159,7 +158,7 @@ def test_conf_daily_medium_range():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -176,7 +175,7 @@ def test_conf_daily_noamds():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -193,7 +192,7 @@ def test_conf_daily_noamds_postprocessed():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -213,7 +212,7 @@ def test_conf_daily_assim_split_vpu_s3out():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -240,12 +239,13 @@ def test_conf_daily_assim_extend_split_vpu_s3out():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
-    assert data['urlbaseinput'] == 7 
-    assert data['runinput']     == 6
+    assert data['urlbaseinput']    == 7 
+    assert data['runinput']        == 6
+    assert data['fcst_cycle'][0]   == 16
     assert len(data['lead_time'] ) == 28
 
     with open(CONF_FP,'r') as fp:
