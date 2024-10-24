@@ -13,7 +13,7 @@ import concurrent.futures as cf
 from datetime import datetime
 import gzip
 import tarfile, tempfile
-from forcingprocessor.weights_hf2ds import hf2ds
+from forcingprocessor.weights_hf2ds import multiprocess_hf2ds
 from forcingprocessor.plot_forcings import plot_ngen_forcings
 from forcingprocessor.utils import get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
 
@@ -784,7 +784,7 @@ def prep_ngen_data(conf):
     log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
     global weights_json
-    weights_json, jcatchment_dict = hf2ds(gpkg_files)
+    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files)
     ncatchments = len(weights_json)
     global x_min, x_max, y_min, y_max
     x_min, x_max, y_min, y_max = get_window(weights_json)

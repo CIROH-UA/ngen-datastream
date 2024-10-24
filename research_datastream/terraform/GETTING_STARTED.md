@@ -87,7 +87,7 @@ Starting from execution_template_datastream. These options correspond directly t
     "subset_id"           : "Gages-09106150",
     "hydrofabric_version" : "2.1.1",
     "s3_bucket"           : "ngen_datstream",
-    "object_prefix"       : "datastream_cloud_test"
+    "s3_prefix"       : "datastream_cloud_test"
   }
 ```
 
@@ -100,7 +100,7 @@ Starting from execution_template_general_purpose. Make sure to wrap commands in 
 ```
 
 ### Edit Run Options
-The state machine is capable of confirming a complete execution by checking for the existence output data in the form of an s3 object. Set booleans here. If `s3_bucket` and `object_prefix` are provided in `datastream_command_options`, `ngen-datastream` will create a `ngen-run.tar.gz` file that can be found at `s3://<s3_bucket>/<object_prefix>/ngen-run.tar.gz`
+The state machine is capable of confirming a complete execution by checking for the existence output data in the form of an s3 object. Set booleans here. If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options`, `ngen-datastream` will create a `ngen-run.tar.gz` file that can be found at `s3://<s3_bucket>/<s3_prefix>/ngen-run.tar.gz`
 ```
   "run_options":{
     "ii_delete_volume" : false,

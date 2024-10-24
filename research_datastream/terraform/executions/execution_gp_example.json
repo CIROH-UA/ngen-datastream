@@ -4,11 +4,11 @@
 ],
 "run_options":{
   "ii_delete_volume" : false,
-  "ii_check_s3"      : true
+  "ii_check_s3"      : false
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-0fd0b3e0199927973",
+  "ImageId"            : "ami-062bdcbb454b8d833",
   "InstanceType"       : "t4g.large",
   "KeyName"            : "jlaser_west2",
   "SecurityGroupIds"   : ["sg-04365a4248fe126bc"],

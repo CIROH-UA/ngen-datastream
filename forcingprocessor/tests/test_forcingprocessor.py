@@ -1,14 +1,13 @@
 import os
 from pathlib import Path
 from datetime import datetime
-from datetime import datetime
+from datetime import timezone
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
-import pytz as tz
 import pytest
 
 HF_VERSION="v2.1.1"
-date = datetime.now(tz.timezone('US/Eastern'))
+date = datetime.now(timezone.utc)
 date = date.strftime('%Y%m%d')
 hourminute  = '0000'
 test_dir = Path(__file__).parent
@@ -163,7 +162,6 @@ def test_noaa_nwm_pds_https_medium_range():
     os.remove(assert_file)         
 
 def test_noaa_nwm_pds_https_analysis_assim():
-    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/36'
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7
@@ -174,11 +172,11 @@ def test_noaa_nwm_pds_https_analysis_assim():
     os.remove(assert_file)  
 
 def test_noaa_nwm_pds_https_analysis_assim_extend():
-    assert False, f'test_nomads_post_processed() is BROKEN - https://github.com/CIROH-UA/nwmurl/issues/36'
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 7
-    nwmurl_conf["runinput"] = 7
+    nwmurl_conf["runinput"] = 6
+    nwmurl_conf["fcst_cycle"] = [16]
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     assert assert_file.exists()
@@ -189,6 +187,7 @@ def test_noaa_nwm_pds_s3():
     nwmurl_conf['end_date']   = date + hourminute   
     nwmurl_conf["runinput"] = 1 
     nwmurl_conf["urlbaseinput"] = 8
+    nwmurl_conf["fcst_cycle"] = [0]
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
     assert assert_file.exists()
