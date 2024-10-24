@@ -140,10 +140,10 @@ jobs:
         ./scripts/stream.sh -s DAILY -C NWM_MEDIUM_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
           
     
-    # - name: DAILY analysis assim extend today test
-    #   if: always()
-    #   run: |        
-    #     sudo rm -rf $(pwd)/data/datastream_test
-    #     ./scripts/stream.sh -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+    - name: DAILY analysis assim extend today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/stream.sh -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
            
   
