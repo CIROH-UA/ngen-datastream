@@ -9,7 +9,7 @@
     "runuser -l ec2-user -c 'aws s3 cp /home/ec2-user/ngen-datastream/docker_build_log.txt s3://ciroh-community-ngen-datastream/docker_build_log.txt'"
 ],
 "run_options":{
-  "ii_delete_volume" : false,
+  "ii_delete_volume" : true,
   "check_s3"         : false
 },
 "instance_parameters" :
