@@ -8,7 +8,7 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-02801556a781a4499",
+  "ImageId"            : "ami-062bdcbb454b8d833",
   "InstanceType"       : "t4g.nano",
   "KeyName"            : "actions_key",
   "SecurityGroupIds"   : ["sg-06f57f883e902d7bc"],
@@ -30,7 +30,7 @@
     {
         "DeviceName": "/dev/xvda",  
         "Ebs": {
-            "VolumeSize": 16,
+            "VolumeSize": 32,
             "VolumeType": "gp3"  
         }
     }

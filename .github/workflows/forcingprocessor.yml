@@ -43,7 +43,7 @@ jobs:
     - name: Test with pytest
       run: |
         cd forcingprocessor
-        python -m pytest -vv --deselect="tests/test_forcingprocessor.py::test_google_cloud_storage" --deselect="tests/test_forcingprocessor.py::test_gcs" --deselect="tests/test_forcingprocessor.py::test_gs" --deselect="tests/test_forcingprocessor.py::test_ciroh_zarr" --deselect="tests/test_forcingprocessor.py::test_nomads_post_processed" --deselect="tests/test_forcingprocessor.py::test_retro_ciroh_zarr" --deselect="tests/test_forcingprocessor.py::test_noaa_nwm_pds_https_analysis_assim" --deselect="tests/test_hf2ds.py" --deselect="tests/test_plotter.py"
+        python -m pytest -vv --deselect="tests/test_forcingprocessor.py::test_google_cloud_storage" --deselect="tests/test_forcingprocessor.py::test_gcs" --deselect="tests/test_forcingprocessor.py::test_gs" --deselect="tests/test_forcingprocessor.py::test_ciroh_zarr" --deselect="tests/test_forcingprocessor.py::test_nomads_post_processed" --deselect="tests/test_forcingprocessor.py::test_retro_ciroh_zarr" --deselect="tests/test_hf2ds.py" --deselect="tests/test_plotter.py"
         python -m pytest -vv tests/test_hf2ds.py
         python -m pytest -vv tests/test_plotter.py
         python -m pytest -vv -k test_google_cloud_storage 

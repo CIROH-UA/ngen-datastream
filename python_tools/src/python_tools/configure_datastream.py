@@ -1,7 +1,6 @@
 import argparse, json, os, copy, re
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import pytz as tz
 import platform
 import psutil
 
@@ -83,22 +82,25 @@ def create_conf_nwm(args):
     start = args.start_date
     end   = args.end_date  
 
+    fcst_cycle = 0
+
     if "DAILY" in start:
         if end == "":
-            start_dt = datetime.now(tz.timezone('US/Eastern'))
+            start_dt = datetime.now(timezone.utc)
         else:
             start_dt = datetime.strptime(end,'%Y%m%d%H%M') 
         end_dt = start_dt
+        num_hrs= 24
     else:
         start_dt = datetime.strptime(start,'%Y%m%d%H%M')
         end_dt   = datetime.strptime(end,'%Y%m%d%H%M')  
+        num_hrs = (end_dt - start_dt).seconds // 3600
 
     start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
-    end_dt   = end_dt.replace(hour=1,minute=0,second=0,microsecond=0)
+    end_dt   = end_dt.replace(hour=1,minute=0,second=0,microsecond=0)    
     start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
-    end_str_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S')      
     start_str_nwm = start_dt.strftime('%Y%m%d%H%M') 
-    end_str_nwm = start_dt.strftime('%Y%m%d%H%M')   
+    end_str_nwm    = start_dt.strftime('%Y%m%d%H%M') 
                            
     if "RETRO" in args.forcing_source:                    
         if "V2" in args.forcing_source:
@@ -115,8 +117,7 @@ def create_conf_nwm(args):
         "write_to_file"        : True
         }   
     else:
-        varinput = 5
-        num_hrs = (end_dt - start_dt).seconds // 3600
+        varinput = 5        
 
         if "HAWAII" in args.forcing_source:
             geoinput=2
@@ -146,12 +147,17 @@ def create_conf_nwm(args):
                 runinput=6
                 num_hrs=28
                 dt=0 
+                fcst_cycle = 16
+                start_dt = start_dt - timedelta(hours=12)
+                start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
             else:
+                start_dt = start_dt - timedelta(hours=3)
+                start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
                 runinput=5
                 num_hrs=3
         else:
             runinput=2
-            num_hrs = 24
+            num_hrs=24        
     
         nwm_conf = {
             "forcing_type" : "operational_archive",
@@ -162,9 +168,12 @@ def create_conf_nwm(args):
             "geoinput"     : geoinput,
             "meminput"     : 0,
             "urlbaseinput" : urlbaseinput,
-            "fcst_cycle"   : [0],
+            "fcst_cycle"   : [fcst_cycle],
             "lead_time"    : [x+dt for x in range(num_hrs)]
         }
+
+    end_str_real = start_dt + timedelta(hours=num_hrs-1)
+    end_str_real = end_str_real.strftime('%Y-%m-%d %H:%M:%S')            
 
     return nwm_conf, start_str_real, end_str_real
 
@@ -178,7 +187,7 @@ def create_conf_fp(args):
     output_file_type = ["netcdf"]
     if len(args.s3_bucket) > 0:
         if "DAILY" in args.start_date: 
-            args.s3_prefix = re.sub(r"\$DAILY",datetime.now(tz.timezone('US/Eastern')).strftime('%Y%m%d'),args.s3_prefix)
+            args.s3_prefix = re.sub(r"\DAILY",datetime.now(timezone.utc).strftime('%Y%m%d'),args.s3_prefix)
         output_path  = f"s3://{args.s3_bucket}/{args.s3_prefix}"
     elif len(args.docker_mount) > 0:
         gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
@@ -225,6 +234,10 @@ def create_confs(args):
         nwm_conf = {}
         fp_conf = {}
         fp_conf['forcing'] = args.forcings
+        start_real = datetime.strptime(args.start_date,'%Y%m%d%H%M')
+        end_real   = datetime.strptime(args.end_date,'%Y%m%d%H%M')  
+        start_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
+        end_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S') 
     elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
         nwm_conf = {}
         fp_conf  = create_conf_fp(args) 

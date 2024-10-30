@@ -19,6 +19,7 @@ def lambda_handler(event, context):
     """
     Generic Poller funcion    
     """
+    t0 = time.perf_counter()
 
     global client_ssm, client_ec2
     client_ssm = boto3.client('ssm',region_name=event['region'])
@@ -29,7 +30,8 @@ def lambda_handler(event, context):
     output = get_command_result(command_id,instance_id)
 
     ii_pass = False
-    while not ii_pass:
+    ii_time = False
+    while not ii_pass and not ii_time:
         output = get_command_result(command_id,instance_id)
         if output['Status'] == 'Success':
             print(f'Command has succeeded!')
@@ -37,8 +39,11 @@ def lambda_handler(event, context):
             break
         elif output['Status'] == 'InProgress':
             ii_pass = False   
-            print(f'Commands are still in progress. Waiting a minute and checking again')
-            time.sleep(10)                            
+            print(f'Commands are still in progress. Waiting 5 seconds and checking again')
+            if (time.perf_counter() - t0) > 850: 
+                print(f'Cycling...')
+                ii_time = True
+            time.sleep(5)                            
         else:
             raise Exception(f'Command failed {output}')         
     

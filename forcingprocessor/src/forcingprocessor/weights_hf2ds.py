@@ -1,11 +1,42 @@
 import json
 import argparse, time
 import geopandas as gpd
-import boto3
 import re, os
 import concurrent.futures as cf
 import pandas as pd
 gpd.options.io_engine = "pyogrio"   
+
+def multiprocess_hf2ds(files : list):
+    nprocs = min(len(files),os.cpu_count())
+    i = 0
+    k = 0
+    nfiles = len(files)
+    files_list = []
+    nper = nfiles // nprocs
+    nleft = nfiles - (nper * nprocs)    
+    for i in range(nprocs):
+        k = nper + i + nleft
+        files_list.append(files[i:k])
+        i=k
+
+    weight_jsons = []
+    jcatchment_dicts = []
+    with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        for results in pool.map(
+        hf2ds,
+        files_list,
+        ):
+            weight_jsons.append(results[0])
+            jcatchment_dicts.append(results[1])    
+
+    print(f'Processes have returned')
+    weight_json = {}
+    [weight_json.update(x) for x in weight_jsons]
+    jcatchment_dict = {}
+    [jcatchment_dict.update(x) for x in jcatchment_dicts]
+  
+    return weight_json, jcatchment_dict  
+
 
 def hf2ds(files : list):
     """

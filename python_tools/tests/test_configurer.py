@@ -1,6 +1,5 @@
 import os, pytest, json
-from datetime import datetime
-import pytz as tz
+from datetime import datetime, timezone, timedelta
 from python_tools.configure_datastream import create_confs
 
 SCRIPT_DIR        = os.path.dirname(os.path.realpath(__file__))
@@ -110,7 +109,7 @@ def test_conf_daily():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -142,7 +141,10 @@ def test_conf_daily_short_range():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(timezone.utc).day
+    assert end.day == datetime.now(timezone.utc).day
+    assert end.hour == 18
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -159,7 +161,7 @@ def test_conf_daily_medium_range():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -176,7 +178,10 @@ def test_conf_daily_noamds():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(timezone.utc).day
+    assert end.day == (datetime.now(timezone.utc)+timedelta(hours=240-1)).day
+    assert end.hour == 0
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -193,7 +198,7 @@ def test_conf_daily_noamds_postprocessed():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    assert start.day == datetime.now(timezone.utc).day
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -213,7 +218,11 @@ def test_conf_daily_assim_split_vpu_s3out():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")        
+    assert start.hour == 22
+    assert start.day == (datetime.now(timezone.utc)-timedelta(hours=24)).day
+    assert end.day == datetime.now(timezone.utc).day
+    assert end.hour == 00
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
@@ -240,17 +249,45 @@ def test_conf_daily_assim_extend_split_vpu_s3out():
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(tz.timezone('US/Eastern')).day
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.hour == 13
+    assert start.day == (datetime.now(timezone.utc)-timedelta(hours=24)).day
+    assert end.day == datetime.now(timezone.utc).day
+    assert end.hour == 16
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
-    assert data['urlbaseinput'] == 7 
-    assert data['runinput']     == 6
+    assert data['urlbaseinput']    == 7 
+    assert data['runinput']        == 6
+    assert data['fcst_cycle'][0]   == 16
     assert len(data['lead_time'] ) == 28
 
     with open(CONF_FP,'r') as fp:
         data = json.load(fp)   
     assert len(data['forcing']['gpkg_file']) == 4
     assert data['storage']['output_path'].startswith("s3://ciroh-community-ngen-datastream/pytest")
+
+def test_conf_forcings_provided():
+    inputs.start_date = "202410300100"
+    inputs.end_date   = "202410300400"
+    inputs.forcing_source = ""
+    inputs.forcings = "test_file.nc"
+    inputs.forcing_split_vpu = "01,02,03W,16"
+    inputs.s3_bucket = ""
+    inputs.s3_prefix = ""  
+    create_confs(inputs)
+    check_paths()    
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.hour == 1
+    assert start.day == 30
+    assert end.hour == 4   
+    assert end.day == 30
+    
+
+
 
 
