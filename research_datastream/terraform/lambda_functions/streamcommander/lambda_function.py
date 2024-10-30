@@ -38,7 +38,7 @@ def lambda_handler(event, context):
         event['commands'] = []
         if "s3_bucket" in ds_options:
             bucket = ds_options["s3_bucket"]
-            prefix = ds_options["object_prefix"]
+            prefix = ds_options["s3_prefix"]
         nprocs = ds_options["nprocs"]
         start = ds_options["start_time"]
         end = ds_options["end_time"]

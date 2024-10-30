@@ -13,7 +13,7 @@ import concurrent.futures as cf
 from datetime import datetime
 import gzip
 import tarfile, tempfile
-from forcingprocessor.weights_hf2ds import hf2ds
+from forcingprocessor.weights_hf2ds import multiprocess_hf2ds
 from forcingprocessor.plot_forcings import plot_ngen_forcings
 from forcingprocessor.utils import get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
 
@@ -784,7 +784,7 @@ def prep_ngen_data(conf):
     log_time("READWEIGHTS_START", log_file) 
     if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
     global weights_json
-    weights_json, jcatchment_dict = hf2ds(gpkg_files)
+    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files)
     ncatchments = len(weights_json)
     global x_min, x_max, y_min, y_max
     x_min, x_max, y_min, y_max = get_window(weights_json)
@@ -833,6 +833,12 @@ def prep_ngen_data(conf):
         # t_ax = t_ax
         # nwm_data=nwm_data[0][None,:]
         data_array, t_ax, nwm_data = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
+
+        if datetime.strptime(t_ax[0],'%Y-%m-%d %H:%M:%S') > datetime.strptime(t_ax[-1],'%Y-%m-%d %H:%M:%S'):
+            # Hack to ensure data is always written out with time moving forward.
+            t_ax=list(reversed(t_ax))
+            data_array = np.flip(data_array,axis=0)
+
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
         score = complexity / t_extract

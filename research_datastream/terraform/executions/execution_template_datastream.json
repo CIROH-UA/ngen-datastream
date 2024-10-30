@@ -9,7 +9,7 @@
     "subset_id"           : "",
     "hydrofabric_version" : "",
     "s3_bucket"           : "",
-    "object_prefix"       : ""
+    "s3_prefix"       : ""
 },
   "run_options":{
     "ii_delete_volume" : true,
