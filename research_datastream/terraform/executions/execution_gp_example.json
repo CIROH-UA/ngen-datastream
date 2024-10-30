@@ -8,7 +8,7 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-062bdcbb454b8d833",
+  "ImageId"            : "ami-03b72f226b125860d",
   "InstanceType"       : "t4g.large",
   "KeyName"            : "jlaser_west2",
   "SecurityGroupIds"   : ["sg-04365a4248fe126bc"],
