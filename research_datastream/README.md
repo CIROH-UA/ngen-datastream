@@ -1,2 +1,2 @@
 # NextGen Framework Research Datastream 
-This software does stuff
+Now generating daily NextGen data! -> https://datastream.ciroh.org/index.html
