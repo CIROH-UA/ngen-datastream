@@ -571,7 +571,7 @@ def write_netcdf(data, vpu, t_ax, catchments):
     """
     if storage_type == 's3':
         s3_client = boto3.session.Session().client("s3")
-        nc_filename = forcing_path + f'/{vpu}_forcings.nc'
+        nc_filename = forcing_path + f'/ngen.{FCST_CYCLE}z.{URLBASE}.forcing.{LEAD_START}_{LEAD_END}.{vpu}.nc'
     else:
         nc_filename = Path(forcing_path,f'{vpu}_forcings.nc')
 
@@ -761,7 +761,7 @@ def prep_ngen_data(conf):
 
     elif storage_type == "s3":
         bucket_path  = output_path
-        forcing_path = bucket_path + '/forcings'
+        forcing_path = bucket_path
         meta_path    = bucket_path + '/metadata'
         metaf_path   = bucket_path + '/metadata/forcings_metadata'
         bucket, key  = convert_url2key(metaf_path,storage_type)
@@ -795,6 +795,19 @@ def prep_ngen_data(conf):
         for jline in fp.readlines():
             nwm_forcing_files.append(jline.strip())
     nfiles = len(nwm_forcing_files)
+
+    # s3://noaa-nwm-pds/nwm.20241029/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
+    pattern = r"nwm\.(\d{8})/forcing_(\w+)/nwm\.(\w+)(\d{2})z\.\w+\.forcing\.(\w+)(\d{2})\.conus\.nc"
+
+    global URLBASE, FCST_CYCLE, LEAD_START, LEAD_END
+    match = re.search(pattern, nwm_forcing_files[0])
+    if match:
+        URLBASE = match.group(2)
+        FCST_CYCLE = match.group(3) + match.group(4)
+        LEAD_START = match.group(5) + match.group(6)
+    match = re.search(pattern, nwm_forcing_files[-1])
+    if match:
+        LEAD_END = match.group(5) + match.group(6)            
 
     global fs_type
     if 's3://' in nwm_forcing_files[0] in nwm_forcing_files[0]:
@@ -838,6 +851,9 @@ def prep_ngen_data(conf):
             # Hack to ensure data is always written out with time moving forward.
             t_ax=list(reversed(t_ax))
             data_array = np.flip(data_array,axis=0)
+            tmp = LEAD_START
+            LEAD_START = LEAD_END
+            LEAD_END = tmp
 
         t_extract = time.perf_counter() - t0
         complexity = (nfiles_tot * ncatchments) / 10000
