@@ -20,6 +20,7 @@ def lambda_handler(event, context):
     Generic Poller funcion    
     """
     t0 = time.perf_counter()
+    timeout_s = event['run_options']['timeout_s']
 
     global client_ssm, client_ec2
     client_ssm = boto3.client('ssm',region_name=event['region'])
@@ -40,9 +41,13 @@ def lambda_handler(event, context):
         elif output['Status'] == 'InProgress':
             ii_pass = False   
             print(f'Commands are still in progress. Waiting 5 seconds and checking again')
-            if (time.perf_counter() - t0) > 850: 
+            if (time.perf_counter() - t0) > 800: 
                 print(f'Cycling...')
                 ii_time = True
+            duration = time.time() - event['t0']
+            if duration >= timeout_s:
+                print(f'Duration -> {duration}\nTimeout -> {timeout_s}')
+                raise Exception(f'Commands duration have exceed the timeout specified in the execution')
             time.sleep(5)                            
         else:
             raise Exception(f'Command failed {output}')         
