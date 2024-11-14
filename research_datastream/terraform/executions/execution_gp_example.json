@@ -3,9 +3,10 @@
     "runuser -l ec2-user -c 'ls -la'"
 ],
 "run_options":{
-  "ii_delete_volume" : false,
-  "ii_check_s3"      : false,
-  "timeout_s"        : 3600
+  "ii_delete_volume"      : false,
+  "ii_terminate_instance" : true,
+  "ii_check_s3"           : false,
+  "timeout_s"             : 3600
 },
 "instance_parameters" :
 {

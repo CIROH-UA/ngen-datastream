@@ -17,6 +17,20 @@ def confirm_detach(volume_id):
             time.sleep(1)
         else:
             return
+        
+def confirm_instance_termination(instance_id):
+    while True:
+        response = client_ec2.describe_instances(
+            InstanceIds=[
+                instance_id
+            ]
+        )
+        if response['Reservations'][0]['Instances'][0]['State']['Name'] != 'terminated':
+            print(f'Instance not yet terminated')
+            time.sleep(1)
+        else:
+            print(f'Instance {instance_id} terminated')
+            return        
 
 def lambda_handler(event, context):
     """
@@ -41,20 +55,28 @@ def lambda_handler(event, context):
     ],)
     print(response)
     volume_id=event['volume_id']
-    if event["run_options"]["ii_delete_volume"]:
-        print(f'Instance VolumeId {volume_id} located.')
-        response = client_ec2.detach_volume(
-            InstanceId=instance_id,
-            VolumeId=volume_id,
-            DryRun=False
+    if event["run_options"]["ii_terminate_instance"]:
+        response = client_ec2.terminate_instances(
+            InstanceIds=[
+                instance_id,
+            ],
         )
-        confirm_detach(volume_id)
-        print(f'EBS volume {instance_id} has been successfully detached.')
-        response = client_ec2.delete_volume(
-            VolumeId=volume_id,
-            DryRun=False
-        )   
-        print(f'EBS volume {instance_id} has been successfully deleted.')     
+        confirm_instance_termination(instance_id)
     else:
-        print(f"Volume {volume_id} remains attached or available and is still incurring costs.")
+        if event["run_options"]["ii_delete_volume"]:
+            print(f'Instance VolumeId {volume_id} located.')
+            response = client_ec2.detach_volume(
+                InstanceId=instance_id,
+                VolumeId=volume_id,
+                DryRun=False
+            )
+            confirm_detach(volume_id)
+            print(f'EBS volume {instance_id} has been successfully detached.')
+            response = client_ec2.delete_volume(
+                VolumeId=volume_id,
+                DryRun=False
+            )   
+            print(f'EBS volume {volume_id} has been successfully deleted.')     
+        else:
+            print(f"Volume {volume_id} remains attached or available and is still incurring costs.")
 
