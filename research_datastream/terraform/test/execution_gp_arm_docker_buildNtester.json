@@ -9,12 +9,14 @@
     "runuser -l ec2-user -c 'aws s3 cp /home/ec2-user/ngen-datastream/docker_build_log.txt s3://ciroh-community-ngen-datastream/docker_build_log.txt'"
 ],
 "run_options":{
-  "ii_delete_volume" : true,
-  "check_s3"         : false
+  "ii_terminate_instance" : true,
+  "ii_delete_volume"      : true,
+  "ii_check_s3"           : false,
+  "timeout_s"             : 3600
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-03b72f226b125860d",
+  "ImageId"            : "ami-07161bb3f4b6e5b6d",
   "InstanceType"       : "t4g.large",
   "KeyName"            : "actions_key_arm",
   "SecurityGroupIds"   : ["sg-0fcbe0c6d6faa0117"],

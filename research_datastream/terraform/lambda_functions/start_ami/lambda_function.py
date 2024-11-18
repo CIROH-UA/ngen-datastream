@@ -34,6 +34,12 @@ def replace_in_dict(d, pattern, replacement):
     
 def lambda_handler(event, context):
 
+    t0 = time.time()
+    event['t0'] = t0
+    if not "timeout_s" in event['run_options']:
+        print(f'Setting timeout_s to default 3600 seconds')
+        event['run_options']['timeout_s'] = 3600
+
     event['region'] = os.environ['AWS_REGION']
     global client_ec2
     client_ec2 = boto3.client('ec2',region_name=event['region'])

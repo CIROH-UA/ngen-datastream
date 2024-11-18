@@ -100,13 +100,19 @@ Starting from execution_template_general_purpose. Make sure to wrap commands in 
 ```
 
 ### Edit Run Options
-The state machine is capable of confirming a complete execution by checking for the existence output data in the form of an s3 object. Set booleans here. If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options`, `ngen-datastream` will create a `ngen-run.tar.gz` file that can be found at `s3://<s3_bucket>/<s3_prefix>/ngen-run.tar.gz`
 ```
   "run_options":{
-    "ii_delete_volume" : false,
-    "ii_check_s3"      : true
+    "ii_terminate_instance" : true,
+    "ii_delete_volume"      : false,
+    "ii_check_s3"           : true,
+    "timeout_s"             : 3600
 },
 ```
+If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options` and `ii_check_s3` is set to `true` , the state machine will confirm that at least one object exists at `s3://<s3_bucket>/<s3_prefix>/`. 
+
+`ii_terminate_instance` and `ii_delete_volume` allow the user to clean up AWS resources to avoid needless costs. While stopped instances do not incur costs, detached volumes do incur costs until deleted. 
+
+`timeout_s` is a timeout for the commands issued during execution. This is valuable for shutting down hanging instances that may become unresponsive due to memory overflow, etc. Default is 3600.
 
 ### Edit Instance Options
 4) Define the AMI ID. 
