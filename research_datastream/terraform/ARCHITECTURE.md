@@ -3,7 +3,7 @@ This document provides a technical look at the AWS infrastructure that is create
 
 The AWS State Machine diagram
 
-![statemachine](../../docs/images/statemachine.jpg)
+![statemachine](./images/AWS_infra_basic.jpg)
 
 Each green box represents a distinct AWS Lambda Function that is responsible for a task such as spawning an instance from an Amazon Machine Image or issuing commands to an instance. Together these lambdas coordinate the task of creating a cloud based host to which a user can issue commands. 
 
