@@ -21,8 +21,7 @@ terraform apply -var-file=./variables.tfvars
 ```
 
 ## Execute AWS State Machine
-This command will execute the aws state machine, which will start and manage an ec2 instance to run the datastream command. See [GETTING_STARTED.md]
-(https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/GETTING_STARTED.md#create-execution-file) for more guidance on configuring the `execution.json`.
+This command will execute the aws state machine, which will start and manage an ec2 instance to run the datastream command. See [GETTING_STARTED.md](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/GETTING_STARTED.md#create-execution-file) for more guidance on configuring the `execution.json`.
 ```
 aws stepfunctions start-execution \
 --state-machine-arn arn:aws:states:us-east-1:###:stateMachine:<sm_name> \
