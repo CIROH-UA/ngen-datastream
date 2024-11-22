@@ -38,5 +38,5 @@ terraform destroy -var-file=./variables.tfvars
 ## Partial Success (`terraform apply failure`)
 `terraform apply` will fail if some of the resources already exist with the names defined in `variables.tfvars`. These resources must be either manually destroyed or imported. A script exists [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/research_datastream/scripts/import_resources.sh) to automate importing any existing resources. Remove all spaces from variable file if using this script.
 ```
-./test/import_resources.sh <path-to-variables.tfvars>
+import_resources.sh <path-to-variables.tfvars>
 ```
