@@ -8,7 +8,7 @@ This document will step users through the following
 You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform#build-aws-infrastructure)
 
 ## 2. Build an Amazon Machine Image
-Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform/AWS_BASICS.md#machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream. The following steps are shown through the AWS Console.
+Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/AWS_BASICS.md#6-amazon-machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream. The following steps are shown through the AWS Console.
 
 ### Launch instance
 Pick a region to launch your instance in, here it is `us-east-2`. Also pick a name, here `terraform_demo`. Select the Amazon Linux 2023 AMI as seen below.
