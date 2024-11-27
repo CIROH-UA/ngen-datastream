@@ -28,6 +28,13 @@ AWS Identity and Access Management (IAM) allows you to securely manage access to
 ### 5. **Execution JSON Files**
 These JSON files define inputs, outputs, and parameters for workflows, making it easy to customize the behavior of state machines and their components without modifying code.
 
+### 6. **Amazon Machine Images (AMIs)**  
+Amazon Machine Images (AMIs) are pre-configured templates used to launch virtual machines (EC2 instances). An AMI includes the operating system, application software, and settings required for your environment.  
+- **Public AMIs**: Available to all AWS users and often include popular OS distributions.  
+- **Private AMIs**: Customized AMIs created by you or shared within your AWS account.  
+- **Benefits**: Using AMIs ensures consistent environments across multiple instances and simplifies the deployment of pre-configured servers.  
+- [Learn more about AMIs](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)  
+
 ## Understanding AWS Pricing
 
 AWS operates on a pay-as-you-go pricing model, meaning you only pay for the resources you use. Below is an overview of pricing for the services in this project:
