@@ -4,10 +4,10 @@ This document will step users through the following
 3) Configuring an execution file
 4) Executing the the State Machine
 
-## Build the infrastructure
+## 1. Build the infrastructure
 You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform#build-aws-infrastructure)
 
-## Build an Amazon Machine Image
+## 2. Build an Amazon Machine Image
 Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform/AWS_BASICS.md#machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream. The following steps are shown through the AWS Console.
 
 ### Launch instance
@@ -63,22 +63,19 @@ Hold on to the AMI ID.
 
 ![ami](./images/create_AMI2.jpg)
 
-## Execute a NextGen job
-### Create Execution File
-1) Create an execution json. The user has 2 templates to begin from. These templates are identical, with the exception that execution_template_datastream.json has the field "datastream_command_options", whereas execution_template_general_purpose.json has the field "commands". The reason for this is to make the executions as readable as possible, while still preserving the general purpose nature of this architecture. The following commands are performed in a local linux terminal with the working directory being `/ngen-datastream/research_datastream/terraform`. 
+## 3. Configure Execution File
+Create an execution json. The user has 2 templates to begin from. These templates are identical, with the exception that execution_template_datastream.json has the field "datastream_command_options", whereas execution_template_general_purpose.json has the field "commands". The reason for this is to make the executions as readable as possible, while still preserving the general purpose nature of this architecture. The following commands are performed in a local linux terminal with the working directory being `/ngen-datastream/research_datastream/terraform`. 
 
 ```
 cp ./executions/execution_template_<pick_one>.json  ./executions/execution_test_1.json
 ```
 
-2) Open file to configure the execution
+Open file to configure the execution
 ```
 vi ./executions/execution_test_1.json
 ```
 
-### Edit Commands
 Provide the commands you want the instance to execute. 
-
 Starting from execution_template_datastream. These options correspond directly to the cli args for `ngen-datastream/scripts/stream.sh`
 ```
   "datastream_command_options" : {
@@ -103,7 +100,7 @@ Starting from execution_template_general_purpose. Make sure to wrap commands in 
 ],
 ```
 
-### Edit Run Options
+Edit Run Options
 ```
   "run_options":{
     "ii_terminate_instance" : true,
@@ -118,28 +115,28 @@ If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options` and 
 
 `timeout_s` is a timeout for the commands issued during execution. This is valuable for shutting down hanging instances that may become unresponsive due to memory overflow, etc. Default is 3600.
 
-### Edit Instance Options
+Edit Instance Options
 4) Define the AMI ID. 
 ```
   "instance_parameters" :
   {
     "ImageId"            : "ami-###",
 ```
-4) Define the desired instance type. Make sure the hardware architecture matches the AMI.
+Define the desired instance type. Make sure the hardware architecture matches the AMI.
 ```
     "InstanceType"       : "t2g.xlarge",
 ```
-5) Define the key that authenticates the user when SSH'ing into the instance. Don't include the file extension (i.e. `.pem`).  
+Define the key that authenticates the user when SSH'ing into the instance. Don't include the file extension (i.e. `.pem`).  
 ```
     "KeyName"            : "your_key",
 ```
-6) This must match `profile_name` in variables.tfvars
+This must match `profile_name` in variables.tfvars
 ```
     "IamInstanceProfile" : {
         "Name" : "name-of-instance-profile"
         },
 ```
-7) Name for the instance
+Name for the instance
 ```
     "TagSpecifications"   :[
       {
@@ -152,7 +149,7 @@ If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options` and 
           ]
       }
 ```
-8) Define the disk size for the instance
+Define the disk size and type for the instance
 ```
     "BlockDeviceMappings":[
       {
@@ -165,7 +162,8 @@ If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options` and 
     ]
 ```
 
-9) Finally, execute the state machine. Issue this command from a local linux terminal.
+## 4. Execute the state machine. 
+Issue this command from a local linux terminal from the `terraform` folder.
 ```
 aws stepfunctions start-execution \
 --state-machine-arn <sm_ARN> \
