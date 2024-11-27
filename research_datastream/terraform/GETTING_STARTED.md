@@ -1,10 +1,14 @@
-This document will step users through standing up the AWS State Machine and executing NextGen jobs via `ngen-datastream`. Make sure to have completed the [prerequsites](https://github.com/CIROH-UA/ngen-datastream/tree/main/terraform#prerequisites).
+This document will step users through the following
+1) Building the AWS infrastructure with Terraform
+2) Preparing a custom Amazon Machine Image with the AWS Console
+3) Configuring an execution file
+4) Executing the the State Machine
 
 ## Build the infrastructure
-You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform#Building-AWS-State-Machine)
+You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform#build-aws-infrastructure)
 
 ## Build an Amazon Machine Image
-Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform/AWS_BASICS.md#machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream.
+Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform/AWS_BASICS.md#machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream. The following steps are shown through the AWS Console.
 
 ### Launch instance
 Pick a region to launch your instance in, here it is `us-east-2`. Also pick a name, here `terraform_demo`. Select the Amazon Linux 2023 AMI as seen below.
@@ -19,7 +23,7 @@ Lastly, define a security group to which the instance will belong. Typically a u
 
 ![launch_3](./images/launch_instance_3.jpg)
 
-SSH into the instance by providing the path to the key pair file. Find the instance in the AWS console to retrieve the Public IPv4 DNS address. 
+SSH into the instance by providing the path to the key pair file. Find the instance in the AWS console to retrieve the Public IPv4 DNS address. The following steps occur in a local linux terminal. 
 ```
 ssh -i <path_to_your_key> ec2-user@<Public_IPv4_DNS_address>
 ```
@@ -51,7 +55,7 @@ docker pull zwills/merkdir
 This is not requried, but will save on execution time at the expensive of AMI size.
 
 ### Create AMI from instance
-Head back to the AWS console and find your instance and create an image from it. Note that this will shut down the instance and you will not be able to SSH into it during the image creation.
+Head back to the AWS console and find your instance and create an image from it. Note that this will shut down the instance and you will not be able to SSH into it during the image creation. The SSH session will end in your local linux terminal.
 
 ![ami](./images/create_AMI.jpg)
 
@@ -61,7 +65,7 @@ Hold on to the AMI ID.
 
 ## Execute a NextGen job
 ### Create Execution File
-1) Create an execution json. The user has 2 templates to begin from. These templates are identical, with the exception that execution_template_datastream.json has the field "datastream_command_options", whereas execution_template_general_purpose.json has the field "commands". The reason for this is to make the executions as readable as possible, while still preserving the general purpose nature of this architecture. 
+1) Create an execution json. The user has 2 templates to begin from. These templates are identical, with the exception that execution_template_datastream.json has the field "datastream_command_options", whereas execution_template_general_purpose.json has the field "commands". The reason for this is to make the executions as readable as possible, while still preserving the general purpose nature of this architecture. The following commands are performed in a local linux terminal with the working directory being `/ngen-datastream/research_datastream/terraform`. 
 
 ```
 cp ./executions/execution_template_<pick_one>.json  ./executions/execution_test_1.json
@@ -161,7 +165,7 @@ If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options` and 
     ]
 ```
 
-9) Finally, execute the state machine.
+9) Finally, execute the state machine. Issue this command from a local linux terminal.
 ```
 aws stepfunctions start-execution \
 --state-machine-arn <sm_ARN> \
