@@ -1,8 +1,10 @@
-The Terraform in this folder will stand up Amazon Web Services cloud infrastructure that allows users to run hydrologic numeric simulations remotely and within the NextGen Framework. These executions are performed with `ngen-datastream` tooling, which provides scalability, reproducibility, and ease of use. The cloud based components of the research datastream were constructed using this infrastructure.
+The Terraform in this folder will build the Research Datastream Amazon Web Services cloud infrastructure. With this infrastructure built, users can then issue AWS StepFunction executions (via the CLI) that activate an AWS State Machine responsible for managing individual NextGen simulations on an AWS EC2 instance. This tooling effectively gives users the ability to execute NextGen simulations in AWS cloud.
+
+Note that this infrastructure does not cost anything to build. A user's account will only incur costs when the AWS State Machine is executed. The Research Datastream infrastructure contains AWS EventBridge Schedules that trigger executions daily. These schedules have been left out of the main branch terraform, so that users are able to build the this infrastructure without incurring any costs. 
 
 # AWS
 In order to go from cloning this repository to executing NextGen simulations in AWS cloud, see this [document](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/GETTING_STARTED.md).
-See [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/ARCHITECTURE.md) for a technical explanation of the Amazon Web Services (AWS) infrastructure architecture. See [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/AWS_BASICS.md) for a crash course in AWS basics relevant to this tooling.
+See [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/ARCHITECTURE.md) for a technical explanation of the Amazon Web Services (AWS) infrastructure architecture. See [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/AWS_BASICS.md) for a crash course in AWS basics relevant to this tooling. See [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/TERRAFORM_BASICS.md) for a crash course in Terraform basics relevant to this tooling.
 
 # Prerequisites
 * AWS account
