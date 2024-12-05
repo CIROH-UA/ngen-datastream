@@ -80,7 +80,7 @@ def gen_petAORcfe(hf_file,out,include):
         models.append(Cfe)        
     for j, jmodel in enumerate(include):
         hf: gpd.GeoDataFrame = gpd.read_file(hf_file, layer="divides")
-        hf_lnk_data: pd.DataFrame = gpd.read_file(hf_file,layer="model-attributes")
+        hf_lnk_data: pd.DataFrame = gpd.read_file(hf_file,layer="divide-attributes")
         hook_provider = DefaultHookProvider(hf=hf, hf_lnk_data=hf_lnk_data)
         jmodel_out = Path(out,'cat_config',jmodel)
         os.system(f"mkdir -p {jmodel_out}")
