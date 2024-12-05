@@ -781,20 +781,22 @@ def prep_ngen_data(conf):
 
     log_time("CONFIGURATION_END", log_file) 
 
-    log_time("READWEIGHTS_START", log_file) 
-    if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
-    global weights_json
-    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files)
-    ncatchments = len(weights_json)
-    global x_min, x_max, y_min, y_max
-    x_min, x_max, y_min, y_max = get_window(weights_json)
-    log_time("READWEIGHTS_END", log_file) 
-
     nwm_forcing_files = []
     with open(nwm_file,'r') as fp:
         for jline in fp.readlines():
             nwm_forcing_files.append(jline.strip())
-    nfiles = len(nwm_forcing_files)
+    nfiles = len(nwm_forcing_files)    
+
+    log_time("READWEIGHTS_START", log_file) 
+    tw = time.perf_counter()
+    if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
+    global weights_json
+    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files,nwm_forcing_files[0])
+    ncatchments = len(weights_json)
+    global x_min, x_max, y_min, y_max
+    x_min, x_max, y_min, y_max = get_window(weights_json)
+    weight_time = time.perf_counter() - tw
+    log_time("READWEIGHTS_END", log_file) 
 
     # s3://noaa-nwm-pds/nwm.20241029/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
     pattern = r"nwm\.(\d{8})/forcing_(\w+)/nwm\.(\w+)(\d{2})z\.\w+\.forcing\.(\w+)(\d{2})\.conus\.nc"
@@ -879,18 +881,23 @@ def prep_ngen_data(conf):
     runtime = time.perf_counter() - t_start
 
     if ii_plot:
-        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one file')
-        if gpkg_files[0].endswith('.parquet'): raise Warning(f'Plotting currently not implemented for parquet, need geopackage')
-        cat_ids = ['cat-' + x for x in forcing_cat_ids]
-        jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
-        if storage_type == "s3":
-            gif_out = './GIFs'
+        if gpkg_files[0].endswith('.parquet') or gpkg_files[0].endswith('.json'): 
+            print(f'Plotting currently not implemented for parquet, need geopackage')
         else:
-            gif_out = Path(meta_path,'GIFs')
-        plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, gif_out)
-        if storage_type == "s3":
-            sync_cmd = f'aws s3 sync ./GIFs {meta_path}/GIFs'
-            os.system(sync_cmd)
+
+            if len(gpkg_files) > 1: 
+                raise Warning(f'Plotting only the first geopackage {gpkg_files[0]}')
+
+            cat_ids = ['cat-' + x for x in forcing_cat_ids]
+            jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
+            if storage_type == "s3":
+                gif_out = './GIFs'
+            else:
+                gif_out = Path(meta_path,'GIFs')
+            plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, gif_out)
+            if storage_type == "s3":
+                sync_cmd = f'aws s3 sync ./GIFs {meta_path}/GIFs'
+                os.system(sync_cmd)
     
     # Metadata        
     if ii_collect_stats:
@@ -1030,6 +1037,7 @@ def prep_ngen_data(conf):
     if ii_verbose:
         print(f"\n\n--------SUMMARY-------")
         msg = f"\nData has been written to {output_path}"
+        msg += f"\nCalc weights  : {weight_time:.2f}s"
         msg += f"\nProcess data  : {t_extract:.2f}s"
         msg += f"\nWrite data    : {write_time:.2f}s"
         if ii_collect_stats: 
