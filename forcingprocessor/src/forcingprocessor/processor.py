@@ -1025,15 +1025,6 @@ def prep_ngen_data(conf):
         tar_time = time.perf_counter() - t0000
         log_time("TAR_END", log_file)
 
-    if storage_type == "s3": 
-        bucket, key  = convert_url2key(metaf_path,storage_type)
-        log_path = key + '/profile_fp.txt'
-        s3.upload_file(
-                f'./profile_fp.txt',
-                bucket,
-                log_path
-            )
-
     if ii_verbose:
         print(f"\n\n--------SUMMARY-------")
         msg = f"\nData has been written to {output_path}"
@@ -1049,6 +1040,17 @@ def prep_ngen_data(conf):
         msg += f"\nRuntime       : {runtime:.2f}s\n"
         print(msg)
     log_time("FORCINGPROCESSOR_END", log_file)
+
+    if storage_type == "s3": 
+        bucket, key  = convert_url2key(metaf_path,storage_type)
+        log_path = key + '/profile_fp.txt'
+        s3.upload_file(
+                f'./profile_fp.txt',
+                bucket,
+                log_path
+            )
+    else:
+        os.system(f"mv ./profile_fp.txt {metaf_path}")    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
