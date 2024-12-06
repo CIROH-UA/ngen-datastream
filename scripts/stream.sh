@@ -261,6 +261,15 @@ if [ ! -z $RESOURCE_DIR ]; then
     if [ -f "$NGEN_BMI_CONFS" ]; then
         echo "Using" $NGEN_BMI_CONFS
         tar -xf $NGEN_BMI_CONFS -C "${NGENRUN_CONFIG%/}"
+    else
+        # Look for BMI configs
+        NGEN_BMI_CONFS_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz")
+        NBMI=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz"| wc -l)
+        if [ ${NBMI} -gt 0 ]; then
+            echo "Using "$NGEN_BMI_CONFS_RESOURCES "for BMI configs"
+            tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
+        fi
+
     fi    
 
     # Look for realization
@@ -312,8 +321,10 @@ if [ ! -z $RESOURCE_DIR ]; then
     # Look for ngen forcings
     if [ -z $NGEN_FORCINGS ]; then
         NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
-        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then
-            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.")
+        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then            
+            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "*forcings*")
+            echo "Using resource directory forcings "$NGEN_FORCINGS
+            get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
         fi
     fi 
 
@@ -426,7 +437,7 @@ else
         --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json"
     TAR_NAME="ngen-bmi-configs.tar.gz"
     NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
-    tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
+    tar -cf - --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
 fi
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
@@ -434,11 +445,11 @@ if [ ! -z $NGEN_FORCINGS ]; then
     log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
     echo "Using $NGEN_FORCINGS"
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
-    get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
-    if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
+    # get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
+    if [ ! -e $DATASTREAM_RESOURCES_NGENFORCINGS ]; then
         mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
+        get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     fi    
-    get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
@@ -515,8 +526,8 @@ else
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
-NIGAB_TAG="latest$PLATORM_TAG"
-# NIGAB_TAG="1.2.1"
+# NIGAB_TAG="latest$PLATORM_TAG"
+NIGAB_TAG="latest"
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
