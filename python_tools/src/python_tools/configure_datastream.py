@@ -194,7 +194,7 @@ def create_conf_fp(args):
         output_path = f"{args.docker_mount}/ngen-run"  
     
     if len(args.forcing_split_vpu) > 0:
-        template = f"/mounted_dir/nextgen_$VPU_weights.json"
+        template = f"/mounted_dir/nextgen_VPU_$VPU_weights.json"
         gpkg_file = []
         for jvpu in args.forcing_split_vpu.split(','):
             tmpl_cpy = copy.deepcopy(template)
