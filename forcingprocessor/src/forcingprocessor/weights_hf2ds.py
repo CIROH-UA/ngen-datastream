@@ -57,18 +57,20 @@ def multiprocess_hf2ds(files : list,raster_template_in : str, max_procs : int):
     global raster_template
     raster_template = raster_template_in
 
-    nprocs = min(len(files),os.cpu_count())
-    i = 0
-    k = 0
+    nprocs = min(len(files),max_procs)
     nfiles = len(files)
     files_list = []
     nper = nfiles // nprocs
-    nleft = nfiles - (nper * nprocs)    
-    for i in range(len(files)):
-        k = nper + i + nleft
+    nleft = nfiles - (nper * nprocs)   
+    i = 0
+    k = nper
+    for j in range(nprocs):
+        if j < nleft: k += 1
+        print(f"{i} {k}")
         files_list.append(files[i:k])
         i=k
-
+        k = nper + i
+        
     weight_jsons = []
     jcatchment_dicts = []
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
@@ -173,7 +175,7 @@ def hydrofabric2datastream_weights(weights_file : str) -> dict:
 
     tf = time.perf_counter()
     dt = tf - t0
-    print(f'{ncatchment} catchment weights obtained {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
+    print(f'{weights_file} {ncatchment} catchment weights obtained {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
     return weights_json
 
 if __name__ == "__main__":
