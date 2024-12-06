@@ -104,7 +104,7 @@ def hf2ds(files : list):
     jcatchment_dict = {}
     count = 0
     for jgpkg in files:
-        pattern = r'vpuid%3D([^/]+)'
+        pattern = r'VPU_([0-9A-Z]+)_weights\.json'
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
