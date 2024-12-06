@@ -194,7 +194,7 @@ def create_conf_fp(args):
         output_path = f"{args.docker_mount}/ngen-run"  
     
     if len(args.forcing_split_vpu) > 0:
-        template = f"/home/ec2-user/hydrofabric/{args.hydrofabric_version}/nextgen_$VPU.gpkg"
+        template = f"/home/ec2-user/hydrofabric/{args.hydrofabric_version}/nextgen_$VPU_weights.json"
         gpkg_file = []
         for jvpu in args.forcing_split_vpu.split(','):
             tmpl_cpy = copy.deepcopy(template)
