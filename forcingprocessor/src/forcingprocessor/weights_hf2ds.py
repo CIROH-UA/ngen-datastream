@@ -66,7 +66,6 @@ def multiprocess_hf2ds(files : list,raster_template_in : str, max_procs : int):
     k = nper
     for j in range(nprocs):
         if j < nleft: k += 1
-        print(f"{i} {k}")
         files_list.append(files[i:k])
         i=k
         k = nper + i

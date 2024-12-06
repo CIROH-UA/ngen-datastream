@@ -234,10 +234,7 @@ def create_confs(args):
         nwm_conf = {}
         fp_conf = {}
         fp_conf['forcing'] = args.forcings
-        start_real = datetime.strptime(args.start_date,'%Y%m%d%H%M')
-        end_real   = datetime.strptime(args.end_date,'%Y%m%d%H%M')  
-        start_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
-        end_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S') 
+        _, start_real, end_real = create_conf_nwm(args)
     elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
         nwm_conf = {}
         fp_conf  = create_conf_fp(args) 
