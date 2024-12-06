@@ -275,7 +275,7 @@ def create_confs(args):
     else:
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = f"./forcings/{args.forcings}"
+        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization_datastream.json')
 
