@@ -791,7 +791,7 @@ def prep_ngen_data(conf):
     tw = time.perf_counter()
     if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
     global weights_json
-    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files,nwm_forcing_files[0])
+    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files,nwm_forcing_files[0],nprocs)
     ncatchments = len(weights_json)
     global x_min, x_max, y_min, y_max
     x_min, x_max, y_min, y_max = get_window(weights_json)

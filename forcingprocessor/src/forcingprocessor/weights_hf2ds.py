@@ -53,7 +53,7 @@ def calc_weights_from_gdf(gdf:gpd.GeoDataFrame, raster_file : str) -> dict:
 
     return out_json
 
-def multiprocess_hf2ds(files : list,raster_template_in : str):
+def multiprocess_hf2ds(files : list,raster_template_in : str, max_procs : int):
     global raster_template
     raster_template = raster_template_in
 
@@ -64,7 +64,7 @@ def multiprocess_hf2ds(files : list,raster_template_in : str):
     files_list = []
     nper = nfiles // nprocs
     nleft = nfiles - (nper * nprocs)    
-    for i in range(nprocs):
+    for i in range(len(files)):
         k = nper + i + nleft
         files_list.append(files[i:k])
         i=k
