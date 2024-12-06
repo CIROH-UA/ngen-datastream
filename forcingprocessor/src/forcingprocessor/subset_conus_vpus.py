@@ -27,6 +27,7 @@ def subset_conus2vpus(conus:str,raster_file:str,output_dir:str) -> None:
             print(f'subsetting layer {jlayer} for vpu {jvpu}')
             data_conus_jlayer = gpd.read_file(conus, layer=jlayer)  
             data_jvpu = gpd.GeoDataFrame(data_conus_jlayer[data_conus_jlayer['vpuid'] == jvpu])
+            data_jvpu = gpd.GeoDataFrame(data_conus_jlayer[data_conus_jlayer['type'] != "coastal"])
             data_jvpu.to_file(jfile,layer=jlayer)
 
             if jlayer == "divides":
