@@ -20,6 +20,8 @@ def subset_conus2vpus(conus:str,raster_file:str,output_dir:str) -> None:
 
     jfile_template = os.path.join(output_dir,"nextgen_$VPU.gpkg")    
     for j,jvpu in enumerate(VPUs):
+        ncats = 0
+        nattrs = 0
         tmpl_cpy = copy.deepcopy(jfile_template)
         jfile = re.sub(PATTERN_VPU, jvpu, tmpl_cpy)    
 
@@ -31,6 +33,7 @@ def subset_conus2vpus(conus:str,raster_file:str,output_dir:str) -> None:
             data_jvpu.to_file(jfile,layer=jlayer)
 
             if jlayer == "divides":
+                ncats = len(data_jvpu)
 
                 weights_json = calc_weights_from_gdf(data_jvpu, raster_file)
                 jfile_weights_template = os.path.join(output_dir,"nextgen_$VPU_weights.json")
@@ -39,6 +42,13 @@ def subset_conus2vpus(conus:str,raster_file:str,output_dir:str) -> None:
 
                 with open(jfile_weights,'w') as fp:
                     json.dump(weights_json,fp)
+            elif jlayer == "divide-attributes":
+                nattrs = len(data_jvpu)
+            else:
+                pass
+
+        assert ncats == nattrs
+
     
 if __name__ == "__main__":
 
