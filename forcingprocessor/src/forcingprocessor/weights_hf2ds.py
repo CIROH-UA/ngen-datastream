@@ -1,12 +1,10 @@
-import json, re, os, argparse, time, requests
+import json, re, argparse, time, requests
 from io import BytesIO
 import geopandas as gpd
 import concurrent.futures as cf
 import pandas as pd
 import xarray as xr
 import numpy as np
-from exactextract import exact_extract
-from exactextract.raster import NumPyRasterSource
 gpd.options.io_engine = "pyogrio"   
 
 def calc_weights_from_gdf(gdf:gpd.GeoDataFrame, raster_file : str) -> dict:
@@ -14,6 +12,8 @@ def calc_weights_from_gdf(gdf:gpd.GeoDataFrame, raster_file : str) -> dict:
     # keys are divide_ids, values are a 2 element list 
     # with the first element being a list of cell_id's
     # and the second element being the corresponding coverage fraction's
+    from exactextract import exact_extract
+    from exactextract.raster import NumPyRasterSource
     if 'https://' in raster_file:
         response = requests.get(raster_file)
         
