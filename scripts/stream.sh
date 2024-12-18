@@ -595,14 +595,15 @@ if [ -n "$S3_BUCKET" ]; then
     S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/merkdir.file"
     aws s3 cp $DATA_DIR/merkdir.file $S3_OUT
 
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
-    aws s3 sync $DATASTREAM_META $S3_OUT
-
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-resources"
-    aws s3 sync $DATASTREAM_RESOURCES $S3_OUT
+    # S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-resources"
+    # aws s3 sync $DATASTREAM_RESOURCES $S3_OUT
 
     echo "Data exists here: $S3_OUT"
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
+    aws s3 sync $DATASTREAM_META $S3_OUT    
+
 fi
 echo "Data exists here: $DATA_DIR"
 
