@@ -2,6 +2,14 @@ ARG TAG_NAME
 FROM awiciroh/datastream-deps:${TAG_NAME} as datastream_base
 COPY ./ngen-datastream/ /ngen-datastream
 RUN pip3 install -e /ngen-datastream/python_tools
+
+# HACK to install local ngen-cal
+COPY ./ngen-cal /ngen-cal
+RUN pip3 uninstall ngen_config ngen_init_config ngen_config_gen -y
+RUN pip3 install -e /ngen-cal/python/ngen_conf
+RUN pip3 install -e /ngen-cal/python/ngen_init_config
+RUN pip3 install -e /ngen-cal/python/ngen_config_gen
+
 RUN groupadd -r mygroup && useradd -r -g mygroup myuser
 RUN chown -R myuser:mygroup /ngen-datastream
 

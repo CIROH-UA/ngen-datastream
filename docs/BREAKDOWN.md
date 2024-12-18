@@ -44,12 +44,12 @@ hfsubset \
     -w medium_range \
     -s nextgen \
     -v 2.1.1 \
-    -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes \
+    -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,divide-attributes \
     -o ./palisade_2019/ngen-run/config/palisade.gpkg \
     -t hl "Gages-09106150"
 ```
 Some things to note about this command:
-* `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`model-attributes`
+* `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`divide-attributes`
 * `-w` : Defines which grid the weights are calculated from. In this case, it's the medium_range forcing from the National Water Model
 * `-v` : Defines the hydrofabric version
 * The last arguement `"Gages-09106150"`, corresponds to the stream gauge that hfsubset will use to trace the upstream network. This effectively defines the spatial domain. This is a gauge on the Colorado River in Palisade, Colorado.

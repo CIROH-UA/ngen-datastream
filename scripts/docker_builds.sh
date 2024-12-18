@@ -49,9 +49,16 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/python_tools $DOCKER_DATASTREAM/python_tools
   cp -r $DATASTREAM_PATH/configs $DOCKER_DATASTREAM/configs
+
+  NGEN_CAL_DOCKER=$DOCKER_DIR/ngen-cal
+  cp -r $DATASTREAM_PATH/ngen-cal $DOCKER_DIR
+
   docker build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
+  fi
+  if [ -d "$NGEN_CAL_DOCKER" ]; then
+    rm -rf $NGEN_CAL_DOCKER
   fi
 fi
 

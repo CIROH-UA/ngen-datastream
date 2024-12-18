@@ -33,8 +33,7 @@ get_file() {
     if is_directory "$IN_STRING"; then
         cp -r $IN_STRING/* $OUT_STRING
     elif is_s3_key "$IN_STRING"; then
-        OUTPUT=$(aws s3 ls $IN_STRING)
-        NUM_LINES=$(echo "$OUTPUT" | wc -l)
+        NUM_LINES=$(aws s3 ls $IN_STRING | wc -l)
         if [ $NUM_LINES -eq 0 ]; then
             echo "Nothing found for $IN_STRING"
         elif [ $NUM_LINES -eq 1 ]; then
@@ -151,7 +150,7 @@ echo "HOST_OS" $HOST_OS
 PLATORM_TAG=""
 if [ $(uname -m) = "x86_64" ]; then
     PLATORM_TAG="-x86"
-elif [ $(uname -m) = "arm64" ]; then
+elif [ $(uname -m) = "aarch64" ]; then
     PLATORM_TAG=""
 else 
   echo "Warning: Unsupported architecture $(uname -m)"
@@ -261,6 +260,15 @@ if [ ! -z $RESOURCE_DIR ]; then
     if [ -f "$NGEN_BMI_CONFS" ]; then
         echo "Using" $NGEN_BMI_CONFS
         tar -xf $NGEN_BMI_CONFS -C "${NGENRUN_CONFIG%/}"
+    else
+        # Look for BMI configs
+        NGEN_BMI_CONFS_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz")
+        NBMI=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz"| wc -l)
+        if [ ${NBMI} -gt 0 ]; then
+            echo "Using "$NGEN_BMI_CONFS_RESOURCES "for BMI configs"
+            tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
+        fi
+
     fi    
 
     # Look for realization
@@ -312,9 +320,21 @@ if [ ! -z $RESOURCE_DIR ]; then
     # Look for ngen forcings
     if [ -z $NGEN_FORCINGS ]; then
         NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
-        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then
-            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.")
+        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then            
+            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "*forcings*")
+            echo "Using resource directory forcings "$NGEN_FORCINGS
+            get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
         fi
+    else
+        echo "Using" $NGEN_FORCINGS
+        if [[ "$NGEN_FORCINGS" == *"DAILY"* ]]; then
+            current_date=$(date -u +"%Y%m%d")
+            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$current_date}"
+            echo "Updated NGEN_FORCINGS: $NGEN_FORCINGS"
+        else
+            echo "The NGEN_FORCINGS does not contain 'DAILY'."
+        fi
+        get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
     fi 
 
     # Look for partitions file
@@ -337,13 +357,23 @@ else
         exit 1
     fi    
 
-    # ngen bmi module configs    
     if [ ! -z "$NGEN_BMI_CONFS" ]; then
         echo "Using" $NGEN_BMI_CONFS
-        cp -r "$NGEN_BMI_CONFS"/* $NGENRUN_CONFIG
+        tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
     fi  
 
-    # Look for nwm forcings
+    if [ ! -z "$NGEN_FORCINGS" ]; then
+        echo "Using" $NGEN_FORCINGS
+        if [[ "$NGEN_FORCINGS" == *"DAILY"* ]]; then
+            current_date=$(date -u +"%Y%m%d")
+            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$current_date}"
+            echo "Updated NGEN_FORCINGS: $NGEN_FORCINGS"
+        else
+            echo "The NGEN_FORCINGS does not contain 'DAILY'."
+        fi
+        get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
+    fi 
+
     if [ ! -z $NWM_FORCINGS_DIR ]; then
         NWM_FORCINGS=$(find "$NWM_FORCINGS_DIR" -type f -name "*.nc")
     fi    
@@ -366,7 +396,7 @@ if [ ! -z $SUBSET_ID ]; then
     log_time "SUBSET_START" $DATASTREAM_PROFILING
     GEO_BASE="$SUBSET_ID.gpkg"
     GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_NGENCONF%/}/$GEO_BASE"
-    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
+    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,divide-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
     GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
     cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
     log_time "SUBSET_END" $DATASTREAM_PROFILING
@@ -426,7 +456,7 @@ else
         --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json"
     TAR_NAME="ngen-bmi-configs.tar.gz"
     NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
-    tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
+    tar -cf - --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
 fi
 log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
 
@@ -434,11 +464,11 @@ if [ ! -z $NGEN_FORCINGS ]; then
     log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
     echo "Using $NGEN_FORCINGS"
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
-    get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
-    if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
+    # get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
+    if [ ! -e $DATASTREAM_RESOURCES_NGENFORCINGS ]; then
         mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
+        get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     fi    
-    get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
@@ -515,8 +545,8 @@ else
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING
 
-NIGAB_TAG="latest$PLATORM_TAG"
-# NIGAB_TAG="1.2.1"
+# NIGAB_TAG="latest$PLATORM_TAG"
+NIGAB_TAG="latest"
 log_time "NGEN_START" $DATASTREAM_PROFILING
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
@@ -546,6 +576,15 @@ log_time "TAR_END" $DATASTREAM_PROFILING
 log_time "DATASTREAM_END" $DATASTREAM_PROFILING
 
 if [ -n "$S3_BUCKET" ]; then
+
+    if [[ "$S3_PREFIX" == *"DAILY"* ]]; then
+        current_date=$(date -u +"%Y%m%d")
+        S3_PREFIX="${S3_PREFIX//DAILY/$current_date}"
+        echo "Updated S3_PREFIX: $S3_PREFIX"
+    else
+        echo "The S3_PREFIX does not contain 'DAILY'."
+    fi
+
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING
 
     echo "Writing data to S3" $S3_OUT $S3_BUCKET $S3_PREFIX 
@@ -556,14 +595,15 @@ if [ -n "$S3_BUCKET" ]; then
     S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/merkdir.file"
     aws s3 cp $DATA_DIR/merkdir.file $S3_OUT
 
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
-    aws s3 sync $DATASTREAM_META $S3_OUT
-
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-resources"
-    aws s3 sync $DATASTREAM_RESOURCES $S3_OUT
+    # S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-resources"
+    # aws s3 sync $DATASTREAM_RESOURCES $S3_OUT
 
     echo "Data exists here: $S3_OUT"
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
+    aws s3 sync $DATASTREAM_META $S3_OUT    
+
 fi
 echo "Data exists here: $DATA_DIR"
 

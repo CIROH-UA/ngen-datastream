@@ -9,17 +9,17 @@ def gen_noah_owp_pkl(attrs_path,out):
     with open(template,'r') as fp:
         conf_template = fp.readlines()
     
-    attrs     = gpd.read_file(attrs_path,layer = 'model-attributes')
+    attrs     = gpd.read_file(attrs_path,layer = 'divide-attributes')
     catchment_list = sorted(list(attrs['divide_id']))
 
     all_confs = {}
     for jcatch in catchment_list:
         jcatch_conf = copy.deepcopy(conf_template)
         jcatch_attrs = attrs.loc[attrs["divide_id"] == jcatch]
-        lat = jcatch_attrs["Y"].iloc[0]
-        lon = jcatch_attrs["X"].iloc[0]
-        slope = jcatch_attrs["slope_mean"].iloc[0]
-        azimuth = jcatch_attrs["aspect_c_mean"].iloc[0]
+        lat = jcatch_attrs["centroid_x"].iloc[0]
+        lon = jcatch_attrs["centroid_y"].iloc[0]
+        slope = jcatch_attrs["mean.slope"].iloc[0]
+        azimuth = jcatch_attrs["circ_mean.aspect"].iloc[0]
         for j,jline in enumerate(jcatch_conf):
             pattern = r'^\s{2}lat\s*=\s*([\d.]+)\s*'
             if re.search(pattern,jline):

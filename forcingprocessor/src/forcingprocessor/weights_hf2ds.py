@@ -1,24 +1,75 @@
-import json
-import argparse, time
+import json, re, argparse, time, requests
+from io import BytesIO
 import geopandas as gpd
-import re, os
 import concurrent.futures as cf
 import pandas as pd
+import xarray as xr
+import numpy as np
 gpd.options.io_engine = "pyogrio"   
 
-def multiprocess_hf2ds(files : list):
-    nprocs = min(len(files),os.cpu_count())
-    i = 0
-    k = 0
+def calc_weights_from_gdf(gdf:gpd.GeoDataFrame, raster_file : str) -> dict:
+    # Create a dict of weights from the "divides" layer geodataframe
+    # keys are divide_ids, values are a 2 element list 
+    # with the first element being a list of cell_id's
+    # and the second element being the corresponding coverage fraction's
+    from exactextract import exact_extract
+    from exactextract.raster import NumPyRasterSource
+    if 'https://' in raster_file:
+        response = requests.get(raster_file)
+        
+        if response.status_code == 200:
+            raster_file = BytesIO(response.content)
+
+    raster_data = xr.open_dataset(raster_file)  
+
+    projection = raster_data.crs.esri_pe_string
+    geo_data = gdf.to_crs(projection)    
+
+    rastersource = NumPyRasterSource(
+            np.squeeze(raster_data["T2D"]), 
+            srs_wkt=geo_data.crs.to_wkt(), 
+            xmin=raster_data.x[0], 
+            xmax=raster_data.x[-1], 
+            ymin=raster_data.y[0], 
+            ymax=raster_data.y[-1]  
+        )    
+
+    output = exact_extract(
+        rastersource,
+        geo_data,
+        ["cell_id", "coverage"],
+        include_cols=["divide_id"],
+        output="pandas",
+    )
+
+    weights = output.set_index("divide_id")
+    out_json = {}
+    for jcol in range(len(weights)):
+        jcat = weights.index[jcol]
+        jdata = weights[weights.index == jcat]
+        cell_ids = jdata['cell_id'].values[0].tolist()
+        coverage =  jdata['coverage'].values[0].tolist()
+        out_json[jcat] = [cell_ids, coverage]    
+
+    return out_json
+
+def multiprocess_hf2ds(files : list,raster_template_in : str, max_procs : int):
+    global raster_template
+    raster_template = raster_template_in
+
+    nprocs = min(len(files),max_procs)
     nfiles = len(files)
     files_list = []
     nper = nfiles // nprocs
-    nleft = nfiles - (nper * nprocs)    
-    for i in range(nprocs):
-        k = nper + i + nleft
+    nleft = nfiles - (nper * nprocs)   
+    i = 0
+    k = nper
+    for j in range(nprocs):
+        if j < nleft: k += 1
         files_list.append(files[i:k])
         i=k
-
+        k = nper + i
+        
     weight_jsons = []
     jcatchment_dicts = []
     with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
@@ -54,7 +105,7 @@ def hf2ds(files : list):
     jcatchment_dict = {}
     count = 0
     for jgpkg in files:
-        pattern = r'vpuid%3D([^/]+)'
+        pattern = r'VPU_([0-9A-Z]+)_weights\.json'
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
@@ -76,6 +127,10 @@ def hydrofabric2datastream_weights(weights_file : str) -> dict:
     returns weights_json : a dictionary where keys are catchment ids and the values are a list of weights
 
     """
+    # This function looks a bit wild bc weights may be provided 
+    # to datastream in several different ways, or not at all. 
+    # Need to handle each situation. 
+
     t0 = time.perf_counter()    
 
     if weights_file.endswith('.json'):
@@ -83,34 +138,43 @@ def hydrofabric2datastream_weights(weights_file : str) -> dict:
             weights_json = json.load(fp)
         ncatchment = len(weights_json) 
     else:
+        weights_json = {}
         if weights_file.endswith('.gpkg'):
             catchments     = gpd.read_file(weights_file, layer='divides')
-            weights_table  = gpd.read_file(weights_file, layer = 'forcing-weights')
+            layers         = gpd.list_layers(weights_file)
+            if 'forcing-weights' in list(layers.name):
+                print(f'Weights table found in geopackage as \'forcing-weights\'. Converting to dict for processing.')
+                weights_table  = gpd.read_file(weights_file, layer = 'forcing-weights')
+            else:
+                print(f'Weights table not found in geopackage. Calculating from scratch with raster {raster_template}.')
+                weights_json = calc_weights_from_gdf(catchments,raster_template)
+                ncatchment = len(weights_json) 
         elif weights_file.endswith('parquet'):            
             weights_table     = pd.read_parquet(weights_file)
         else:
             raise Exception(f'Dont know how to deal with {weights_file}')
-                    
-        weights_table_unqiue_ids = weights_table.groupby('divide_id').agg(tuple).map(list).reset_index()
-        catchments        = weights_table_unqiue_ids['divide_id']
-        catchment_list    = sorted(set(list(catchments)))
-        weights_table_unqiue_ids = weights_table_unqiue_ids.set_index('divide_id')
-        weights_json = json.loads(weights_table_unqiue_ids.to_json(orient="index"))
-        out_dict = {}
-        for jcatch in weights_json:
-            jlist = []
-            jlist.append([int(x) for x in weights_json[jcatch]['cell']])
-            jlist.append(weights_json[jcatch]['coverage_fraction'])
-            out_dict[jcatch] = jlist
-        tf = time.perf_counter()
-        dt = tf - t0             
-        ncatchment = len(catchment_list)   
-        print(f'{ncatchment} catchment weights converted from tabular to json in {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
-        return out_dict
+
+        if len(weights_json) == 0:
+            weights_table_unqiue_ids = weights_table.groupby('divide_id').agg(tuple).map(list).reset_index()
+            catchments        = weights_table_unqiue_ids['divide_id']
+            catchment_list    = sorted(set(list(catchments)))
+            weights_table_unqiue_ids = weights_table_unqiue_ids.set_index('divide_id')
+            weights_json = json.loads(weights_table_unqiue_ids.to_json(orient="index"))
+            out_dict = {}
+            for jcatch in weights_json:
+                jlist = []
+                jlist.append([int(x) for x in weights_json[jcatch]['cell']])
+                jlist.append(weights_json[jcatch]['coverage_fraction'])
+                out_dict[jcatch] = jlist
+            tf = time.perf_counter()
+            dt = tf - t0             
+            ncatchment = len(catchment_list)   
+            print(f'{ncatchment} catchment weights converted from tabular to json in {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
+            return out_dict
 
     tf = time.perf_counter()
     dt = tf - t0
-    print(f'{ncatchment} catchment weights converted from tabular to json in {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
+    print(f'{weights_file} {ncatchment} catchment weights obtained {dt:.2f} seconds, {ncatchment/dt:.2f} catchments/second')
     return weights_json
 
 if __name__ == "__main__":
