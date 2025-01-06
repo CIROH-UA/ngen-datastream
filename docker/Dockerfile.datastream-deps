@@ -1,12 +1,19 @@
-FROM amazonlinux:2023 as datastream-base
+FROM amazonlinux:2023 AS datastream-base
 
-RUN dnf -y install pigz tar git python3.9 python3-pip
+RUN dnf -y install pigz tar git python3.9 python3-pip bzip2
 
-ARG ARCH
-RUN if [ "${ARCH}" = "aarch64" ]; then \
-        dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
+ARG TARGETARCH
+RUN if [ "${TARGETARCH}" = "aarch64" ]; then \
+        dnf -y groupinstall "Development Tools" && \
+        dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel sqlite-devel && \
+        curl -L https://download.osgeo.org/geos/geos-3.11.1.tar.bz2 | tar xjf - && \
+        cd geos-3.11.1 && \
+        mkdir build && cd build && \
+        cmake .. && \
+        make && \
+        make install && \
         dnf clean all && \
-        pip3 install setuptools numpy && \
+        pip3 install geopandas shapely setuptools numpy && \
         wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz && \
         tar zxvf proj-9.3.1.tar.gz && \
         cd proj-9.3.1 && \
@@ -22,7 +29,7 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
         cd gdal-3.8.3 && \
         mkdir build && \
         cd build && \
-        cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF .. && \
+        cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_ENABLE_DRIVER_GPKG=ON .. && \
         cmake --build . --parallel $(nproc) && \
         cmake --install . --prefix /usr && \
         cd ../.. && \
@@ -38,4 +45,3 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
         rm -rf hdf5-1.14.3 hdf5-1.14.3.tar.gz && \
         HDF5_DIR=/usr pip3 install --no-binary=h5py h5py; \
     fi
-
