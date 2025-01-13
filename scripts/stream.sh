@@ -33,8 +33,7 @@ get_file() {
     if is_directory "$IN_STRING"; then
         cp -r $IN_STRING/* $OUT_STRING
     elif is_s3_key "$IN_STRING"; then
-        OUTPUT=$(aws s3 ls $IN_STRING)
-        NUM_LINES=$(echo "$OUTPUT" | wc -l)
+        NUM_LINES=$(aws s3 ls $IN_STRING | wc -l)
         if [ $NUM_LINES -eq 0 ]; then
             echo "Nothing found for $IN_STRING"
         elif [ $NUM_LINES -eq 1 ]; then
@@ -72,7 +71,12 @@ is_in_list() {
 log_time() {
     local LABEL="$1"
     local LOG="$2"
+    local S3="$3"
     echo "$LABEL: $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')" >> $LOG
+    if [[ ${#S3} -ge 1 ]]; then
+        aws s3 cp $LOG $S3/profile.txt
+    fi
+
 }
 
 usage() {
@@ -126,6 +130,12 @@ DRYRUN="False"
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
 
+DS_HASH="N/A"
+FP_HASH="N/A"
+NGIAB_HASH="N/A"
+MERK_HASH="N/A"
+STREAM_HASH="sha256:"$(sha256sum $SCRIPT_DIR"/stream.sh" | awk '{ print $1 }')
+
 FORCING_SOURCE_OPTIONS=("NWM_RETRO_V2" "NWM_RETRO_V3" "NWM_OPERATIONAL_V3" "NOMADS_OPERATIONAL")
 if is_in_list "$FORCING_SOURCE" "${FORCING_SOURCE_OPTIONS[@]}"; then
   :
@@ -133,13 +143,6 @@ else
   echo "FORCING_SOURCE $FORCING_SOURCE not among options: $FORCING_SOURCE_OPTIONS"
 fi
 
-# if ! command -v ec2-metadata >/dev/null 2>&1; then
-#     HOST_TYPE="NON-AWS"
-# else
-#     HOST_TYPE=$(ec2-metadata --instance-type)
-#     HOST_TYPE=$(echo "$HOST_TYPE" | awk -F': ' '{print $2}')
-# fi
-# echo "HOST_TYPE" $HOST_TYPE
 if [ -f "/etc/os-release" ]; then
     HOST_OS=$(cat /etc/os-release | grep "PRETTY_NAME")
     HOST_OS=$(echo "$HOST_OS" | sed 's/.*"\(.*\)"/\1/')
@@ -151,7 +154,7 @@ echo "HOST_OS" $HOST_OS
 PLATORM_TAG=""
 if [ $(uname -m) = "x86_64" ]; then
     PLATORM_TAG="-x86"
-elif [ $(uname -m) = "arm64" ]; then
+elif [ $(uname -m) = "aarch64" ]; then
     PLATORM_TAG=""
 else 
   echo "Warning: Unsupported architecture $(uname -m)"
@@ -246,7 +249,13 @@ DOCKER_META="${DOCKER_MOUNT%/}/datastream-metadata"
 DOCKER_FP="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 DOCKER_PY="/ngen-datastream/python_tools/src/python_tools/"
 
-log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING
+if [[ ${#S3_BUCKET} -ge 1 ]]; then
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
+else
+    S3_OUT=""
+fi
+
+log_time "GET_RESOURCES_START" $DATASTREAM_PROFILING $S3_OUT
 if [ ! -z $RESOURCE_DIR ]; then
     echo "running in lite mode"
     get_file "$RESOURCE_DIR" $DATASTREAM_RESOURCES
@@ -257,13 +266,19 @@ fi
 
 if [ ! -z $RESOURCE_DIR ]; then  
 
-    # Untar ngen bmi module configs    
     if [ -f "$NGEN_BMI_CONFS" ]; then
         echo "Using" $NGEN_BMI_CONFS
         tar -xf $NGEN_BMI_CONFS -C "${NGENRUN_CONFIG%/}"
+    else
+        NGEN_BMI_CONFS_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz")
+        NBMI=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz"| wc -l)
+        if [ ${NBMI} -gt 0 ]; then
+            echo "Using "$NGEN_BMI_CONFS_RESOURCES "for BMI configs"
+            tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
+        fi
+
     fi    
 
-    # Look for realization
     if [ -z $REALIZATION ]; then
         REALIZATION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*realization*.json")
         if [ -z $REALIZATION_RESOURCES ]; then
@@ -278,7 +293,6 @@ if [ ! -z $RESOURCE_DIR ]; then
         get_file "$REALIZATION" $REALIZATION_RESOURCES   
     fi
 
-    # Look for geopackage file
     if [ -z $GEOPACKAGE ]; then
         GEOPACKAGE_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*.gpkg")
         NGEO=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*.gpkg" | wc -l)
@@ -300,7 +314,6 @@ if [ ! -z $RESOURCE_DIR ]; then
         NGEO=1
     fi
 
-    # Look for nwm forcings
     if [ -z $NWM_FORCINGS_DIR ]; then
         NWM_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "nwm-forcings")
         NNWM_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "nwm-forcings" | wc -l)
@@ -309,15 +322,25 @@ if [ ! -z $RESOURCE_DIR ]; then
         fi
     fi
 
-    # Look for ngen forcings
     if [ -z $NGEN_FORCINGS ]; then
         NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
-        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then
-            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "forcings.")
+        if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then            
+            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "*forcings*")
+            echo "Using resource directory forcings "$NGEN_FORCINGS
+            get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
         fi
+    else
+        echo "Using" $NGEN_FORCINGS
+        if [[ "$NGEN_FORCINGS" == *"DAILY"* ]]; then
+            current_date=$(date -u +"%Y%m%d")
+            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$current_date}"
+            echo "Updated NGEN_FORCINGS: $NGEN_FORCINGS"
+        else
+            echo "The NGEN_FORCINGS does not contain 'DAILY'."
+        fi
+        get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
     fi 
 
-    # Look for partitions file
     PARTITION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*partitions*.json")
     if [ -e "$PARTITION_RESOURCES" ]; then
         PARTITION_NGENRUN=$NGEN_RUN/$(basename $PARTITION_RESOURCES)
@@ -337,13 +360,23 @@ else
         exit 1
     fi    
 
-    # ngen bmi module configs    
     if [ ! -z "$NGEN_BMI_CONFS" ]; then
         echo "Using" $NGEN_BMI_CONFS
-        cp -r "$NGEN_BMI_CONFS"/* $NGENRUN_CONFIG
+        tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
     fi  
 
-    # Look for nwm forcings
+    if [ ! -z "$NGEN_FORCINGS" ]; then
+        echo "Using" $NGEN_FORCINGS
+        if [[ "$NGEN_FORCINGS" == *"DAILY"* ]]; then
+            current_date=$(date -u +"%Y%m%d")
+            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$current_date}"
+            echo "Updated NGEN_FORCINGS: $NGEN_FORCINGS"
+        else
+            echo "The NGEN_FORCINGS does not contain 'DAILY'."
+        fi
+        get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
+    fi 
+
     if [ ! -z $NWM_FORCINGS_DIR ]; then
         NWM_FORCINGS=$(find "$NWM_FORCINGS_DIR" -type f -name "*.nc")
     fi    
@@ -363,16 +396,15 @@ else
 fi
 
 if [ ! -z $SUBSET_ID ]; then
-    log_time "SUBSET_START" $DATASTREAM_PROFILING
+    log_time "SUBSET_START" $DATASTREAM_PROFILING $S3_OUT
     GEO_BASE="$SUBSET_ID.gpkg"
     GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_NGENCONF%/}/$GEO_BASE"
-    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
+    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,divide-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
     GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
     cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
-    log_time "SUBSET_END" $DATASTREAM_PROFILING
+    log_time "SUBSET_END" $DATASTREAM_PROFILING $S3_OUT
 fi 
 
-# copy files from resources into ngen-run
 REALIZATION_NGENRUN=$NGENRUN_CONFIG/"realization.json"
 cp $REALIZATION_RESOURCES $REALIZATION_NGENRUN
 GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
@@ -380,20 +412,19 @@ cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN
 if [ -z "$DOMAIN_NAME" ]; then
     DOMAIN_NAME=${GEO_BASE%".gpkg"}
 fi
-log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING
+log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING $S3_OUT
 
-# begin calculations
-log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING
+log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING $S3_OUT
 DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
+DS_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
 echo "Generating ngen-datastream metadata"
 CONFIGURER=$DOCKER_PY"configure_datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python3 $CONFIGURER \
     --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
-log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING
+log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING $S3_OUT
 
-log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING
-# Look for pkl file
+log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING $S3_OUT
 PKL_NAME="noah-owp-modular-init.namelist.input.pkl"
 PKL_FILE=$(find "$NGENRUN_CONFIG" -type f -name $PKL_NAME)
 if [ ! -f "$PKL_FILE" ]; then
@@ -426,22 +457,21 @@ else
         --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir "$DOCKER_MOUNT/config" --pkl_file "$DOCKER_MOUNT/config"/$PKL_NAME --realization "$DOCKER_MOUNT/config/realization.json"
     TAR_NAME="ngen-bmi-configs.tar.gz"
     NGENCON_TAR="${DATASTREAM_RESOURCES_NGENCONF%/}/$TAR_NAME"
-    tar -cf - --exclude="*noah-owp-modular-init-cat*.namelist.input" --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
+    tar -cf - --exclude="*realization*" --exclude="*.gpkg" --exclude="*.parquet" -C $NGENRUN_CONFIG . | pigz > $NGENCON_TAR
 fi
-log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING    
+log_time "NGENCONFGEN_END" $DATASTREAM_PROFILING $S3_OUT
 
 if [ ! -z $NGEN_FORCINGS ]; then
     log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
     echo "Using $NGEN_FORCINGS"
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
-    get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
-    if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
+    if [ ! -e $DATASTREAM_RESOURCES_NGENFORCINGS ]; then
         mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
+        get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     fi    
-    get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
-    log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
+    log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING $S3_OUT
 else
-    log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING
+    log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING $S3_OUT
     echo "Creating nwm filenames file"
     DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
     if [ ! -z $NWM_FORCINGS_DIR ]; then
@@ -485,12 +515,13 @@ else
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
     else
+        FP_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
         mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
-        log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING
+        log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING $S3_OUT
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
@@ -499,7 +530,7 @@ else
     fi
 fi    
 
-log_time "VALIDATION_START" $DATASTREAM_PROFILING
+log_time "VALIDATION_START" $DATASTREAM_PROFILING $S3_OUT
 VALIDATOR=$DOCKER_PY"run_validator.py"
 DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
 echo "Validating " $NGEN_RUN
@@ -513,40 +544,65 @@ else
         $DOCKER_TAG python3 $VALIDATOR \
         --data_dir $DOCKER_MOUNT
 fi
-log_time "VALIDATION_END" $DATASTREAM_PROFILING
+log_time "VALIDATION_END" $DATASTREAM_PROFILING $S3_OUT
 
-NIGAB_TAG="latest$PLATORM_TAG"
-# NIGAB_TAG="1.2.1"
-log_time "NGEN_START" $DATASTREAM_PROFILING
+# NIGAB_TAG="latest$PLATORM_TAG"
+NIGAB_TAG="awiciroh/ciroh-ngen-image:latest"
+log_time "NGEN_START" $DATASTREAM_PROFILING $S3_OUT
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:$NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS"
 else
-    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" awiciroh/ciroh-ngen-image:$NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS
+    NGIAB_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $NIGAB_TAG --format "{{.ID}}") | tr -d '"')
+    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS
     cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_NGENCONF/
 fi
-log_time "NGEN_END" $DATASTREAM_PROFILING
+log_time "NGEN_END" $DATASTREAM_PROFILING $S3_OUT
 
-log_time "MERKLE_START" $DATASTREAM_PROFILING
+log_time "MERKLE_START" $DATASTREAM_PROFILING $S3_OUT
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - MERKDIR EXECUTION SKIPPED"
     echo "COMMAND: docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT"
 else
+    MERK_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls zwills/merkdir:latest --format "{{.ID}}") | tr -d '"')
     docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
 fi
-log_time "MERKLE_END" $DATASTREAM_PROFILING
+log_time "MERKLE_END" $DATASTREAM_PROFILING $S3_OUT
 
-log_time "TAR_START" $DATASTREAM_PROFILING
+log_time "TAR_START" $DATASTREAM_PROFILING $S3_OUT
 TAR_NAME="ngen-run.tar.gz"
 NGENRUN_TAR="${DATA_DIR%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN | pigz > $NGENRUN_TAR
-log_time "TAR_END" $DATASTREAM_PROFILING
+log_time "TAR_END" $DATASTREAM_PROFILING $S3_OUT
 
-log_time "DATASTREAM_END" $DATASTREAM_PROFILING
+echo "DOCKER HASHES"
+echo "DATASTREAM       " $DS_HASH
+echo "FORCINGPROCESSOR " $FP_HASH
+echo "NGIAB            " $NGIAB_HASH
+echo "MERKDIR          " $MERK_HASH
+echo "STREAM SCRIPT    " $STREAM_HASH
+
+HASHES=$DATASTREAM_META/docker_hashes.txt
+echo "DATASTREAM DOCKER: $DS_HASH" >> $HASHES
+echo "FORCINGPROCESSOR DOCKER: $FP_HASH" >> $HASHES
+echo "NGIAB DOCKER: $NGIAB_HASH" >> $HASHES
+echo "MERKDIR DOCKER: $MERK_HASH" >> $HASHES
+echo "STREAM SCRIPT: $STREAM_HASH" >> $HASHES
+
+log_time "DATASTREAM_END" $DATASTREAM_PROFILING $S3_OUT
 
 if [ -n "$S3_BUCKET" ]; then
-    log_time "S3_MOVE_START" $DATASTREAM_PROFILING
+
+    if [[ "$S3_PREFIX" == *"DAILY"* ]]; then
+        current_date=$(date -u +"%Y%m%d")
+        S3_PREFIX="${S3_PREFIX//DAILY/$current_date}"
+        echo "Updated S3_PREFIX: $S3_PREFIX"
+    else
+        echo "The S3_PREFIX does not contain 'DAILY'."
+    fi
+
+    log_time "S3_MOVE_START" $DATASTREAM_PROFILING $S3_OUT
 
     echo "Writing data to S3" $S3_OUT $S3_BUCKET $S3_PREFIX 
 
@@ -556,14 +612,12 @@ if [ -n "$S3_BUCKET" ]; then
     S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/merkdir.file"
     aws s3 cp $DATA_DIR/merkdir.file $S3_OUT
 
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
-    aws s3 sync $DATASTREAM_META $S3_OUT
-
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-resources"
-    aws s3 sync $DATASTREAM_RESOURCES $S3_OUT
-
     echo "Data exists here: $S3_OUT"
-    log_time "S3_MOVE_END" $DATASTREAM_PROFILING
+    log_time "S3_MOVE_END" $DATASTREAM_PROFILING $S3_OUT
+
+    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
+    aws s3 sync $DATASTREAM_META $S3_OUT    
+
 fi
 echo "Data exists here: $DATA_DIR"
 
