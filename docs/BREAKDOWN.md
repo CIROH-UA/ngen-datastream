@@ -49,7 +49,7 @@ hfsubset \
     -t hl "Gages-09106150"
 ```
 Some things to note about this command:
-* `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`divide-attributes`
+* `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`divide-attributes` (Use `model-attributes` instead of `divide attributes` for <v2.2  hydrofabric)
 * `-w` : Defines which grid the weights are calculated from. In this case, it's the medium_range forcing from the National Water Model
 * `-v` : Defines the hydrofabric version
 * The last arguement `"Gages-09106150"`, corresponds to the stream gauge that hfsubset will use to trace the upstream network. This effectively defines the spatial domain. This is a gauge on the Colorado River in Palisade, Colorado.

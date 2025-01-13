@@ -194,11 +194,13 @@ def create_conf_fp(args):
         output_path = f"{args.docker_mount}/ngen-run"  
     
     if len(args.forcing_split_vpu) > 0:
-        template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{args.hydrofabric_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
+        template = f"/mounted_dir/nextgen_VPU_$VPU_weights.json"
         gpkg_file = []
         for jvpu in args.forcing_split_vpu.split(','):
             tmpl_cpy = copy.deepcopy(template)
             gpkg_file.append(re.sub(PATTERN_VPU, jvpu, tmpl_cpy))
+    elif args.united_conus:
+        gpkg_file = [f"/mounted_dir/conus_weights.parquet"]
     else:
         gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
 
@@ -234,10 +236,7 @@ def create_confs(args):
         nwm_conf = {}
         fp_conf = {}
         fp_conf['forcing'] = args.forcings
-        start_real = datetime.strptime(args.start_date,'%Y%m%d%H%M')
-        end_real   = datetime.strptime(args.end_date,'%Y%m%d%H%M')  
-        start_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
-        end_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S') 
+        _, start_real, end_real = create_conf_nwm(args)
     elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
         nwm_conf = {}
         fp_conf  = create_conf_fp(args) 
@@ -278,7 +277,7 @@ def create_confs(args):
     else:
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = "./forcings/1_forcings.nc"
+        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization_datastream.json')
 
@@ -300,6 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
     parser.add_argument("--forcing_split_vpu", type=str,help="list of vpus",default="")
+    parser.add_argument("--united_conus", type=bool,help="boolean to process entire conus from local weights file",default=False)
     parser.add_argument("--realization_file", type=str,help="ngen realization file",required=True)
     parser.add_argument("--s3_bucket", type=str,help="s3 bucket to write to",default="")
     parser.add_argument("--s3_prefix", type=str,help="s3 prefix to prepend to files",required="")    

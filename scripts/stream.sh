@@ -366,7 +366,7 @@ if [ ! -z $SUBSET_ID ]; then
     log_time "SUBSET_START" $DATASTREAM_PROFILING
     GEO_BASE="$SUBSET_ID.gpkg"
     GEOPACKAGE_RESOURCES="${DATASTREAM_RESOURCES_NGENCONF%/}/$GEO_BASE"
-    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,divide-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
+    hfsubset -w "medium_range" -s 'nextgen' -v "2.1.1" -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes -o $GEOPACKAGE_RESOURCES -t $SUBSET_ID_TYPE "$SUBSET_ID"
     GEOPACKAGE_NGENRUN=$NGENRUN_CONFIG/$GEO_BASE
     cp $GEOPACKAGE_RESOURCES $GEOPACKAGE_NGENRUN        
     log_time "SUBSET_END" $DATASTREAM_PROFILING
@@ -435,10 +435,6 @@ if [ ! -z $NGEN_FORCINGS ]; then
     echo "Using $NGEN_FORCINGS"
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
     get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
-    if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
-        mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
-    fi    
-    get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING

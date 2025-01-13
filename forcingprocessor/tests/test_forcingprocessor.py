@@ -261,7 +261,7 @@ def test_s3_output():
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)     
     conf['storage']['output_path'] = str(data_dir)
-    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/forcings/1_forcings.nc')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/ngen.t00z.short_range.forcing.f001_f001.conus.nc')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/conf_fp.json')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/retro_filenamelist.txt')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/profile_fp.txt')

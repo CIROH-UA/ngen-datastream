@@ -66,14 +66,14 @@ def load_balance(items_per_proc,launch_delay,single_ex, exec_count):
     if ii_verbose: print(f'item distribution {items_per_proc}')
     return items_per_proc
 
-def multiprocess_data_extract(files,nprocs,weights_json,fs):
+def multiprocess_data_extract(files : list, nprocs : int, weights_df : pd.DataFrame, fs):
     """
     Sets up the multiprocessing pool for forcing_grid2catchment and returns the data and time axis ordered in time.
 
     Parameters:
         files (list): List of files to be processed.
         nprocs (int): Number of processes to be used.
-        weights_json (dict): Dictionary containing catchment weights.
+        weights_df (dict): DataFrame containing catchment weights.
         fs (s3 filesystem): s3fs
 
     Returns:
@@ -111,7 +111,7 @@ def multiprocess_data_extract(files,nprocs,weights_json,fs):
             nwm_data.append(results[2])        
 
     print(f'Processes have returned')
-    del weights_json
+    del weights_df
     data_array = np.concatenate(data_ax)
     t_ax_local = [item for sublist in t_ax_local for item in sublist]
     nwm_data = np.concatenate(nwm_data)
@@ -132,7 +132,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
     nwm_data : nwm data saved for plotting. nwm_data : 3d array (forcing_variable x west_east x south_north)
 
     Globals:
-    weights_json : dictionary with catchment-ids as keys and values are a list of two items, indices and coverage
+    weights_df : dataframe with catchment-ids as the index and columns indices and coverage
     ngen_variables
     ngen_vars_plot
     ii_plot, nts_plot
@@ -180,10 +180,10 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float32)       
             for var_dx, jvar in enumerate(nwm_variables):  
                 if "retrospective-2-1" in nwm_file:
-                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max + 1), south_north=slice(shp[1] - y_max, shp[1] - y_min + 1)).values),axis=0)
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max+1), south_north=slice(shp[1] - (y_max+1), shp[1] - y_min)).values),axis=0)
                     t = datetime.strftime(datetime.strptime(nwm_file.split('/')[-1].split('.')[0],'%Y%m%d%H'),'%Y-%m-%d %H:%M:%S')
                 else:                            
-                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max + 1), y=slice(shp[1] - y_max, shp[1] - y_min + 1)).values),axis=0)
+                    data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(x=slice(x_min, x_max+1), y=slice(shp[1] - (y_max+1), shp[1] - y_min)).values),axis=0)
                     time_splt = nwm_data.attrs["model_output_valid_time"].split("_")
                     t = time_splt[0] + " " + time_splt[1]
             t_list.append(t)       
@@ -193,12 +193,12 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
 
         t0 = time.perf_counter()
         data_allvars = data_allvars.reshape(nvar, dx*dy)
-        ncatch = len(weights_json)
+        ncatch = len(weights_df)
         data_array = np.zeros((nvar,ncatch), dtype=np.float32)
         jcatch = 0
-        for _, value in weights_json.items(): 
-            weights = value[0]
-            coverage = np.array(value[1])
+        for row in weights_df.itertuples(): 
+            weights = row.cell_id
+            coverage = np.array(row.coverage)
             coverage_mat = np.repeat(coverage[None,:],nvar,axis=0)
 
             weights_dx, weights_dy = np.unravel_index(weights, (shp[2], shp[1]), order='F')
@@ -740,7 +740,38 @@ def prep_ngen_data(conf):
         storage_type = "google"
     else:
         storage_type = "local"
-    
+
+    nwm_forcing_files = []
+    with open(nwm_file,'r') as fp:
+        for jline in fp.readlines():
+            nwm_forcing_files.append(jline.strip())
+    nfiles = len(nwm_forcing_files)         
+
+    log_time("CONFIGURATION_END", log_file)
+
+    log_time("READWEIGHTS_START", log_file) 
+    tw = time.perf_counter()
+    if ii_verbose: print(f'Obtaining weights\n',flush=True) 
+    global weights_df
+    weights_df, jcatchment_dict = multiprocess_hf2ds(gpkg_files,nwm_forcing_files[0],nprocs)
+    log_time("READWEIGHTS_END", log_file)
+
+    # # conus hack
+    # x = {}
+    # x_list = []
+    # for jdict in jcatchment_dict:
+    #     [x_list.append(x) for x in jcatchment_dict[jdict]]
+    # x['conus'] = x_list
+    # jcatchment_dict = x
+
+    log_time("CALC_WINDOW_START", log_file)
+    ncatchments = len(weights_df)
+    global x_min, x_max, y_min, y_max
+    x_min, x_max, y_min, y_max = get_window(weights_df)
+    weight_time = time.perf_counter() - tw
+    log_time("CALC_WINDOW_END", log_file)
+
+    log_time("STORE_METADATA_START", log_file)            
     global forcing_path
     if storage_type == "local":
         if output_path == "":
@@ -758,6 +789,7 @@ def prep_ngen_data(conf):
             json.dump(conf, f)
         cp_cmd = f'cp {nwm_file} {metaf_path}'
         os.system(cp_cmd)
+        weights_df.to_parquet(os.path.join(metaf_path,"weights.parquet"))
 
     elif storage_type == "s3":
         bucket_path  = output_path
@@ -778,23 +810,13 @@ def prep_ngen_data(conf):
                 bucket,
                 filenamelist_path
             )
+        buf = BytesIO()
+        filename = metaf_path + f"/weights.parquet" 
+        weights_df.to_parquet(buf, index=False)         
+        buf.seek(0)                  
+        s3.put_object(Bucket=bucket, Key="/".join(filename.split('/')[3:]), Body=buf.getvalue())    
 
-    log_time("CONFIGURATION_END", log_file) 
-
-    log_time("READWEIGHTS_START", log_file) 
-    if ii_verbose: print(f'Obtaining weights from geopackage(s)\n',flush=True) 
-    global weights_json
-    weights_json, jcatchment_dict = multiprocess_hf2ds(gpkg_files)
-    ncatchments = len(weights_json)
-    global x_min, x_max, y_min, y_max
-    x_min, x_max, y_min, y_max = get_window(weights_json)
-    log_time("READWEIGHTS_END", log_file) 
-
-    nwm_forcing_files = []
-    with open(nwm_file,'r') as fp:
-        for jline in fp.readlines():
-            nwm_forcing_files.append(jline.strip())
-    nfiles = len(nwm_forcing_files)
+    log_time("STORE_METADATA_END", log_file)                 
 
     # s3://noaa-nwm-pds/nwm.20241029/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc
     pattern = r"nwm\.(\d{8})/forcing_(\w+)/nwm\.(\w+)(\d{2})z\.\w+\.forcing\.(\w+)(\d{2})\.conus\.nc"
@@ -845,7 +867,7 @@ def prep_ngen_data(conf):
         # data_array=data_array[0][None,:]
         # t_ax = t_ax
         # nwm_data=nwm_data[0][None,:]
-        data_array, t_ax, nwm_data = multiprocess_data_extract(jnwm_files,nprocs,weights_json,fs)
+        data_array, t_ax, nwm_data = multiprocess_data_extract(jnwm_files,nprocs,weights_df,fs)
 
         if datetime.strptime(t_ax[0],'%Y-%m-%d %H:%M:%S') > datetime.strptime(t_ax[-1],'%Y-%m-%d %H:%M:%S'):
             # Hack to ensure data is always written out with time moving forward.
@@ -866,7 +888,7 @@ def prep_ngen_data(conf):
         if "netcdf" in output_file_type:
             multiprocess_write_netcdf(data_array, jcatchment_dict, t_ax)
         if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
-        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped, tar_buffs = multiprocess_write(data_array,t_ax,weights_json.keys(),nprocs,forcing_path,ii_append)
+        forcing_cat_ids, dfs, filenames, file_sizes, file_sizes_zipped, tar_buffs = multiprocess_write(data_array,t_ax,list(weights_df.index),nprocs,forcing_path,ii_append)
 
         ii_append = True
         write_time += time.perf_counter() - t0    
@@ -879,18 +901,23 @@ def prep_ngen_data(conf):
     runtime = time.perf_counter() - t_start
 
     if ii_plot:
-        if len(gpkg_files) > 1: raise Warning(f'Plotting currently not implemented for more than one file')
-        if gpkg_files[0].endswith('.parquet'): raise Warning(f'Plotting currently not implemented for parquet, need geopackage')
-        cat_ids = ['cat-' + x for x in forcing_cat_ids]
-        jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
-        if storage_type == "s3":
-            gif_out = './GIFs'
+        if gpkg_files[0].endswith('.parquet'): 
+            print(f'Plotting currently not implemented for parquet, need geopackage')
         else:
-            gif_out = Path(meta_path,'GIFs')
-        plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, gif_out)
-        if storage_type == "s3":
-            sync_cmd = f'aws s3 sync ./GIFs {meta_path}/GIFs'
-            os.system(sync_cmd)
+
+            if len(gpkg_files) > 1: 
+                raise Warning(f'Plotting only the first geopackage {gpkg_files[0]}')
+
+            cat_ids = ['cat-' + x for x in forcing_cat_ids]
+            jplot_vars = np.array([x for x in range(len(ngen_variables)) if ngen_variables[x] in ngen_vars_plot])
+            if storage_type == "s3":
+                gif_out = './GIFs'
+            else:
+                gif_out = Path(meta_path,'GIFs')
+            plot_ngen_forcings(nwm_data, data_array[:,jplot_vars,:], gpkg_files[0], t_ax, cat_ids, ngen_vars_plot, gif_out)
+            if storage_type == "s3":
+                sync_cmd = f'aws s3 sync ./GIFs {meta_path}/GIFs'
+                os.system(sync_cmd)
     
     # Metadata        
     if ii_collect_stats:
@@ -1018,18 +1045,10 @@ def prep_ngen_data(conf):
         tar_time = time.perf_counter() - t0000
         log_time("TAR_END", log_file)
 
-    if storage_type == "s3": 
-        bucket, key  = convert_url2key(metaf_path,storage_type)
-        log_path = key + '/profile_fp.txt'
-        s3.upload_file(
-                f'./profile_fp.txt',
-                bucket,
-                log_path
-            )
-
     if ii_verbose:
         print(f"\n\n--------SUMMARY-------")
         msg = f"\nData has been written to {output_path}"
+        msg += f"\nCalc weights  : {weight_time:.2f}s"
         msg += f"\nProcess data  : {t_extract:.2f}s"
         msg += f"\nWrite data    : {write_time:.2f}s"
         if ii_collect_stats: 
@@ -1041,6 +1060,17 @@ def prep_ngen_data(conf):
         msg += f"\nRuntime       : {runtime:.2f}s\n"
         print(msg)
     log_time("FORCINGPROCESSOR_END", log_file)
+
+    if storage_type == "s3": 
+        bucket, key  = convert_url2key(metaf_path,storage_type)
+        log_path = key + '/profile_fp.txt'
+        s3.upload_file(
+                f'./profile_fp.txt',
+                bucket,
+                log_path
+            )
+    else:
+        os.system(f"mv ./profile_fp.txt {metaf_path}")    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -2,24 +2,21 @@ from pathlib import Path
 import re, copy, pickle, argparse, os
 import geopandas as gpd
 gpd.options.io_engine = "pyogrio"
+import concurrent.futures as cf
 
-def gen_noah_owp_pkl(attrs_path,out):
-    print(f'Generating NoahOWP pkl',flush=True)
+def gen_noah_owp_pkl(catchment_list,gdf):    
     template = Path(__file__).parent.parent.parent.parent/"configs/ngen/noah-owp-modular-init.namelist.input"
     with open(template,'r') as fp:
         conf_template = fp.readlines()
-    
-    attrs     = gpd.read_file(attrs_path,layer = 'divide-attributes')
-    catchment_list = sorted(list(attrs['divide_id']))
 
     all_confs = {}
-    for jcatch in catchment_list:
+    for row in gdf.itertuples():
+        jcatch = row.divide_id
+        lat = row.centroid_x
+        lon = row.centroid_y
+        slope = row._37
+        azimuth = row._38
         jcatch_conf = copy.deepcopy(conf_template)
-        jcatch_attrs = attrs.loc[attrs["divide_id"] == jcatch]
-        lat = jcatch_attrs["centroid_x"].iloc[0]
-        lon = jcatch_attrs["centroid_y"].iloc[0]
-        slope = jcatch_attrs["mean.slope"].iloc[0]
-        azimuth = jcatch_attrs["circ_mean.aspect"].iloc[0]
         for j,jline in enumerate(jcatch_conf):
             pattern = r'^\s{2}lat\s*=\s*([\d.]+)\s*'
             if re.search(pattern,jline):
@@ -36,9 +33,42 @@ def gen_noah_owp_pkl(attrs_path,out):
 
         all_confs[jcatch] = jcatch_conf
 
-    if not os.path.exists(out): os.system(f"mkdir -p {out}")
-    with open(Path(out,"noah-owp-modular-init.namelist.input.pkl"),'wb') as fp:
-        pickle.dump(all_confs, fp, protocol=pickle.HIGHEST_PROTOCOL)
+    return all_confs
+
+def multiprocess_pkl(gpkg_path):
+    print(f'Generating NoahOWP pkl',flush=True)
+
+    gdf     = gpd.read_file(gpkg_path,layer = 'divide-attributes').sort_values(by='divide_id')
+    catchment_list = sorted(list(gdf['divide_id']))
+
+    nprocs = os.cpu_count() - 1
+    ncatch = len(catchment_list)
+    catchment_list_list = []
+    gdf_list = []
+    nper = ncatch // nprocs
+    nleft = ncatch - (nper * nprocs)   
+    i = 0
+    k = nper
+    for j in range(nprocs):
+        if j < nleft: k += 1
+        catchment_list_list.append(catchment_list[i:k])
+        gdf_list.append(gdf[i:k])
+        i=k
+        k = nper + i
+        
+    all_proc_confs = {}
+    with cf.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        for results in pool.map(
+        gen_noah_owp_pkl,
+        catchment_list_list,
+        gdf_list
+        ):
+            all_proc_confs.update(results)
+
+    if not os.path.exists(outdir): 
+        os.system(f"mkdir -p {outdir}")
+    with open(Path(outdir,"noah-owp-modular-init.namelist.input.pkl"),'wb') as fp:
+        pickle.dump(all_proc_confs, fp, protocol=pickle.HIGHEST_PROTOCOL)        
 
 if __name__ == "__main__":
 
@@ -67,4 +97,9 @@ if __name__ == "__main__":
     else:
         hf_file = args.hf_file
 
-    gen_noah_owp_pkl(hf_file,args.outdir)        
+    global outdir
+    outdir = args.outdir
+    multiprocess_pkl(hf_file)   
+    # gdf     = gpd.read_file(hf_file,layer = 'divide-attributes')
+    # catchment_list = sorted(list(gdf['divide_id']))         
+    # gen_noah_owp_pkl(catchment_list,gdf)
