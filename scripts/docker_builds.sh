@@ -31,6 +31,7 @@ echo "BUILD_DEPS "$BUILD_DEPS
 echo "BUILD_FORCINGPROCESSOR "$BUILD_FORCINGPROCESSOR
 echo "BUILD_DATASTREAM "$BUILD_DATASTREAM
 echo "BUILD_DATASTREAM "$BUILD_DATASTREAM
+echo "PUSH_LOAD" $PUSH_LOAD
 echo "TAG "$TAG
 
 cd $DOCKER_DIR
@@ -43,7 +44,7 @@ fi
 if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/forcingprocessor $DOCKER_DATASTREAM/forcingprocessor
-  docker buildx build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --platform linux/amd64,linux/arm64 $PUSH_LOAD
+  docker buildx build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG=$TAG --platform linux/amd64,linux/arm64 $PUSH_LOAD
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
@@ -53,7 +54,7 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   cp -r $DATASTREAM_PATH/python_tools $DOCKER_DATASTREAM/python_tools
   cp -r $DATASTREAM_PATH/configs $DOCKER_DATASTREAM/configs
 
-  docker buildx build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --platform linux/amd64,linux/arm64 $PUSH_LOAD
+  docker buildx build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG=$TAG --platform linux/amd64,linux/arm64 $PUSH_LOAD
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi

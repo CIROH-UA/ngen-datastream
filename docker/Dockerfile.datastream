@@ -1,4 +1,5 @@
-FROM awiciroh/datastream-deps:latest AS datastream_base
+ARG TAG
+FROM awiciroh/datastream-deps:{$TAG} AS datastream_base
 COPY ./ngen-datastream/ /ngen-datastream
 RUN pip3 install -e /ngen-datastream/python_tools
 RUN groupadd -r mygroup && useradd -r -g mygroup myuser
