@@ -33,7 +33,7 @@ jobs:
         
     - name: Build and push with temporary tags
       run: |
-        ./scripts/docker_builds.sh -e -f -d -t tmp-${{ github.run_id }}  
+        ./scripts/docker_builds.sh -e -f -d -t tmp-${{ github.run_id }} -p
         
   test-forcingprocessor:
     runs-on: ubuntu-latest
@@ -108,4 +108,4 @@ jobs:
 
       - name: Rebuild and push with proper tags
         run: |
-          ./scripts/docker_builds.sh -e -f -d -t latest
+          ./scripts/docker_builds.sh -e -f -d -p -t latest
