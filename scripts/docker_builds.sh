@@ -9,6 +9,7 @@ BUILD_DATASTREAM="no"
 BUILD_DEPS="no"
 TAG="tmp"
 PUSH_LOAD="--load"
+PLATFORM="linux/amd64,linux/arm64"
 while getopts "pefdt:" flag; do
   case $flag in
     e) BUILD_DEPS="yes"
@@ -19,6 +20,8 @@ while getopts "pefdt:" flag; do
     ;;
     p) PUSH_LOAD="--push"
     ;; 
+    m) PLATFORM="$OPTARG"
+    ;;     
     t) TAG="$OPTARG"
     ;;
     \?)

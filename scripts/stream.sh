@@ -136,6 +136,10 @@ NGIAB_HASH="N/A"
 MERK_HASH="N/A"
 STREAM_HASH="sha256:"$(sha256sum $SCRIPT_DIR"/stream.sh" | awk '{ print $1 }')
 
+DATASTREAM_TAG=${DATASTREAM_TAG:-"latest"}
+FP_TAG=${FP_TAG:-"latest"}
+NGIAB_TAG=${NGIAB_TAG:-"latest"}
+
 FORCING_SOURCE_OPTIONS=("NWM_RETRO_V2" "NWM_RETRO_V3" "NWM_OPERATIONAL_V3" "NOMADS_OPERATIONAL")
 if is_in_list "$FORCING_SOURCE" "${FORCING_SOURCE_OPTIONS[@]}"; then
   :
@@ -415,7 +419,7 @@ fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING $S3_OUT
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING $S3_OUT
-DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
+DOCKER_TAG="awiciroh/datastream:$DATASTREAM_TAG"
 DS_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
 echo "Generating ngen-datastream metadata"
 CONFIGURER=$DOCKER_PY"configure_datastream.py"
@@ -473,7 +477,7 @@ if [ ! -z $NGEN_FORCINGS ]; then
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING $S3_OUT
     echo "Creating nwm filenames file"
-    DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
+    DOCKER_TAG="awiciroh/forcingprocessor:$FP_TAG"
     if [ ! -z $NWM_FORCINGS_DIR ]; then
         LOCAL_FILENAMES="filenamelist.txt"
         > "$LOCAL_FILENAMES"
@@ -532,7 +536,7 @@ fi
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING $S3_OUT
 VALIDATOR=$DOCKER_PY"run_validator.py"
-DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
+DOCKER_TAG="awiciroh/datastream:$DATASTREAM_TAG"
 echo "Validating " $NGEN_RUN
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - VALIDATION SKIPPED"
@@ -546,8 +550,7 @@ else
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING $S3_OUT
 
-# NIGAB_TAG="latest$PLATORM_TAG"
-NIGAB_TAG="awiciroh/ciroh-ngen-image:latest"
+NIGAB_TAG="awiciroh/ciroh-ngen-image:$NGIAB_TAG"
 log_time "NGEN_START" $DATASTREAM_PROFILING $S3_OUT
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
