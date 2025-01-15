@@ -1,0 +1,45 @@
+name: Create Multi-Platform Manifest
+on:
+    push:
+      branches:
+        - main
+      paths:
+        - 'docker/**'
+        - 'forcingprocessor/**'
+        - 'scripts/**'  
+        - 'python_tools/**'
+        - 'research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json' 
+        - 'research_datastream/terraform/test/docker_loginNpush.sh' 
+        - '.github/workflows/forcingprocessor.yml'
+        - '.github/workflows/datastream_python.yml'  
+        - '.github/workflows/build_test_push_docker_arm.yml'  
+
+jobs:
+  create-multi-platform-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Create and push multi-platform image
+        run: |
+          docker buildx create --use
+          docker buildx imagetools create \
+            -t awiciroh/datastream-deps:latest \
+            awiciroh/datastream-deps:latest-x86 \
+            awiciroh/datastream-deps:latest
+
+          docker buildx create --use
+          docker buildx imagetools create \
+            -t awiciroh/datastream:latest \
+            awiciroh/datastream:latest-x86 \
+            awiciroh/datastream:latest            
+
+          docker buildx create --use
+          docker buildx imagetools create \
+            -t awiciroh/forcingprocessor:latest \
+            awiciroh/forcingprocessor:latest-x86 \
+            awiciroh/forcingprocessor:latest                        
