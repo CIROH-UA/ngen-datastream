@@ -10,7 +10,7 @@ BUILD_DEPS="no"
 TAG="tmp"
 PUSH_LOAD="--load"
 PLATFORM="linux/amd64,linux/arm64"
-while getopts "pefdt:" flag; do
+while getopts "pefdm:t:" flag; do
   case $flag in
     e) BUILD_DEPS="yes"
     ;;
@@ -19,7 +19,7 @@ while getopts "pefdt:" flag; do
     d) BUILD_DATASTREAM="yes"
     ;;
     p) PUSH_LOAD="--push"
-    ;; 
+    ;;
     m) PLATFORM="$OPTARG"
     ;;     
     t) TAG="$OPTARG"
@@ -35,11 +35,12 @@ echo "BUILD_FORCINGPROCESSOR "$BUILD_FORCINGPROCESSOR
 echo "BUILD_DATASTREAM "$BUILD_DATASTREAM
 echo "BUILD_DATASTREAM "$BUILD_DATASTREAM
 echo "PUSH_LOAD" $PUSH_LOAD
+echo "PLATFORM "$PLATFORM
 echo "TAG "$TAG
 
 cd $DOCKER_DIR
 if [ "$BUILD_DEPS" = "yes" ]; then
-  docker buildx build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --platform linux/amd64,linux/arm64 $PUSH_LOAD
+  docker buildx build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --platform $PLATFORM $PUSH_LOAD
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
@@ -47,7 +48,7 @@ fi
 if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/forcingprocessor $DOCKER_DATASTREAM/forcingprocessor
-  docker buildx build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG=$TAG --platform linux/amd64,linux/arm64 $PUSH_LOAD
+  docker buildx build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG=$TAG --platform $PLATFORM $PUSH_LOAD
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
@@ -57,7 +58,7 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   cp -r $DATASTREAM_PATH/python_tools $DOCKER_DATASTREAM/python_tools
   cp -r $DATASTREAM_PATH/configs $DOCKER_DATASTREAM/configs
 
-  docker buildx build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG=$TAG --platform linux/amd64,linux/arm64 $PUSH_LOAD
+  docker buildx build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG=$TAG --platform $PLATFORM $PUSH_LOAD
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
