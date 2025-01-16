@@ -5,7 +5,7 @@ DOCKER_DIR="$DATASTREAM_PATH"/docker
 DOCKER_DATASTREAM=$DOCKER_DIR/ngen-datastream
 
 PLATFORM=$(uname -m)
-PLATORM_TAG=""
+PLATORM_TAG="-arm64"
 if [ $PLATFORM = "x86_64" ]; then
     PLATORM_TAG="-x86"
 fi

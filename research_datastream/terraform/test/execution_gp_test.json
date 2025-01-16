@@ -10,7 +10,7 @@
 },
 "instance_parameters" :
 {
-  "ImageId"            : "ami-07161bb3f4b6e5b6d",
+  "ImageId"            : "ami-0be3c5d34679be688",
   "InstanceType"       : "t4g.nano",
   "KeyName"            : "actions_key",
   "SecurityGroupIds"   : ["sg-06f57f883e902d7bc"],

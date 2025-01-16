@@ -1,18 +1,16 @@
 name: Create Multi-Platform Manifest
 on:
-    push:
-      branches:
-        - main
-      paths:
-        - 'docker/**'
-        - 'forcingprocessor/**'
-        - 'scripts/**'  
-        - 'python_tools/**'
-        - 'research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json' 
-        - 'research_datastream/terraform/test/docker_loginNpush.sh' 
-        - '.github/workflows/forcingprocessor.yml'
-        - '.github/workflows/datastream_python.yml'  
-        - '.github/workflows/build_test_push_docker_arm.yml'  
+  workflow_run:
+    workflows:
+      - "Build, Test, and Push Datastream Docker Containers on ARM"
+    types:
+      - completed  
+      
+  pull_request:
+    branches:
+      - main    
+    paths:      
+      - '.github/workflows/manifest_docker_containers.yaml'    
 
 jobs:
   create-multi-platform-image:
@@ -21,8 +19,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Create and push multi-platform image
         run: |
@@ -30,16 +28,16 @@ jobs:
           docker buildx imagetools create \
             -t awiciroh/datastream-deps:latest \
             awiciroh/datastream-deps:latest-x86 \
-            awiciroh/datastream-deps:latest
+            awiciroh/datastream-deps:latest-arm64
 
           docker buildx create --use
           docker buildx imagetools create \
             -t awiciroh/datastream:latest \
             awiciroh/datastream:latest-x86 \
-            awiciroh/datastream:latest            
+            awiciroh/datastream:latest-arm64       
 
           docker buildx create --use
           docker buildx imagetools create \
             -t awiciroh/forcingprocessor:latest \
             awiciroh/forcingprocessor:latest-x86 \
-            awiciroh/forcingprocessor:latest                        
+            awiciroh/forcingprocessor:latest-arm64                       
