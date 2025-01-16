@@ -60,6 +60,7 @@ if [ "$PUSH" = "yes" ]; then
     if [ "$SKIP_DEPS" = "no" ]; then
       docker push awiciroh/datastream-deps:$TAG
     fi
+    docker push awiciroh/datastream-deps:$TAG
     docker push awiciroh/datastream:$TAG
     docker push awiciroh/forcingprocessor:$TAG
     echo "Docker containers have been pushed to awiciroh dockerhub!"
