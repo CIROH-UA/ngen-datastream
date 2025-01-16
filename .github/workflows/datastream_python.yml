@@ -9,12 +9,14 @@ on:
     paths:
       - 'python_tools/**'
       - '.github/workflows/datastream_python.yml'
+      - '.github/workflows/build_test_docker_x86.yml'
   pull_request:
     branches:
       - main    
     paths:      
       - 'python_tools/**'
       - '.github/workflows/datastream_python.yml'
+      - '.github/workflows/build_test_docker_x86.yml'
 permissions:
   contents: read
 jobs:
