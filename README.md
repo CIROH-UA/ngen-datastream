@@ -1,93 +1,43 @@
-# hfsubset - CLI-based Hydrofabric Subsetter
+# NextGen Water Modeling Framework Datastream
+`ngen-datastream` automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion.
 
-For those interested in using the NOAA NextGen fabric as is, we have
-provided a Go-based CLI
-[here](https://github.com/lynker-spatial/hfsubsetCLI/releases)
+![ngen-datastream](docs/images/ngen-datastream.jpg)
 
-## Usage
+## Getting Started
+* **Installation:** Follow the [Installation Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md) to set up `ngen-datastream` on your system.
+* **Docs**: Make sure to review the [documentation](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/) for
+  * Available [NextGen models](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/NGEN_MODELS.md) and automated BMI configuration generation
+  * [Datastream options](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/DATASTREAM_OPTIONS.md)
+  * Input and output [directory structure](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/STANDARD_DIRECTORIES.md)
+  * A [usage guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/USAGE.md) for executing `ngen-datastream` effectively 
+  * A step-by-step [breakdown](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/BREAKDOWN.md) of `ngen-datastream`'s internal workflow
+  * An explanation of the [Research DataStream](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/README.md)
 
-This utility has the following syntax:
+## Run it
+This example will execute a 24 hour NextGen simulation over the Palisade, Colorado watershed with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. The forcings used are the National Water Model v3 Retrospective.
 
-``` bash
-hfsubset - Hydrofabric Subsetter
-
-Usage:
-  hfsubset [OPTIONS] identifiers...
-  hfsubset (-h | --help)
-
-Examples:
-  hfsubset -o ./divides_nexus.gpkg \
-           -r "2.2"                 \
-           -t hl_uri                   \
-           "Gages-06752260"
-
-  hfsubset -o ./poudre.gpkg -t hl_uri "Gages-06752260"
-
-  # Using network-linked data index identifiers
-  hfsubset -o ./poudre.gpkg -t nldi "nwissite:USGS-08279500"
-  
-  # Specifying layers and hydrofabric version
-  hfsubset -o ./divides_nexus.gpkg -r "2.2" -t hl_uri "Gages-06752260"
-  
-  # Finding data around a coordinate point
-  hfsubset -o ./sacramento_flowpaths.gpkg -t xy -121.494400,38.581573
-
-Environment Variables:
-  ${HFSUBSET_ENDPOINT} - Endpoint to use for subsetting,
-                         defaults to 'https://www.lynker-spatial.com/hydrofabric/hfsubset/'.
-                         Note: the endpoint must end with a trailing slash.
-
-Details:
-  * Finding POI identifiers can be done visually
-    through https://www.lynker-spatial.com/hydrolocations.html
-
-  * When using identifier type 'xy', the coordinates are in OGC:CRS84 order,
-    which is the same reference system as EPSG:4326 (WGS84), but uses
-    longitude-latitude axis order rather than latitude-longitude.
-
-  * When using identifier type 'nldi', the identifiers follow the syntax
-
-      <featureSource>:<featureID>
-
-    For example, USGS-08279500 is accessed with featureSource 'nwissite',
-    so this gives the form 'nwissite:USGS-08279500'
-
-Options:
-  -debug
-        Run in debug mode
-  -dryrun
-        Perform a dry run, only outputting the request that will be sent
-  -l string
-        Comma-delimited list of layers to subset. (default "divides,flowlines,network,nexus")
-  -o string
-        Output file name (default "hydrofabric.gpkg")
-  -quiet
-        Disable logging
-  -s string
-        Hydrofabric type, only "reference" is supported (default "reference")
-  -t string
-        One of: "hf", "comid", "hl", "poi", "nldi", or "xy" (default "hf")
-  -v string
-        Hydrofabric version (NOTE: omit the preceeding v) (default "2.2")
-  -verify
-        Verify that endpoint is available (default true)
-  -w string
-        Comma-delimited list of weights to generate over the subset.
+First, obtain a hydrofabric file for the gage you wish to model. Check out [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) for a handy cli tool for generating geopackages. For Palisade, Colorado:
+```
+hfsubset -w medium_range \
+          -s nextgen \
+          -v 2.1.1 \
+          -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes \
+          -o palisade.gpkg \
+          -t hl "Gages-09106150"
 ```
 
-### Generating Forcing Weights
-
-The `-w` flag allows server-side generation of forcing weights on the requested subset,
-as of v1.1.0, only `medium_range` is supported. Note that the `divides` layer must be
-requested for this flag to be available.
-
-```bash
-hfsubset -w medium_range -t nldi "nwissite:USGS-08279500"
+Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration
+```
+./scripts/stream.sh -s 202006200100 \
+                    -e 202006210000 \
+                    -C NWM_RETRO_V3 \
+                    -d $(pwd)/data/datastream_test \
+                    -g $(pwd)/palisade.gpkg \
+                    -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json \
+                    -n 4
 ```
 
-The above call will generate a subset `hydrofabric.gpkg` containing the
-table `weight_grid_medium_range`.
+And that's it! Outputs will exist at `$(pwd)/data/datastream_test/ngen-run/outputs`
 
 ## License
-
-`hfsubset` is distributed under [GNU General Public License v3.0 or later](LICENSE.md)
+`ngen-datastream` is distributed under [GNU General Public License v3.0 or later](LICENSE.md)
