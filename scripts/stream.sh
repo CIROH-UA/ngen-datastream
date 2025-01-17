@@ -27,6 +27,10 @@ is_file() {
 get_file() {
     local IN_STRING="$1"
     local OUT_STRING="$2"
+
+    if [[ "$IN_STRING" == ./* ]]; then
+        IN_STRING=$(realpath "$IN_STRING")
+    fi
     
     IN_STRING_BASE=$(basename $IN_STRING)
     echo "Retrieving "$IN_STRING" and storing it here "$OUT_STRING
@@ -136,6 +140,10 @@ NGIAB_HASH="N/A"
 MERK_HASH="N/A"
 STREAM_HASH="sha256:"$(sha256sum $SCRIPT_DIR"/stream.sh" | awk '{ print $1 }')
 
+DS_TAG=${DS_TAG:-"latest"}
+FP_TAG=${FP_TAG:-"latest"}
+NGIAB_TAG=${NGIAB_TAG:-"latest"}
+
 FORCING_SOURCE_OPTIONS=("NWM_RETRO_V2" "NWM_RETRO_V3" "NWM_OPERATIONAL_V3" "NOMADS_OPERATIONAL")
 if is_in_list "$FORCING_SOURCE" "${FORCING_SOURCE_OPTIONS[@]}"; then
   :
@@ -150,15 +158,6 @@ else
     echo "Warning: /etc/os-release file not found"
 fi
 echo "HOST_OS" $HOST_OS
-
-PLATORM_TAG=""
-if [ $(uname -m) = "x86_64" ]; then
-    PLATORM_TAG="-x86"
-elif [ $(uname -m) = "aarch64" ]; then
-    PLATORM_TAG=""
-else 
-  echo "Warning: Unsupported architecture $(uname -m)"
-fi
 
 # read cli args
 while [ "$#" -gt 0 ]; do
@@ -415,13 +414,13 @@ fi
 log_time "GET_RESOURCES_END" $DATASTREAM_PROFILING $S3_OUT
 
 log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING $S3_OUT
-DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
-DS_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
+DOCKER_TAG="awiciroh/datastream:$DS_TAG"
 echo "Generating ngen-datastream metadata"
 CONFIGURER=$DOCKER_PY"configure_datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
     python3 $CONFIGURER \
     --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+DS_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING $S3_OUT
 
 log_time "NGENCONFGEN_START" $DATASTREAM_PROFILING $S3_OUT
@@ -473,7 +472,7 @@ if [ ! -z $NGEN_FORCINGS ]; then
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING $S3_OUT
     echo "Creating nwm filenames file"
-    DOCKER_TAG="awiciroh/forcingprocessor:latest$PLATORM_TAG"
+    DOCKER_TAG="awiciroh/forcingprocessor:$FP_TAG"
     if [ ! -z $NWM_FORCINGS_DIR ]; then
         LOCAL_FILENAMES="filenamelist.txt"
         > "$LOCAL_FILENAMES"
@@ -515,11 +514,11 @@ else
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
     else
-        FP_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
         docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
+        FP_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
         mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
         log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING $S3_OUT
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
@@ -532,7 +531,7 @@ fi
 
 log_time "VALIDATION_START" $DATASTREAM_PROFILING $S3_OUT
 VALIDATOR=$DOCKER_PY"run_validator.py"
-DOCKER_TAG="awiciroh/datastream:latest$PLATORM_TAG"
+DOCKER_TAG="awiciroh/datastream:$DS_TAG"
 echo "Validating " $NGEN_RUN
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - VALIDATION SKIPPED"
@@ -546,8 +545,7 @@ else
 fi
 log_time "VALIDATION_END" $DATASTREAM_PROFILING $S3_OUT
 
-# NIGAB_TAG="latest$PLATORM_TAG"
-NIGAB_TAG="awiciroh/ciroh-ngen-image:latest"
+NIGAB_TAG="awiciroh/ciroh-ngen-image:$NGIAB_TAG"
 log_time "NGEN_START" $DATASTREAM_PROFILING $S3_OUT
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
