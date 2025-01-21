@@ -1,5 +1,5 @@
 # `ngen-datastream` Breakdown
-This document serves as a guide to run `ngen-datastream` step-by-step, which essentially walks the user through an example execution of `ngen-datastream/scripts/stream.sh`
+This document serves as a guide to run `ngen-datastream` step-by-step, which essentially walks the user through an example execution of `ngen-datastream/scripts/ngen-datastream`
 
 ## Use Case
 Imagine we want to study the variation in NextGen configurations of retrospective streamflow forecasts for the Colorado River for the day of June 10th, 2019. We will use the steps below to prepare an input data package for NextGen, execute NextGen through NextGen in a Box, and then plot the results.
@@ -64,7 +64,7 @@ Use the [NGIA geopackage viewer](https://ngageoint.github.io/geopackage-viewer-j
 
 ![ngen-datastream](images/geopackage-viewer.jpg)
 
-[hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) is integrated into `ngen-datastream`, which means the user can simply provide these three cli args to `stream.sh` to offload the [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) call to `ngen-datastream`
+[hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) is integrated into `ngen-datastream`, which means the user can simply provide these three cli args to `ngen-datastream` to offload the [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) call to `ngen-datastream`
 ```
   -I, --SUBSET_ID           <Hydrofabric id to subset>  
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
@@ -218,7 +218,7 @@ In this command we mount the `./palisade_2019/ngen-run` directory to the docker 
 ## Equivalent Command
 Now that we have performed each component of the datastream individually, let's take a look at the single command that would have accomplished all of the steps we just went through.
 ```
-./scripts/stream.sh \
+./scripts/ngen-datastream \
     -s 201901010000 \
     -e 201912312300 \
     -i hl \
