@@ -1,5 +1,8 @@
 #!/bin/bash
 
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+ngen_datastream_script=$SCRIPT_DIR/ngen-datastream
+
 set_realization_file() {
   echo "Please provide a realizations file"
   echo "1. What is a realization file?"
@@ -41,6 +44,38 @@ set_resource_directory() {
       echo "2) A resource directory serves as a convenient way to give ngen-datastream many files without needing to explictly provide the path for each file."
       echo "3) Communicating runs. ngen-datastream versions everything in DATA_DIR, which means a single hash corresponds to a unique RESOURCE_DIR, which allows users to quickly identify potential differences between ngen-datastream input data."
       echo "See docs/STANDARD_DIRECTORIES.md/RESOURCE_DIR for more information."
+      echo ""
+      echo "Here's the resource directory sample:"
+      echo "RESOURCE_DIR/
+|
+├── config/
+|   │
+|   ├── nextgen_09.gpkg
+|   |
+|   ├── realization.json
+|   |
+|   ├── ngen.yaml
+|   |
+|   ├── partitions.json
+|   |
+|   ├── cat-config/
+|   │   |
+|   |   ├──PET/
+|   │   |
+|   |   ├──CFE/
+|   │   |
+|   |   ├──NOAH-OWP-M/
+|
+├── nwm-forcings/
+|   |
+|   ├── nwm.t00z.medium_range.forcing.f001.conus
+|   |
+|   ├── ...
+|
+├── ngen-forcings/
+|   |
+|   ├── forcings.nc
+|"
       echo ""
       echo ""
       set_resource_directory
@@ -128,52 +163,146 @@ set_hydrofabric() {
   esac
 }
 
+pause() {
+    echo ""
+    printf "Press Enter to continue...\033[0K\r"  
+    read -r < /dev/tty                           
+    printf "\033[1A\033[2K"                                       
+}
+
 echo ""
 echo "Welcome to the ngen-datastream guide!"
 echo ""
 read -p  "Would you like a quick look around ngen-datastream before we get started? Type y for a tour, n to proceed to setting CLI options. " TOUR
+echo ""
 if [ "$TOUR" == "y" ]; then
-  echo ""
+  echo "" 
   echo "----------TOUR START----------"
+  echo ""z
+  echo "ngen-datastream is a command line interface tool that automates the process of collecting and formatting input data for the NextGen Water Modeling Framework (NextGen), orchestrating the NextGen simulation through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, relatively painless, and reproducible fashion."
+  pause
   echo ""
-  echo "ngen-datastream automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, relatively painless, and reproducible fashion."
   echo ""
-  sleep 10
+
   echo "ngen-datastream is \"batteries included, yet flexible.\""
   echo "ngen-datastream will, by default, perform various steps in preparing input files for NextGen, but also allows the user to supply these files directly to ngen-datastream via CLI args."
   echo "This allows users to take advantaged of ngen-datastream features where desired, while maintaining the control over particular steps in the workflow."
   echo "To give an example, ngen-datastream will calculate NextGen catchment-level forcings from National Water Model gridded forcings for you, or you can supply NextGen forcings directly via NGEN_FORCINGS CLI arg"
+  pause
   echo ""
-  sleep 20  
+  echo ""
+ 
   echo "Check out the documentation in this repository at docs/"
+  pause
   echo ""
-  sleep 5
+  echo ""
+
   echo "ngen-datastream does many things for you, but these steps can be done manually and are outlined at docs/BREAKDOWN.md"
   echo "This document is helpful to show the user what ngen-datastream is doing internally."
+  pause
   echo ""
-  sleep 10
+  echo ""
+
   echo "ngen-datastream follows some data format conventions explained in docs/STANDARD_DIRECTORIES.md"
+  pause
   echo ""
-  sleep 10
+  echo ""
+
   echo "The NextGen framework is composed of several components that are connected via the Basic Model Interface (BMI)."
   echo "It is common that a configuration file is required for each catchment per BMI model specified in the realization file."
   echo "ngen-datastream will generate these files for you. That being said, this functionality has not yet been extended to all NextGen BMI models available in NGIAB."
   echo "Take a look at docs/NGEN_MODELS.md for an up-to-date list on which NextGen models ngen-datastream supports BMI config generation."
+  pause
   echo ""
-  sleep 20
+  echo ""
+
   echo "NextGen requires a user-supplied configuration via the realization file. This file is where BMI models are specified and parameterized. There are templates in this repository (configs/ngen/realization*.json), but this file is where all the science happens. Become comfortable editing this file with your scientific contributions!"
+  pause
   echo ""
-  sleep 15 
+  echo ""
+ 
   echo "Numerical simulation can easily consume computer resources. Take a look at docs/USAGE.md for a guide on how best to deploy ngen-datastream given the available resources."
+  pause
   echo ""
-  sleep 10 
+  echo ""
   echo "----------TOUR END----------"
   echo ""
-  sleep 3
-  echo "Now let's set run this thing!"
-  echo ""
+  pause
 fi
 
+echo ""
+echo "In order to execute ngen-datastream, we will build a command of the following form. Not all options are required."
+eval "$ngen_datastream_script -h"
+echo ""
+echo "That's a lot of options! Let's break them down."
+pause
+echo ""
+echo ""
+echo "In general, there are 5 types of cli args ngen-datastream accepts: "
+echo "cli args that define the time of the forcings and NextGen simulation: "
+echo "  
+  -s, --START_DATE          <YYYYMMDDHHMM or "DAILY"> 
+  -e, --END_DATE            <YYYYMMDDHHMM> 
+  -C, --FORCING_SOURCE      <Forcing source option>
+  "
+pause
+echo ""
+echo ""
+
+echo "cli args that define the spatial domain of the simulation: "
+echo "
+  -g, --GEOPACKAGE          <Path to geopackage file> 
+  -I, --SUBSET_ID           <Hydrofabric id to subset>  
+  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
+  -v, --HYDROFABRIC_VERSION <Hydrofabric version> 
+  -D, --DOMAIN_NAME         <Name for spatial domain>
+"
+pause
+echo ""
+echo ""
+
+echo "cli args that provide NextGen input files: "
+echo "
+  -R, --REALIZATION         <Path to realization file> 
+  -r, --RESOURCE_DIR        <Path to resource directory> 
+  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> 
+  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> 
+  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> 
+"
+
+pause
+echo ""
+echo "" 
+
+echo "the cli args the handle where data is written to"
+echo "
+  -d, --DATA_DIR            <Path to write to> 
+  -S, --S3_BUCKET           <s3 bucket to write output to>  
+  -o, --S3_PREFIX           <File prefix within s3 bucket> 
+"
+pause
+echo ""
+echo ""  
+
+echo "and cli args that manage compute"
+echo "
+  -n, --NPROCS              <Process limit> 
+  -y, --DRYRUN              <True to skip calculations>
+"
+pause
+echo ""
+echo ""  
+
+echo "The ngen-datastream configuration file is not necessary, but can be a convenient way for users to store ngen-datastream cli arg combinations under a single file."
+echo "
+  -c, --CONF_FILE           <Path to datastream configuration file>
+"
+pause
+echo ""
+echo "" 
+
+
+echo "Now let's go through how to set these options."
 echo "First, let's get set the output directory. Where do you want data written to locally? You can set options to write to Amazon s3 later, but for now, setting a local path is required."
 read -p "Enter the local path to DATA_DIR: " DATA_DIR
 echo ""

@@ -157,7 +157,6 @@ if [ -f "/etc/os-release" ]; then
 else 
     echo "Warning: /etc/os-release file not found"
 fi
-echo "HOST_OS" $HOST_OS
 
 # read cli args
 while [ "$#" -gt 0 ]; do
