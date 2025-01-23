@@ -140,28 +140,25 @@ set_hydrofabric() {
             }"
       echo ""
       echo "ngen-datastream calls the hfsubset service internally, so you can provide ngen-datastream with these values or you can use hfsubset directly."
-      echo "The hfsubset documentation describes a command of the following form:"
-      echo "https://github.com/owp-spatial/hfsubsetCLI"
-      echo "  hfsubset -o ./divides_nexus.gpkg \
-           -r "2.2"                 \
-           -t hl                   \
-           "Gages-06752260""
-      echo "In this example, hfsubset expects a -t argument to define what type of identifying value is being used to subset. In this case, a hydrolocation id was use (Gages-###) and thus -t is set to 'hl'. ngen-datastream refers to this option as SUBSET_ID_TYPE" 
+      echo "The hfsubset documentation (https://github.com/owp-spatial/hfsubsetCLI) describes a command of the following form:"
+      echo ""
+      echo "hfsubset -o ./divides_nexus.gpkg -r "2.2" -t hl "Gages-06752260""
+      echo ""
+      echo "In this example, hfsubset expects a -t argument to define what type of identifying value is being used to subset. In this case, a hydrolocation id was used (Gages-###) and thus -t is set to 'hl'. ngen-datastream refers to this option as SUBSET_ID_TYPE" 
+      echo ""
       echo "An example of interpreting hyview tooltip output to ngen-datastream options : "
       echo "For our case, let's use the poi_id from the hyview tooltip"
       echo "SUBSET_ID=45229"
       echo "SUBSET_ID_TYPE=poi"
       echo "HYDROFABRIC_VERSION=2.2"
       echo "Or if you wanted to run the hfsubset command yourself : "
-      echo "  hfsubset -o ./palisade.gpkg \
-           -r "2.2"                 \
-           -t poi                   \
-           "45229""
+      echo "  hfsubset -o ./palisade.gpkg -r "2.2" -t poi "45229""
       echo ""
       echo ""
       echo "Would you like to proceed with building our ngen-datastream command?"
       echo "No, I will obtain a geopackage myself and return later to this guide script"
       echo "Yes, I know which spatial domain I want to run over and how to provide the hfsubset cli options to ngen-datastream"
+      echo ""
       read -p "Enter n for No and y for Yes " proceed_options
       echo ""
       echo ""
