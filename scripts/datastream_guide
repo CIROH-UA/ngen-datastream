@@ -19,7 +19,8 @@ set_realization_file() {
       set_realization_file
     ;;
     2)
-      read -p "Path to realization file: " REALIZATION 
+      echo "EXAMPLE : /path/to/ngen-datastream/config/ngen/realization_sloth_nom_cfe_pet.json"
+      read -p "Enter the path to your realization file: " REALIZATION 
       echo ""
       echo ""     
       ;;
@@ -34,6 +35,7 @@ set_resource_directory() {
   echo "1. What is a resource directory?"
   echo "2. No, I want to proceed without a resource directory."
   echo "3. Yes, I would like to provide a resource directory"
+  echo ""
   read -p "Enter the number corresponding to your choice: " choice
   echo ""
   echo ""
@@ -84,7 +86,8 @@ set_resource_directory() {
       :
       ;;
     3)
-      read -p "Path to directory that contains the datastream resources. : " RESOURCES 
+      echo "EXAMPLE : /example/path/resource_directory"
+      read -p "Enter the path to your resource directory : " RESOURCES 
       echo ""
       echo ""     
       ;;
@@ -104,12 +107,15 @@ set_hydrofabric() {
   case $choice in
     1)
       echo "You chose to provide a geopackage directly."
+      echo ""
+      echo "EXAMPLE : /example/path/palisade.gpkg"
       read -p "Enter the path to your geopackage (local file, S3 URI, or URL): " GEOPACKAGE
       echo ""
       echo ""         
 
       echo "For additional options, you can configure the following:"
-      echo "1. DOMAIN_NAME (Name for the spatial domain, stripped from gpkg if not supplied)."
+      echo "DOMAIN_NAME (Name for the spatial domain, stripped from gpkg if not supplied)."
+      echo "EXAMPLE : PALISADE_COLORADO"
       read -p "Enter DOMAIN_NAME (leave blank to skip): " DOMAIN_NAME
       echo ""
       echo ""         
@@ -117,11 +123,43 @@ set_hydrofabric() {
       ;;
     2)
       echo "You will need to either obtain a geopackage or provide ngen-datastream enough information to query hfsubset for you."
+      echo ""
       echo "If you would like to obtain the geopackage manually, see the workflow here on how to do that."
       echo "https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/BREAKDOWN.md#spatial-domain"
       echo ""
+      echo "Or you can go to this link to find the location you want to run over and collect the following information from the tooltip"
+      echo "https://www.lynker-spatial.com/hyview.html"
+      echo "Example tooltip output : "
+      echo "
+            {
+          "id": "nex-2595505",
+          "toid": "wb-2595505",
+          "type": "nexus",
+          "vpuid": "14",
+          "poi_id": "45229"
+            }"
       echo ""
-      echo "Would you like to proceed?"
+      echo "ngen-datastream calls the hfsubset service internally, so you can provide ngen-datastream with these values or you can use hfsubset directly."
+      echo "The hfsubset documentation describes a command of the following form:"
+      echo "https://github.com/owp-spatial/hfsubsetCLI"
+      echo "  hfsubset -o ./divides_nexus.gpkg \
+           -r "2.2"                 \
+           -t hl                   \
+           "Gages-06752260""
+      echo "In this example, hfsubset expects a -t argument to define what type of identifying value is being used to subset. In this case, a hydrolocation id was use (Gages-###) and thus -t is set to 'hl'. ngen-datastream refers to this option as SUBSET_ID_TYPE" 
+      echo "An example of interpreting hyview tooltip output to ngen-datastream options : "
+      echo "For our case, let's use the poi_id from the hyview tooltip"
+      echo "SUBSET_ID=45229"
+      echo "SUBSET_ID_TYPE=poi"
+      echo "HYDROFABRIC_VERSION=2.2"
+      echo "Or if you wanted to run the hfsubset command yourself : "
+      echo "  hfsubset -o ./palisade.gpkg \
+           -r "2.2"                 \
+           -t poi                   \
+           "45229""
+      echo ""
+      echo ""
+      echo "Would you like to proceed with building our ngen-datastream command?"
       echo "No, I will obtain a geopackage myself and return later to this guide script"
       echo "Yes, I know which spatial domain I want to run over and how to provide the hfsubset cli options to ngen-datastream"
       read -p "Enter n for No and y for Yes " proceed_options
@@ -132,13 +170,16 @@ set_hydrofabric() {
           echo ""
           exit 1
       else
+          echo "EXAMPLE : \"Gages-09106150\""
           read -p "Enter SUBSET_ID (catchment ID to subset): " SUBSET_ID
           echo ""
-          echo ""             
+          echo ""    
+          echo "EXAMPLE : \"hl\""         
           read -p "Enter SUBSET_ID_TYPE (ID type corresponding to SUBSET_ID): " SUBSET_ID_TYPE
           echo ""
-          echo ""             
-          read -p "Enter HYDROFABRIC_VERSION (e.g., >=v20.1): " HYDROFABRIC_VERSION
+          echo "" 
+          echo "EXAMPLE : v2.2"            
+          read -p "Enter HYDROFABRIC_VERSION: " HYDROFABRIC_VERSION
           echo ""
           echo ""             
           echo "hfsubset options configured. Will execute hfsubset internally."
@@ -303,25 +344,24 @@ echo ""
 
 
 echo "Now let's go through how to set these options."
-echo "First, let's get set the output directory. Where do you want data written to locally? You can set options to write to Amazon s3 later, but for now, setting a local path is required."
+echo "First, let's set the output directory. Where do you want data written to locally? You can set options to write to Amazon s3 later, but for now, setting a local path is required."
+echo ""
 read -p "Enter the local path to DATA_DIR: " DATA_DIR
 echo ""
 echo ""
 echo "Great! Now that's set, let's choose the time frame for the NextGen simulation"
+echo "If you want quick and easy options to proceed with, enter 'DAILY' for START_DATE, leave END_DATE blank, and enter 'NWM_V3_SHORT_RANGE' for FORCING_SOURCE"
 echo ""
 read -p "Enter START_DATE (YYYYMMDDHHMM or set to 'DAILY' to dynamically set START_DATE and END_DATE based on FORCING_SOURCE): " START_DATE
 echo ""
 read -p "Enter END_DATE (YYYYMMDDHHMM, if START_DATE is 'DAILY' leave END_DATE blank for today's date or set the day to select a different day): " END_DATE
 echo ""
+echo " You must set FORCING_SOURCE to determine which NWM forcings to use. Your options are: NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE, NWM_V3_MEDIUM_RANGE, NWM_V3_ANALYSIS_ASSIM, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, or NOMADS_POSTPROCESSED"
+echo "Be advised that the time range available varies from FORCING_SOURCE to FORCING_SOURCE. For example, NWM_V3_SHORT_RANGE are only available within the last 30 days."
 echo ""
-
-if [ "$START_DATE" == "DAILY" ]; then
-  echo "'DAILY' has been chosen!"
-  echo " You must set FORCING_SOURCE to determine which NWM forcings to use. Your options are: NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE, NWM_V3_MEDIUM_RANGE, NWM_V3_ANALYSIS_ASSIM, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, or NOMADS_POSTPROCESSED"
-  read -p "Enter FORCING_SOURCE: " FORCING_SOURCE
-  echo ""
-  echo ""
-fi
+read -p "Enter FORCING_SOURCE: " FORCING_SOURCE
+echo ""
+echo ""
 
 set_resource_directory
 set_hydrofabric
