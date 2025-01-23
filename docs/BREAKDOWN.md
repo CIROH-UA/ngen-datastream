@@ -37,7 +37,7 @@ mkdir ./palisade_2019/datastream-metadata
 ```
 
 ## Spatial Domain
-The spatial domain is defined via a geopackage file which is "cut" from the hydrofabric. Lynker-Spatial serves this spatial data via [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI). An example command is provided below:
+The spatial domain is defined via a geopackage file which is "cut" from the hydrofabric. Lynker-Spatial serves this spatial data via [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI). Please refer to hfsubset for the latest documenation as this document may not represent the current version. An example command is provided below:
 
 ```
 hfsubset \
@@ -56,9 +56,9 @@ Some things to note about this command:
 
 See [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) for more options.
 
-Use the [Lynker Spatial Hydrolocation Viewer](https://www.lynker-spatial.com/hydrolocations.html) to find the gauge (`usgs_site_code`) you want. 
+Use the [Lynker Spatial Hydrolocation Viewer](https://www.lynker-spatial.com/hydrolocations.html) to find the point of interest (`poi`) you want to use to subset. See hfsubset documentation to see how to subset with Gage Id and other options.  
 
-![ngen-datastream](images/lynker-spatial-palisade.jpg)
+![ngen-datastream](images/lynker-spatial-hyview.png)
 
 Use the [NGIA geopackage viewer](https://ngageoint.github.io/geopackage-viewer-js/) to make sure you've got the spatial domain set properly.
 
