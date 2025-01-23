@@ -28,7 +28,7 @@ hfsubset -w medium_range \
 
 Then feed the hydrofabric file to ngen-datastream along with a few cli args to define the time domain and NextGen configuration
 ```
-./scripts/stream.sh -s 202006200100 \
+./scripts/ngen-datastream -s 202006200100 \
                     -e 202006210000 \
                     -C NWM_RETRO_V3 \
                     -d $(pwd)/data/datastream_test \

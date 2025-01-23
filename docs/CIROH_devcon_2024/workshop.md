@@ -10,9 +10,9 @@ A few quick notes before beginning
 
 2) Now we can issue `ngen-datastream` commands. First, we will issue the command available in the repository's main [README.md](https://github.com/CIROH-UA/ngen-datastream?tab=readme-ov-file#run-it). If you downloaded files prior to the workshop, replace the argument URLs in the commands below with local paths.
 
-   This command will execute a 24 hour NextGen simulation over VPU 09 (11,000 catchments) with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. The `time` command has been placed in front of `stream.sh` so that we will get the runtime following execution.
+   This command will execute a 24 hour NextGen simulation over VPU 09 (11,000 catchments) with CFE, SLOTH, PET, and NOM configuration distributed over 4 processes. The `time` command has been placed in front of `ngen-datastream` so that we will get the runtime following execution.
    ```
-   time ./scripts/stream.sh \
+   time ./scripts/ngen-datastream \
     -s 202405200100 \
     -e 202405210000 \
     -d $(pwd)/data/datastream_test_VPU09_0520 \
@@ -45,7 +45,7 @@ A few quick notes before beginning
     ```
 
    ```
-   time ./scripts/stream.sh \
+   time ./scripts/ngen-datastream \
     -s 202405200100 \
     -e 202405210000 \
     -d $(pwd)/data/datastream_test_VPU09_0520_with_resources \
@@ -67,7 +67,7 @@ A few quick notes before beginning
     The below command will point to the same realization as in step 2, but it is possible to supply any valid NextGen realization file. Note that if the BMI modules defined in the user supplied realization file do not correspond to the configs in `ngen-bmi-configs.tar.gz` in `$(pwd)/data/resources_09/config`, validation will fail. Remove `ngen-bmi-configs.tar.gz` from the resources and `ngen-datastream` will generate the proper config files for the current realization.
 
     ```
-    time ./scripts/stream.sh \
+    time ./scripts/ngen-datastream \
         -s 202405200100 \
         -e 202405210000 \
         -d $(pwd)/data/datastream_test_VPU09_0520_with_resources_new_realization \
@@ -93,7 +93,7 @@ A few quick notes before beginning
     We now process over the next day (0521)
     
     ```
-    time ./scripts/stream.sh \
+    time ./scripts/ngen-datastream \
     -s 202405210100 \
     -e 202405220000 \
     -d $(pwd)/data/datastream_test_VPU09_0521_with_resources_new_realization \
@@ -109,7 +109,7 @@ A few quick notes before beginning
     Note that this command points to the 0520 execution's resource directory, but modifies the time.
 
     ```
-    time ./scripts/stream.sh \
+    time ./scripts/ngen-datastream \
     -s 202405210100 \
     -e 202405220000 \
     -d $(pwd)/data/datastream_test_validation_fail \

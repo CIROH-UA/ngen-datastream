@@ -138,7 +138,7 @@ DS_HASH="N/A"
 FP_HASH="N/A"
 NGIAB_HASH="N/A"
 MERK_HASH="N/A"
-STREAM_HASH="sha256:"$(sha256sum $SCRIPT_DIR"/stream.sh" | awk '{ print $1 }')
+STREAM_HASH="sha256:"$(sha256sum $SCRIPT_DIR"/ngen-datastream" | awk '{ print $1 }')
 
 DS_TAG=${DS_TAG:-"latest"}
 FP_TAG=${FP_TAG:-"latest"}
@@ -157,7 +157,6 @@ if [ -f "/etc/os-release" ]; then
 else 
     echo "Warning: /etc/os-release file not found"
 fi
-echo "HOST_OS" $HOST_OS
 
 # read cli args
 while [ "$#" -gt 0 ]; do

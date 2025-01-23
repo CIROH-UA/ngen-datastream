@@ -1,7 +1,7 @@
-Below is the output of `./scripts/stream.sh -h`. A more in depth of each option is given in the table below. 
+Below is the output of `./scripts/ngen-datastream -h`. A more in depth of each option is given in the table below. 
 
 ```
-Usage: ./scripts/stream.sh [options]
+Usage: ./scripts/ngen-datastream [options]
 Either provide a datastream configuration file
   -c, --CONF_FILE           <Path to datastream configuration file> 
 or run with cli args
