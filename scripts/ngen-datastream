@@ -580,7 +580,7 @@ if [ "$EVAL" == "True" ]; then
     log_time "EVAL_START" $DATASTREAM_PROFILING $S3_OUT
     TEEHR_DOCKER=awiciroh/ngiab-teehr
     TEEHR_TAG="latest"
-    docker run -v "$DATA_DIR:/app/data" "$TEEHR_DOCKER:$TEEHR_TAG"
+    docker run -v "$NGEN_RUN:/app/data" "$TEEHR_DOCKER:$TEEHR_TAG"
     TEEHR_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls "$TEEHR_DOCKER:$TEEHR_TAG" --format "{{.ID}}") | tr -d '"')
     log_time "EVAL_END" $DATASTREAM_PROFILING $S3_OUT
 fi
