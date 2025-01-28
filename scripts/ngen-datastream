@@ -107,6 +107,7 @@ usage() {
     echo "  -o, --S3_PREFIX           <File prefix within s3 bucket> "
     echo "  -n, --NPROCS              <Process limit> "
     echo "  -y, --DRYRUN              <True to skip calculations> "
+    echo "  -E, --EVAL                <True to run TEEHR evaluation service> "
     exit 1
 }
 
@@ -130,6 +131,7 @@ S3_BUCKET=""
 S3_PREFIX=""
 NPROCS=4
 DRYRUN="False"
+DO_TEEHR="False"
 
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
@@ -180,6 +182,7 @@ while [ "$#" -gt 0 ]; do
         -o|--S3_PREFIX) S3_PREFIX="$2"; shift 2;;
         -n|--NPROCS) NPROCS="$2"; shift 2;;
         -y|--DRYRUN) DRYRUN="$2"; shift 2;;
+        -E|--EVAL) EVAL="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -573,18 +576,29 @@ NGENRUN_TAR="${DATA_DIR%/}/$TAR_NAME"
 tar -cf - $NGEN_RUN | pigz > $NGENRUN_TAR
 log_time "TAR_END" $DATASTREAM_PROFILING $S3_OUT
 
-echo "DOCKER HASHES"
-echo "DATASTREAM       " $DS_HASH
-echo "FORCINGPROCESSOR " $FP_HASH
-echo "NGIAB            " $NGIAB_HASH
-echo "MERKDIR          " $MERK_HASH
-echo "STREAM SCRIPT    " $STREAM_HASH
+if [ "$EVAL" == "True" ]; then
+    log_time "EVAL_START" $DATASTREAM_PROFILING $S3_OUT
+    TEEHR_DOCKER=awiciroh/ngiab-teehr
+    TEEHR_TAG="latest"
+    docker run -v "$NGEN_RUN:/app/data" "$TEEHR_DOCKER:$TEEHR_TAG"
+    TEEHR_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls "$TEEHR_DOCKER:$TEEHR_TAG" --format "{{.ID}}") | tr -d '"')
+    log_time "EVAL_END" $DATASTREAM_PROFILING $S3_OUT
+fi
+
+echo "sha256 hashes:"
+echo "DATASTREAM DOCKER       " $DS_HASH
+echo "FORCINGPROCESSOR DOCKER " $FP_HASH
+echo "NGIAB DOCKER            " $NGIAB_HASH
+echo "MERKDIR DOCKER          " $MERK_HASH
+echo "TEEHR DOCKER            " $TEEHR_HASH
+echo "STREAM SCRIPT           " $STREAM_HASH
 
 HASHES=$DATASTREAM_META/docker_hashes.txt
 echo "DATASTREAM DOCKER: $DS_HASH" >> $HASHES
 echo "FORCINGPROCESSOR DOCKER: $FP_HASH" >> $HASHES
 echo "NGIAB DOCKER: $NGIAB_HASH" >> $HASHES
 echo "MERKDIR DOCKER: $MERK_HASH" >> $HASHES
+echo "TEEHR DOCKER: $TEEHR_HASH" >> $HASHES
 echo "STREAM SCRIPT: $STREAM_HASH" >> $HASHES
 
 log_time "DATASTREAM_END" $DATASTREAM_PROFILING $S3_OUT
