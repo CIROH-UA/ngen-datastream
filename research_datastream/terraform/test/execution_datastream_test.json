@@ -1,6 +1,6 @@
 {
   "commands": [
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_short_range/ngen.t00z.short_range.forcing.f001_f018.VPU_16.nc -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_16 --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/short_range/VPU_16'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -R /home/ec2-user/ngen-datastream/config/ngen/realization_sloth_nom_cfe_pet.json -s DAILY -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -g s3://datastream-resources/VPU_09/config/nextgen_VPU_09.gpkg --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX test'"
   ],
   "run_options": {
     "ii_terminate_instance": true,
@@ -9,7 +9,7 @@
     "timeout_s": 2400
   },
   "instance_parameters": {
-    "ImageId": "ami-0be3c5d34679be688",
+    "ImageId": "ami-0aa93c0d3de2986f5",
     "InstanceType": "t4g.2xlarge",
     "KeyName": "jlaser_community_east1",
     "SecurityGroupIds": [
@@ -24,7 +24,7 @@
         "Tags": [
           {
             "Key": "Project",
-            "Value": "datastream_short_range_16"
+            "Value": "datastream_test"
           }
         ]
       }
@@ -33,7 +33,7 @@
       {
         "DeviceName": "/dev/xvda",
         "Ebs": {
-          "VolumeSize": 32,
+          "VolumeSize": 16,
           "VolumeType": "gp3"
         }
       }

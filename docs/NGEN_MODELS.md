@@ -13,6 +13,7 @@ NextGen is a framework in which physical models can be coupled in numerical simu
 * [SoilFreezeThaw](https://github.com/NOAA-OWP/SoilFreezeThaw)
 * [SoilMoistureProfiles](https://github.com/NOAA-OWP/SoilMoistureProfiles)
 * [TOPMODEL](https://github.com/NOAA-OWP/topmodel)
+* [LSTM](https://github.com/NOAA-OWP/lstm)
   
 ## Coming Soon to NGIAB and `ngen-datastream`
 * [Sac-SMA](https://github.com/NOAA-OWP/sac-sma)
