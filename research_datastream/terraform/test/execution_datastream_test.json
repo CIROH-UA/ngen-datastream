@@ -1,0 +1,42 @@
+{
+  "commands": [
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastreamcli -R /home/ec2-user/ngen-datastream/config/ngen/realization_sloth_nom_cfe_pet.json -s DAILY -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -g s3://datastream-resources/VPU_09/config/nextgen_VPU_09.gpkg --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX test'"
+  ],
+  "run_options": {
+    "ii_terminate_instance": true,
+    "ii_delete_volume": true,
+    "ii_check_s3": true,
+    "timeout_s": 2400
+  },
+  "instance_parameters": {
+    "ImageId": "ami-0aa93c0d3de2986f5",
+    "InstanceType": "t4g.2xlarge",
+    "KeyName": "jlaser_community_east1",
+    "SecurityGroupIds": [
+      "sg-0fcbe0c6d6faa0117"
+    ],
+    "IamInstanceProfile": {
+      "Name": "datastream_community_ec2_profile"
+    },
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "datastream_test"
+          }
+        ]
+      }
+    ],
+    "BlockDeviceMappings": [
+      {
+        "DeviceName": "/dev/xvda",
+        "Ebs": {
+          "VolumeSize": 16,
+          "VolumeType": "gp3"
+        }
+      }
+    ]
+  }
+}
