@@ -23,6 +23,7 @@ or run with cli args
   -o, --S3_PREFIX           <File prefix within s3 bucket> 
   -n, --NPROCS              <Process limit> 
   -y, --DRYRUN              <True to skip calculations> 
+  -E, --EVAL                <True to run TEEHR evaluation service> 
   ```
 
 ### Explanation of cli args (or variables in defined in `CONF_FILE`)
@@ -47,3 +48,4 @@ or run with cli args
 | DRYRUN             | `-y` | Set to "True" to skip all compute steps. |
 | NPROCS              | `-n` | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
 | CONF_FILE            | `-c` | Store CLI args as env variables in a file. |  |
+| EVAL | `-E` | Set to "True" to run the TEEHR automated evaluation service on NextGen outputs. |  |

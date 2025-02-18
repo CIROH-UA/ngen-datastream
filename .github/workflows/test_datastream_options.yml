@@ -154,4 +154,10 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/datastream -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
            
+    - name: TEEHR integration test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/ngen-datastream -s DAILY -C NWM_V3_SHORT_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -E True
+                     
   
