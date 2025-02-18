@@ -1,7 +1,7 @@
-Below is the output of `./scripts/datastreamcli -h`. A more in depth of each option is given in the table below. 
+Below is the output of `./scripts/datastream -h`. A more in depth of each option is given in the table below. 
 
 ```
-Usage: ./scripts/datastreamcli [options]
+Usage: ./scripts/datastream [options]
 Either provide a datastream configuration file
   -c, --CONF_FILE           <Path to datastream configuration file> 
 or run with cli args

@@ -11,7 +11,7 @@ Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastre
 # DataStreamCLI
 The software backend of the Research DataStream is DataStreamCLI, which is a stand alone tool that automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion while providing flexibility and integrations like hfsubset, NextGen In A Box, and TEEHR.
 
-![DataStreamCLI](docs/images/datastreamcli.jpg)
+![datastream](docs/images/datastreamcli.jpg)
 
 ## Getting Started
 * **Installation:** Follow the [Installation Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md) to prepare your environment for `DataStreamCLI`.
@@ -39,7 +39,7 @@ hfsubset -w medium_range \
 
 Then feed the hydrofabric file to DataStreamCLI along with a few cli args to define the time domain and NextGen configuration
 ```
-./scripts/datastreamcli -s 202006200100 \
+./scripts/datastream -s 202006200100 \
                     -e 202006210000 \
                     -C NWM_RETRO_V3 \
                     -d $(pwd)/data/datastream_test \
