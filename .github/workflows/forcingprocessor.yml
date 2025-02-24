@@ -9,12 +9,15 @@ on:
     paths:
       - 'forcingprocessor/**'
       - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/build_test_docker_x86.yml'
   pull_request:
     branches:
       - main    
     paths:      
       - 'forcingprocessor/**'
       - '.github/workflows/forcingprocessor.yml'
+      - '.github/workflows/build_test_docker_x86.yml'
+
 permissions:
   contents: read
 jobs:

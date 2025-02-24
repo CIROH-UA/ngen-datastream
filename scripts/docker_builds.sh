@@ -5,7 +5,7 @@ DOCKER_DIR="$DATASTREAM_PATH"/docker
 DOCKER_DATASTREAM=$DOCKER_DIR/ngen-datastream
 
 PLATFORM=$(uname -m)
-PLATORM_TAG=""
+PLATORM_TAG="-arm64"
 if [ $PLATFORM = "x86_64" ]; then
     PLATORM_TAG="-x86"
 fi
@@ -60,6 +60,7 @@ if [ "$PUSH" = "yes" ]; then
     if [ "$SKIP_DEPS" = "no" ]; then
       docker push awiciroh/datastream-deps:$TAG
     fi
+    docker push awiciroh/datastream-deps:$TAG
     docker push awiciroh/datastream:$TAG
     docker push awiciroh/forcingprocessor:$TAG
     echo "Docker containers have been pushed to awiciroh dockerhub!"

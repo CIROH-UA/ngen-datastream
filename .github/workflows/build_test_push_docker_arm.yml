@@ -12,7 +12,13 @@ on:
       - 'research_datastream/terraform/test/docker_loginNpush.sh' 
       - '.github/workflows/forcingprocessor.yml'
       - '.github/workflows/datastream_python.yml'  
-      - '.github/workflows/build_test_push_docker_arm.yml'    
+      - '.github/workflows/build_test_push_docker_arm.yml'   
+
+  pull_request:
+    branches:
+      - main
+    paths: 
+      - '.github/workflows/build_test_push_docker_arm.yml'      
   
 jobs:
   build-test-push-docker-arm:
@@ -48,11 +54,10 @@ jobs:
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
       - name: Confirm docker push
         run : |
-          docker rmi -f $(docker images -aq)
-          docker pull awiciroh/datastream:latest
-          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/datastream:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
-          docker pull awiciroh/forcingprocessor:latest
-          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/forcingprocessor:latest)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
+          docker pull awiciroh/datastream:latest-arm64
+          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/datastream:latest-arm64)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
+          docker pull awiciroh/forcingprocessor:latest-arm64
+          CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/forcingprocessor:latest-arm64)" +%s) && CURRENT_EPOCH=$(date +%s) && TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH)) && [ $TIME_DIFF -le 900 ] && echo "The container was created within the past 15 minutes." || { echo "Error: The container was NOT created within the past 15 minutes."; exit 1; }
           sleep 5
       - name: Tear down infra
         if: always()
