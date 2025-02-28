@@ -27,7 +27,11 @@ The software backend of the Research DataStream is DataStreamCLI, which is a sta
 ## Run DataStreamCLI
 This example will execute a 24 hour NextGen simulation over the Palisade, Colorado watershed with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. The forcings used are the National Water Model v3 Retrospective.
 
-First, obtain a hydrofabric file for the gage you wish to model. Check out [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) for a handy cli tool for generating geopackages. For Palisade, Colorado:
+First, obtain a hydrofabric file for the gage you wish to model. There are several tooling options to use to obtain a geopackage. One of which, [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI), is maintained by the Office of Water Prediction and it integrated in DataStreamCLI. 
+
+![hfsubset status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_hfsubset.yaml/badge.svg)
+
+For Palisade, Colorado:
 ```
 hfsubset -w medium_range \
           -s nextgen \
