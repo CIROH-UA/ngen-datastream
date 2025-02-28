@@ -29,7 +29,7 @@ This example will execute a 24 hour NextGen simulation over the Palisade, Colora
 
 First, obtain a hydrofabric file for the gage you wish to model. There are several tooling options to use to obtain a geopackage. One of which, [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI), is maintained by the Office of Water Prediction and it integrated in DataStreamCLI. 
 
-![hfsubset status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_hfsubset.yml/badge.svg)
+![hfsubset status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_hfsubset.yaml/badge.svg)
 
 For Palisade, Colorado:
 ```
