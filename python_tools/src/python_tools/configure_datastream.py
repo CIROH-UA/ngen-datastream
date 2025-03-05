@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import platform
 import psutil
+import requests, yaml
 
 PATTERN_VPU = r'\$VPU'
 
@@ -26,6 +27,51 @@ NWMURL_NUM_HRS_MAPPING = {
     "ANALYSIS_ASSIM": 3,
     "ANALYSIS_ASSIM_EXTEND": 28,
 }
+
+def get_research_datastream_realization(gpkg,data_path):
+    
+    # url = "https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/research_datastream/configuration/time_parition.yaml"
+    # response = requests.get(url)
+    # response.raise_for_status()
+    # data = yaml.safe_load(response.text)
+    file_path = "/home/jlaser/code/CIROH/ngen-datastream/research_datastream/configuration/time_partition.yaml"
+    with open(file_path, "r") as file:
+        data =  yaml.safe_load(file)
+
+    match = re.search(r"vpu-([0-9A-Z]+)", gpkg, re.IGNORECASE)
+    VPU =  "VPU"+match.group(1)
+
+    realization_file = None
+    start_dt = datetime.now(timezone.utc)
+    for date_range in data[VPU]:
+        jstart, jend = date_range.split(" - ")
+        jstart_dt = datetime(year = datetime.today().year, month=int(jstart[:2]), day=int(jstart[2:]),tzinfo=timezone.utc)
+        jend_dt = datetime(year = datetime.today().year,month=int(jend[:2]), day=int(jend[2:]),tzinfo=timezone.utc)
+        if start_dt < jend_dt and start_dt >= jstart_dt:
+            realization_file = f"{VPU}_{jstart}_{jend}_realization.json"
+            # Make call to github
+            # github_raw = f"https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/research_datastream/configuration/{realization_file}"
+            github_raw = f"https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/refs/heads/main/research_datastream/configuration/CONUS/realization_sloth_nom_cfe_pet_troute.json"
+            response = requests.get(github_raw)
+            response.raise_for_status()
+            if response.status_code == 200:
+                outdir = os.path.join(data_path,"datastream-metadata")
+                os.makedirs(outdir, exist_ok=True)
+                file_path = os.path.join(outdir, "realization_user.json")
+                with open(file_path, "w", encoding="utf-8") as file:
+                    file.write(response.text)
+                outdir = os.path.join(data_path,"datastream-resources","config")
+                file_path = os.path.join(outdir, "realization_user.json")
+                with open(file_path, "w", encoding="utf-8") as file:
+                    file.write(response.text)    
+
+                realization_local = file_path
+            return realization_local
+
+    if realization_file is None:
+        raise Exception(f"Obtaining a realization for gpkg {gpkg} failed!")
+    
+    return
 
 def bytes2human(n):
     # http://code.activestate.com/recipes/578019
@@ -227,6 +273,9 @@ def create_conf_fp(args):
 def create_confs(args):
     conf = config_class2dict(args)
     realization = args.realization_file
+    if realization == "/dev/null":
+        realization = get_research_datastream_realization(args.gpkg,args.data_path)
+
 
     if args.start_date != 'DAILY':
         start_dt = datetime.strptime(args.start_date,'%Y%m%d%H%M')
