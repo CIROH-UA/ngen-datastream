@@ -5,7 +5,7 @@ from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 import pytest
 
-HF_VERSION="v2.1.1"
+HF_VERSION="v2.2"
 date = datetime.now(timezone.utc)
 date = date.strftime('%Y%m%d')
 hourminute  = '0000'
@@ -23,11 +23,9 @@ os.system(f"mkdir {data_dir}")
 pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
 retro_filenamelist = str((pwd/"retro_filenamelist.txt").resolve())
-geopackage_name = "palisade.gpkg"
-os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg")
-weights_name = "01_weights.parquet"
-os.system(f"curl -o {os.path.join(data_dir,weights_name)} -L -O https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{HF_VERSION}/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet")
-assert_file=(data_dir/f"forcings/cat-2586011.parquet").resolve()
+geopackage_name = "vpu-09_subset.gpkg"
+os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg")
+assert_file=(data_dir/f"forcings/1_forcings.nc").resolve()
 
 conf = {
     "forcing"  : {
@@ -38,7 +36,7 @@ conf = {
     "storage":{
         "storage_type"      : "local",
         "output_path"       : str(data_dir),
-        "output_file_type"  : ["parquet"]
+        "output_file_type"  : ["netcdf"]
     },    
 
     "run" : {
@@ -261,17 +259,13 @@ def test_s3_output():
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)     
     conf['storage']['output_path'] = str(data_dir)
-    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/forcings/1_forcings.nc')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/ngen.t00z.short_range.forcing.f001_f001.conus.nc')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/conf_fp.json')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/retro_filenamelist.txt')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/profile_fp.txt')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/weights.parquet')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/ngen.t16z.analysis_assim_extend.forcing.tm01_tm01.1.nc')
 
-def test_muliple_weights():
-    conf['forcing']['nwm_file'] = retro_filenamelist
-    nwmurl_conf_retro["urlbaseinput"] = 4
-    conf['forcing']['gpkg_file'] = ["https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D01/part-0.parquet","https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.1.1/nextgen/conus_forcing-weights/vpuid%3D02/part-0.parquet"]
-    generate_nwmfiles(nwmurl_conf_retro)
-    prep_ngen_data(conf)   
-    os.system(f"rm -rf {data_dir}")
+
 
     

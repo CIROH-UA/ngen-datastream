@@ -216,7 +216,7 @@ echo ""
 if [ "$TOUR" == "y" ]; then
   echo "" 
   echo "----------TOUR START----------"
-  echo ""z
+  echo ""
   echo "ngen-datastream is a command line interface tool that automates the process of collecting and formatting input data for the NextGen Water Modeling Framework (NextGen), orchestrating the NextGen simulation through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, relatively painless, and reproducible fashion."
   pause
   echo ""
@@ -322,10 +322,11 @@ pause
 echo ""
 echo ""  
 
-echo "and cli args that manage compute"
+echo "and cli args that manage compute and run the TEEHR evaluation service"
 echo "
   -n, --NPROCS              <Process limit> 
   -y, --DRYRUN              <True to skip calculations>
+  -E, --EVAL                <True to run TEEHR evaluation service>
 "
 pause
 echo ""
@@ -369,7 +370,8 @@ echo "You can optionally configure the following:"
 read -p "Enter S3_BUCKET (S3 bucket to write output to, leave blank to skip): " S3_BUCKET
 read -p "Enter S3_PREFIX (File prefix within S3 bucket, leave blank to skip): " S3_PREFIX
 read -p "Set NPROCS (Maximum number of processes, leave blank for default): " NPROCS
-read -p "Enable DRYRUN? (Enter 'True' to skip calculations, leave blank for default): " DRYRUN
+read -p "Enable DRYRUN? (Enter 'True' to skip calculations, leave blank to perform calculations): " DRYRUN
+read -p "Run TEEHR? (Enter 'True' to run TEEHR evaluation service, leave blank to skip TEEHR): " EVAL
 
 # Summarize user input
 echo ""
@@ -390,6 +392,7 @@ echo "Configuration summary:"
 [[ -n $S3_PREFIX ]] && echo "- S3_PREFIX: $S3_PREFIX"
 [[ -n $NPROCS ]] && echo "- NPROCS: $NPROCS"
 [[ -n $DRYRUN ]] && echo "- DRYRUN: $DRYRUN"
+[[ -n $EVAL ]] && echo "- EVAL: $EVAL"
 echo ""
 echo ""
 echo "All required configurations have been completed."
@@ -417,6 +420,7 @@ cmd="./scripts/ngen-datastream"
 [ -n "$S3_PREFIX" ] && cmd="$cmd -o \"$S3_PREFIX\""
 [ -n "$NPROCS" ] && cmd="$cmd -n \"$NPROCS\""
 [ -n "$DRYRUN" ] && cmd="$cmd -y \"$DRYRUN\""
+[ -n "$EVAL" ] && cmd="$cmd -E \"$EVAL\""
 echo "Executing ngen-datastream with the following command "\n\n"$cmd"
 
 # Display the final command to the user

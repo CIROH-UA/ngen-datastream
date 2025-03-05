@@ -90,15 +90,15 @@ def create_conf_nwm(args):
         else:
             start_dt = datetime.strptime(end,'%Y%m%d%H%M') 
         end_dt = start_dt
+        start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
         num_hrs= 24
     else:
         start_dt = datetime.strptime(start,'%Y%m%d%H%M')
         end_dt   = datetime.strptime(end,'%Y%m%d%H%M')  
         num_hrs = (end_dt - start_dt).seconds // 3600
-
-    start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
-    end_dt   = end_dt.replace(hour=1,minute=0,second=0,microsecond=0)    
-    start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
+    
+    start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+    end_str_real = end_dt.strftime('%Y-%m-%d %H:%M:%S')    
     start_str_nwm = start_dt.strftime('%Y%m%d%H%M') 
     end_str_nwm    = start_dt.strftime('%Y%m%d%H%M') 
                            
@@ -132,6 +132,8 @@ def create_conf_nwm(args):
                 urlbaseinput = 2         
         elif "NWM" in args.forcing_source: 
             urlbaseinput = 7
+        elif len(args.forcing_source) == 0 and len(args.forcings) > 0:
+            return {}, start_str_real, end_str_real # nextgen forcings have been supplied directly
         else:
             raise Exception(f'Forcing source {args.forcing_source} not understood')
         
@@ -194,11 +196,13 @@ def create_conf_fp(args):
         output_path = f"{args.docker_mount}/ngen-run"  
     
     if len(args.forcing_split_vpu) > 0:
-        template = f"https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/{args.hydrofabric_version}/nextgen/conus_forcing-weights/vpuid%3D$VPU/part-0.parquet"
+        template = f"/mounted_dir/nextgen_VPU_$VPU_weights.json"
         gpkg_file = []
         for jvpu in args.forcing_split_vpu.split(','):
             tmpl_cpy = copy.deepcopy(template)
             gpkg_file.append(re.sub(PATTERN_VPU, jvpu, tmpl_cpy))
+    elif args.united_conus:
+        gpkg_file = [f"/mounted_dir/conus_weights.parquet"]
     else:
         gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
 
@@ -234,10 +238,7 @@ def create_confs(args):
         nwm_conf = {}
         fp_conf = {}
         fp_conf['forcing'] = args.forcings
-        start_real = datetime.strptime(args.start_date,'%Y%m%d%H%M')
-        end_real   = datetime.strptime(args.end_date,'%Y%m%d%H%M')  
-        start_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
-        end_real   = end_dt.strftime('%Y-%m-%d %H:%M:%S') 
+        _, start_real, end_real = create_conf_nwm(args)
     elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
         nwm_conf = {}
         fp_conf  = create_conf_fp(args) 
@@ -274,11 +275,15 @@ def create_confs(args):
     if args.forcings.endswith(".tar.gz"):
         data['global']['forcing']['file_pattern'] = ".*{{id}}.*.csv"
         data['global']['forcing']['path'] = "./forcings"
-        data['global']['forcing']['provider'] = "CsvPerFeature"
+        data['global']['forcing']['provider'] = "CsvPerFeature"     
+    elif args.forcings.endswith(".nc"):
+        if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
+        data['global']['forcing']['provider'] = "NetCDF"
+        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"         
     else:
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = "./forcings/1_forcings.nc"
+        data['global']['forcing']['path'] = f"./forcings/1_forcings.nc"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization_datastream.json')
 
@@ -300,6 +305,7 @@ if __name__ == "__main__":
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
     parser.add_argument("--forcing_split_vpu", type=str,help="list of vpus",default="")
+    parser.add_argument("--united_conus", type=bool,help="boolean to process entire conus from local weights file",default=False)
     parser.add_argument("--realization_file", type=str,help="ngen realization file",required=True)
     parser.add_argument("--s3_bucket", type=str,help="s3 bucket to write to",default="")
     parser.add_argument("--s3_prefix", type=str,help="s3 prefix to prepend to files",required="")    

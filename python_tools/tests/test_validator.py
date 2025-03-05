@@ -3,7 +3,7 @@ from python_tools.run_validator import validate_data_dir
 
 SCRIPT_DIR   = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR     = os.path.join(SCRIPT_DIR,'data')
-DATA_PACKAGE = "https://ngen-datastream.s3.us-east-2.amazonaws.com/validator_pytest.tar.gz"
+DATA_PACKAGE = "https://datastream-resources.s3.us-east-1.amazonaws.com/validator.tar.gz"
 ORIGINAL_TAR = "validator_test_original.tar.gz"
 ORIGINAL_TAR_PATH = os.path.join(DATA_DIR,ORIGINAL_TAR)
 TEST_DIR = os.path.join(DATA_DIR,"test_dir")
@@ -15,7 +15,7 @@ def ready_test_folder():
     if os.path.exists(TEST_DIR):
         os.system(f"rm -rf {TEST_DIR}")
     os.system(f'mkdir {TEST_DIR}')
-    os.system(f"tar -xf {ORIGINAL_TAR_PATH} -C {TEST_DIR}")
+    os.system(f"tar xfz {ORIGINAL_TAR_PATH} -C {TEST_DIR}")
 
 def test_missing_geopackage():
     del_file = str(TEST_DATA_DIR) + '/config/*.gpkg'
@@ -57,13 +57,13 @@ def test_duplicate_realization():
 
 
 def test_missing_bmi_config():
-    del_file = str(TEST_DATA_DIR) + '/config/cat_config/CFE/CFE_cat-2586011.ini'
+    del_file = str(TEST_DATA_DIR) + '/config/cat_config/CFE/CFE_cat-1496145.ini'
     os.system(f"rm {del_file}")
     try:
         validate_data_dir(TEST_DATA_DIR)
         assert False 
     except Exception as inst:
-        assert inst.__str__() == "cat-2586011 -> File config/cat_config/CFE/CFE_cat-2586012.ini does not match pattern specified config/cat_config/CFE/CFE_{{id}}.ini"                
+        assert inst.__str__() == "cat-1496145 -> File config/cat_config/CFE/CFE_cat-1496146.ini does not match pattern specified config/cat_config/CFE/CFE_{{id}}.ini"                
 
 def test_missing_forcings():
     del_file = str(TEST_DATA_DIR) + '/forcings/*.nc'

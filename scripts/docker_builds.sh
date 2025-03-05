@@ -9,7 +9,7 @@ PLATORM_TAG="-arm64"
 if [ $PLATFORM = "x86_64" ]; then
     PLATORM_TAG="-x86"
 fi
-TAG="latest$PLATORM_TAG"
+TAG="latest"
 
 BUILD_FORCINGPROCESSOR="no"
 BUILD_DATASTREAM="no"
@@ -32,7 +32,7 @@ done
 
 cd $DOCKER_DIR
 if [ "$BUILD_DEPS" = "yes" ]; then
-  docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg TAG_NAME=$TAG --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
+  docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi

@@ -1,0 +1,51 @@
+name: Validate research datastream terraform
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'research_datastream/terraform/**'
+      - '.github/workflows/research_datastream_terraform.yaml'
+  pull_request:
+    branches:
+      - main    
+    paths:      
+      - 'research_datastream/terraform/**'
+      - '.github/workflows/research_datastream_terraform.yaml'
+jobs:
+  validate-terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Configure AWS
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1 
+
+      - name: Validate Terraform
+        run: |
+          cd research_datastream/terraform
+          terraform init
+          terraform validate
+          ../scripts/import_resources.sh ./test/variables_gitactions.tfvars
+          terraform apply -var-file=./test/variables_gitactions.tfvars -auto-approve
+          sleep 60
+
+      - name: Test execution
+        run: |   
+          cd research_datastream/terraform
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; else echo "Key pair 'actions_key' already exists"; fi
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name gp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_test.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
+
+      - name: Tear down infra
+        if: always()
+        run: |
+          cd research_datastream/terraform
+          terraform destroy -var-file=./test/variables_gitactions.tfvars -auto-approve
+          sleep 60
