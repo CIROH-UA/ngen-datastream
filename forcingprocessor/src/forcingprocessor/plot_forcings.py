@@ -137,7 +137,7 @@ def get_nwm_data_array(
     Outputs a windowed array of national water model data for the domain and forcing variables specified.
     nwm_data  : 4d array (time x nwm_forcing_variable x west_east x south_north)
     """
-    weights_json, _ = hf2ds([geopackage])
+    weights_json, _ = hf2ds([geopackage],nwm_folder[0],1)
     x_min, x_max, y_min, y_max = get_window(weights_json)     
 
     for path, _, files in os.walk(nwm_folder):

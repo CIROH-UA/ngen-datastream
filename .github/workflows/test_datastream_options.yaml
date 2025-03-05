@@ -1,0 +1,145 @@
+name: Test Datastream Options
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+     - 'docs/**'
+     
+  pull_request:
+    branches:
+      - main  
+    paths-ignore:
+      - 'docs/**'       
+
+jobs:
+  test-datastream-options:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2  
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3      
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1    
+        export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+        export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        echo $AWS_ACCESS_KEY_ID
+        echo $AWS_SECRET_ACCESS_KEY
+
+    - name: Build docker containers
+      run : |        
+        ./scripts/docker_builds.sh -f -d    
+
+    - name: Get geopackage 
+      run: |
+        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+
+    - name: Base test and NWM_RETRO_V3
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test        
+        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+
+    - name: Cache resource directory
+      run: |
+        mkdir ./data/cache
+        cp -r ./data/datastream_test/datastream-resources ./data/cache
+        cp -r ./data/cache/datastream-resources ./data/cache/datastream-resources-no-forcings
+        cp -r ./data/cache/datastream-resources ./data/cache/datastream-resources-missing
+        sudo rm -rf ./data/cache/datastream-resources-no-forcings/ngen-forcings 
+
+    - name: NextGen forcings CLI option test
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -g $(pwd)/palisade.gpkg -R $(pwd)/data/cache/datastream-resources/config/realization_sloth_nom_cfe_pet.json -F $(pwd)/data/cache/datastream-resources/ngen-forcings/1_forcings.nc -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test        
+
+    - name: Resource directory test missing all
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        sudo rm -rf ./data/cache/datastream-resources-missing/ngen-forcings 
+        sudo rm -rf ./data/cache/datastream-resources-missing/config/*
+        ./scripts/datastream -r ./data/cache/datastream-resources-missing -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg
+
+    - name: Resource directory test
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -r ./data/cache/datastream-resources -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test
+
+    - name: Forcings sources option test NWM_RETRO_V2
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -r ./data/cache/datastream-resources-no-forcings -s 201906200100 -e 201906200200 -C NWM_RETRO_V2 -d $(pwd)/data/datastream_test        
+        
+    - name: Forcings sources option test NWM_RETRO_V3
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -r ./data/cache/datastream-resources-no-forcings -s 201906200100 -e 201906200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test        
+                  
+    
+    - name: Forcings sources option test NWM_V3
+      if: always()
+      run: |
+        sudo rm -rf $(pwd)/data/datastream_test
+        TODAY=$(env TZ=US/Eastern date +'%Y%m%d')
+        ./scripts/datastream -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NWM_V3 -d $(pwd)/data/datastream_test   
+        
+    - name: Forcings sources option test NOMADS
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        TODAY=$(env TZ=US/Eastern date +'%Y%m%d')
+        ./scripts/datastream -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NOMADS -d $(pwd)/data/datastream_test  
+        
+    - name: S3 write out test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -S ciroh-community-ngen-datastream -o git_actions_test
+        aws s3api wait object-exists --bucket ciroh-community-ngen-datastream --key git_actions_test/ngen-run.tar.gz   
+        aws s3 rm s3://ciroh-community-ngen-datastream/git_actions_test --recursive
+
+    - name: DAILY today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -C NWM_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+
+    - name: DAILY pick day test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -C NWM_V3 -e $(date -d '-15 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
+        
+    - name: DAILY short_range today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -C NWM_SHORT_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+
+    - name: DAILY medium_range today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -C NWM_MEDIUM_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+          
+    
+    - name: DAILY analysis assim extend today test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json      
+  

@@ -1,0 +1,436 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+ngen_datastream_script=$SCRIPT_DIR/ngen-datastream
+
+set_realization_file() {
+  echo "Please provide a realizations file"
+  echo "1. What is a realization file?"
+  echo "2. I know what a realization file is and will provide one"
+  echo "3. I provided a realization file via the resource directory"
+  read -p "Enter the number corresponding to your choice: " choice
+  echo ""
+  echo ""
+  case $choice in
+    1)
+      echo "NextGen requires a user-supplied configuration via the realization file. This file is where BMI models are specified and parameterized. There are templates in this repository (configs/ngen/realization*.json), but this file is where all the science happens. Become comfortable editing this file with your scientific contributions!"
+      echo ""
+      echo ""
+      set_realization_file
+    ;;
+    2)
+      echo "EXAMPLE : /path/to/ngen-datastream/config/ngen/realization_sloth_nom_cfe_pet.json"
+      read -p "Enter the path to your realization file: " REALIZATION 
+      echo ""
+      echo ""     
+      ;;
+    3)
+      echo "ngen-datastream will use the realization file in the resouce directory"
+      ;;      
+  esac
+}
+
+set_resource_directory() {
+  echo "It is possible to provide ngen-datastream a resources directory. Do you want to do this?"
+  echo "1. What is a resource directory?"
+  echo "2. No, I want to proceed without a resource directory."
+  echo "3. Yes, I would like to provide a resource directory"
+  echo ""
+  read -p "Enter the number corresponding to your choice: " choice
+  echo ""
+  echo ""
+  case $choice in
+    1)
+      echo "A resource directory may have a few different applications:"
+      echo "1) Repeated executions. A resource directory is generated in every ngen-datastream execution and can be resued in future executions, saving compute time. ngen-datastream will retrieve files (that are given as arguements) remotely, however this can take time depending on the networking between the data source and host. Storing these files locally in RESOURCE_DIR for repeated runs will save time and network bandwith."
+      echo "2) A resource directory serves as a convenient way to give ngen-datastream many files without needing to explictly provide the path for each file."
+      echo "3) Communicating runs. ngen-datastream versions everything in DATA_DIR, which means a single hash corresponds to a unique RESOURCE_DIR, which allows users to quickly identify potential differences between ngen-datastream input data."
+      echo "See docs/STANDARD_DIRECTORIES.md/RESOURCE_DIR for more information."
+      echo ""
+      echo "Here's the resource directory sample:"
+      echo "RESOURCE_DIR/
+|
+├── config/
+|   │
+|   ├── nextgen_09.gpkg
+|   |
+|   ├── realization.json
+|   |
+|   ├── ngen.yaml
+|   |
+|   ├── partitions.json
+|   |
+|   ├── cat-config/
+|   │   |
+|   |   ├──PET/
+|   │   |
+|   |   ├──CFE/
+|   │   |
+|   |   ├──NOAH-OWP-M/
+|
+├── nwm-forcings/
+|   |
+|   ├── nwm.t00z.medium_range.forcing.f001.conus
+|   |
+|   ├── ...
+|
+├── ngen-forcings/
+|   |
+|   ├── forcings.nc
+|"
+      echo ""
+      echo ""
+      set_resource_directory
+    ;;
+    2)
+      :
+      ;;
+    3)
+      echo "EXAMPLE : /example/path/resource_directory"
+      read -p "Enter the path to your resource directory : " RESOURCES 
+      echo ""
+      echo ""     
+      ;;
+  esac
+}
+
+set_hydrofabric() {
+  echo "Great! Now let's figure out where the hydrofabric data is coming from. Choose an option below"
+  echo "1. I have a geopackage."
+  echo "2. I do not have a geopackage."
+  echo "3. What is a geopackage?"
+  echo "4. I provided a geopackage via the resource directory"
+  read -p "Enter the number corresponding to your choice: " choice
+  echo ""
+  echo ""
+
+  case $choice in
+    1)
+      echo "You chose to provide a geopackage directly."
+      echo ""
+      echo "EXAMPLE : /example/path/palisade.gpkg"
+      read -p "Enter the path to your geopackage (local file, S3 URI, or URL): " GEOPACKAGE
+      echo ""
+      echo ""         
+
+      echo "For additional options, you can configure the following:"
+      echo "DOMAIN_NAME (Name for the spatial domain, stripped from gpkg if not supplied)."
+      echo "EXAMPLE : PALISADE_COLORADO"
+      read -p "Enter DOMAIN_NAME (leave blank to skip): " DOMAIN_NAME
+      echo ""
+      echo ""         
+
+      ;;
+    2)
+      echo "You will need to either obtain a geopackage or provide ngen-datastream enough information to query hfsubset for you."
+      echo ""
+      echo "If you would like to obtain the geopackage manually, see the workflow here on how to do that."
+      echo "https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/BREAKDOWN.md#spatial-domain"
+      echo ""
+      echo "Or you can go to this link to find the location you want to run over and collect the following information from the tooltip"
+      echo "https://www.lynker-spatial.com/hyview.html"
+      echo "Example tooltip output : "
+      echo "
+            {
+          "id": "nex-2595505",
+          "toid": "wb-2595505",
+          "type": "nexus",
+          "vpuid": "14",
+          "poi_id": "45229"
+            }"
+      echo ""
+      echo "ngen-datastream calls the hfsubset service internally, so you can provide ngen-datastream with these values or you can use hfsubset directly."
+      echo "The hfsubset documentation (https://github.com/owp-spatial/hfsubsetCLI) describes a command of the following form:"
+      echo ""
+      echo "hfsubset -o ./divides_nexus.gpkg -r "2.2" -t hl "Gages-06752260""
+      echo ""
+      echo "In this example, hfsubset expects a -t argument to define what type of identifying value is being used to subset. In this case, a hydrolocation id was used (Gages-###) and thus -t is set to 'hl'. ngen-datastream refers to this option as SUBSET_ID_TYPE" 
+      echo ""
+      echo "An example of interpreting hyview tooltip output to ngen-datastream options : "
+      echo "For our case, let's use the poi_id from the hyview tooltip"
+      echo "SUBSET_ID=45229"
+      echo "SUBSET_ID_TYPE=poi"
+      echo "HYDROFABRIC_VERSION=2.2"
+      echo "Or if you wanted to run the hfsubset command yourself : "
+      echo "  hfsubset -o ./palisade.gpkg -r "2.2" -t poi "45229""
+      echo ""
+      echo ""
+      echo "Would you like to proceed with building our ngen-datastream command?"
+      echo "No, I will obtain a geopackage myself and return later to this guide script"
+      echo "Yes, I know which spatial domain I want to run over and how to provide the hfsubset cli options to ngen-datastream"
+      echo ""
+      read -p "Enter n for No and y for Yes " proceed_options
+      echo ""
+      echo ""
+      if [ "$proceed_options" == "n" ]; then
+          echo "Goodbye!"
+          echo ""
+          exit 1
+      else
+          echo "EXAMPLE : \"Gages-09106150\""
+          read -p "Enter SUBSET_ID (catchment ID to subset): " SUBSET_ID
+          echo ""
+          echo ""    
+          echo "EXAMPLE : \"hl\""         
+          read -p "Enter SUBSET_ID_TYPE (ID type corresponding to SUBSET_ID): " SUBSET_ID_TYPE
+          echo ""
+          echo "" 
+          echo "EXAMPLE : v2.2"            
+          read -p "Enter HYDROFABRIC_VERSION: " HYDROFABRIC_VERSION
+          echo ""
+          echo ""             
+          echo "hfsubset options configured. Will execute hfsubset internally."
+          echo ""
+          echo ""          
+      fi
+      ;;
+    3)
+      echo "A geopackage is a file that contains the hydrofabric. The hydrofabric is spatial data about the surface of the earth and is delineated by catchment (i.e. water basin). A geopackage is composed of layers of data laid out in tables, so it is able to be queried like an SQL database. This file effectively defines the spatial domain over which NextGen will execute. Many NextGen BMI models derive parameters from a geopakage."
+      echo ""
+      echo ""
+      set_hydrofabric
+      ;;
+    4)
+      echo "ngen-datastream will use the geopackage found in the resource directory"
+      :
+      ;;
+    *)
+      echo "Invalid choice."
+      set_hydrofabric
+      ;;
+  esac
+}
+
+pause() {
+    echo ""
+    printf "Press Enter to continue...\033[0K\r"  
+    read -r < /dev/tty                           
+    printf "\033[1A\033[2K"                                       
+}
+
+echo ""
+echo "Welcome to the ngen-datastream guide!"
+echo ""
+read -p  "Would you like a quick look around ngen-datastream before we get started? Type y for a tour, n to proceed to setting CLI options. " TOUR
+echo ""
+if [ "$TOUR" == "y" ]; then
+  echo "" 
+  echo "----------TOUR START----------"
+  echo ""
+  echo "ngen-datastream is a command line interface tool that automates the process of collecting and formatting input data for the NextGen Water Modeling Framework (NextGen), orchestrating the NextGen simulation through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, relatively painless, and reproducible fashion."
+  pause
+  echo ""
+  echo ""
+
+  echo "ngen-datastream is \"batteries included, yet flexible.\""
+  echo "ngen-datastream will, by default, perform various steps in preparing input files for NextGen, but also allows the user to supply these files directly to ngen-datastream via CLI args."
+  echo "This allows users to take advantaged of ngen-datastream features where desired, while maintaining the control over particular steps in the workflow."
+  echo "To give an example, ngen-datastream will calculate NextGen catchment-level forcings from National Water Model gridded forcings for you, or you can supply NextGen forcings directly via NGEN_FORCINGS CLI arg"
+  pause
+  echo ""
+  echo ""
+ 
+  echo "Check out the documentation in this repository at docs/"
+  pause
+  echo ""
+  echo ""
+
+  echo "ngen-datastream does many things for you, but these steps can be done manually and are outlined at docs/BREAKDOWN.md"
+  echo "This document is helpful to show the user what ngen-datastream is doing internally."
+  pause
+  echo ""
+  echo ""
+
+  echo "ngen-datastream follows some data format conventions explained in docs/STANDARD_DIRECTORIES.md"
+  pause
+  echo ""
+  echo ""
+
+  echo "The NextGen framework is composed of several components that are connected via the Basic Model Interface (BMI)."
+  echo "It is common that a configuration file is required for each catchment per BMI model specified in the realization file."
+  echo "ngen-datastream will generate these files for you. That being said, this functionality has not yet been extended to all NextGen BMI models available in NGIAB."
+  echo "Take a look at docs/NGEN_MODELS.md for an up-to-date list on which NextGen models ngen-datastream supports BMI config generation."
+  pause
+  echo ""
+  echo ""
+
+  echo "NextGen requires a user-supplied configuration via the realization file. This file is where BMI models are specified and parameterized. There are templates in this repository (configs/ngen/realization*.json), but this file is where all the science happens. Become comfortable editing this file with your scientific contributions!"
+  pause
+  echo ""
+  echo ""
+ 
+  echo "Numerical simulation can easily consume computer resources. Take a look at docs/USAGE.md for a guide on how best to deploy ngen-datastream given the available resources."
+  pause
+  echo ""
+  echo ""
+  echo "----------TOUR END----------"
+  echo ""
+  pause
+fi
+
+echo ""
+echo "In order to execute ngen-datastream, we will build a command of the following form. Not all options are required."
+eval "$ngen_datastream_script -h"
+echo ""
+echo "That's a lot of options! Let's break them down."
+pause
+echo ""
+echo ""
+echo "In general, there are 5 types of cli args ngen-datastream accepts: "
+echo "cli args that define the time of the forcings and NextGen simulation: "
+echo "  
+  -s, --START_DATE          <YYYYMMDDHHMM or "DAILY"> 
+  -e, --END_DATE            <YYYYMMDDHHMM> 
+  -C, --FORCING_SOURCE      <Forcing source option>
+  "
+pause
+echo ""
+echo ""
+
+echo "cli args that define the spatial domain of the simulation: "
+echo "
+  -g, --GEOPACKAGE          <Path to geopackage file> 
+  -I, --SUBSET_ID           <Hydrofabric id to subset>  
+  -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
+  -v, --HYDROFABRIC_VERSION <Hydrofabric version> 
+  -D, --DOMAIN_NAME         <Name for spatial domain>
+"
+pause
+echo ""
+echo ""
+
+echo "cli args that provide NextGen input files: "
+echo "
+  -R, --REALIZATION         <Path to realization file> 
+  -r, --RESOURCE_DIR        <Path to resource directory> 
+  -f, --NWM_FORCINGS_DIR    <Path to nwm forcings directory> 
+  -N, --NGEN_BMI_CONFS      <Path to ngen BMI config directory> 
+  -F, --NGEN_FORCINGS       <Path to ngen forcings directory, tarball, or netcdf> 
+"
+
+pause
+echo ""
+echo "" 
+
+echo "the cli args the handle where data is written to"
+echo "
+  -d, --DATA_DIR            <Path to write to> 
+  -S, --S3_BUCKET           <s3 bucket to write output to>  
+  -o, --S3_PREFIX           <File prefix within s3 bucket> 
+"
+pause
+echo ""
+echo ""  
+
+echo "and cli args that manage compute and run the TEEHR evaluation service"
+echo "
+  -n, --NPROCS              <Process limit> 
+  -y, --DRYRUN              <True to skip calculations>
+  -E, --EVAL                <True to run TEEHR evaluation service>
+"
+pause
+echo ""
+echo ""  
+
+echo "The ngen-datastream configuration file is not necessary, but can be a convenient way for users to store ngen-datastream cli arg combinations under a single file."
+echo "
+  -c, --CONF_FILE           <Path to datastream configuration file>
+"
+pause
+echo ""
+echo "" 
+
+
+echo "Now let's go through how to set these options."
+echo "First, let's set the output directory. Where do you want data written to locally? You can set options to write to Amazon s3 later, but for now, setting a local path is required."
+echo ""
+read -p "Enter the local path to DATA_DIR: " DATA_DIR
+echo ""
+echo ""
+echo "Great! Now that's set, let's choose the time frame for the NextGen simulation"
+echo "If you want quick and easy options to proceed with, enter 'DAILY' for START_DATE, leave END_DATE blank, and enter 'NWM_V3_SHORT_RANGE' for FORCING_SOURCE"
+echo ""
+read -p "Enter START_DATE (YYYYMMDDHHMM or set to 'DAILY' to dynamically set START_DATE and END_DATE based on FORCING_SOURCE): " START_DATE
+echo ""
+read -p "Enter END_DATE (YYYYMMDDHHMM, if START_DATE is 'DAILY' leave END_DATE blank for today's date or set the day to select a different day): " END_DATE
+echo ""
+echo " You must set FORCING_SOURCE to determine which NWM forcings to use. Your options are: NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE, NWM_V3_MEDIUM_RANGE, NWM_V3_ANALYSIS_ASSIM, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, or NOMADS_POSTPROCESSED"
+echo "Be advised that the time range available varies from FORCING_SOURCE to FORCING_SOURCE. For example, NWM_V3_SHORT_RANGE are only available within the last 30 days."
+echo ""
+read -p "Enter FORCING_SOURCE: " FORCING_SOURCE
+echo ""
+echo ""
+
+set_resource_directory
+set_hydrofabric
+set_realization_file
+
+# Common optional parameters
+echo "You can optionally configure the following:"
+read -p "Enter S3_BUCKET (S3 bucket to write output to, leave blank to skip): " S3_BUCKET
+read -p "Enter S3_PREFIX (File prefix within S3 bucket, leave blank to skip): " S3_PREFIX
+read -p "Set NPROCS (Maximum number of processes, leave blank for default): " NPROCS
+read -p "Enable DRYRUN? (Enter 'True' to skip calculations, leave blank to perform calculations): " DRYRUN
+read -p "Run TEEHR? (Enter 'True' to run TEEHR evaluation service, leave blank to skip TEEHR): " EVAL
+
+# Summarize user input
+echo ""
+echo ""
+echo "Configuration summary:"
+[[ -n $GEOPACKAGE ]] && echo "- GEOPACKAGE: $GEOPACKAGE"
+[[ -n $SUBSET_ID ]] && echo "- SUBSET_ID: $SUBSET_ID"
+[[ -n $SUBSET_ID_TYPE ]] && echo "- SUBSET_ID_TYPE: $SUBSET_ID_TYPE"
+[[ -n $HYDROFABRIC_VERSION ]] && echo "- HYDROFABRIC_VERSION: $HYDROFABRIC_VERSION"
+[[ -n $DOMAIN_NAME ]] && echo "- DOMAIN_NAME: $DOMAIN_NAME"
+[[ -n $REALIZATION ]] && echo "- REALIZATION: $REALIZATION"
+[[ -n $DATA_DIR ]] && echo "- DATA_DIR: $DATA_DIR"
+[[ -n $RESOURCE_DIR ]] && echo "- RESOURCE_DIR: $RESOURCE_DIR"
+[[ -n $START_DATE ]] && echo "- START_DATE: $START_DATE"
+[[ -n $END_DATE ]] && echo "- END_DATE: $END_DATE"
+[[ -n $FORCING_SOURCE ]] && echo "- FORCING_SOURCE: $FORCING_SOURCE"
+[[ -n $S3_BUCKET ]] && echo "- S3_BUCKET: $S3_BUCKET"
+[[ -n $S3_PREFIX ]] && echo "- S3_PREFIX: $S3_PREFIX"
+[[ -n $NPROCS ]] && echo "- NPROCS: $NPROCS"
+[[ -n $DRYRUN ]] && echo "- DRYRUN: $DRYRUN"
+[[ -n $EVAL ]] && echo "- EVAL: $EVAL"
+echo ""
+echo ""
+echo "All required configurations have been completed."
+echo ""
+echo ""
+
+echo "Building the command..."
+sleep 3
+cmd="./scripts/ngen-datastream"
+[ -n "$START_DATE" ] && cmd="$cmd -s \"$START_DATE\""
+[ -n "$END_DATE" ] && cmd="$cmd -e \"$END_DATE\""
+[ -n "$FORCING_SOURCE" ] && cmd="$cmd -C \"$FORCING_SOURCE\""
+[ -n "$DATA_DIR" ] && cmd="$cmd -d \"$DATA_DIR\""
+[ -n "$REALIZATION" ] && cmd="$cmd -R \"$REALIZATION\""
+[ -n "$GEOPACKAGE" ] && cmd="$cmd -g \"$GEOPACKAGE\""
+[ -n "$SUBSET_ID" ] && cmd="$cmd -I \"$SUBSET_ID\""
+[ -n "$SUBSET_ID_TYPE" ] && cmd="$cmd -i \"$SUBSET_ID_TYPE\""
+[ -n "$HYDROFABRIC_VERSION" ] && cmd="$cmd -v \"$HYDROFABRIC_VERSION\""
+[ -n "$DOMAIN_NAME" ] && cmd="$cmd -D \"$DOMAIN_NAME\""
+[ -n "$RESOURCE_DIR" ] && cmd="$cmd -r \"$RESOURCE_DIR\""
+[ -n "$NWM_FORCINGS_DIR" ] && cmd="$cmd -f \"$NWM_FORCINGS_DIR\""
+[ -n "$NGEN_BMI_CONFS" ] && cmd="$cmd -N \"$NGEN_BMI_CONFS\""
+[ -n "$NGEN_FORCINGS" ] && cmd="$cmd -F \"$NGEN_FORCINGS\""
+[ -n "$S3_BUCKET" ] && cmd="$cmd -S \"$S3_BUCKET\""
+[ -n "$S3_PREFIX" ] && cmd="$cmd -o \"$S3_PREFIX\""
+[ -n "$NPROCS" ] && cmd="$cmd -n \"$NPROCS\""
+[ -n "$DRYRUN" ] && cmd="$cmd -y \"$DRYRUN\""
+[ -n "$EVAL" ] && cmd="$cmd -E \"$EVAL\""
+echo "Executing ngen-datastream with the following command "\n\n"$cmd"
+
+# Display the final command to the user
+echo -e "\nThe following command will be executed:"
+echo "$cmd"
+
+# Confirm and run the command
+read -p "Do you want to execute this command? (y/n): " confirm
+if [[ "$confirm" == "y" ]]; then
+    eval $cmd
+else
+    echo "Command execution canceled."
+fi

@@ -1,5 +1,5 @@
 # `ngen-datastream` Breakdown
-This document serves as a guide to run `ngen-datastream` step-by-step, which essentially walks the user through an example execution of `ngen-datastream/scripts/stream.sh`
+This document serves as a guide to run `ngen-datastream` step-by-step, which essentially walks the user through an example execution of `ngen-datastream/scripts/ngen-datastream`
 
 ## Use Case
 Imagine we want to study the variation in NextGen configurations of retrospective streamflow forecasts for the Colorado River for the day of June 10th, 2019. We will use the steps below to prepare an input data package for NextGen, execute NextGen through NextGen in a Box, and then plot the results.
@@ -37,34 +37,34 @@ mkdir ./palisade_2019/datastream-metadata
 ```
 
 ## Spatial Domain
-The spatial domain is defined via a geopackage file which is "cut" from the hydrofabric. Lynker-Spatial serves this spatial data via [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI). An example command is provided below:
+The spatial domain is defined via a geopackage file which is "cut" from the hydrofabric. Lynker-Spatial serves this spatial data via [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI). Please refer to hfsubset for the latest documenation as this document may not represent the current version. An example command is provided below:
 
 ```
 hfsubset \
     -w medium_range \
     -s nextgen \
     -v 2.1.1 \
-    -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,model-attributes \
+    -l divides,flowlines,network,nexus,forcing-weights,flowpath-attributes,divide-attributes \
     -o ./palisade_2019/ngen-run/config/palisade.gpkg \
     -t hl "Gages-09106150"
 ```
 Some things to note about this command:
-* `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`model-attributes`
+* `-l` : These layers are required: `divides`,`flowlines`,`network`,`nexus`,`forcing-weights`,`flowpath-attributes`, and`divide-attributes` (Use `model-attributes` instead of `divide attributes` for <v2.2  hydrofabric)
 * `-w` : Defines which grid the weights are calculated from. In this case, it's the medium_range forcing from the National Water Model
 * `-v` : Defines the hydrofabric version
 * The last arguement `"Gages-09106150"`, corresponds to the stream gauge that hfsubset will use to trace the upstream network. This effectively defines the spatial domain. This is a gauge on the Colorado River in Palisade, Colorado.
 
 See [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) for more options.
 
-Use the [Lynker Spatial Hydrolocation Viewer](https://www.lynker-spatial.com/hydrolocations.html) to find the gauge (`usgs_site_code`) you want. 
+Use the [Lynker Spatial Hydrolocation Viewer](https://www.lynker-spatial.com/hydrolocations.html) to find the point of interest (`poi`) you want to use to subset. See hfsubset documentation to see how to subset with Gage Id and other options.  
 
-![ngen-datastream](images/lynker-spatial-palisade.jpg)
+![ngen-datastream](images/lynker-spatial-hyview.png)
 
 Use the [NGIA geopackage viewer](https://ngageoint.github.io/geopackage-viewer-js/) to make sure you've got the spatial domain set properly.
 
 ![ngen-datastream](images/geopackage-viewer.jpg)
 
-[hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) is integrated into `ngen-datastream`, which means the user can simply provide these three cli args to `stream.sh` to offload the [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) call to `ngen-datastream`
+[hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) is integrated into `ngen-datastream`, which means the user can simply provide these three cli args to `ngen-datastream` to offload the [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) call to `ngen-datastream`
 ```
   -I, --SUBSET_ID           <Hydrofabric id to subset>  
   -i, --SUBSET_ID_TYPE      <Hydrofabric id type>  
@@ -218,7 +218,7 @@ In this command we mount the `./palisade_2019/ngen-run` directory to the docker 
 ## Equivalent Command
 Now that we have performed each component of the datastream individually, let's take a look at the single command that would have accomplished all of the steps we just went through.
 ```
-./scripts/stream.sh \
+./scripts/ngen-datastream \
     -s 201901010000 \
     -e 201912312300 \
     -i hl \

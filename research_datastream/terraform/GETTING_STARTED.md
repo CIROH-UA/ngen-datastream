@@ -76,7 +76,7 @@ vi ./executions/execution_test_1.json
 ```
 
 Provide the commands you want the instance to execute. 
-Starting from execution_template_datastream. These options correspond directly to the cli args for `ngen-datastream/scripts/stream.sh`
+Starting from execution_template_datastream. These options correspond directly to the cli args for `ngen-datastream/scripts/ngen-datastream`
 ```
   "datastream_command_options" : {
     "start_time"          : "202006200100",

@@ -50,7 +50,7 @@ Prior to executing the processor, the user will need to obtain a geopackage file
 | Field             | Description              | Required |
 |-------------------|--------------------------|----------|
 | nwm_file          | Path to a text file containing nwm file names. One filename per line. [Tool](#nwm_file) to create this file | :white_check_mark: |
-| gpkg_file       | Geopackage file to define spatial domain. Use [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) to generate a geopackage with a `forcing-weights` layer. Accepts local absolute path, s3 URI or URL. |  :white_check_mark: |
+| gpkg_file       | Geopackage file to define spatial domain. Use [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) to generate a geopackage with a `forcing-weights` layer. Accepts local absolute path, s3 URI or URL. Also acceptable is a weights parquet generated with [weights_hf2ds.py](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/src/forcingprocessor/weights_hf2ds.py), though the plotting option will no longer be available. |  :white_check_mark: |
 
 ### 2. Storage
 
@@ -107,3 +107,15 @@ A text file given to forcingprocessor that contains each nwm forcing file name. 
     "lead_time"    : [1]
 }
  ```
+
+## Weights
+To calculate NextGen forcings, "weights" must be calculated to extract polygon averaged data from gridded data. The weights are made up of two parts, the `cell_id` and `coverage`. These are calculated via [exactextract](https://github.com/isciences/exactextract) within [weights_hf2ds.py](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/src/forcingprocessor/weights_hf2ds.py), which is optionally called from forcingprocessor. 
+
+If a geopackage is supplied to forcingprocessor, it will be searched for the layer `forcings-weights`. If this layer is found, these weights are used during processing. If not, forcingprocessor will call [weights_hf2ds.py](https://github.com/CIROH-UA/ngen-datastream/blob/main/forcingprocessor/src/forcingprocessor/weights_hf2ds.py) to calculate the weights (cell_id and coverage) for every divide-id in the geopackage. This can take time, so forcingprocessor will write a parquet of weights out in the metadata, that can be reused in future forcingprocessor executions.
+
+Example of direct call
+```
+python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/weights_hf2ds.py \
+--outname ./weights.parquet \
+--input_file ./nextgen_VPU_03W.gpkg
+```

@@ -31,6 +31,7 @@ class Inputs:
                  hydrofabric_version="",
                  nprocs=None,
                  host_os="",
+                 united_conus="",
                  domain_name="Not Specified",
                  forcing_split_vpu="",
                  realization_file="",
@@ -49,6 +50,7 @@ class Inputs:
         self.hydrofabric_version = hydrofabric_version
         self.nprocs = nprocs if nprocs is not None else os.cpu_count()
         self.host_os = host_os
+        self.united_conus = united_conus
         self.domain_name = domain_name
         self.forcing_split_vpu = forcing_split_vpu
         self.realization_file = realization_file
@@ -69,6 +71,7 @@ inputs = Inputs(
     hydrofabric_version = "",
     nprocs = 2,
     host_os = "Linux",
+    united_conus = False,
     domain_name = "",
     forcing_split_vpu = "",
     realization_file = str(REALIZATION_ORIG),

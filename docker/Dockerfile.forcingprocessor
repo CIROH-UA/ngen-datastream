@@ -1,4 +1,4 @@
-ARG TAG
+ARG TAG="latest"
 FROM awiciroh/datastream-deps:$TAG AS datastream_base
 COPY ./ngen-datastream/ /ngen-datastream
 RUN pip install -e /ngen-datastream/forcingprocessor

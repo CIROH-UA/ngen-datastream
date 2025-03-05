@@ -1,7 +1,7 @@
-Below is the output of `./scripts/stream.sh -h`. A more in depth of each option is given in the table below. 
+Below is the output of `./scripts/datastream -h`. A more in depth of each option is given in the table below. 
 
 ```
-Usage: ./scripts/stream.sh [options]
+Usage: ./scripts/datastream [options]
 Either provide a datastream configuration file
   -c, --CONF_FILE           <Path to datastream configuration file> 
 or run with cli args
@@ -23,12 +23,13 @@ or run with cli args
   -o, --S3_PREFIX           <File prefix within s3 bucket> 
   -n, --NPROCS              <Process limit> 
   -y, --DRYRUN              <True to skip calculations> 
+  -E, --EVAL                <True to run TEEHR evaluation service> 
   ```
 
 ### Explanation of cli args (or variables in defined in `CONF_FILE`)
-| Field               | Flag | Description              | Required |
-|---------------------|------|--------------------|------|
-| START_DATE          | `-s` |Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
+| Field               | Flag | Description              | Required | STATUS  |
+|---------------------|------|--------------------|------|------|
+| START_DATE          | `-s` |Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: | ![datastream options status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_datastream_options.yaml/badge.svg) |
 | END_DATE            | `-e` |End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | FORCING_SOURCE | `-C` |Select the forcings data provider. Options include NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE, NWM_V3_MEDIUM_RANGE, NWM_V3_ANALYSIS_ASSIM, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, NOMADS_POSTPROCESSED| :white_check_mark: |
 | DATA_DIR           | `-d` |Absolute local path to construct the datastream run. | :white_check_mark: |
@@ -47,3 +48,4 @@ or run with cli args
 | DRYRUN             | `-y` | Set to "True" to skip all compute steps. |
 | NPROCS              | `-n` | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
 | CONF_FILE            | `-c` | Store CLI args as env variables in a file. |  |
+| EVAL | `-E` | Set to "True" to run the TEEHR automated evaluation service on NextGen outputs. |  |
