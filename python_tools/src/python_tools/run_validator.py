@@ -3,8 +3,8 @@ from ngen.config.realization import NgenRealization
 from ngen.config.validate import validate_paths
 import re
 import xarray as xr
-import geopandas
-geopandas.options.io_engine = "pyogrio"
+import geopandas as gpd
+gpd.options.io_engine = "pyogrio"
 import pandas as pd
 from datetime import datetime, timezone
 import concurrent.futures as cf
@@ -113,7 +113,7 @@ def validate_data_dir(data_dir):
     if geopackage_file is None: 
         raise Exception(f"Did not find geopackage file in ngen-run/config!!!")    
 
-    catchments     = geopandas.read_file(geopackage_file, layer='divides')
+    catchments     = gpd.read_file(geopackage_file, layer='divides')
     catchment_list = sorted(list(catchments['divide_id']))
 
     global serialized_realization
@@ -156,6 +156,20 @@ def validate_data_dir(data_dir):
     if serialized_realization.routing:
         troute_path = os.path.join(data_dir,serialized_realization.routing.config)
         assert os.path.exists(troute_path), "t-route specified in config, but not found"
+
+        try:
+            print(f'Trying troute hack for hydrofabric v2.2 ...')
+            # TROUTE HACK
+            # From Josh Strutevant
+            # remove duplicate columns and rename columns so the gpkg is compatable with T-Route
+            target_gdf_flowpath_atts = gpd.read_file(geopackage_file,layer="flowpath-attributes")
+            target_gdf_flowpath_atts = target_gdf_flowpath_atts.drop(columns=['id', 'to', 'toid'])
+            target_gdf_flowpath_atts = target_gdf_flowpath_atts.rename(columns={'Length_m': 'length_m'})
+            target_gdf_flowpath_atts = target_gdf_flowpath_atts.rename(columns={'WaterbodyID': 'rl_NHDWaterbodyComID'})
+            gpd.GeoDataFrame(target_gdf_flowpath_atts).to_file(geopackage_file,layer="flowpath-attributes") 
+            print(f'TROUTE HYDROFABRIC V2.2 HACK APPLIED')
+        except:
+            print(f'Hack not applied!')
 
     nprocs = os.cpu_count()
     val_dict_list = []

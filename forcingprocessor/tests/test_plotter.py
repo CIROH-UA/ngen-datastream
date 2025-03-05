@@ -14,18 +14,19 @@ test_dir = Path(__file__).parent
 DATA_DIR = (test_dir/'data').resolve()
 pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
-geopackage = str(f"{DATA_DIR}/palisade.gpkg")
+geopackage_name = "vpu-09_subset.gpkg"
+geopackage = str(f"{DATA_DIR}/{geopackage_name}")
 if os.path.exists(DATA_DIR):
     os.system(f"rm -rf {DATA_DIR}")
 os.system(f"mkdir {DATA_DIR}")
 
-geopackage_name = "palisade.gpkg"
-os.system(f"curl -o {os.path.join(DATA_DIR,geopackage_name)} -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg")
+
+os.system(f"curl -o {os.path.join(DATA_DIR,geopackage_name)} -L -O https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg")
 
 conf = {
     "forcing"  : {
         "nwm_file"   : filenamelist,
-        "gpkg_file"  : geopackage
+        "gpkg_file"  : [geopackage]
     },
 
     "storage":{

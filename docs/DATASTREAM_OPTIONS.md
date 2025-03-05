@@ -27,9 +27,9 @@ or run with cli args
   ```
 
 ### Explanation of cli args (or variables in defined in `CONF_FILE`)
-| Field               | Flag | Description              | Required |
-|---------------------|------|--------------------|------|
-| START_DATE          | `-s` |Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: |
+| Field               | Flag | Description              | Required | STATUS  |
+|---------------------|------|--------------------|------|------|
+| START_DATE          | `-s` |Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: | ![datastream options status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_datastream_options.yaml/badge.svg) |
 | END_DATE            | `-e` |End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
 | FORCING_SOURCE | `-C` |Select the forcings data provider. Options include NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE, NWM_V3_MEDIUM_RANGE, NWM_V3_ANALYSIS_ASSIM, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, NOMADS_POSTPROCESSED| :white_check_mark: |
 | DATA_DIR           | `-d` |Absolute local path to construct the datastream run. | :white_check_mark: |
