@@ -5,13 +5,13 @@ on:
       - main
     paths:
       - 'research_datastream/terraform/**'
-      - '.github/workflows/research_datastream_terraform.yml'
+      - '.github/workflows/research_datastream_terraform.yaml'
   pull_request:
     branches:
       - main    
     paths:      
       - 'research_datastream/terraform/**'
-      - '.github/workflows/research_datastream_terraform.yml'
+      - '.github/workflows/research_datastream_terraform.yaml'
 jobs:
   validate-terraform:
     runs-on: ubuntu-latest

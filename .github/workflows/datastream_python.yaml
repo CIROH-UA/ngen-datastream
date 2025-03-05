@@ -8,15 +8,15 @@ on:
       - main
     paths:
       - 'python_tools/**'
-      - '.github/workflows/datastream_python.yml'
-      - '.github/workflows/build_test_docker_x86.yml'
+      - '.github/workflows/datastream_python.yaml'
+      - '.github/workflows/build_test_docker_x86.yaml'
   pull_request:
     branches:
       - main    
     paths:      
       - 'python_tools/**'
-      - '.github/workflows/datastream_python.yml'
-      - '.github/workflows/build_test_docker_x86.yml'
+      - '.github/workflows/datastream_python.yaml'
+      - '.github/workflows/build_test_docker_x86.yaml'
 permissions:
   contents: read
 jobs:

@@ -466,16 +466,11 @@ if [ ! -z $NGEN_FORCINGS ]; then
     log_time "GET_FORCINGS_START" $DATASTREAM_PROFILING
     echo "Using $NGEN_FORCINGS"
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
-<<<<<<< HEAD:scripts/stream.sh
-    get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
-    log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING
-=======
     if [ ! -e $DATASTREAM_RESOURCES_NGENFORCINGS ]; then
         mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
     fi    
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING $S3_OUT
->>>>>>> 8d5569d875c86f124f639cb8acf77a347f77ee9e:scripts/datastream
 else
     log_time "FORCINGPROCESSOR_START" $DATASTREAM_PROFILING $S3_OUT
     echo "Creating nwm filenames file"
@@ -526,7 +521,7 @@ else
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
             python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
         FP_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
-        mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
+        # mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
         log_time "FORCINGPROCESSOR_END" $DATASTREAM_PROFILING $S3_OUT
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS

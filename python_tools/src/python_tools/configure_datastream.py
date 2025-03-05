@@ -90,15 +90,15 @@ def create_conf_nwm(args):
         else:
             start_dt = datetime.strptime(end,'%Y%m%d%H%M') 
         end_dt = start_dt
+        start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
         num_hrs= 24
     else:
         start_dt = datetime.strptime(start,'%Y%m%d%H%M')
         end_dt   = datetime.strptime(end,'%Y%m%d%H%M')  
         num_hrs = (end_dt - start_dt).seconds // 3600
-
-    start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
-    end_dt   = end_dt.replace(hour=1,minute=0,second=0,microsecond=0)    
-    start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')    
+    
+    start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+    end_str_real = end_dt.strftime('%Y-%m-%d %H:%M:%S')    
     start_str_nwm = start_dt.strftime('%Y%m%d%H%M') 
     end_str_nwm    = start_dt.strftime('%Y%m%d%H%M') 
                            
@@ -132,6 +132,8 @@ def create_conf_nwm(args):
                 urlbaseinput = 2         
         elif "NWM" in args.forcing_source: 
             urlbaseinput = 7
+        elif len(args.forcing_source) == 0 and len(args.forcings) > 0:
+            return {}, start_str_real, end_str_real # nextgen forcings have been supplied directly
         else:
             raise Exception(f'Forcing source {args.forcing_source} not understood')
         
@@ -273,11 +275,15 @@ def create_confs(args):
     if args.forcings.endswith(".tar.gz"):
         data['global']['forcing']['file_pattern'] = ".*{{id}}.*.csv"
         data['global']['forcing']['path'] = "./forcings"
-        data['global']['forcing']['provider'] = "CsvPerFeature"
+        data['global']['forcing']['provider'] = "CsvPerFeature"     
+    elif args.forcings.endswith(".nc"):
+        if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
+        data['global']['forcing']['provider'] = "NetCDF"
+        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"         
     else:
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"
+        data['global']['forcing']['path'] = f"./forcings/1_forcings.nc"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization_datastream.json')
 

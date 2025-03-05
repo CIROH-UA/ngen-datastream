@@ -9,8 +9,8 @@ on:
       - 'forcingprocessor/**'
       - 'scripts/**'  
       - 'python_tools/**'
-      - '.github/workflows/forcingprocessor.yml'
-      - '.github/workflows/datastream_python.yml'        
+      - '.github/workflows/forcingprocessor.yaml'
+      - '.github/workflows/datastream_python.yaml'        
 
 jobs:
   build-test-docker-x86:
