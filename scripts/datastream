@@ -419,7 +419,7 @@ log_time "DATASTREAMCONFGEN_START" $DATASTREAM_PROFILING $S3_OUT
 DOCKER_TAG="awiciroh/datastream:$DS_TAG"
 echo "Generating ngen-datastream metadata"
 CONFIGURER=$DOCKER_PY"configure_datastream.py"
-docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" $DOCKER_TAG \
+docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $DOCKER_TAG \
     python3 $CONFIGURER \
     --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
 DS_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
@@ -437,7 +437,7 @@ if [ ! -f "$PKL_FILE" ]; then
             python3 $NOAHOWPPKL_GENERATOR \
             --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config""
     else
-        docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $DOCKER_TAG \
+        docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $DOCKER_TAG \
             python3 $NOAHOWPPKL_GENERATOR \
             --hf_file "$DOCKER_MOUNT/config/$GEO_BASE" --outdir $DOCKER_MOUNT"/config"
     fi
@@ -538,10 +538,12 @@ echo "Validating " $NGEN_RUN
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - VALIDATION SKIPPED"
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+        -u $(id -u):$(id -g) \
         $DOCKER_TAG python3 $VALIDATOR \
         --data_dir $DOCKER_MOUNT"
 else
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
+        -u $(id -u):$(id -g) \
         $DOCKER_TAG python3 $VALIDATOR \
         --data_dir $DOCKER_MOUNT
 fi
@@ -552,9 +554,9 @@ log_time "NGEN_START" $DATASTREAM_PROFILING $S3_OUT
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS"
 else    
-    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS
+    docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS
     NGIAB_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $NIGAB_TAG --format "{{.ID}}") | tr -d '"')
     cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_NGENCONF/
 fi
@@ -563,9 +565,9 @@ log_time "NGEN_END" $DATASTREAM_PROFILING $S3_OUT
 log_time "MERKLE_START" $DATASTREAM_PROFILING $S3_OUT
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - MERKDIR EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT"
+    echo "COMMAND: docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" -u $(id -u):$(id -g) zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT"
 else    
-    docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
+    docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" -u $(id -u):$(id -g) zwills/merkdir /merkdir/merkdir gen -o $DOCKER_MOUNT/merkdir.file $DOCKER_MOUNT
     MERK_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls zwills/merkdir:latest --format "{{.ID}}") | tr -d '"')
 fi
 log_time "MERKLE_END" $DATASTREAM_PROFILING $S3_OUT
