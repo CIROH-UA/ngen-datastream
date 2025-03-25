@@ -16,6 +16,7 @@ The software backend of the Research DataStream is DataStreamCLI, which is a sta
 ## Getting Started
 * **Installation:** Follow the [Installation Guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/INSTALL.md) to prepare your environment for `DataStreamCLI`.
 * **Guide:** Start by running the [DataStreamCLI guide](https://github.com/CIROH-UA/ngen-datastream/blob/main/scripts/datastream_guide)! It is an interactive script that will provide a tour of the repo as well as help you form a command with `DataStreamCLI`.
+* **Status:** Check the [status page](https://github.com/CIROH-UA/ngen-datastream/blob/main/STATUS.md) for availability of tooling/integrations.
 * **Docs**: Make sure to review the [documentation](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/) for
   * Available [NextGen models](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/NGEN_MODELS.md) and automated BMI configuration generation
   * [Datastream options](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/DATASTREAM_OPTIONS.md)
@@ -27,9 +28,7 @@ The software backend of the Research DataStream is DataStreamCLI, which is a sta
 ## Run DataStreamCLI
 This example will execute a 24 hour NextGen simulation over the Palisade, Colorado watershed with CFE, SLOTH, PET, NOM, and t-route configuration distributed over 4 processes. The forcings used are the National Water Model v3 Retrospective.
 
-First, obtain a hydrofabric file for the gage you wish to model. There are several tooling options to use to obtain a geopackage. One of which, [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI), is maintained by the Office of Water Prediction and it integrated in DataStreamCLI. 
-
-![hfsubset status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_hfsubset.yaml/badge.svg)
+First, obtain a hydrofabric file for the gage you wish to model. There are several tooling options to use to obtain a geopackage. One of which, [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI), is maintained by Lynker and is integrated in DataStreamCLI. 
 
 For Palisade, Colorado:
 ```
