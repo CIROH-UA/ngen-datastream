@@ -279,11 +279,21 @@ def create_confs(args):
     elif args.forcings.endswith(".nc"):
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"         
+        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"      
     else:
-        if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
-        data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = f"./forcings/1_forcings.nc"
+        if "vpu" in args.gpkg.lower():
+            if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
+            pattern = r'(?i)VPU[_-](\d{2,3})'
+            match = re.search(pattern, args.gpkg)
+            if match: 
+                data['global']['forcing']['provider'] = "NetCDF"
+                data['global']['forcing']['path'] = f"./forcings/VPU_{match.group(1)}_forcings.nc"   
+            else:
+                raise Exception(f"Could not pattern match for VPU forcings {args.forcings}")
+        else:
+            if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
+            data['global']['forcing']['provider'] = "NetCDF"
+            data['global']['forcing']['path'] = f"./forcings/1_forcings.nc"
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization_datastream.json')
 
