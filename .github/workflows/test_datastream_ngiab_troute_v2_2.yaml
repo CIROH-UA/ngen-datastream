@@ -43,4 +43,4 @@ jobs:
     - name: Test with v2.2
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test       
-        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg $(pwd)/AWI_16_2863657_007/config/cat-2863657_subset.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json
+        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet_troute.json
