@@ -1,4 +1,4 @@
-name: Test Datastream Routing with Hydrofabric v2.2
+name: Test Datastream Routing with Community Hydrofabric v2.2
 
 on:
   push:

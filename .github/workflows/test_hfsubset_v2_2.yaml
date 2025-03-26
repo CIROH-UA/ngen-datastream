@@ -1,4 +1,4 @@
-name: Test hfsubset v2.2
+name: Test hfsubset v2.2 Integration
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Test Datastream Routing with Hydrofabric v2.1
+name: Test Datastream Routing with hfsubset Hydrofabric v2.1
 
 on:
   push:
