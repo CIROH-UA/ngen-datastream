@@ -73,7 +73,7 @@ def calc_weights_from_gdf(gdf:gpd.GeoDataFrame, raster_file : str, nf :str) -> d
     geo_data = gdf.to_crs(projection)   
     nrows = len(gdf) 
     
-    nprocs = min(nrows // 9000 , (os.cpu_count()-1) // nf)
+    nprocs = max(min(nrows // 9000 , (os.cpu_count()-1) // nf),1)
     geo_df_list = []
     nper = nrows // nprocs
     nleft = nrows - (nper * nprocs)   
