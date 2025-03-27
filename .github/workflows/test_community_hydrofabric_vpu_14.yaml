@@ -1,0 +1,21 @@
+name: Test Community Hydrofabric
+
+on:
+  workflow_dispatch:     
+
+permissions:
+  contents: read
+      
+jobs:
+  test-vpu-14:
+    runs-on: ubuntu-latest
+    name: Test VPU 14
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2  
+    - name: Test VPU 14
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test    
+        export VPU=14    
+        ./scripts/datastream -s 202006201400 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-${VPU}_subset.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
