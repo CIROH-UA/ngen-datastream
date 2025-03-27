@@ -11,7 +11,10 @@ on:
     branches:
       - main  
     paths-ignore:
-      - 'docs/**'       
+      - 'docs/**'      
+      
+permissions:
+  contents: read      
 
 jobs:
   test-datastream-options:

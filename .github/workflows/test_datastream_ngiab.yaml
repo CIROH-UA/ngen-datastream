@@ -1,13 +1,23 @@
-name: Test TEEHR Integration
+name: Test Datastream NGIAB Integration
 
 on:
-  workflow_dispatch:     
+  push:
+    branches:
+      - main
+    paths-ignore:
+     - 'docs/**'
+     
+  pull_request:
+    branches:
+      - main  
+    paths-ignore:
+      - 'docs/**'       
 
 permissions:
-  contents: read  
+  contents: read      
 
 jobs:
-  test-datastream-options:
+  test-ngiab-integration:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -17,7 +27,7 @@ jobs:
       uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3 
+      uses: docker/setup-buildx-action@v3      
 
     - name: Configure AWS
       run: |
@@ -31,17 +41,9 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -f -d        
+        ./scripts/docker_builds.sh -f -d    
 
-    - name: Get geopackage 
-      run: |
-        curl -L -O https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg      
-      
-    - name: TEEHR integration test
-      if: always()
+    - name: Base test and NWM_RETRO_V3
       run: |        
-        sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_V3_SHORT_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/vpu-09_subset.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -E True
-
-        
-           
+        sudo rm -rf $(pwd)/data/datastream_test        
+        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json

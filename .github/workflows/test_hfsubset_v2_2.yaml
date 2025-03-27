@@ -1,19 +1,10 @@
-name: Test hfsubset v2.2
+name: Test hfsubset v2.2 Integration
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "scripts/**"
-      - '.github/workflows/test_hfsubset_v2_2.yaml'
-     
-  pull_request:
-    branches:
-      - main  
-    paths:
-      - "scripts/**"
-      - '.github/workflows/test_hfsubset_v2_2.yaml'
+  workflow_dispatch:     
+
+permissions:
+  contents: read
 
 jobs:
   test-hfsubset-v2-2-integration:

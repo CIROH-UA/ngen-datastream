@@ -12,6 +12,10 @@ on:
     paths:      
       - 'research_datastream/terraform/**'
       - '.github/workflows/research_datastream_terraform.yaml'
+
+permissions:
+  contents: read
+  
 jobs:
   validate-terraform:
     runs-on: ubuntu-latest
