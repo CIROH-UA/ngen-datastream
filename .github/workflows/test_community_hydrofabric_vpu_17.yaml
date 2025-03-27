@@ -1,4 +1,4 @@
-name: Test Community Hydrofabric
+name: Test Community Hydrofabric VPU 17
 
 on:
   workflow_dispatch:     
