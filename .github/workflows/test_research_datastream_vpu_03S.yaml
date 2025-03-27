@@ -1,15 +1,9 @@
 name: Test Research DataStream VPU03S
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/test_research_datastream_vpu_03S.yaml'
-  pull_request:
-    branches:
-      - main    
-    paths:      
-      - '.github/workflows/test_research_datastream_vpu_03S.yaml'
+  workflow_dispatch:     
+
+permissions:
+  contents: read
 jobs:
   test-research-datastream-vpu-03S:
     runs-on: ubuntu-latest
