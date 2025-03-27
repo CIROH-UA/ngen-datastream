@@ -10,7 +10,10 @@ on:
       - 'scripts/**'  
       - 'python_tools/**'
       - '.github/workflows/forcingprocessor.yaml'
-      - '.github/workflows/datastream_python.yaml'        
+      - '.github/workflows/datastream_python.yaml'   
+      
+permissions:
+  contents: read      
 
 jobs:
   build-test-docker-x86:

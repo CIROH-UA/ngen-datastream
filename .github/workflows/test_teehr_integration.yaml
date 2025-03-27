@@ -1,19 +1,10 @@
 name: Test TEEHR Integration
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "scripts/**"
-      - '.github/workflows/test_teehr_integration.yaml'
-     
-  pull_request:
-    branches:
-      - main  
-    paths:
-      - "scripts/**"
-      - '.github/workflows/test_teehr_integration.yaml'    
+  workflow_dispatch:     
+
+permissions:
+  contents: read  
 
 jobs:
   test-datastream-options:

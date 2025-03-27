@@ -1,17 +1,10 @@
 name: Test Datastream Routing with Community Hydrofabric v2.2
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-     - 'docs/**'
-     
-  pull_request:
-    branches:
-      - main  
-    paths-ignore:
-      - 'docs/**'       
+  workflow_dispatch:     
+
+permissions:
+  contents: read    
 
 jobs:
   test-routing-v2-2:

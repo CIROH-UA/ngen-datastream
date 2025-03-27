@@ -12,6 +12,9 @@ on:
       - '.github/workflows/forcingprocessor.yaml'
       - '.github/workflows/datastream_python.yaml'  
 
+permissions:
+  contents: read
+
 jobs:
   build-test-push-docker-x86:
     runs-on: ubuntu-latest

@@ -1,20 +1,11 @@
 name: Test Community Hydrofabric
 
 on:
-  push:
-    branches:
-      - main
-    paths:      
-      - 'research_datastream/**'
-      - '.github/workflows/test_community_hydrofabric.yaml'    
-     
-  pull_request:
-    branches:
-      - main  
-    paths:      
-      - 'research_datastream/**'    
-      - '.github/workflows/test_community_hydrofabric.yaml'      
+  workflow_dispatch:     
 
+permissions:
+  contents: read
+      
 jobs:
   test-vpu-01:
     runs-on: ubuntu-latest

@@ -20,6 +20,9 @@ on:
     paths: 
       - '.github/workflows/build_test_push_docker_arm.yaml'      
   
+permissions:
+  contents: read
+
 jobs:
   build-test-push-docker-arm:
     runs-on: ubuntu-latest
