@@ -49,7 +49,8 @@
 # Community Hydrofabric
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_01.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_02.yaml/badge.svg)
-* ![](https://github.com/CIROH-U3W/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_03N.yaml/badge.svg)
+* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_03N.yaml/badge.svg)
+* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_03N.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_03S.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_04.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_community_hydrofabric_vpu_05.yaml/badge.svg)
