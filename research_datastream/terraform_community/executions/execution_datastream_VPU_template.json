@@ -1,6 +1,6 @@
 {  
   "commands"  : [
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc -C NWM_V3_$RUN_TYPE_H -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_$VPU --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/$RUN_TYPE_L/VPU_$VPU'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc -C NWM_V3_$RUN_TYPE_H -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_$VPU -R https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/refs/heads/main/research_datastream/configuration/VPU/realization_VPU_$VPU.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/$RUN_TYPE_L/VPU_$VPU'"
 
 ],
 "run_options":{
