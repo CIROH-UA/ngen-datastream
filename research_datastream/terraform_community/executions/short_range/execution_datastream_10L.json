@@ -1,6 +1,6 @@
 {
   "commands": [
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/stream.sh -s DAILY -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_short_range/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_10L --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/short_range/VPU_10L'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n 8 -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_short_range/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_10L -R https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_10L.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/short_range/VPU_10L'"
   ],
   "run_options": {
     "ii_terminate_instance": true,
@@ -9,7 +9,7 @@
     "timeout_s": 2400
   },
   "instance_parameters": {
-    "ImageId": "ami-0be3c5d34679be688",
+    "ImageId": "ami-0fcfa7de8edc2129c",
     "InstanceType": "t4g.2xlarge",
     "KeyName": "jlaser_community_east1",
     "SecurityGroupIds": [

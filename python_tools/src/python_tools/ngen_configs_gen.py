@@ -69,7 +69,7 @@ def multiprocess_noahowp():
 
 def generate_troute_conf(out_dir,start,max_loop_size,geo_file_path):
 
-    template = Path(__file__).parent.parent.parent.parent/"configs/ngen/ngen.yaml"
+    template = Path(__file__).parent.parent.parent.parent/"configs/ngen/troute.yaml"
 
     with open(template,'r') as fp:
         conf_template = fp.readlines()
@@ -98,7 +98,7 @@ def generate_troute_conf(out_dir,start,max_loop_size,geo_file_path):
         if re.search(pattern,jline):
             troute_conf_str[j] = re.sub(pattern,  f'\\1 {geo_file_path}', jline)            
 
-    with open(Path(out_dir,"ngen.yaml"),'w') as fp:
+    with open(Path(out_dir,"troute.yaml"),'w') as fp:
         fp.writelines(troute_conf_str)  
 
 def gen_petAORcfe(hf_file,out,include):
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     for jmodel in model_names:
         config_path = Path(args.outdir,"cat_config",dir_dict[jmodel])
         if config_path.exists(): ignore.append(jmodel)
-    routing_path = Path(args.outdir,"ngen.yaml")
+    routing_path = Path(args.outdir,"troute.yaml")
     if routing_path.exists(): ignore.append("routing")        
 
     if "NoahOWP" in model_names:

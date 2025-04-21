@@ -18,14 +18,14 @@ compute_parameters:
   forcing_parameters:
     binary_nexus_file_folder: ./outputs/parquet/
     dt: 300
-    max_loop_size: 288.0
-    nts: 288.0
+    max_loop_size: 18.0      
+    nts: 216.0      
     qlat_file_pattern_filter: nex-*
     qlat_input_folder: ./outputs/ngen/
     qts_subdivisions: 12
   parallel_compute_method: by-subnetwork-jit-clustered
   restart_parameters:
-    start_datetime: '2024-05-20 01:00:00'
+    start_datetime: '2025-04-21 01:00:00'
   subnetwork_target_size: 10000
 log_parameters:
   log_level: INFO
@@ -33,30 +33,34 @@ log_parameters:
 network_topology_parameters:
   supernetwork_parameters:
     columns:
-      alt: alt
-      bw: BtmWdth
-      cs: ChSlp
-      downstream: toid
-      dx: length_m
-      gages: rl_gages
-      key: id
-      musk: MusK
-      musx: MusX
-      n: n
-      ncc: nCC
-      s0: So
-      tw: TopWdth
-      twcc: TopWdthCC
-      waterbody: rl_NHDWaterbodyComID
-    geo_file_path: ./config/nextgen_09.gpkg
+        key: "id"
+        downstream: "toid"
+        dx: "Length_m"
+        n: "n"
+        ncc: "nCC"
+        s0: "So"
+        bw: "BtmWdth"
+        waterbody: "WaterbodyID"
+        gages: "gage"
+        tw: "TopWdth"
+        twcc: "TopWdthCC"
+        musk: "MusK"
+        musx: "MusX"
+        cs: "ChSlp"
+        alt: "alt"
+    geo_file_path: ./config/nextgen_VPU_09.gpkg
   waterbody_parameters:
     break_network_at_waterbodies: false
 output_parameters:
-  lakeout_output: ./lakeout/
-  lite_restart:
-    lite_restart_output_directory: ./restart/
-  stream_output:
-    stream_output_directory: ./outputs/troute/
-    stream_output_internal_frequency: 60
-    stream_output_time: 696.0
-    stream_output_type: .csv
+    #----------
+    #test_output: outputs/lcr_flowveldepth.pkl
+    lite_restart:
+        #----------
+        lite_restart_output_directory: restart/
+    lakeout_output: lakeout/
+    stream_output:
+        stream_output_directory: outputs/troute/
+        stream_output_time: 24.0 #number of internal_frequency timesteps per output file
+        stream_output_type: ".nc" #please select only between netcdf '.nc' or '.csv' or '.pkl'
+        stream_output_internal_frequency: 60 #[min] it should be order of 5 minutes. For instance if you want to output every hour put 60
+
