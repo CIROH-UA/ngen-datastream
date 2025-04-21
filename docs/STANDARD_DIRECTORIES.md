@@ -63,7 +63,7 @@ RESOURCE_DIR/
 |   |
 |   ├── realization.json
 |   |
-|   ├── ngen.yaml
+|   ├── troute.yaml
 |   |
 |   ├── partitions.json
 |   |
@@ -140,7 +140,7 @@ ngen-run/
 |   |
 |   ├── realization.json
 |   |
-|   ├── ngen.yaml
+|   ├── troute.yaml
 |   |
 |   ├── cat-config/
 |   │   |

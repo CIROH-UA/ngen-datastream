@@ -108,7 +108,7 @@
     "output_interval": 3600
   },
   "routing": {
-    "t_route_config_file_with_path": "./config/ngen.yaml"
+    "t_route_config_file_with_path": "./config/troute.yaml"
   },
   "output_root": "./outputs/ngen"
 }

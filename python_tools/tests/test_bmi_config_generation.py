@@ -57,7 +57,7 @@ def test_pet_v21():
 def test_routing_v21():
     max_loop_size = (END - START + dt.timedelta(hours=1)).total_seconds() / (3600)
     generate_troute_conf(DATA_DIR,START,max_loop_size,GEOPACKAGE_PATH_v21) 
-    yml_example = os.path.join(DATA_DIR,'ngen.yaml')
+    yml_example = os.path.join(DATA_DIR,'troute.yaml')
     assert os.path.exists(yml_example)
 
 
@@ -87,7 +87,7 @@ def test_pet_v22():
 def test_routing_v22():
     max_loop_size = (END - START + dt.timedelta(hours=1)).total_seconds() / (3600)
     generate_troute_conf(DATA_DIR,START,max_loop_size,GEOPACKAGE_PATH_v22) 
-    yml_example = os.path.join(DATA_DIR,'ngen.yaml')
+    yml_example = os.path.join(DATA_DIR,'troute.yaml')
     assert os.path.exists(yml_example)    
 
 
