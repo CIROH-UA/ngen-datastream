@@ -15,7 +15,7 @@
     "timeout_s": 1200
   },
   "instance_parameters": {
-    "ImageId": "ami-0be3c5d34679be688",
+    "ImageId": "ami-0589546ed413f9673",
     "InstanceType": "t4g.2xlarge",
     "KeyName": "jlaser_community_east1",
     "SecurityGroupIds": [
