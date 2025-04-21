@@ -1,6 +1,6 @@
 {
   "commands": [
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n 8 -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_short_range/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -g /home/ec2-user/resources/VPU_10L/config/nextgen_VPU_10L.gpkg -R https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_10L.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/short_range/VPU_10L'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n 8 -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_short_range/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc -C NWM_V3_SHORT_RANGE -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_10L -R https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_10L.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/short_range/VPU_10L'"
   ],
   "run_options": {
     "ii_terminate_instance": true,
