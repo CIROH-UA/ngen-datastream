@@ -183,6 +183,7 @@ def hydrofabric2datastream_weights(weights_file : str, raster_template: str, nf 
         with open(weights_file,'r') as fp:
             weights_json = json.load(fp)
         ncatchment = len(weights_json) 
+        weights_df = pd.DataFrame.from_dict(weights_json, orient='index', columns=['cell_id','coverage'])
     else:
         if weights_file.endswith('.gpkg'):
             catchments     = gpd.read_file(weights_file, layer='divides')
