@@ -1,6 +1,6 @@
 {  
   "commands"  : [
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n $NPROCS -F s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc -C NWM_V3_$RUN_TYPE_H -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_$VPU -R https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_$VPU.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX v2.2/ngen.DAILY/$RUN_TYPE_L/VPU_$VPU'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n $NPROCS -F s3://ciroh-community-ngen-datastream-copy/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc -C NWM_V3_$RUN_TYPE_H -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_$VPU -R https://ciroh-community-ngen-datastream-copy.s3.us-east-1.amazonaws.com/realizations/realization_VPU_$VPU.json --S3_BUCKET ciroh-community-ngen-datastream-copy --S3_PREFIX v2.2/ngen.DAILY/$RUN_TYPE_L/VPU_$VPU'"
 
 ],
 "run_options":{

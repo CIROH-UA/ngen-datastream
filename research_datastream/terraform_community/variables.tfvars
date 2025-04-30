@@ -1,4 +1,4 @@
-region="us-east-1"
+region="us-west-2"
 sm_name="datastream_community_sm"
 sm_role_name="datastream_community_sm_role"
 starter_lambda_name="datastream_community_start_ec2"

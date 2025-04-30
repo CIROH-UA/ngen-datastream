@@ -4,12 +4,12 @@
     "end_time"            : "",
     "geopackage"          : "https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-$VPU_subset.gpkg",
     "forcing_source"      : "NWM_V3_$RUN_TYPE_H",
-    "ngen-forcings"       : "s3://ciroh-community-ngen-datastream/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc",
+    "ngen-forcings"       : "s3://ciroh-community-ngen-datastream-copy/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc",
     "realization"         : "https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/refs/heads/main/configs/ngen/realization_sloth_nom_cfe_pet.json",
     "hydrofabric_version" : "2.2",
     "data_dir"            : "/home/ec2-user/outputs",
     "resource_dir"        : "/home/ec2-user/resources/VPU_$VPU",
-    "s3_bucket"           : "ciroh-community-ngen-datastream",
+    "s3_bucket"           : "ciroh-community-ngen-datastream-copy",
     "s3_prefix"           : "v2.2/ngen.DAILY/$RUN_TYPE_L/VPU_$VPU"
 },
   "run_options":{
