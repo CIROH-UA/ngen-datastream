@@ -2,7 +2,7 @@
   "datastream_command_options" : {
     "start_time"          : "DAILY",
     "end_time"            : "",
-    "geopackage"          : "https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-$VPU_subset.gpkg",
+    "geopackage"          : "https://communityhydrofabric.s3.us-west-2.amazonaws.com/hydrofabrics/community/VPU/vpu-$VPU_subset.gpkg",
     "forcing_source"      : "NWM_V3_$RUN_TYPE_H",
     "ngen-forcings"       : "s3://ciroh-community-ngen-datastream-copy/v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/ngen.$INIT.$RUN_TYPE_L.forcing.$FCST.VPU_$VPU.nc",
     "realization"         : "https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/refs/heads/main/configs/ngen/realization_sloth_nom_cfe_pet.json",

@@ -1,6 +1,6 @@
 {
   "commands": [
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n 8 -F s3://ciroh-community-ngen-datastream-copy/v2.2/ngen.DAILY/forcing_analysis_assim_extend/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_01.nc -C NWM_V3_ANALYSIS_ASSIM_EXTEND -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_01 -R https://ciroh-community-ngen-datastream-copy.s3.us-east-1.amazonaws.com/realizations/realization_VPU_01.json --S3_BUCKET ciroh-community-ngen-datastream-copy --S3_PREFIX v2.2/ngen.DAILY/analysis_assim_extend/VPU_01'"
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s DAILY -n 8 -F s3://ciroh-community-ngen-datastream-copy/v2.2/ngen.DAILY/forcing_analysis_assim_extend/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_01.nc -C NWM_V3_ANALYSIS_ASSIM_EXTEND -d /home/ec2-user/outputs -r /home/ec2-user/resources/VPU_01 -R https://ciroh-community-ngen-datastream-copy.s3.us-west-2.amazonaws.com/realizations/realization_VPU_01.json --S3_BUCKET ciroh-community-ngen-datastream-copy --S3_PREFIX v2.2/ngen.DAILY/analysis_assim_extend/VPU_01'"
   ],
   "run_options": {
     "ii_terminate_instance": true,
