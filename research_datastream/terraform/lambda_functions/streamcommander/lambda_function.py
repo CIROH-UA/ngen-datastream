@@ -47,7 +47,7 @@ def lambda_handler(event, context):
         hf_version = ds_options["hydrofabric_version"]
         subset_id = ds_options["subset_id"]
         subset_type = ds_options["subset_id_type"]
-        command_str = f"runuser -l ec2-user -c 'cd /home/ec2-user/datastream && ./scripts/datastream -s {start} -e {end} -C {forcing_source} -I {subset_id} -i {subset_type} -v {hf_version} -d $(pwd)/data/datastream -R {realization} -n {nprocs}"
+        command_str = f"runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && ./scripts/datastream -s {start} -e {end} -C {forcing_source} -I {subset_id} -i {subset_type} -v {hf_version} -d $(pwd)/data/datastream -R {realization} -n {nprocs}"
         if "s3_bucket" in ds_options: 
             command_str += f" -S {bucket} -o {prefix}"
         command_str += '\''
