@@ -3,7 +3,9 @@ set -e
 
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PACAKGE_DIR=$(dirname $SCRIPT_DIR)
-START_TIME=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')
+START_TIME_UTC=$(date -u +'%Y%m%d%H%M%S')
+START_DATE_UTC=$(date -u +'%Y%m%d')
+run_date=$START_DATE_UTC
 
 is_s3_key() {
   [[ "$1" =~ ^s3:// ]]
@@ -76,7 +78,7 @@ log_time() {
     local LABEL="$1"
     local LOG="$2"
     local S3="$3"
-    echo "$LABEL: $(env TZ=US/Eastern date +'%Y%m%d%H%M%S')" >> $LOG
+    echo "$LABEL: $(date -u +'%Y%m%d%H%M%S')" >> $LOG
     if [[ ${#S3} -ge 1 ]]; then
         aws s3 cp $LOG $S3/profile.txt
     fi
@@ -223,7 +225,7 @@ DATASTREAM_PROFILING="${DATASTREAM_META%/}/profile.txt"
 mkdir -p $DATASTREAM_RESOURCES
 mkdir -p $DATASTREAM_META
 touch $DATASTREAM_PROFILING
-echo "DATASTREAM_START: $START_TIME" > $DATASTREAM_PROFILING
+echo "DATASTREAM_START: $START_TIME_UTC" > $DATASTREAM_PROFILING
 
 NGENRUN_CONFIG="${NGEN_RUN%/}/config"
 NGENRUN_FORCINGS="${NGEN_RUN%/}/forcings"
@@ -250,7 +252,30 @@ DOCKER_META="${DOCKER_MOUNT%/}/datastream-metadata"
 DOCKER_FP="/ngen-datastream/forcingprocessor/src/forcingprocessor/"
 DOCKER_PY="/ngen-datastream/python_tools/src/python_tools/"
 
-if [[ ${#S3_BUCKET} -ge 1 ]]; then
+# Time shift back 1 day for when init > hour
+if [[ "$START_DATE" == *"DAILY"* ]]; then
+    if [[ -z "$END_DATE" ]]; then
+        if [[ "$FORCING_SOURCE" == *"SHORT_RANGE"* ]]; then
+            INIT=$(echo "$FORCING_SOURCE" | grep -oE '[0-9]{2}$')
+        elif [[ "$FORCING_SOURCE" == *"ANALYSIS_ASSIM_EXTEND"* ]]; then
+            INIT="16"
+        elif [[ "$FORCING_SOURCE" == *"MEDIUM_RANGE"* ]]; then
+            INIT=$(echo "$FORCING_SOURCE" | grep -oP '[0-9]{2}(?=_[0-9]$)')
+        fi
+        HOUR=$(date -u +%H)
+        if [[ $INIT > $HOUR ]]; then
+            run_date=$(date -u -d "$START_DATE_UTC -1 day" +'%Y%m%d')
+        fi
+    fi
+fi
+
+if [[ ${#S3_BUCKET} -ge 1 ]]; then    
+    if [[ "$S3_PREFIX" == *"DAILY"* ]]; then
+        S3_PREFIX="${S3_PREFIX//DAILY/$run_date}"
+        echo "Updated S3_PREFIX: $S3_PREFIX"
+    else
+        echo "The S3_PREFIX does not contain 'DAILY'."
+    fi
     S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
 else
     S3_OUT=""
@@ -333,8 +358,7 @@ if [ ! -z $RESOURCE_DIR ]; then
     else
         echo "Using" $NGEN_FORCINGS
         if [[ "$NGEN_FORCINGS" == *"DAILY"* ]]; then
-            current_date=$(date -u +"%Y%m%d")
-            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$current_date}"
+            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$run_date}"
             echo "Updated NGEN_FORCINGS: $NGEN_FORCINGS"
         else
             echo "The NGEN_FORCINGS does not contain 'DAILY'."
@@ -369,8 +393,7 @@ else
     if [ ! -z "$NGEN_FORCINGS" ]; then
         echo "Using" $NGEN_FORCINGS
         if [[ "$NGEN_FORCINGS" == *"DAILY"* ]]; then
-            current_date=$(date -u +"%Y%m%d")
-            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$current_date}"
+            NGEN_FORCINGS="${NGEN_FORCINGS//DAILY/$run_date}"
             echo "Updated NGEN_FORCINGS: $NGEN_FORCINGS"
         else
             echo "The NGEN_FORCINGS does not contain 'DAILY'."
@@ -554,7 +577,7 @@ log_time "NGEN_START" $DATASTREAM_PROFILING $S3_OUT
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS"
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS" local
 else    
     docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS
     NGIAB_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $NIGAB_TAG --format "{{.ID}}") | tr -d '"')
@@ -607,29 +630,16 @@ log_time "DATASTREAM_END" $DATASTREAM_PROFILING $S3_OUT
 
 if [ -n "$S3_BUCKET" ]; then
 
-    if [[ "$S3_PREFIX" == *"DAILY"* ]]; then
-        current_date=$(date -u +"%Y%m%d")
-        S3_PREFIX="${S3_PREFIX//DAILY/$current_date}"
-        echo "Updated S3_PREFIX: $S3_PREFIX"
-    else
-        echo "The S3_PREFIX does not contain 'DAILY'."
-    fi
-
     log_time "S3_MOVE_START" $DATASTREAM_PROFILING $S3_OUT
 
     echo "Writing data to S3" $S3_OUT $S3_BUCKET $S3_PREFIX 
+    aws s3 cp $NGENRUN_TAR "s3://$S3_BUCKET/${S3_PREFIX%/}/$TAR_NAME"
+    aws s3 cp $DATA_DIR/merkdir.file "s3://$S3_BUCKET/${S3_PREFIX%/}/merkdir.file"
+    aws s3 sync $DATASTREAM_META "s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"    
 
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/$TAR_NAME"
-    aws s3 cp $NGENRUN_TAR $S3_OUT
-
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/merkdir.file"
-    aws s3 cp $DATA_DIR/merkdir.file $S3_OUT
-
-    echo "Data exists here: $S3_OUT"
     log_time "S3_MOVE_END" $DATASTREAM_PROFILING $S3_OUT
 
-    S3_OUT="s3://$S3_BUCKET/${S3_PREFIX%/}/datastream-metadata"
-    aws s3 sync $DATASTREAM_META $S3_OUT    
+    echo "Data exists here: $S3_OUT"
 
 fi
 echo "Data exists here: $DATA_DIR"
