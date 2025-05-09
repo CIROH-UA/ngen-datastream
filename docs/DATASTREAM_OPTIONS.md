@@ -31,7 +31,7 @@ or run with cli args
 |---------------------|------|--------------------|------|------|
 | START_DATE          | `-s` |Start simulation time (YYYYMMDDHHMM) or "DAILY" | :white_check_mark: | ![datastream options status](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_datastream_options.yaml/badge.svg) |
 | END_DATE            | `-e` |End simulation time  (YYYYMMDDHHMM) | :white_check_mark: |
-| FORCING_SOURCE | `-C` |Select the forcings data provider. Options include NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE, NWM_V3_MEDIUM_RANGE, NWM_V3_ANALYSIS_ASSIM, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, NOMADS_POSTPROCESSED| :white_check_mark: |
+| FORCING_SOURCE | `-C` |Select the forcings data provider. Format is `NWM_$VERSION_$RUN_TYPE_$INIT_CYCLE_$MEMBER` Options include NWM_RETRO_V2, NWM_RETRO_V3, NWM_V3, NWM_V3_SHORT_RANGE_00, NWM_V3_MEDIUM_RANGE_00_0, NWM_V3_ANALYSIS_ASSIM_16, NWM_V3_ANALYSIS_ASSIM_EXTEND, NOMADS, NOMADS_POSTPROCESSED | :white_check_mark: |
 | DATA_DIR           | `-d` |Absolute local path to construct the datastream run. | :white_check_mark: |
 | REALIZATION         | `-R` |Path to NextGen realization file | Required here or file exists in `RESOURCE_DIR/config` |
 | GEOPACKAGE          | `-g` | Path to hydrofabric, can be s3URI, URL, or local file. Generate file with [hfsubset](https://github.com/lynker-spatial/hfsubsetCLI) or use SUBSET args. | Required here or file exists in `RESOURCE_DIR/config` |
