@@ -127,22 +127,27 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/datastream -s DAILY -C NWM_V3 -e $(date -d '-15 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
         
-    - name: DAILY short_range today test
+    - name: DAILY short_range 00 today test
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_SHORT_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+        ./scripts/datastream -s DAILY -C NWM_SHORT_RANGE_00 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
-    - name: DAILY medium_range today test
+    - name: DAILY short_range 23 today test
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_MEDIUM_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
-          
+        ./scripts/datastream -s DAILY -C NWM_SHORT_RANGE_23 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+
+    - name: DAILY medium_range today test 00 0
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -C NWM_MEDIUM_RANGE_00_0 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
     
     - name: DAILY analysis assim extend today test
       if: always()
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json      
+        ./scripts/datastream -s DAILY -C NWM_ANALYSIS_ASSIM_EXTEND_16 -e $(date -d '-2 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json      
   
