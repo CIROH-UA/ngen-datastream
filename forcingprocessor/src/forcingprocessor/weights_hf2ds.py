@@ -152,7 +152,7 @@ def hf2ds(files : list, raster : str, nf):
     jcatchment_dict = {}
     count = 0
     for jgpkg in files:
-        pattern = r"[Vv][Pp][Uu]_([0-9]{2}[A-Za-z]?)"
+        pattern = r"(?i)vpu[-_](\d+)"
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
