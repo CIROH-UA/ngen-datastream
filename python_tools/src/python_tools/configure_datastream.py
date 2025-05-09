@@ -88,9 +88,10 @@ def create_conf_nwm(args):
         if end == "":
             start_dt = datetime.now(timezone.utc)
         else:
-            start_dt = datetime.strptime(end,'%Y%m%d%H%M') 
-        end_dt = start_dt
+            start_dt = datetime.strptime(end,'%Y%m%d%H%M')   
+        start_dt_exact = start_dt
         start_dt = start_dt.replace(hour=1,minute=0,second=0,microsecond=0)
+        end_dt = start_dt
         num_hrs= 24
     else:
         start_dt = datetime.strptime(start,'%Y%m%d%H%M')
@@ -138,29 +139,52 @@ def create_conf_nwm(args):
             raise Exception(f'Forcing source {args.forcing_source} not understood')
         
         dt = 1
+        ens_member = 0
         if "SHORT_RANGE" in args.forcing_source:
             runinput=1
             num_hrs=18
+            # SHORT_RANGE_FCST
+            # SHORT_RANGE_00
+            fcst_cycle = int(args.forcing_source[-2:])
+            # Adjust hours
+            start_str_real = datetime.strftime(datetime.strptime(start_str_real,'%Y-%m-%d %H:%M:%S') + timedelta(hours=fcst_cycle),'%Y-%m-%d %H:%M:%S')
+            end_str_real = datetime.strftime(datetime.strptime(end_str_real,'%Y-%m-%d %H:%M:%S') + timedelta(hours=fcst_cycle+num_hrs-1),'%Y-%m-%d %H:%M:%S')        
         elif "MEDIUM_RANGE" in args.forcing_source:
             runinput=2
             num_hrs=240   
+            # MEDIUM_RANGE_FCST_MEMBER
+            # MEDIUM_RANGE_00_3
+            fcst_cycle = int(args.forcing_source[-4:-2])
+            ens_member = int(args.forcing_source[-1])
+            start_str_real = datetime.strftime(datetime.strptime(start_str_real,'%Y-%m-%d %H:%M:%S') + timedelta(hours=fcst_cycle),'%Y-%m-%d %H:%M:%S')
+            end_str_real = datetime.strftime(datetime.strptime(end_str_real,'%Y-%m-%d %H:%M:%S') + timedelta(hours=fcst_cycle+num_hrs-1),'%Y-%m-%d %H:%M:%S')             
         elif "ANALYSIS_ASSIM" in args.forcing_source:
-            if "EXTEND" in args.forcing_source:
+            if "EXTEND" in args.forcing_source:                
                 runinput=6
                 num_hrs=28
                 dt=0 
                 fcst_cycle = 16
                 start_dt = start_dt - timedelta(hours=12)
+                end_dt = end_dt + timedelta(hours=15)
                 start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+                end_str_real = end_dt.strftime('%Y-%m-%d %H:%M:%S')
             else:
                 start_dt = start_dt - timedelta(hours=3)
                 start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
                 runinput=5
                 num_hrs=3
+                
         else:
             runinput=2
-            num_hrs=24        
-    
+            num_hrs=24      
+
+        # apply a time shift if the requested init hour is after the current hour in utc, if so, date shift a day
+        if "DAILY" in start and start_dt_exact.hour < fcst_cycle and args.end_date == "":
+            start_str_real = datetime.strftime(datetime.strptime(start_str_real,'%Y-%m-%d %H:%M:%S') - timedelta(days=1),'%Y-%m-%d %H:%M:%S')
+            end_str_real = datetime.strftime(datetime.strptime(end_str_real,'%Y-%m-%d %H:%M:%S') - timedelta(days=1),'%Y-%m-%d %H:%M:%S')
+            start_str_nwm = datetime.strftime(datetime.strptime(start_str_nwm,'%Y%m%d%H%M') - timedelta(days=1),'%Y%m%d%H%M')
+            end_str_nwm = datetime.strftime(datetime.strptime(end_str_nwm,'%Y%m%d%H%M') - timedelta(days=1),'%Y%m%d%H%M')                     
+                          
         nwm_conf = {
             "forcing_type" : "operational_archive",
             "start_date"   : start_str_nwm,
@@ -168,18 +192,15 @@ def create_conf_nwm(args):
             "runinput"     : runinput,
             "varinput"     : varinput,
             "geoinput"     : geoinput,
-            "meminput"     : 0,
+            "meminput"     : ens_member,
             "urlbaseinput" : urlbaseinput,
             "fcst_cycle"   : [fcst_cycle],
             "lead_time"    : [x+dt for x in range(num_hrs)]
-        }
-
-    end_str_real = start_dt + timedelta(hours=num_hrs-1)
-    end_str_real = end_str_real.strftime('%Y-%m-%d %H:%M:%S')            
+        }          
 
     return nwm_conf, start_str_real, end_str_real
 
-def create_conf_fp(args):
+def create_conf_fp(args,start_real):
     geo_base = args.gpkg.split('/')[-1]      
     if "RETRO" in args.forcing_source:
         filename = "retro_filenamelist.txt"
@@ -189,7 +210,7 @@ def create_conf_fp(args):
     output_file_type = ["netcdf"]
     if len(args.s3_bucket) > 0:
         if "DAILY" in args.start_date: 
-            args.s3_prefix = re.sub(r"\DAILY",datetime.now(timezone.utc).strftime('%Y%m%d'),args.s3_prefix)
+            args.s3_prefix = re.sub(r"\DAILY",datetime.strptime(start_real,'%Y-%m-%d %H:%M:%S').strftime('%Y%m%d'),args.s3_prefix)
         output_path  = f"s3://{args.s3_bucket}/{args.s3_prefix}"
     elif len(args.docker_mount) > 0:
         gpkg_file = [f"{args.docker_mount}/datastream-resources/config/{geo_base}"]
@@ -241,10 +262,10 @@ def create_confs(args):
         _, start_real, end_real = create_conf_nwm(args)
     elif os.path.exists(os.path.join(args.resource_path,"nwm-forcings")):
         nwm_conf = {}
-        fp_conf  = create_conf_fp(args) 
+        fp_conf  = create_conf_fp(args,start_real) 
     else:
         nwm_conf, start_real, end_real = create_conf_nwm(args)
-        fp_conf  = create_conf_fp(args) 
+        fp_conf  = create_conf_fp(args,start_real) 
 
     conf['nwmurl'] = nwm_conf 
     conf['forcingprocessor'] = nwm_conf    
@@ -271,29 +292,36 @@ def create_confs(args):
     write_json(data,datastream_meta_dir,'realization_user.json')
 
     data['time']['start_time'] = start_real
-    data['time']['end_time']   = end_real    
+    data['time']['end_time']   = end_real  
+    forcing_dict={}  
     if args.forcings.endswith(".tar.gz"):
-        data['global']['forcing']['file_pattern'] = ".*{{id}}.*.csv"
-        data['global']['forcing']['path'] = "./forcings"
-        data['global']['forcing']['provider'] = "CsvPerFeature"     
+        forcing_dict['file_pattern'] = ".*{{id}}.*.csv"
+        forcing_dict['path'] = "./forcings"
+        forcing_dict['provider'] = "CsvPerFeature"     
     elif args.forcings.endswith(".nc"):
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
-        data['global']['forcing']['provider'] = "NetCDF"
-        data['global']['forcing']['path'] = f"./forcings/{os.path.basename(args.forcings)}"      
+        forcing_dict['provider'] = "NetCDF"
+        forcing_dict['path'] = f"./forcings/{os.path.basename(args.forcings)}"      
     else:
         if "vpu" in args.gpkg.lower():
             if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
             pattern = r'(?i)VPU[_-](\d{2,3})'
             match = re.search(pattern, args.gpkg)
             if match: 
-                data['global']['forcing']['provider'] = "NetCDF"
-                data['global']['forcing']['path'] = f"./forcings/VPU_{match.group(1)}_forcings.nc"   
+                forcing_dict['provider'] = "NetCDF"
+                forcing_dict['path'] = f"./forcings/VPU_{match.group(1)}_forcings.nc"   
             else:
                 raise Exception(f"Could not pattern match for VPU forcings {args.forcings}")
         else:
             if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
-            data['global']['forcing']['provider'] = "NetCDF"
-            data['global']['forcing']['path'] = f"./forcings/1_forcings.nc"
+            forcing_dict['provider'] = "NetCDF"
+            forcing_dict['path'] = f"./forcings/1_forcings.nc"
+
+    data['global']['forcing'] = forcing_dict
+    if "catchments" in data:
+        for jcatch in data['catchments']:
+            data['catchments'][jcatch]['forcing'] = forcing_dict
+    
     write_json(data,ngen_config_dir,'realization.json')
     write_json(data,datastream_meta_dir,'realization_datastream.json')
 

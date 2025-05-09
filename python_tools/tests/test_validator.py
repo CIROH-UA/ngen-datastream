@@ -74,6 +74,16 @@ def test_missing_forcings():
     except Exception as inst:
         assert inst.__str__() == f"Forcings file not found!"  
 
+def test_forcings_time_axis():
+    del_file = str(TEST_DATA_DIR) + '/forcings/*.nc'
+    
+    os.system(f"rm {del_file}")
+    try:
+        validate_data_dir(TEST_DATA_DIR)
+        assert False 
+    except Exception as inst:
+        assert inst.__str__() == f"Forcings file not found!"          
+
 def test_missing_troute_config():
     del_file = str(TEST_DATA_DIR) + '/config/ngen.yaml'
     os.system(f"rm {del_file}")
