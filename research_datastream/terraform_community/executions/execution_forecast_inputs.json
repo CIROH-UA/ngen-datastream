@@ -1,0 +1,92 @@
+{
+  "short_range": {
+    "init_cycles": [
+      "00", "01", "02", "03", "04", "05",
+      "06", "07", "08", "09", "10", "11",
+      "12", "13", "14", "15", "16", "17",
+      "18", "19", "20", "21", "22", "23"
+    ],
+    "instance_types": {
+      "01": "t4g.2xlarge",
+      "02": "t4g.2xlarge",
+      "03N": "t4g.2xlarge",
+      "03S": "t4g.2xlarge",
+      "03W": "t4g.2xlarge",
+      "04": "t4g.2xlarge",
+      "05": "t4g.2xlarge",
+      "06": "t4g.2xlarge",
+      "07": "t4g.2xlarge",
+      "08": "t4g.2xlarge",
+      "09": "t4g.2xlarge",
+      "10L": "t4g.2xlarge",
+      "10U": "t4g.2xlarge",
+      "11": "t4g.2xlarge",
+      "12": "t4g.2xlarge",
+      "13": "t4g.2xlarge",
+      "14": "t4g.2xlarge",
+      "15": "t4g.2xlarge",
+      "16": "t4g.2xlarge",
+      "17": "t4g.2xlarge",
+      "18": "t4g.2xlarge",
+      "fp":"t4g.2xlarge"
+      },
+      "volume_size": 32
+  },
+  "medium_range": {
+    "init_cycles": ["00", "06", "12", "18"],
+    "ensemble_members": ["0"],
+    "instance_types": {
+      "01":"m8g.8xlarge",
+      "02":"m8g.8xlarge",
+      "03W":"m8g.8xlarge",
+      "03N":"m8g.8xlarge",
+      "03S":"m8g.8xlarge",
+      "04":"m8g.8xlarge",
+      "05":"m8g.8xlarge",
+      "06":"m8g.8xlarge",
+      "07":"m8g.8xlarge",
+      "08":"m8g.8xlarge",
+      "09":"m8g.8xlarge",
+      "10L":"m8g.8xlarge",
+      "10U":"m8g.8xlarge",
+      "11":"m8g.8xlarge", 
+      "12":"m8g.8xlarge",
+      "13":"m8g.8xlarge",
+      "14":"m8g.8xlarge",
+      "15":"m8g.8xlarge",            
+      "16":"m8g.8xlarge",
+      "17":"m8g.8xlarge",
+      "18":"m8g.8xlarge",
+      "fp":"m8g.4xlarge"
+      },
+      "volume_size": 32
+  },
+  "analysis_assim_extend": {
+    "init_cycles": ["16"],
+    "instance_types": {
+      "01":"t4g.2xlarge",
+      "02":"t4g.2xlarge",
+      "03W":"t4g.2xlarge",
+      "03N":"t4g.2xlarge",
+      "03S":"t4g.2xlarge",
+      "04":"t4g.2xlarge",
+      "05":"t4g.2xlarge",
+      "06":"t4g.2xlarge",
+      "07":"t4g.2xlarge",
+      "08":"t4g.2xlarge",
+      "09":"t4g.2xlarge",
+      "10L":"t4g.2xlarge",
+      "10U":"t4g.2xlarge",
+      "11":"t4g.2xlarge",
+      "12":"t4g.2xlarge",
+      "13":"t4g.2xlarge",
+      "14":"t4g.2xlarge",
+      "15":"t4g.2xlarge",
+      "16":"t4g.2xlarge",
+      "17":"t4g.2xlarge",
+      "18":"t4g.2xlarge",
+      "fp":"t4g.2xlarge"
+      },
+      "volume_size": 32
+  }
+}
