@@ -224,6 +224,6 @@ if __name__ == "__main__":
     global raster_template
     raster_template = "https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250105/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc"
 
-    weights, jcatchments = hf2ds(args.input_file.split(','))
+    weights, jcatchments = hf2ds([args.input_file],raster_template,1)
     weights.to_parquet(args.outname)
     

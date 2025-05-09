@@ -21,7 +21,7 @@ if os.path.exists(DATA_DIR):
 os.system(f"mkdir {DATA_DIR}")
 
 
-os.system(f"curl -o {os.path.join(DATA_DIR,geopackage_name)} -L -O https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg")
+os.system(f"curl -o {os.path.join(DATA_DIR,geopackage_name)} -L -O https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg")
 
 conf = {
     "forcing"  : {

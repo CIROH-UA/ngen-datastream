@@ -24,7 +24,7 @@ pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
 retro_filenamelist = str((pwd/"retro_filenamelist.txt").resolve())
 geopackage_name = "vpu-09_subset.gpkg"
-os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://communityhydrofabric.s3.us-east-1.amazonaws.com/hydrofabrics/community/VPU/vpu-09_subset.gpkg")
+os.system(f"curl -o {os.path.join(data_dir,geopackage_name)} -L -O https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg")
 assert_file=(data_dir/f"forcings/VPU_09_forcings.nc").resolve()
 
 conf = {
