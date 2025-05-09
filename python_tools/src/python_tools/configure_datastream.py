@@ -176,7 +176,6 @@ def create_conf_nwm(args):
                 
         else:
             runinput=2
-            num_hrs=24      
 
         # apply a time shift if the requested init hour is after the current hour in utc, if so, date shift a day
         if "DAILY" in start and start_dt_exact.hour < fcst_cycle and args.end_date == "":
