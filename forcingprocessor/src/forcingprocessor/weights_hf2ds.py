@@ -152,7 +152,7 @@ def hf2ds(files : list, raster : str, nf):
     jcatchment_dict = {}
     count = 0
     for jgpkg in files:
-        pattern = r"(?i)vpu[-_](\d+)"
+        pattern = r"[Vv][Pp][Uu]_([0-9]{2}[A-Za-z]?)"
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
@@ -183,6 +183,7 @@ def hydrofabric2datastream_weights(weights_file : str, raster_template: str, nf 
         with open(weights_file,'r') as fp:
             weights_json = json.load(fp)
         ncatchment = len(weights_json) 
+        weights_df = pd.DataFrame.from_dict(weights_json, orient='index', columns=['cell_id','coverage'])
     else:
         if weights_file.endswith('.gpkg'):
             catchments     = gpd.read_file(weights_file, layer='divides')
@@ -223,6 +224,6 @@ if __name__ == "__main__":
     global raster_template
     raster_template = "https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250105/forcing_short_range/nwm.t00z.short_range.forcing.f001.conus.nc"
 
-    weights, jcatchments = hf2ds(args.input_file.split(','))
+    weights, jcatchments = hf2ds([args.input_file],raster_template,1)
     weights.to_parquet(args.outname)
     
