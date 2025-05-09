@@ -92,14 +92,6 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/datastream -r ./data/cache/datastream-resources-no-forcings -s 201906200100 -e 201906200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test        
                   
-    
-    - name: Forcings sources option test NWM_V3
-      if: always()
-      run: |
-        sudo rm -rf $(pwd)/data/datastream_test
-        TODAY=$(env TZ=US/Eastern date +'%Y%m%d')
-        ./scripts/datastream -r ./data/cache/datastream-resources-no-forcings -s $TODAY"0100" -e $TODAY"0200" -C NWM_V3 -d $(pwd)/data/datastream_test   
-        
     - name: Forcings sources option test NOMADS
       if: always()
       run: |        
@@ -115,18 +107,6 @@ jobs:
         aws s3api wait object-exists --bucket ciroh-community-ngen-datastream --key git_actions_test/ngen-run.tar.gz   
         aws s3 rm s3://ciroh-community-ngen-datastream/git_actions_test --recursive
 
-    - name: DAILY today test
-      if: always()
-      run: |        
-        sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
-
-    - name: DAILY pick day test
-      if: always()
-      run: |        
-        sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_V3 -e $(date -d '-15 day' '+%Y%m%d0000') -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json       
-        
     - name: DAILY short_range 00 today test
       if: always()
       run: |        
@@ -139,6 +119,12 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/datastream -s DAILY -C NWM_SHORT_RANGE_23 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
+    - name: DAILY short_range 00 pick day test
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        ./scripts/datastream -s DAILY -e $(date -d '-15 day' '+%Y%m%d0000') -C NWM_SHORT_RANGE_00 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+        
     - name: DAILY medium_range today test 00 0
       if: always()
       run: |        
