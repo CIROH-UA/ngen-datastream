@@ -134,10 +134,10 @@ def test_conf_daily_pick():
         data = json.load(fp)
     assert data['urlbaseinput'] == 4
 
-def test_conf_daily_short_range():
+def test_conf_daily_short_range_init00():
     inputs.start_date = "DAILY"
     inputs.end_date   = ""
-    inputs.forcing_source = "NWM_V3_SHORT_RANGE"
+    inputs.forcing_source = "NWM_V3_SHORT_RANGE_00"
     create_confs(inputs)
     check_paths()
 
@@ -154,22 +154,91 @@ def test_conf_daily_short_range():
     assert data['urlbaseinput'] == 7 
     assert data['runinput']     == 1   
 
-def test_conf_daily_medium_range():
+def test_conf_daily_short_range_init15():
     inputs.start_date = "DAILY"
     inputs.end_date   = ""
-    inputs.forcing_source = "NWM_V3_MEDIUM_RANGE"
+    inputs.forcing_source = "NWM_V3_SHORT_RANGE_15"
     create_confs(inputs)
     check_paths()
 
     with open(REALIZATION_RUN,'r') as fp:
         data = json.load(fp) 
     start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
-    assert start.day == datetime.now(timezone.utc).day
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == (datetime.now(timezone.utc)).day
+    assert start.hour == 16
+    assert end.day == (datetime.now(timezone.utc) + timedelta(days=1)).day
+    assert end.hour == 10
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   
     assert data['urlbaseinput'] == 7 
-    assert data['runinput']     == 2    
+    assert data['runinput']     == 1      
+
+def test_conf_daily_short_range_init23():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_SHORT_RANGE_23"
+    create_confs(inputs)
+    check_paths()
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == (datetime.now(timezone.utc) + timedelta(days=1)).day
+    assert start.hour == 0
+    assert end.day == (datetime.now(timezone.utc) + timedelta(days=1)).day
+    assert end.hour == 18
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 1      
+
+def test_conf_daily_medium_range_init00_member0():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_MEDIUM_RANGE_00_0"
+    create_confs(inputs)
+    check_paths()
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(timezone.utc).day
+    assert start.hour == 1
+    assert end.day == (datetime.now(timezone.utc) + timedelta(days=10)).day
+    assert end.hour == 0
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 2   
+    assert data['meminput']     == 0
+
+def test_conf_daily_medium_range_init12_member3():
+    inputs.start_date = "DAILY"
+    inputs.end_date   = ""
+    inputs.forcing_source = "NWM_V3_MEDIUM_RANGE_12_3"
+    create_confs(inputs)
+    check_paths()
+
+    with open(REALIZATION_RUN,'r') as fp:
+        data = json.load(fp) 
+    start = datetime.strptime(data['time']['start_time'],"%Y-%m-%d %H:%M:%S")
+    end = datetime.strptime(data['time']['end_time'],"%Y-%m-%d %H:%M:%S")
+    assert start.day == datetime.now(timezone.utc).day
+    assert start.hour == 1
+    assert end.day == (datetime.now(timezone.utc) + timedelta(days=10)).day
+    assert end.hour == 0
+
+    with open(CONF_NWM,'r') as fp:
+        data = json.load(fp)   
+    assert data['urlbaseinput'] == 7 
+    assert data['runinput']     == 2   
+    assert data['meminput']     == 0    
 
 def test_conf_daily_noamds():
     inputs.start_date = "DAILY"
