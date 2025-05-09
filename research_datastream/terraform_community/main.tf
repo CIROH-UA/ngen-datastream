@@ -22,6 +22,7 @@ variable "ec2_policy_name" {}
 variable "profile_name" {}
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
+variable "sns_publish_policy_name" {}
 
 resource "aws_iam_role" "ec2_role" {
   name                = var.ec2_role
@@ -218,7 +219,7 @@ resource "aws_lambda_function" "starter_lambda" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/starter_lambda.zip"
-  timeout       = 180
+  timeout       = 360
 }
 
 resource "aws_lambda_function" "commander_lambda" {
@@ -227,7 +228,7 @@ resource "aws_lambda_function" "commander_lambda" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/commander_lambda.zip"
-  timeout       = 60
+  timeout       = 120
 }
 
 resource "aws_lambda_function" "poller_lambda" {
@@ -287,11 +288,29 @@ resource "aws_iam_policy" "lambda_invoke_policy" {
   })
 }
 
+resource "aws_iam_policy" "sns_publish_policy" {
+  name        = var.sns_publish_policy_name
+  description = "Policy to allow invoking Lambda functions"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow",
+      Action   = "sns:Publish",
+      Resource = "arn:aws:sns:us-east-1:879381264451:AlertJordanOnDataStreamFailure"
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "lambda_invoke_attachment" {
   role       = aws_iam_role.iam_for_sfn.name
   policy_arn = aws_iam_policy.lambda_invoke_policy.arn
 }
 
+resource "aws_iam_role_policy_attachment" "sns_publish_attachment" {
+  role       = aws_iam_role.iam_for_sfn.name
+  policy_arn = aws_iam_policy.sns_publish_policy.arn
+}
 
 resource "aws_sfn_state_machine" "datastream_state_machine" {
   name       = var.sm_name
@@ -325,9 +344,11 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
       "Next": "Commander",
       "Catch": [
         {
-          "ErrorEquals": ["States.TaskFailed"],
-          "Next": "EC2Stopper",
-          "Comment": "Kill EC2 in case of failure",
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "AlertJordan",
+          "Next": "AlertJordan",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -356,9 +377,11 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
       "Next": "EC2Poller",
       "Catch": [
         {
-          "ErrorEquals": ["States.TaskFailed"],
-          "Next": "EC2Stopper",
-          "Comment": "Kill EC2 in case of failure",
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "AlertJordan",
+          "Next": "AlertJordan",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -384,9 +407,11 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
       ],
       "Catch": [
         {
-          "ErrorEquals": ["States.TaskFailed"],
-          "Next": "EC2Stopper",
-          "Comment": "Kill EC2 in case of failure",
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "AlertJordan",
+          "Next": "AlertJordan",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -425,12 +450,24 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
       ],
       "Catch": [
         {
-          "ErrorEquals": ["States.TaskFailed"],
-          "Next": "EC2Stopper",
-          "Comment": "Kill EC2 in case of failure",
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "AlertJordan",
+          "Next": "AlertJordan",
           "ResultPath": "$.failedInput"
         }
       ]
+    },
+    "AlertJordan": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "Message.$": "$",
+        "TopicArn": "arn:aws:sns:us-east-1:879381264451:AlertJordanOnDataStreamFailure"
+      },
+      "Next": "EC2Stopper",
+      "ResultPath": "$.failedInput"
     },
     "EC2Stopper": {
       "Type": "Task",
@@ -505,313 +542,139 @@ resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
 }
 
 
-# SHORT RANGE SCHEDULES
-resource "aws_scheduler_schedule" "datastream_schedule_short_range_fp" {
-  name       = "fp_short_range_schedule"
+
+locals {
+  init_cycles_config = jsondecode(file("${path.module}/executions/execution_forecast_inputs.json"))
+
+  # 01, 07, and 17 removed for now
+  vpus = [
+    "fp","02","03N","03S","03W","04",
+    "05","06","08","09","10L",
+    "10U","11","12","13","14","15",
+    "16","18"
+  ]
+  short_range_paths = {
+    for pair in flatten([
+      for init in local.init_cycles_config.short_range.init_cycles : [
+        for vpu in local.vpus : {
+          key   = "${init}_${vpu}"
+          value = "${path.module}/executions/short_range/${init}/execution_datastream_${vpu}.json"
+        }
+      ]
+    ]) : pair.key => pair.value
+  }
+  short_range_times = {
+    for pair in flatten([
+      for init in local.init_cycles_config.short_range.init_cycles : [
+        for vpu in local.vpus : {
+          key   = "${init}_${vpu}"
+          value = "${vpu}" == "fp"? (tonumber("${init}")) % 24 : (tonumber("${init}") + 1) % 24
+        }
+      ]
+    ]) : pair.key => pair.value
+  }
+
+  analysis_assim_extend_paths = {
+    for pair in flatten([
+      for init in local.init_cycles_config.analysis_assim_extend.init_cycles : [
+        for vpu in local.vpus : {
+          key   = "${init}_${vpu}"
+          value = "${path.module}/executions/analysis_assim_extend/${init}/execution_datastream_${vpu}.json"
+        }
+      ]
+    ]) : pair.key => pair.value
+  }
+  medium_range_paths = {
+    for pair in flatten([
+      for init in local.init_cycles_config.medium_range.init_cycles : [
+        for member in local.init_cycles_config.medium_range.ensemble_members : [
+          for vpu in local.vpus : {
+            key   = "${init}_${member}_${vpu}"
+            value = "${path.module}/executions/medium_range/${init}/${member}/execution_datastream_${vpu}.json"
+          }
+        ]
+      ]
+    ]) : pair.key => pair.value
+  }
+  medium_range_times = {
+    for pair in flatten([
+      for init in local.init_cycles_config.medium_range.init_cycles : [
+        for member in local.init_cycles_config.medium_range.ensemble_members : [
+          for vpu in local.vpus : {
+            key   = "${init}_${member}_${vpu}"
+            value = "${vpu}" == "fp"? (tonumber("${init}")+4) % 24 : (tonumber("${init}") + 5) % 24
+          }
+        ]
+      ]
+    ]) : pair.key => pair.value
+  }  
+}
+
+resource "aws_scheduler_schedule" "datastream_schedule_short_range" {
+  for_each = {
+    for forecast, paths in local.short_range_paths : 
+    forecast => paths
+  }
+
+  name       = "short_range_fcst${split("_", each.key)[0]}_vpu${split("_", each.key)[1]}_schedule"
   group_name = "default"
 
   flexible_time_window {
     mode = "OFF"
   }
 
-  schedule_expression = "cron(0 3 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
+  schedule_expression        = "cron(0 ${local.short_range_times[each.key]} * * ? *)"
+  schedule_expression_timezone = "America/New_York"
 
   target {
     arn      = aws_sfn_state_machine.datastream_state_machine.arn
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/short_range/execution_datastream_fp.json")
-  }
-}
-# resource "aws_scheduler_schedule" "datastream_schedule_short_range_01" {
-#   name       = "01_short_range_schedule"
-#   group_name = "default"
-
-#   flexible_time_window {
-#     mode = "OFF"
-#   }
-
-#   schedule_expression = "cron(0 4 * * ? *)"  
-#   schedule_expression_timezone  = "America/New_York"
-
-#   target {
-#     arn      = aws_sfn_state_machine.datastream_state_machine.arn
-#     role_arn = aws_iam_role.scheduler_role.arn
-#     input    = file("${path.module}/executions/short_range/execution_datastream_01.json")
-#   }
-# }
-resource "aws_scheduler_schedule" "datastream_schedule_short_range_02" {
-  name       = "02_short_range_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 4 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/short_range/execution_datastream_02.json")
-  }
-}
-resource "aws_scheduler_schedule" "datastream_schedule_short_range_03W" {
-  name       = "03W_short_range_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 4 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/short_range/execution_datastream_03W.json")
-  }
-}
-resource "aws_scheduler_schedule" "datastream_schedule_short_range_16" {
-  name       = "16_short_range_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 4 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/short_range/execution_datastream_16.json")
+    input    = file(each.value)
   }
 }
 
-# MEDIUM RANGE SCHEDULES
 resource "aws_scheduler_schedule" "datastream_schedule_medium_range" {
-  name       = "fp_medium_range_schedule"
+  for_each = {
+    for forecast, paths in local.medium_range_paths : 
+    forecast => paths
+  }
+
+  name       = "medium_range_fcst${split("_", each.key)[0]}_mem${split("_", each.key)[1]}_vpu${split("_", each.key)[2]}_schedule"
   group_name = "default"
 
   flexible_time_window {
     mode = "OFF"
   }
 
-  schedule_expression = "cron(0 3 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
+  schedule_expression        = "cron(15 ${local.medium_range_times[each.key]} * * ? *)"
+  schedule_expression_timezone = "America/New_York"
 
   target {
     arn      = aws_sfn_state_machine.datastream_state_machine.arn
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/medium_range/execution_datastream_fp.json")
+    input    = file(each.value)
+  }
+}
+
+resource "aws_scheduler_schedule" "datastream_schedule_AnA_range" {
+  for_each = {
+    for forecast, paths in local.analysis_assim_extend_paths : 
+    forecast => paths
   }
 
-}
-# resource "aws_scheduler_schedule" "datastream_schedule_medium_range_01" {
-#   name       = "01_medium_range_schedule"
-#   group_name = "default"
-
-#   flexible_time_window {
-#     mode = "OFF"
-#   }
-
-#   schedule_expression = "cron(0 4 * * ? *)"  
-#   schedule_expression_timezone  = "America/New_York"
-
-#   target {
-#     arn      = aws_sfn_state_machine.datastream_state_machine.arn
-#     role_arn = aws_iam_role.scheduler_role.arn
-#     input    = file("${path.module}/executions/medium_range/execution_datastream_01.json")
-#   }
-# }
-
-resource "aws_scheduler_schedule" "datastream_schedule_medium_range_02" {
-  name       = "02_medium_range_schedule"
+  name       = "analysis_assim_extend_fcst${split("_", each.key)[0]}_vpu${split("_", each.key)[1]}_schedule"
   group_name = "default"
 
   flexible_time_window {
     mode = "OFF"
   }
 
-  schedule_expression = "cron(0 4 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
+  schedule_expression        = "cron(0 17 * * ? *)"
+  schedule_expression_timezone = "America/New_York"
 
   target {
     arn      = aws_sfn_state_machine.datastream_state_machine.arn
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/medium_range/execution_datastream_02.json")
+    input    = file(each.value)
   }
 }
-resource "aws_scheduler_schedule" "datastream_schedule_medium_range_03W" {
-  name       = "03W_medium_range_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 4 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/medium_range/execution_datastream_03W.json")
-  }
-}
-resource "aws_scheduler_schedule" "datastream_schedule_medium_range_16" {
-  name       = "16_medium_range_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 4 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/medium_range/execution_datastream_16.json")
-  }
-}
-
-
-# ANALYSIS_ASSIM_EXTEND SCHEDULES
-resource "aws_scheduler_schedule" "datastream_schedule_analysis_assim_extend" {
-  name       = "fp_analysis_assim_extend_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 16 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/analysis_assim_extend/execution_datastream_fp.json")
-  }
-}
-
-# resource "aws_scheduler_schedule" "datastream_schedule_analysis_assim_extend_01" {
-#   name       = "01_analysis_assim_extend_schedule"
-#   group_name = "default"
-
-#   flexible_time_window {
-#     mode = "OFF"
-#   }
-
-#   schedule_expression = "cron(0 17 * * ? *)"  
-#   schedule_expression_timezone  = "America/New_York"
-
-#   target {
-#     arn      = aws_sfn_state_machine.datastream_state_machine.arn
-#     role_arn = aws_iam_role.scheduler_role.arn
-#     input    = file("${path.module}/executions/analysis_assim_extend/execution_datastream_01.json")
-#   }
-# }
-
-resource "aws_scheduler_schedule" "datastream_schedule_analysis_assim_extend_02" {
-  name       = "02_analysis_assim_extend_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 17 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/analysis_assim_extend/execution_datastream_02.json")
-  }
-}
-resource "aws_scheduler_schedule" "datastream_schedule_analysis_assim_extend_03W" {
-  name       = "03W_analysis_assim_extend_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 17 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/analysis_assim_extend/execution_datastream_03W.json")
-  }
-}
-resource "aws_scheduler_schedule" "datastream_schedule_analysis_assim_extend_16" {
-  name       = "16_analysis_assim_extend_schedule"
-  group_name = "default"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression = "cron(0 17 * * ? *)"  
-  schedule_expression_timezone  = "America/New_York"
-
-  target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
-    role_arn = aws_iam_role.scheduler_role.arn
-    input    = file("${path.module}/executions/analysis_assim_extend/execution_datastream_16.json")
-  }
-}
-
-# variable "execution_names" {
-#   type    = list(string)
-#   default = ["01","02","03W","16"]
-# }
-
-# resource "aws_scheduler_schedule" "datastream_schedule_short_range" {
-#   for_each   = toset(var.vpu_execution_names)
-#   name       = "short_range_${each.value}"
-#   group_name = "default"
-
-#   flexible_time_window {
-#     mode = "OFF"
-#   }
-
-#   schedule_expression = "cron(0 1 * * ? *)"  
-#   schedule_expression_timezone  = "America/New_York"
-
-#   target {
-#     arn      = aws_sfn_state_machine.datastream_state_machine.arn
-#     role_arn = aws_iam_role.scheduler_role.arn
-#     input = file("${path.module}/executions/short_range/${var.execution_name}_${each.value}.json")
-#   }
-
-# }
-
-# resource "aws_scheduler_schedule" "datastream_schedule_medium_range" {
-#   for_each   = toset(var.vpu_execution_names)
-#   name       = "medium_range_${each.value}"
-#   group_name = "default"
-
-#   flexible_time_window {
-#     mode = "OFF"
-#   }
-
-#   schedule_expression = "cron(0 1 * * ? *)"  
-#   schedule_expression_timezone  = "America/New_York"
-
-#   target {
-#     arn      = aws_sfn_state_machine.datastream_state_machine.arn
-#     role_arn = aws_iam_role.scheduler_role.arn
-#     input = file("${path.module}/executions/medium_range/${var.execution_name}_${each.value}.json")
-#   }
-
-# }
