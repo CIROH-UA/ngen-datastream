@@ -96,7 +96,7 @@ def create_conf_nwm(args):
     else:
         start_dt = datetime.strptime(start,'%Y%m%d%H%M')
         end_dt   = datetime.strptime(end,'%Y%m%d%H%M')  
-        num_hrs = (end_dt - start_dt).seconds // 3600
+        num_hrs = ((end_dt - start_dt).seconds // 3600) + 1
     
     start_str_real = start_dt.strftime('%Y-%m-%d %H:%M:%S')
     end_str_real = end_dt.strftime('%Y-%m-%d %H:%M:%S')    
