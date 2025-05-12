@@ -72,7 +72,7 @@ def multiprocess_pkl(gpkg_path,outdir):
     
     catchment_list = sorted(list(gdf['divide_id']))
 
-    nprocs = os.cpu_count() - 1
+    nprocs = max(os.cpu_count() - 1,1)
     ncatch = len(catchment_list)
     catchment_list_list = []
     gdf_list = []

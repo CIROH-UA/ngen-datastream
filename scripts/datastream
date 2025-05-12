@@ -51,10 +51,10 @@ get_file() {
         fi 
     elif is_tarball "$IN_STRING"; then
         tar --use-compress-program=pigz -xf $IN_STRING -C "${OUT_STRING%/}"
+    elif is_url "$IN_STRING"; then
+        curl -# -L -o "$OUT_STRING" "$IN_STRING"        
     elif is_netcdf "$IN_STRING"; then
         cp $IN_STRING $OUT_STRING
-    elif is_url "$IN_STRING"; then
-        curl -# -L -o "$OUT_STRING" "$IN_STRING"
     elif is_file "$IN_STRING"; then
         cp $IN_STRING $OUT_STRING        
     else
@@ -398,7 +398,8 @@ else
         else
             echo "The NGEN_FORCINGS does not contain 'DAILY'."
         fi
-        get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
+        FORCING_BASE=$(basename $NGEN_FORCINGS)
+        get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"/$FORCING_BASE
     fi 
 
     if [ ! -z $NWM_FORCINGS_DIR ]; then
@@ -491,7 +492,7 @@ if [ ! -z $NGEN_FORCINGS ]; then
     FORCINGS_BASE=$(basename $NGEN_FORCINGS)    
     if [ ! -e $DATASTREAM_RESOURCES_NGENFORCINGS ]; then
         mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
-        get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"
+        get_file "$NGEN_FORCINGS" "$DATASTREAM_RESOURCES_NGENFORCINGS"/$FORCINGS_BASE
     fi    
     log_time "GET_FORCINGS_END" $DATASTREAM_PROFILING $S3_OUT
 else
