@@ -1,0 +1,66 @@
+compute_parameters:
+  assume_short_ts: true
+  compute_kernel: V02-structured
+  cpu_pool: 1
+  data_assimilation_parameters:
+    reservoir_da:
+      reservoir_persistence_da:
+        reservoir_persistence_usace: false
+        reservoir_persistence_usgs: false
+      reservoir_rfc_da:
+        reservoir_rfc_forecasts: false
+        reservoir_rfc_forecasts_lookback_hours: 28
+        reservoir_rfc_forecasts_offset_hours: 28
+        reservoir_rfc_forecasts_time_series_path: rfc_timeseries/
+    streamflow_da:
+      diffusive_streamflow_nudging: false
+      streamflow_nudging: false
+  forcing_parameters:
+    binary_nexus_file_folder: ./outputs/parquet/
+    dt: 300
+    max_loop_size: 18.0      
+    nts: 216.0      
+    qlat_file_pattern_filter: nex-*
+    qlat_input_folder: ./outputs/ngen/
+    qts_subdivisions: 12
+  parallel_compute_method: by-subnetwork-jit-clustered
+  restart_parameters:
+    start_datetime: '2025-04-21 01:00:00'
+  subnetwork_target_size: 10000
+log_parameters:
+  log_level: INFO
+  showtiming: true
+network_topology_parameters:
+  supernetwork_parameters:
+    columns:
+        key: "id"
+        downstream: "toid"
+        dx: "Length_m"
+        n: "n"
+        ncc: "nCC"
+        s0: "So"
+        bw: "BtmWdth"
+        waterbody: "WaterbodyID"
+        gages: "gage"
+        tw: "TopWdth"
+        twcc: "TopWdthCC"
+        musk: "MusK"
+        musx: "MusX"
+        cs: "ChSlp"
+        alt: "alt"
+    geo_file_path: ./config/nextgen_VPU_09.gpkg
+  waterbody_parameters:
+    break_network_at_waterbodies: false
+output_parameters:
+    #----------
+    #test_output: outputs/lcr_flowveldepth.pkl
+    lite_restart:
+        #----------
+        lite_restart_output_directory: restart/
+    lakeout_output: lakeout/
+    stream_output:
+        stream_output_directory: outputs/troute/
+        stream_output_time: 24.0 #number of internal_frequency timesteps per output file
+        stream_output_type: ".nc" #please select only between netcdf '.nc' or '.csv' or '.pkl'
+        stream_output_internal_frequency: 60 #[min] it should be order of 5 minutes. For instance if you want to output every hour put 60
+
