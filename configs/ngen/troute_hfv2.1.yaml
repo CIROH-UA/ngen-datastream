@@ -1,0 +1,62 @@
+compute_parameters:
+  assume_short_ts: true
+  compute_kernel: V02-structured
+  cpu_pool: 1
+  data_assimilation_parameters:
+    reservoir_da:
+      reservoir_persistence_da:
+        reservoir_persistence_usace: false
+        reservoir_persistence_usgs: false
+      reservoir_rfc_da:
+        reservoir_rfc_forecasts: false
+        reservoir_rfc_forecasts_lookback_hours: 28
+        reservoir_rfc_forecasts_offset_hours: 28
+        reservoir_rfc_forecasts_time_series_path: rfc_timeseries/
+    streamflow_da:
+      diffusive_streamflow_nudging: false
+      streamflow_nudging: false
+  forcing_parameters:
+    binary_nexus_file_folder: ./outputs/parquet/
+    dt: 300
+    max_loop_size: 288.0
+    nts: 288.0
+    qlat_file_pattern_filter: nex-*
+    qlat_input_folder: ./outputs/ngen/
+    qts_subdivisions: 12
+  parallel_compute_method: by-subnetwork-jit-clustered
+  restart_parameters:
+    start_datetime: '2024-05-20 01:00:00'
+  subnetwork_target_size: 10000
+log_parameters:
+  log_level: INFO
+  showtiming: true
+network_topology_parameters:
+  supernetwork_parameters:
+    columns:
+      alt: alt
+      bw: BtmWdth
+      cs: ChSlp
+      downstream: toid
+      dx: length_m
+      gages: rl_gages
+      key: id
+      musk: MusK
+      musx: MusX
+      n: n
+      ncc: nCC
+      s0: So
+      tw: TopWdth
+      twcc: TopWdthCC
+      waterbody: "WaterbodyID"
+    geo_file_path: ./config/nextgen_09.gpkg
+  waterbody_parameters:
+    break_network_at_waterbodies: false
+output_parameters:
+  lakeout_output: ./lakeout/
+  lite_restart:
+    lite_restart_output_directory: ./restart/
+  stream_output:
+    stream_output_directory: ./outputs/troute/
+    stream_output_internal_frequency: 60
+    stream_output_time: 696.0
+    stream_output_type: .csv
