@@ -4,6 +4,7 @@ Last updated: 05/2025
 Status
 * Spatial distribution of processing - split by VPU and subsetted manually from v2.2 [CONUS](https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.2/conus/conus_nextgen.gpkg). 
 * VPUs available : 02, 03N, 03S, 03W, 04, 05, 06, 08, 09, 10L, 10U, 11, 12, 13, 14, 15, 16, 18
+  * (05, 10L, 10U, 11 not available for medium range)
 * Run Types - short_range (all init cycles), medium_range (00 init cycle, 1st member), analysis_assim_extend
 * Cold start
 * NextGen configuration - NOAH-OWP, PET, CFE, and troute. Dynamically read on each execution from [publicly available realizations](https://datastream.ciroh.org/index.html#realizations/) that now hold [mutable community parameters](https://datastream.ciroh.org/index.html#parameters/).
