@@ -214,6 +214,18 @@ docker run --rm -d \
   -e CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
   "${TETHYS_REPO}:${TETHYS_TAG}"
 ```
+Once you run this container, check the status:
+
+```bash
+docker ps
+
+CONTAINER ID   IMAGE                          COMMAND                  CREATED         STATUS                   PORTS                                 NAMES
+4e41122abc98   awiciroh/tethys-ngiab:latest   "/usr/local/bin/_ent…"   4 minutes ago   Up 4 minutes (healthy)   0.0.0.0:80->80/tcp, [::]:80->80/tcp   tethys-ngen-portal
+```
+Once it os healthy, you can access the container at http://localhost:80 with the following credentials:
+
+- User: admin
+- Password: pass
 
 If you want a more detailed explanation 👉 Look at the visualizer [source code](https://github.com/CIROH-UA/ngiab-client)
 
