@@ -178,7 +178,7 @@ Now, the user needs to create the configutatin to save the model outputs at `$HO
 
 ```bash
 echo '{ "model_runs": [] }' > ~/ngiab_visualizer/ngiab_visualizer.json
-echo '{ "datastream": [] }' > ~/.sdatastream_ngiab/datastream_ngiab.json
+echo '{ "datastream": [] }' > ~/.datastream_ngiab/datastream_ngiab.json
 ```
 Now, the user can export ednv variables that the container will require.
 
