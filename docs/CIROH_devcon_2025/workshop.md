@@ -167,6 +167,20 @@ This functionality allows the user to be able to quicklu search the data they wa
 
 If the user wants more control 🎮 and just define the env variables and run the container.
 
+First, the user needs to create, the following directories:
+
+```bash
+mkdir $HOME/ngiab_visualizer
+mkdir $HOME/.datastream_ngiab
+```
+
+Now, the user needs to create the configutatin to save the model outputs at `$HOME/ngiab_visualizer` and the configuration cache for the dataStream at `$HOME/.datastream_ngiab`
+
+```bash
+echo '{ "model_runs": [] }' > ~/ngiab_visualizer/ngiab_visualizer.json
+echo '{ "datastream": [] }' > ~/.sdatastream_ngiab/datastream_ngiab.json
+```
+Now, the user can export ednv variables that the container will require.
 
 ```bash
 # Set environment variables
