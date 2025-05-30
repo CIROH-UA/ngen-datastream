@@ -351,7 +351,7 @@ if [ ! -z $RESOURCE_DIR ]; then
     if [ -z $NGEN_FORCINGS ]; then
         NNGEN_FORCINGS_DIR=$(find $DATASTREAM_RESOURCES -type d -name "ngen-forcings" | wc -l)
         if [ ${NNGEN_FORCINGS_DIR} -gt 0 ]; then            
-            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "*forcings*")
+            NGEN_FORCINGS=$(find $DATASTREAM_RESOURCES_NGENFORCINGS -type f -name "*forcing*")
             echo "Using resource directory forcings "$NGEN_FORCINGS
             get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
         fi
