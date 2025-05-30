@@ -210,7 +210,7 @@ If you want a more detailed explanation 👉 Look at the visualizer [source code
 ### v) How To Contribute Your NextGen Model Parameters
 Lynker and the Alabama Water Institute have developed tooling to implement CIROH community proposed NextGen model parameters in the Research DataStream. This feature enacts the goal of CIROH to 
 
-"collaboratively research, develop and deliver state-of-the science national hydrologic analyses, forecast information, data, guidance, and equitable decision-support services to inform essential emergency management and water resources decisions across all time scales" 
+>"collaboratively research, develop and deliver state-of-the science, national hydrologic analyses, forecast information, data, guidance, and equitable decision-support services to inform essential emergency management and water resources decisions across all time scales" 
 
 by opening a national-scale water modeling system to be continually improved upon by the community. 
 
@@ -239,8 +239,6 @@ This one tool (available as a shell script [here](https://github.com/CIROH-UA/ng
 ---
 
 ### i) DataStreamCLI From Scratch
-The example command below will, from scratch, perform the exact NextGen simulation as today's 1200 UTC short_range cycle. Try this command.
-
 If you haven't cloned the repository already
 
 ```
@@ -251,23 +249,30 @@ git clone https://github.com/CIROH-UA/ngen-datastream.git
 cd ngen-datastream
 ```
 
+If you are executing on ARM architecture, set the following environment variables
 ```
-time ./scripts/datastream \
+export DS_TAG=latest
+export FP_TAG=latest
+```
+
+The example command below will, from scratch, perform the exact NextGen simulation as today's 1200 UTC short_range cycle. Try this command.
+```
+./scripts/datastream \
+--NPROCS 8 \
 --START_DATE DAILY \
 --FORCING_SOURCE NWM_V3_SHORT_RANGE_12 \
 --DATA_DIR ./outputs \
 --REALIZATION https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_09.json \
 --GEOPACKAGE https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg
 ```
-Note the time the command takes, we will compare it in the next step.
 In this command, we specify 
 * the date with `--START_DATE DAILY`
-* the time range and the gridded forcing source with `--FORCING_SOURCE NWM_V3_SHORT_RANGE_12`
+* the time range and the gridded forcing source with `--FORCING_SOURCE NWM_V3_SHORT_RANGE_12`. The string format is "NWM_V3_<RUN_TYPE_>_<INIT_CYCLE>"
 * the local disk location to write the data to with `--DATA_DIR ./outputs`
 * the realization file to configure NextGen with `--REALIZATION https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_09.json `
 * the geopackage, which defines the spatial domain with `--GEOPACKAGE https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg`
 
-Note this will execute every step depicted in the graphic above.
+This command is equivalent to the daily short range execution for the Research DataStream.
 
 ---
 
@@ -282,10 +287,11 @@ cp -r ./outputs/datastream-resources .
 Repeat the command with the addition of `-r` to point to our resource directory. Note that the realization and geopackage arguments are no longer needed, as DataStreamCLI will find them within the resource directory. We will write to `outputs_with_resources`
 
 ```
-time ./scripts/datastream \
+./scripts/datastream \
+--NPROCS 8 \
 --START_DATE DAILY \
 --FORCING_SOURCE NWM_V3_SHORT_RANGE_12 \
---DATA_DIR ./outputs_with_resources 
+--DATA_DIR ./outputs_with_resources \
 --RESOURCE_DIR ./datastream-resources
 ```
 Compared with the previous execution, this should take less time as the NextGen forcings and BMI config files were read directly and not computed. If desired, remove any files from the resource directory and DataStreamCLI dynamically will create them based on the input arguments (i.e. for a simulation over the same domain, but a different time period, you can reuse the resource directory but remember to delete the forcings).
@@ -343,7 +349,7 @@ https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250522/forcing_short_range/nwm.t12z.
 
 The command to execute `ForcingProcessor` is
 ```
-docker run --rm -v /home/exouser/ngen-datastream/outputs:/mounted_dir \
+docker run --rm -v ./outputs:/mounted_dir \
             -u $(id -u):$(id -g) \
             -w /mounted_dir/datastream-resources awiciroh/forcingprocessor:latest-x86 \
             python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/processor.py \
@@ -372,7 +378,6 @@ Executing in this fashion will skip the weight generation step.
 ---
 
 ### ii) Validation
-3a)
 Let's imagine we were very excited about our NextGen configuration and hastily issued the command without removing the ngen forcings from the resource directory. In other words, let's see what happens when we change the simulation time arguments, while supplying DataStreamCLI with ngen-forcings for a different time period.
 
 Note the only difference with this command is we are changing the date of the simulation with `--END_DATE 202505130000`.
@@ -395,7 +400,7 @@ When DataStreamCLI is provided a NextGen realization file, the necessary BMI con
 The command below parallels the command DataStreamCLI issued internally to generate the CFE, PET, and NOAH-OWP, t-route configuration files.
 
 ```
-docker run --rm -v /home/exouser/ngen-datastream/outputs/ngen-run:/mounted_dir \
+docker run --rm -v ./outputs/ngen-run:/mounted_dir \
         -u $(id -u):$(id -g) \
         awiciroh/datastream:latest-x86 python3 /ngen-datastream/python_tools/src/python_tools/ngen_configs_gen.py \
         --hf_file /mounted_dir/config/nextgen_VPU_09.gpkg --outdir /mounted_dir/config --pkl_file /mounted_dir/config/noah-owp-modular-init.namelist.input.pkl --realization /mounted_dir/config/realization.json
