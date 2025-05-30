@@ -255,19 +255,19 @@ export DS_TAG=latest
 export FP_TAG=latest
 ```
 
-The example command below will, from scratch, perform the exact NextGen simulation as today's 1200 UTC short_range cycle. Try this command.
+The example command below will, from scratch, perform the exact NextGen simulation as today's 0600 UTC short_range cycle. Try this command.
 ```
 ./scripts/datastream \
 --NPROCS 8 \
 --START_DATE DAILY \
---FORCING_SOURCE NWM_V3_SHORT_RANGE_12 \
+--FORCING_SOURCE NWM_V3_SHORT_RANGE_06 \
 --DATA_DIR ./outputs \
 --REALIZATION https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_09.json \
 --GEOPACKAGE https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg
 ```
 In this command, we specify 
 * the date with `--START_DATE DAILY`
-* the time range and the gridded forcing source with `--FORCING_SOURCE NWM_V3_SHORT_RANGE_12`. The string format is "NWM_V3_<RUN_TYPE_>_<INIT_CYCLE>"
+* the time range and the gridded forcing source with `--FORCING_SOURCE NWM_V3_SHORT_RANGE_06`. The string format is "NWM_V3_<RUN_TYPE_>_<INIT_CYCLE>"
 * the local disk location to write the data to with `--DATA_DIR ./outputs`
 * the realization file to configure NextGen with `--REALIZATION https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_09.json `
 * the geopackage, which defines the spatial domain with `--GEOPACKAGE https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg`
@@ -290,7 +290,7 @@ Repeat the command with the addition of `-r` to point to our resource directory.
 ./scripts/datastream \
 --NPROCS 8 \
 --START_DATE DAILY \
---FORCING_SOURCE NWM_V3_SHORT_RANGE_12 \
+--FORCING_SOURCE NWM_V3_SHORT_RANGE_06 \
 --DATA_DIR ./outputs_with_resources \
 --RESOURCE_DIR ./datastream-resources
 ```
@@ -341,9 +341,9 @@ The primary configuration file. See the [README](https://github.com/CIROH-UA/nge
 
 which will specify the NWM files to be processed
 ```
-https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t12z.short_range.forcing.f001.conus.nc
-https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t12z.short_range.forcing.f002.conus.nc
-https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t12z.short_range.forcing.f003.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t06z.short_range.forcing.f001.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t06z.short_range.forcing.f002.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t06z.short_range.forcing.f003.conus.nc
 ...
 ```
 
@@ -385,7 +385,7 @@ Note the only difference with this command is we are changing the date of the si
 time ./scripts/datastream \
 --START_DATE DAILY \
 --END_DATE 202505130000 \
---FORCING_SOURCE NWM_V3_SHORT_RANGE_12 \
+--FORCING_SOURCE NWM_V3_SHORT_RANGE_06 \
 --DATA_DIR ./outputs_with_resources_wrong_forcings \
 --RESOURCE_DIR ./datastream-resources
 ```
