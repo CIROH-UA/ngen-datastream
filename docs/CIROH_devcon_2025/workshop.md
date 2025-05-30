@@ -341,9 +341,9 @@ The primary configuration file. See the [README](https://github.com/CIROH-UA/nge
 
 which will specify the NWM files to be processed
 ```
-https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250522/forcing_short_range/nwm.t12z.short_range.forcing.f001.conus.nc
-https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250522/forcing_short_range/nwm.t12z.short_range.forcing.f002.conus.nc
-https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250522/forcing_short_range/nwm.t12z.short_range.forcing.f003.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t12z.short_range.forcing.f001.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t12z.short_range.forcing.f002.conus.nc
+https://noaa-nwm-pds.s3.amazonaws.com/nwm.20250530/forcing_short_range/nwm.t12z.short_range.forcing.f003.conus.nc
 ...
 ```
 
