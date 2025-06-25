@@ -266,6 +266,30 @@ def test_s3_output():
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/weights.parquet')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/ngen.t16z.analysis_assim_extend.forcing.tm01_tm01.1.nc')
 
+def test_csv():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute   
+    nwmurl_conf["runinput"] = 1 
+    nwmurl_conf["urlbaseinput"] = 8
+    nwmurl_conf["fcst_cycle"] = [0]
+    generate_nwmfiles(nwmurl_conf)  
+    conf['storage']['output_file_type'] = "csv"        
+    prep_ngen_data(conf)
+    assert assert_file.exists()
+    os.remove(assert_file)   
+
+def test_parquet():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute   
+    nwmurl_conf["runinput"] = 1 
+    nwmurl_conf["urlbaseinput"] = 8
+    nwmurl_conf["fcst_cycle"] = [0]
+    generate_nwmfiles(nwmurl_conf)  
+    conf['storage']['output_file_type'] = ["csv"]      
+    prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/cat-1496145.parquet").resolve()
+    assert assert_file.exists()
+    os.remove(assert_file)        
 
 
     
