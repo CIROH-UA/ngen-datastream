@@ -387,6 +387,7 @@ def write_data(
         forcing_cat_ids.append(cat_id)
 
         if "parquet" in output_file_type or "csv" in output_file_type :
+            if "netcdf" in output_file_type: output_file_type.pop(output_file_type.index("netcdf"))
             filename = f"cat-{cat_id}.{output_file_type[0]}"
             if j ==0: 
                 if ii_verbose: print(f'{id} writing {nfiles} dataframes to {output_file_type}', end=None, flush =True)
@@ -528,11 +529,15 @@ def write_netcdf(data, vpu, t_ax, catchments):
     Returns:
         None
     """
+    if FCST_CYCLE is None:
+        filename = f'{vpu}_forcings.nc'
+    else:
+        filename = f'ngen.{FCST_CYCLE}z.{URLBASE}.forcing.{LEAD_START}_{LEAD_END}.{vpu}.nc'
     if storage_type == 's3':
         s3_client = boto3.session.Session().client("s3")
-        nc_filename = forcing_path + f'/ngen.{FCST_CYCLE}z.{URLBASE}.forcing.{LEAD_START}_{LEAD_END}.{vpu}.nc'
+        nc_filename = forcing_path + "/" + filename
     else:
-        nc_filename = Path(forcing_path,f'{vpu}_forcings.nc')
+        nc_filename = Path(forcing_path,filename)
 
     data = np.transpose(data,(2,1,0))
 
@@ -834,13 +839,20 @@ def prep_ngen_data(conf):
     # Extract forecast cycle and lead time from the first and last file names
     global URLBASE, FCST_CYCLE, LEAD_START, LEAD_END
     match = re.search(pattern, nwm_forcing_files[0])
+    FCST_CYCLE=None
+    LEAD_START=None
+    LEAD_END=None
     if match:
         URLBASE = match.group(2)
         FCST_CYCLE = match.group(3) + match.group(4)
         LEAD_START = match.group(5) + match.group(6)
+    else:
+        print(f"Could not extract forecast cycle and lead start from the first NWM forcing file: {nwm_forcing_files[0]}")
     match = re.search(pattern, nwm_forcing_files[-1])
     if match:
-        LEAD_END = match.group(5) + match.group(6)            
+        LEAD_END = match.group(5) + match.group(6)  
+    else:
+        print(f"Could not extract lead end from the last NWM forcing file: {nwm_forcing_files[-1]}")
 
     # Determine the file system type based on the first NWM forcing file
     global fs_type
