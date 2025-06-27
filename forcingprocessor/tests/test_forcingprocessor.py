@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 import pytest
+import re
 
 HF_VERSION="v2.2"
 date = datetime.now(timezone.utc)
@@ -183,9 +184,16 @@ def test_noaa_nwm_pds_https_analysis_assim_extend():
     nwmurl_conf["urlbaseinput"] = 7
     nwmurl_conf["runinput"] = 6
     nwmurl_conf["fcst_cycle"] = [16]
-    generate_nwmfiles(nwmurl_conf)          
-    prep_ngen_data(conf)
-    assert_file=(data_dir/f"forcings/ngen.t16z.analysis_assim_extend.forcing.tm01_tm01.VPU_09.nc").resolve()
+    generate_nwmfiles(nwmurl_conf)       
+    try:   
+        prep_ngen_data(conf)
+    except Exception as e:
+        pattern = r"https://noaa-nwm-pds\.s3\.amazonaws\.com/nwm\.\d{8}/forcing_analysis_assim_extend/nwm\.t16z\.analysis_assim_extend\.forcing\.tm01\.conus\.nc does not exist"
+        if re.fullmatch(pattern, str(e)):
+            pytest.skip(f"Upstream datafile missing: {e}")
+        else:
+            raise
+    assert_file=(data_dir/f"forcings/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)    
 
