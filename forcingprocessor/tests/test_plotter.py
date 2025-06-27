@@ -97,7 +97,7 @@ def test_forcings_plot():
 
     nwm_data = get_nwm_data_array(nwm_dir,geopackage)             
 
-    forcings_nc = os.path.join(DATA_DIR,"forcings/VPU_09_forcings.nc")
+    forcings_nc = os.path.join(DATA_DIR,"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc")
     ngen_data, t_ax, catchment_ids = nc_to_3darray(forcings_nc)            
 
     plot_ngen_forcings(

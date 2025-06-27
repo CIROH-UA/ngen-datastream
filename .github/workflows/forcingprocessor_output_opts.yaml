@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Test Forcing Processor Amazon Cloud Sources
+name: Test Forcing Processor Output Options
 on:
   push:
     branches:
@@ -45,13 +45,7 @@ jobs:
     - name: Test with pytest
       run: |
         cd forcingprocessor
-        python -m pytest -vv -k test_noaa_nwm_pds_https 
-        python -m pytest -vv -k test_noaa_nwm_pds_https_short_range 
-        python -m pytest -vv -k test_noaa_nwm_pds_https_medium_range
-        python -m pytest -vv -k test_noaa_nwm_pds_https_analysis_assim
-        python -m pytest -vv -k test_noaa_nwm_pds_https_analysis_assim_extend
-        python -m pytest -vv -k test_noaa_nwm_pds_s3 
-        python -m pytest -vv -k test_retro_2_1_https 
-        python -m pytest -vv -k test_retro_2_1_s3
-        python -m pytest -vv -k test_retro_3_0
-        python -m pytest -vv -k test_s3_output 
+        # netcdf already tested
+        python -m pytest -vv -k test_csv_output_type
+        python -m pytest -vv -k test_parquet_output_type
+

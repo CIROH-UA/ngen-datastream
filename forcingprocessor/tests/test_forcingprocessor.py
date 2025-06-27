@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from forcingprocessor.processor import prep_ngen_data
 from forcingprocessor.nwm_filenames_generator import generate_nwmfiles
 import pytest
+import re
 
 HF_VERSION="v2.2"
 date = datetime.now(timezone.utc)
@@ -110,6 +111,7 @@ def test_google_cloud_storage():
     nwmurl_conf["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)       
 
@@ -117,7 +119,8 @@ def test_gs():
     nwmurl_conf['start_date'] = date + hourminute
     nwmurl_conf['end_date']   = date + hourminute    
     nwmurl_conf["urlbaseinput"] = 5
-    generate_nwmfiles(nwmurl_conf)          
+    generate_nwmfiles(nwmurl_conf)   
+    assert_file=(data_dir/f"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc").resolve()       
     prep_ngen_data(conf)
     assert assert_file.exists()
     os.remove(assert_file)       
@@ -128,6 +131,7 @@ def test_gcs():
     nwmurl_conf["urlbaseinput"] = 6
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)         
 
@@ -137,6 +141,7 @@ def test_noaa_nwm_pds_https():
     nwmurl_conf["urlbaseinput"] = 7
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)     
 
@@ -147,6 +152,7 @@ def test_noaa_nwm_pds_https_short_range():
     nwmurl_conf["runinput"] = 1
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file) 
 
@@ -157,6 +163,7 @@ def test_noaa_nwm_pds_https_medium_range():
     nwmurl_conf["runinput"] = 2
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.medium_range.forcing.f001_f001.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)         
 
@@ -167,6 +174,7 @@ def test_noaa_nwm_pds_https_analysis_assim():
     nwmurl_conf["runinput"] = 5
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.analysis_assim.forcing.tm01_tm01.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)  
 
@@ -176,8 +184,16 @@ def test_noaa_nwm_pds_https_analysis_assim_extend():
     nwmurl_conf["urlbaseinput"] = 7
     nwmurl_conf["runinput"] = 6
     nwmurl_conf["fcst_cycle"] = [16]
-    generate_nwmfiles(nwmurl_conf)          
-    prep_ngen_data(conf)
+    generate_nwmfiles(nwmurl_conf)       
+    try:   
+        prep_ngen_data(conf)
+    except Exception as e:
+        pattern = r"https://noaa-nwm-pds\.s3\.amazonaws\.com/nwm\.\d{8}/forcing_analysis_assim_extend/nwm\.t16z\.analysis_assim_extend\.forcing\.tm01\.conus\.nc does not exist"
+        if re.fullmatch(pattern, str(e)):
+            pytest.skip(f"Upstream datafile missing: {e}")
+        else:
+            raise
+    assert_file=(data_dir/f"forcings/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)    
 
@@ -189,6 +205,7 @@ def test_noaa_nwm_pds_s3():
     nwmurl_conf["fcst_cycle"] = [0]
     generate_nwmfiles(nwmurl_conf)          
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/ngen.t00z.short_range.forcing.f001_f001.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)            
 
@@ -207,6 +224,7 @@ def test_retro_2_1_https():
     nwmurl_conf_retro["urlbaseinput"] = 1
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/VPU_09_forcings.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)     
 
@@ -215,6 +233,7 @@ def test_retro_2_1_s3():
     nwmurl_conf_retro["urlbaseinput"] = 2
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/VPU_09_forcings.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)               
 
@@ -232,6 +251,7 @@ def test_retro_3_0():
     nwmurl_conf_retro["urlbaseinput"] = 4
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/VPU_09_forcings.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)          
 
@@ -259,13 +279,37 @@ def test_s3_output():
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)     
     conf['storage']['output_path'] = str(data_dir)
-    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/ngen.t00z.short_range.forcing.f001_f001.conus.nc')
+    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/VPU_09_forcings.nc')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/conf_fp.json')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/retro_filenamelist.txt')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/profile_fp.txt')
     os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/metadata/forcings_metadata/weights.parquet')
-    os.system(f'aws s3api delete-object --bucket {test_bucket} --key pytest_fp/ngen.t16z.analysis_assim_extend.forcing.tm01_tm01.1.nc')
 
+def test_csv_output_type():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute   
+    nwmurl_conf["runinput"] = 1 
+    nwmurl_conf["urlbaseinput"] = 8
+    nwmurl_conf["fcst_cycle"] = [0]
+    generate_nwmfiles(nwmurl_conf)  
+    conf['storage']['output_file_type'] = ["csv"]      
+    prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/cat-1496145.csv").resolve()
+    assert assert_file.exists()
+    os.remove(assert_file)   
+
+def test_parquet_output_type():
+    nwmurl_conf['start_date'] = date + hourminute
+    nwmurl_conf['end_date']   = date + hourminute   
+    nwmurl_conf["runinput"] = 1 
+    nwmurl_conf["urlbaseinput"] = 8
+    nwmurl_conf["fcst_cycle"] = [0]
+    generate_nwmfiles(nwmurl_conf)  
+    conf['storage']['output_file_type'] = ["parquet"]      
+    prep_ngen_data(conf)
+    assert_file=(data_dir/f"forcings/cat-1496145.parquet").resolve()
+    assert assert_file.exists()
+    os.remove(assert_file)        
 
 
     
