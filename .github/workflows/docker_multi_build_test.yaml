@@ -1,0 +1,47 @@
+name: Build and Test Datastream Docker Containers (Multi-Arch)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'
+      - 'python_tools/**'
+      - '.github/workflows/*.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-multiplatform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install packages for datastream
+        run: |
+          sudo apt-get update
+          sudo apt-get install git pigz -y
+
+      - name: Build Docker images (no push)
+        run: |
+          ./scripts/docker_builds.sh -e -f -d
+        env:
+          PLATFORMS: linux/${{ matrix.arch }}
+          PUSH: no
+
+      - name: Test docker containers
+        run: |
+          curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+          ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
