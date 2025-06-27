@@ -216,8 +216,8 @@ def test_retro_2_1_https():
     nwmurl_conf_retro["urlbaseinput"] = 1
     generate_nwmfiles(nwmurl_conf_retro)
     prep_ngen_data(conf)
-    assert assert_file.exists()
     assert_file=(data_dir/f"forcings/VPU_09_forcings.nc").resolve()
+    assert assert_file.exists()
     os.remove(assert_file)     
 
 def test_retro_2_1_s3():
