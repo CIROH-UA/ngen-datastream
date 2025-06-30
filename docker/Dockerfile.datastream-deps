@@ -2,15 +2,15 @@ FROM amazonlinux:2023 AS datastream-base
 
 RUN dnf -y install pigz tar git python3.12 python3-pip
 
-ARG TARGETARCH
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+ARG ARCH="x86"
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
         dnf clean all && \
         pip3 install setuptools numpy; \
     fi
 
 # --- PROJ Install ---
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz && \
         tar zxvf proj-9.3.1.tar.gz && \
         cd proj-9.3.1 && \
@@ -23,7 +23,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
     fi
 
 # --- GDAL Install ---
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         wget https://github.com/OSGeo/gdal/releases/download/v3.8.3/gdal-3.8.3.tar.gz && \
         tar xvzf gdal-3.8.3.tar.gz && \
         cd gdal-3.8.3 && \
@@ -36,7 +36,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
     fi
 
 # --- HDF5 Install ---
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         dnf -y install python3.11-devel python3-Cython && \
         wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz && \
         tar zxvf hdf5-1.14.3.tar.gz && \
@@ -49,8 +49,9 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
         HDF5_DIR=/usr pip3 install --no-binary=h5py h5py; \
     fi
 
+
 # --- GEOS Install ---
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+RUN if [ "${ARCH}" = "aarch64" ]; then \
     dnf -y install wget gcc-c++ make cmake bzip2 && \
     wget https://download.osgeo.org/geos/geos-3.12.1.tar.bz2 && \
     tar xvjf geos-3.12.1.tar.bz2 && \
@@ -65,7 +66,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 fi
 
 # --- exactextract Install ---
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+RUN if [ "${ARCH}" = "aarch64" ]; then \
     pip install pybind11 && \
     git clone https://github.com/isciences/exactextract && \
     cd exactextract && \
@@ -79,6 +80,4 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 fi
 
 # --- Runtime linker fix ---
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
-    ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"; \
-fi
+ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"

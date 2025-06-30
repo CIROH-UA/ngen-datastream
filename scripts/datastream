@@ -144,8 +144,8 @@ NGIAB_HASH="N/A"
 MERK_HASH="N/A"
 STREAM_HASH="sha256:"$(sha256sum $SCRIPT_DIR"/datastream" | awk '{ print $1 }')
 
-DS_TAG=${DS_TAG:-"latest-x86"}
-FP_TAG=${FP_TAG:-"latest-x86"}
+DS_TAG=${DS_TAG:-"latest"}
+FP_TAG=${FP_TAG:-"latest"}
 NGIAB_TAG=${NGIAB_TAG:-"latest"}
 
 FORCING_SOURCE_OPTIONS=("NWM_RETRO_V2" "NWM_RETRO_V3" "NWM_OPERATIONAL_V3" "NOMADS_OPERATIONAL")
