@@ -550,7 +550,7 @@ else
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
-        cp $NGEN_RUN/forcings/*forcings* $DATASTREAM_RESOURCES_NGENFORCINGS
+        cp $NGEN_RUN/forcings/*forcing* $DATASTREAM_RESOURCES_NGENFORCINGS
         mv "$NGENRUN_METADATA/forcings_metadata" $DATASTREAM_META
     fi
 fi    

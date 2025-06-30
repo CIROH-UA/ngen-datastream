@@ -193,7 +193,7 @@ def test_noaa_nwm_pds_https_analysis_assim_extend():
             pytest.skip(f"Upstream datafile missing: {e}")
         else:
             raise
-    assert_file=(data_dir/f"forcings/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc").resolve()
+    assert_file=(data_dir/f"forcings/ngen.t16z.analysis_assim_extend.forcing.tm01_tm01.VPU_09.nc").resolve()
     assert assert_file.exists()
     os.remove(assert_file)    
 
