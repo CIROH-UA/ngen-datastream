@@ -127,7 +127,10 @@ def validate_data_dir(data_dir):
         forcing_files  = [x for _,_,x in os.walk(forcing_dir)]
         if len(forcing_files) == 0: 
             raise Exception(f"No forcing files in {forcing_dir}")
-        forcing_files  = sorted(forcing_files[0])                   
+        elif len(forcing_files) == 1:
+            forcing_files = [os.path.join(forcing_dir,forcing_files[0][0])]
+        else:
+            forcing_files  = sorted(forcing_files[0])                   
     else:
         forcing_files = [forcing_dir]
         nc_file = forcing_files[0]
