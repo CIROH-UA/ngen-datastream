@@ -59,7 +59,7 @@ jobs:
 
       - name: Build Docker images (no push)
         run: |
-          ./scripts/docker_builds.sh -e -f -d -p -t latest:arm64
+          ./scripts/docker_builds.sh -e -f -d -p -t latest-arm64
 
       - name: Test docker containers
         run: |
