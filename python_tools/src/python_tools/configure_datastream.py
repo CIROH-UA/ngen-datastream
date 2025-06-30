@@ -300,21 +300,14 @@ def create_confs(args):
     elif args.forcings.endswith(".nc"):
         if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
         forcing_dict['provider'] = "NetCDF"
-        forcing_dict['path'] = f"./forcings/{os.path.basename(args.forcings)}"      
+        forcing_dict['path'] = f"./forcings/{os.path.basename(args.forcings)}"   
+    elif args.forcings == "":
+        if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
+        forcing_dict['provider'] = "NetCDF"
+        forcing_dict['path'] = f"./forcings"   
+        forcing_dict['file_pattern'] = ".*\\.nc"
     else:
-        if "vpu" in args.gpkg.lower():
-            if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
-            pattern = r'(?i)VPU[_-](\d{2,3})'
-            match = re.search(pattern, args.gpkg)
-            if match: 
-                forcing_dict['provider'] = "NetCDF"
-                forcing_dict['path'] = f"./forcings/VPU_{match.group(1)}_forcings.nc"   
-            else:
-                raise Exception(f"Could not pattern match for VPU forcings {args.forcings}")
-        else:
-            if "file_pattern" in data['global']['forcing']: del data['global']['forcing']['file_pattern']
-            forcing_dict['provider'] = "NetCDF"
-            forcing_dict['path'] = f"./forcings/1_forcings.nc"
+        raise Exception(f'Forcing file {args.forcings} not understood, must be .nc or .tar.gz')
 
     data['global']['forcing'] = forcing_dict
     if "catchments" in data:
