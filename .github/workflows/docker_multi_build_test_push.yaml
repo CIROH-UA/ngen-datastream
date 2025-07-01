@@ -79,6 +79,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create and push manifest datastream-deps
+        run: |
+          docker manifest create awiciroh/datastream-deps:latest \
+            --amend awiciroh/datastream-deps:latest-x86 \
+            --amend awiciroh/datastream-deps:latest-arm64
+
+          docker manifest push awiciroh/datastream:latest
+
       - name: Create and push manifest datastream
         run: |
           docker manifest create awiciroh/datastream:latest \
