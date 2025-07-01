@@ -32,7 +32,7 @@ done
 
 cd $DOCKER_DIR
 if [ "$BUILD_DEPS" = "yes" ]; then
-  docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM --platform linux/$PLATFORM
+  docker build -t awiciroh/datastream-deps:$TAG -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
@@ -40,7 +40,7 @@ fi
 if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/forcingprocessor $DOCKER_DATASTREAM/forcingprocessor
-  docker build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
+  docker build -t awiciroh/forcingprocessor:$TAG -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=$TAG
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
@@ -49,7 +49,7 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   mkdir $DOCKER_DATASTREAM
   cp -r $DATASTREAM_PATH/python_tools $DOCKER_DATASTREAM/python_tools
   cp -r $DATASTREAM_PATH/configs $DOCKER_DATASTREAM/configs
-  docker build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG --platform linux/$PLATFORM
+  docker build -t awiciroh/datastream:$TAG -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG
   if [ -d "$DOCKER_DATASTREAM" ]; then
     rm -rf $DOCKER_DATASTREAM
   fi
