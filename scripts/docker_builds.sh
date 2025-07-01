@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATASTREAM_PATH="$(dirname "$SCRIPT_DIR")"
 DOCKER_DIR="$DATASTREAM_PATH"/docker

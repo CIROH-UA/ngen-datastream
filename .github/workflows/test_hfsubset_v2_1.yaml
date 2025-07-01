@@ -15,7 +15,7 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -f -d    
+        ./scripts/docker_builds.sh -e -f -d -t latest
         
     - name: Install packages for datastream
       run: |
