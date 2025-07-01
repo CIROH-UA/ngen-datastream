@@ -88,6 +88,4 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
 fi
 
 # --- Runtime linker fix ---
-RUN if [ "${ARCH}" = "aarch64" ]; then \
-    ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"; \
-    fi
+ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"
