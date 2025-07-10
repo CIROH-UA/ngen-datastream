@@ -6,27 +6,37 @@ ARG ARCH="x86"
 RUN if [ "${ARCH}" = "aarch64" ]; then \
         dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
         dnf clean all && \
-        pip3 install setuptools numpy && \
+        pip3 install setuptools numpy; \
+    fi
+
+# --- PROJ Install ---
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         wget https://download.osgeo.org/proj/proj-9.3.1.tar.gz && \
         tar zxvf proj-9.3.1.tar.gz && \
         cd proj-9.3.1 && \
-        mkdir build && \
-        cd build && \
+        mkdir build && cd build && \
         cmake .. && \
         cmake --build . --parallel $(nproc) && \
         cmake --install . --prefix /usr && \
         cd ../.. && \
-        rm -rf proj-9.3.1 proj-9.3.1.tar.gz && \
+        rm -rf proj-9.3.1 proj-9.3.1.tar.gz; \
+    fi
+
+# --- GDAL Install ---
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         wget https://github.com/OSGeo/gdal/releases/download/v3.8.3/gdal-3.8.3.tar.gz && \
         tar xvzf gdal-3.8.3.tar.gz && \
         cd gdal-3.8.3 && \
-        mkdir build && \
-        cd build && \
+        mkdir build && cd build && \
         cmake -DGDAL_BUILD_OPTIONAL_DRIVERS=OFF -DOGR_BUILD_OPTIONAL_DRIVERS=OFF .. && \
         cmake --build . --parallel $(nproc) && \
         cmake --install . --prefix /usr && \
         cd ../.. && \
-        rm -rf gdal-3.8.3 gdal-3.8.3.tar.gz && \
+        rm -rf gdal-3.8.3 gdal-3.8.3.tar.gz; \
+    fi
+
+# --- HDF5 Install ---
+RUN if [ "${ARCH}" = "aarch64" ]; then \
         dnf -y install python3.11-devel python3-Cython && \
         wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz && \
         tar zxvf hdf5-1.14.3.tar.gz && \
@@ -39,3 +49,35 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
         HDF5_DIR=/usr pip3 install --no-binary=h5py h5py; \
     fi
 
+
+# --- GEOS Install ---
+RUN if [ "${ARCH}" = "aarch64" ]; then \
+    dnf -y install wget gcc-c++ make cmake bzip2 && \
+    wget https://download.osgeo.org/geos/geos-3.12.1.tar.bz2 && \
+    tar xvjf geos-3.12.1.tar.bz2 && \
+    cd geos-3.12.1 && \
+    mkdir build && cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install && \
+    echo "/usr/local/lib64" > /etc/ld.so.conf.d/geos.conf && ldconfig && \
+    cd ../.. && \
+    rm -rf geos-3.12.1 geos-3.12.1.tar.bz2; \
+fi
+
+# --- exactextract Install ---
+RUN if [ "${ARCH}" = "aarch64" ]; then \
+    pip install pybind11 && \
+    git clone https://github.com/isciences/exactextract && \
+    cd exactextract && \
+    mkdir cmake-build-release && cd cmake-build-release && \
+    PYBIND11_CMAKE_DIR=$(find /usr -type f -name "pybind11Config.cmake" | head -n 1 | xargs dirname) && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON=ON -DCMAKE_PREFIX_PATH=${PYBIND11_CMAKE_DIR} .. && \
+    make && \
+    make install && \
+    cd .. && \
+    pip install -e .; \
+fi
+
+# --- Runtime linker fix ---
+ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"
