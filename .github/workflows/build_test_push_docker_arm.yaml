@@ -69,4 +69,33 @@ jobs:
           terraform destroy -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
           sleep 60
                
+  create-manifest:
+    name: Create and Push Manifest
+    needs: [build-test-push-docker-arm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push manifest datastream-deps
+        run: |
+          docker manifest create awiciroh/datastream-deps:latest \
+            --amend awiciroh/datastream-deps:latest-x86 \
+            --amend awiciroh/datastream-deps:latest-arm64
+          docker manifest push awiciroh/datastream:latest
+      - name: Create and push manifest datastream
+        run: |
+          docker manifest create awiciroh/datastream:latest \
+            --amend awiciroh/datastream:latest-x86 \
+            --amend awiciroh/datastream:latest-arm64
+          docker manifest push awiciroh/datastream:latest       
           
+      - name: Create and push manifest datastream
+        run: |
+          docker manifest create awiciroh/forcingprocessor:latest \
+            --amend awiciroh/forcingprocessor:latest-x86 \
+            --amend awiciroh/forcingprocessor:latest-arm64
+          docker manifest push awiciroh/forcingprocessor:latest           
