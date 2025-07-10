@@ -69,7 +69,7 @@ jobs:
           terraform destroy -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
           sleep 60
                
-create-manifest:
+  create-manifest:
     name: Create and Push Manifest
     needs: [build-test-push-docker-arm]
     runs-on: ubuntu-latest
