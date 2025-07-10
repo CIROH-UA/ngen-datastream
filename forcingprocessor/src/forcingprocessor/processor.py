@@ -10,7 +10,7 @@ import time
 import boto3
 from io import BytesIO, TextIOWrapper
 import concurrent.futures as cf
-from datetime import datetime, UTC
+from datetime import datetime
 import gzip
 import tarfile, tempfile
 from forcingprocessor.weights_hf2ds import multiprocess_hf2ds
@@ -701,7 +701,7 @@ def prep_ngen_data(conf):
 
     t_start = time.perf_counter()
 
-    datentime = datetime.now(UTC).strftime("%m%d%y_%H%M%S")   
+    datentime = datetime.utcnow().strftime("%m%d%y_%H%M%S")   
 
     log_file = "./profile_fp.txt"   
     log_time("FORCINGPROCESSOR_START", log_file) 
