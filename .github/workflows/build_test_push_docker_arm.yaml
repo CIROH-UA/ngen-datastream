@@ -85,7 +85,7 @@ jobs:
           docker manifest create awiciroh/datastream-deps:latest \
             --amend awiciroh/datastream-deps:latest-x86 \
             --amend awiciroh/datastream-deps:latest-arm64
-          docker manifest push awiciroh/datastream:latest
+          docker manifest push awiciroh/datastream-deps:latest
       - name: Create and push manifest datastream
         run: |
           docker manifest create awiciroh/datastream:latest \
@@ -93,7 +93,7 @@ jobs:
             --amend awiciroh/datastream:latest-arm64
           docker manifest push awiciroh/datastream:latest       
           
-      - name: Create and push manifest datastream
+      - name: Create and push manifest forcingprocessor
         run: |
           docker manifest create awiciroh/forcingprocessor:latest \
             --amend awiciroh/forcingprocessor:latest-x86 \
