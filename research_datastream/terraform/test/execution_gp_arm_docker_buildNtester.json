@@ -1,9 +1,9 @@
 {  
   "commands"  : [
-    "runuser -l ec2-user -c 'rm -rf /home/ec2-user/datastream && docker rmi -f $(docker images -aq)'",     
+    "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && docker rmi -f $(docker images -aq)'",     
     "runuser -l ec2-user -c 'cd /home/ec2-user && git clone https://github.com/CIROH-UA/ngen-datastream.git'",    
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/docker_builds.sh -e -f -d'",
-    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d /home/ec2-user/ngen-datastream/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json'",
+    "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/scripts/docker_builds.sh -e -f -d -t latest-arm64'",
+    "runuser -l ec2-user -c 'export DS_TAG=latest-arm FP_TAG=latest-arm && /home/ec2-user/ngen-datastream/scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d /home/ec2-user/ngen-datastream/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json'",
     "runuser -l ec2-user -c '/home/ec2-user/ngen-datastream/research_datastream/terraform/test/docker_loginNpush.sh >> /home/ec2-user/ngen-datastream/docker_login_log.txt'",
     "runuser -l ec2-user -c 'aws s3 cp /home/ec2-user/ngen-datastream/docker_login_log.txt s3://ciroh-community-ngen-datastream/docker_login_log.txt'",
     "runuser -l ec2-user -c 'aws s3 cp /home/ec2-user/ngen-datastream/docker_build_log.txt s3://ciroh-community-ngen-datastream/docker_build_log.txt'"
@@ -45,3 +45,4 @@
   ]
 }
 }
+
