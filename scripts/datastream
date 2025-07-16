@@ -599,7 +599,7 @@ log_time "MERKLE_END" $DATASTREAM_PROFILING $S3_OUT
 log_time "TAR_START" $DATASTREAM_PROFILING $S3_OUT
 TAR_NAME="ngen-run.tar.gz"
 NGENRUN_TAR="${DATA_DIR%/}/$TAR_NAME"
-tar -cf - $NGEN_RUN | pigz > $NGENRUN_TAR
+tar -cf - -C "$(dirname "$NGEN_RUN")" "$(basename "$NGEN_RUN")" | pigz > "$NGENRUN_TAR"
 log_time "TAR_END" $DATASTREAM_PROFILING $S3_OUT
 
 if [ "$EVAL" == "True" ]; then
