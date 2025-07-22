@@ -307,7 +307,7 @@ if [ ! -z $RESOURCE_DIR ]; then
 
     if [ -z $REALIZATION ]; then
         REALIZATION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*realization*.json")
-        if [ -z $REALIZATION_RESOURCES ]; then
+        if [ ! -e $REALIZATION_RESOURCES ]; then
             echo "realization arg is required if not providing within the resource directory"
             exit 1
         else
@@ -366,7 +366,7 @@ if [ ! -z $RESOURCE_DIR ]; then
         get_file "$NGEN_FORCINGS" "$NGENRUN_FORCINGS"
     fi 
 
-    PARTITION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*partitions*.json")
+    PARTITION_RESOURCES=$(find "$DATASTREAM_RESOURCES" -type f -name "*partitions*.json")
     if [ -e "$PARTITION_RESOURCES" ]; then
         PARTITION_NGENRUN=$NGEN_RUN/$(basename $PARTITION_RESOURCES)
         echo "Found $PARTITION_RESOURCES, copying to $PARTITION_NGENRUN"
@@ -445,7 +445,7 @@ echo "Generating DataStreamCLI metadata"
 CONFIGURER=$DOCKER_PY"configure_datastream.py"
 docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $DOCKER_TAG \
     python3 $CONFIGURER \
-    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_path "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --gpkg "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --realization_file "${DOCKER_MOUNT}/ngen-run/config/realization.json"
+    --docker_mount $DOCKER_MOUNT --start_date "$START_DATE" --end_date "$END_DATE" --data_dir "$DATA_DIR" --forcings "$NGEN_FORCINGS" --forcing_source "$FORCING_SOURCE" --resource_path "$RESOURCE_DIR" --geopackage "$GEOPACKAGE_RESOURCES" --subset_id_type "$SUBSET_ID_TYPE" --subset_id "$SUBSET_ID" --hydrofabric_version "$HYDROFABRIC_VERSION" --nprocs "$NPROCS" --domain_name "$DOMAIN_NAME" --host_os "$HOST_OS" --realization "${DOCKER_MOUNT}/ngen-run/config/realization.json" --realization_provided "$REALIZATION" --ngen_bmi_confs "$NGEN_BMI_CONFS" --geopackage_provided "$GEOPACKAGE"
 DS_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
 log_time "DATASTREAMCONFGEN_END" $DATASTREAM_PROFILING $S3_OUT
 
@@ -599,7 +599,7 @@ log_time "MERKLE_END" $DATASTREAM_PROFILING $S3_OUT
 log_time "TAR_START" $DATASTREAM_PROFILING $S3_OUT
 TAR_NAME="ngen-run.tar.gz"
 NGENRUN_TAR="${DATA_DIR%/}/$TAR_NAME"
-tar -cf - $NGEN_RUN | pigz > $NGENRUN_TAR
+tar -cf - -C "$(dirname "$NGEN_RUN")" "$(basename "$NGEN_RUN")" | pigz > "$NGENRUN_TAR"
 log_time "TAR_END" $DATASTREAM_PROFILING $S3_OUT
 
 if [ "$EVAL" == "True" ]; then

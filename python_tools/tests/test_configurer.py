@@ -21,8 +21,9 @@ class Inputs:
                  docker_mount="",
                  start_date=None,
                  end_date="",
-                 data_path="",
-                 gpkg="",
+                 data_dir="",
+                 geopackage="",
+                 geopackage_provided="",
                  resource_path="",
                  forcings="",
                  forcing_source="",
@@ -34,14 +35,17 @@ class Inputs:
                  united_conus="",
                  domain_name="Not Specified",
                  forcing_split_vpu="",
-                 realization_file="",
+                 realization="",
+                 realization_provided="",
                  s3_bucket="",
-                 s3_prefix=""):
+                 s3_prefix="",
+                 ngen_bmi_confs=""):
         self.docker_mount = docker_mount
         self.start_date = start_date
         self.end_date = end_date
-        self.data_path = data_path
-        self.gpkg = gpkg
+        self.data_dir = data_dir
+        self.geopackage = geopackage
+        self.geopackage_provided = geopackage_provided
         self.resource_path = resource_path
         self.forcings = forcings
         self.forcing_source = forcing_source
@@ -53,16 +57,19 @@ class Inputs:
         self.united_conus = united_conus
         self.domain_name = domain_name
         self.forcing_split_vpu = forcing_split_vpu
-        self.realization_file = realization_file
+        self.realization = realization
+        self.realization_provided = realization_provided
         self.s3_bucket = s3_bucket
         self.s3_prefix = s3_prefix
+        self.ngen_bmi_confs = ngen_bmi_confs
 
 inputs = Inputs(
     docker_mount = "/mounted_dir",
     start_date = "202406100000",
     end_date = "202406102300",
-    data_path = str(DATA_DIR),
-    gpkg = str(os.path.join(DATA_DIR,"palisade.gpkg")),
+    data_dir = str(DATA_DIR),
+    geopackage = str(os.path.join(DATA_DIR,"palisade.gpkg")),
+    geopackage_provided = str(os.path.join(DATA_DIR,"palisade.gpkg")),
     resource_path = "",
     forcings = "",
     forcing_source = "NWM_RETRO_V3",
@@ -74,9 +81,11 @@ inputs = Inputs(
     united_conus = False,
     domain_name = "",
     forcing_split_vpu = "",
-    realization_file = str(REALIZATION_ORIG),
+    realization = str(REALIZATION_ORIG),
+    realization_provided = str(REALIZATION_ORIG),
     s3_bucket="",
-    s3_prefix=""
+    s3_prefix="",
+    ngen_bmi_confs=""
 )
 
 @pytest.fixture
