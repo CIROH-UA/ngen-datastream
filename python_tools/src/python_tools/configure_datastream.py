@@ -44,17 +44,29 @@ def bytes2human(n):
     return "%sB" % n
 
 def config_class2dict(args):
+    start_date = args.start_date
+    if start_date == 'DAILY':
+        if args.end_date == "":
+            end_date = datetime.now(timezone.utc).replace(hour=1,minute=0,second=0,microsecond=0).strftime('%Y%m%d%H%M')
+        else:
+            end_date = args.end_date
     config = {
         "globals": {
             "domain_name"   : args.domain_name,
-            "start_date"    : args.start_date,
-            "end_date"      : args.end_date,
-            "data_path"     : args.data_path,
-            "gpkg"          : args.gpkg,
+            "start_date"    : start_date,
+            "end_date"      : end_date,
+            "data_dir"      : args.data_dir,
+            "geopackage"    : args.geopackage_provided,
             "resource_path" : args.resource_path,
             "forcings"      : args.forcings,
             "nprocs"        : args.nprocs,
-            "forcing_split_vpu"    : args.forcing_split_vpu
+            "forcing_split_vpu"    : args.forcing_split_vpu,
+            "ngen_bmi_confs" : args.ngen_bmi_confs,
+            "realization"    : args.realization_provided, # this makes sure the realization in the output is the one the user provided directly
+            "forcing_source" : args.forcing_source,
+            "ngen_forcings"  : args.forcings,
+            "s3_bucket"      : args.s3_bucket,
+            "s3_prefix"      : args.s3_prefix
         }, 
         "subset": {
             "id_type"      : args.subset_id_type,
@@ -69,6 +81,34 @@ def config_class2dict(args):
         }
     }
     return config
+
+def config_class2envs(args, filename='config.env'):
+    """
+    Extracts values from args and writes them to a file in a format that can be sourced in a shell script.
+    
+    Parameters:
+    args: The argparse Namespace object containing the configuration values.
+    filename: The name of the file to write the environment variables to (default: 'config.env').
+    use_export: If True, includes 'export' keyword for variables (default: True).
+    """
+    config = config_class2dict(args)  # Reuse the dict function to get structured config
+    
+    with open(filename, 'w') as f:
+        # Write globals
+        for key, value in config['globals'].items():
+            env_key = key.upper()
+            if value is not None:
+                f.write(f'{env_key}="{value}"\n')
+            else:
+                f.write(f'{env_key}=\n')
+        
+        # Write subset
+        for key, value in config['subset'].items():
+            env_key = f'SUBSET_{key.upper()}'
+            if value is not None:
+                f.write(f'{env_key}="{value}"\n')
+            else:
+                f.write(f'{env_key}=\n')
 
 def write_json(conf, out_dir, name):
     conf_path = Path(out_dir,name)
@@ -200,7 +240,7 @@ def create_conf_nwm(args):
     return nwm_conf, start_str_real, end_str_real
 
 def create_conf_fp(args,start_real):
-    geo_base = args.gpkg.split('/')[-1]      
+    geo_base = args.geopackage.split('/')[-1]      
     if "RETRO" in args.forcing_source:
         filename = "retro_filenamelist.txt"
     else:
@@ -270,19 +310,21 @@ def create_confs(args):
     conf['forcingprocessor'] = nwm_conf    
 
     if os.path.exists(args.docker_mount):
-        data_path = Path(args.docker_mount)
+        data_dir = Path(args.docker_mount)
     else:
-        data_path = Path(conf['globals']['data_path'])
+        data_dir = Path(conf['globals']['data_dir'])
 
-    ngen_config_dir = Path(data_path,'ngen-run','config')
+    ngen_config_dir = Path(data_dir,'ngen-run','config')
     if not os.path.exists(ngen_config_dir): os.system(f'mkdir -p {ngen_config_dir}')
 
-    datastream_meta_dir = Path(data_path,'datastream-metadata')    
+    datastream_meta_dir = Path(data_dir,'datastream-metadata')    
     if not os.path.exists(datastream_meta_dir):os.system(f'mkdir -p {datastream_meta_dir}')
 
     write_json(nwm_conf,datastream_meta_dir,'conf_nwmurl.json')
     write_json(fp_conf,datastream_meta_dir,'conf_fp.json')
     write_json(conf,datastream_meta_dir,'conf_datastream.json')
+
+    config_class2envs(args,filename = os.path.join(datastream_meta_dir,"datastream.env"))
 
     print(f'datastream metadata have been generated and placed here\n{datastream_meta_dir}')    
     
@@ -315,35 +357,35 @@ def create_confs(args):
             data['catchments'][jcatch]['forcing'] = forcing_dict
     
     write_json(data,ngen_config_dir,'realization.json')
-    write_json(data,datastream_meta_dir,'realization_datastream.json')
+    write_json(data,datastream_meta_dir,'realization_datastream.json')    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--docker_mount", help="Path to DATA_PATH mount within docker container",default="")
+    parser.add_argument("--docker_mount", help="Path to data_dir mount within docker container",default="")
     parser.add_argument("--start_date", help="Set the start date",default=None)
     parser.add_argument("--end_date", help="Set the end date",default="")
-    parser.add_argument("--data_path", help="Set the data directory",default="")
-    parser.add_argument("--gpkg",help="Path to geopackage file",default="")    
+    parser.add_argument("--data_dir", help="Set the data directory",default="")
+    parser.add_argument("--geopackage",help="Lcoal path to geopackage file",default="")    
+    parser.add_argument("--geopackage_provided",help="User provided path to geopackage file",default="")    
     parser.add_argument("--resource_path", help="Set the resource directory",default="")
     parser.add_argument("--forcings", help="Set the forcings file or directory",default="")
     parser.add_argument("--forcing_source", type=str,help="Option for source of forcings",default="NWM_V3")
     parser.add_argument("--subset_id_type", help="Set the subset ID type",default="")
     parser.add_argument("--subset_id", help="Set the subset ID",default="")
-    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="v2.1.1")
+    parser.add_argument("--hydrofabric_version", help="Set the Hydrofabric version",default="")
     parser.add_argument("--nprocs", type=int,help="Maximum number of processes to use",default=os.cpu_count())
     parser.add_argument("--host_platform", type=str,help="Type of host",default="")
     parser.add_argument("--host_os", type=str,help="Operating system of host",default="")
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
     parser.add_argument("--forcing_split_vpu", type=str,help="list of vpus",default="")
     parser.add_argument("--united_conus", type=bool,help="boolean to process entire conus from local weights file",default=False)
-    parser.add_argument("--realization_file", type=str,help="ngen realization file",required=True)
+    parser.add_argument("--realization_file", type=str,help="local ngen realization file",required=True)
+    parser.add_argument("--realization_provided", type=str,help="The exact path the user provided to their realization file",required=True)
     parser.add_argument("--s3_bucket", type=str,help="s3 bucket to write to",default="")
     parser.add_argument("--s3_prefix", type=str,help="s3 prefix to prepend to files",required="")    
+    parser.add_argument("--ngen_bmi_confs", type=str,help="Path for user provided ngen bmi configs",required="")    
 
     args = parser.parse_args() 
     
-    if args.forcing_source == "": args.forcing_source="NWM_V3"
-    if args.hydrofabric_version == "": args.hydrofabric_version="v2.1.1"
-    if args.nprocs == "": args.nprocs=os.cpu_count()
-
     create_confs(args)

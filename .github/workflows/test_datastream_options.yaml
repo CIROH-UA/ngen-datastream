@@ -52,13 +52,19 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test        
         ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
-    - name: Cache resource directory
+    - name: Cache resource directory and CONF_FILE
       run: |
         mkdir ./data/cache
+        cp ./data/datastream_test/datastream-metadata/datastream.env ./data/cache
         cp -r ./data/datastream_test/datastream-resources ./data/cache
         cp -r ./data/cache/datastream-resources ./data/cache/datastream-resources-no-forcings
         cp -r ./data/cache/datastream-resources ./data/cache/datastream-resources-missing
         sudo rm -rf ./data/cache/datastream-resources-no-forcings/ngen-forcings 
+
+    - name: datastream CONF_FILE
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test        
+        ./scripts/datastream -c ./data/cache/datastream.env
 
     - name: NextGen forcings CLI option test
       if: always()
