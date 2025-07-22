@@ -45,6 +45,7 @@ def bytes2human(n):
 
 def config_class2dict(args):
     start_date = args.start_date
+    end_date = args.end_date
     if start_date == 'DAILY':
         if args.end_date == "":
             end_date = datetime.now(timezone.utc).replace(hour=1,minute=0,second=0,microsecond=0).strftime('%Y%m%d%H%M')
@@ -286,7 +287,7 @@ def create_conf_fp(args,start_real):
 
 def create_confs(args):
     conf = config_class2dict(args)
-    realization = args.realization_file
+    realization = args.realization
 
     if args.start_date != 'DAILY':
         start_dt = datetime.strptime(args.start_date,'%Y%m%d%H%M')
@@ -380,7 +381,7 @@ if __name__ == "__main__":
     parser.add_argument("--domain_name", type=str,help="Name of spatial domain",default="Not Specified")
     parser.add_argument("--forcing_split_vpu", type=str,help="list of vpus",default="")
     parser.add_argument("--united_conus", type=bool,help="boolean to process entire conus from local weights file",default=False)
-    parser.add_argument("--realization_file", type=str,help="local ngen realization file",required=True)
+    parser.add_argument("--realization", type=str,help="local ngen realization file",required=True)
     parser.add_argument("--realization_provided", type=str,help="The exact path the user provided to their realization file",required=True)
     parser.add_argument("--s3_bucket", type=str,help="s3 bucket to write to",default="")
     parser.add_argument("--s3_prefix", type=str,help="s3 prefix to prepend to files",required="")    
