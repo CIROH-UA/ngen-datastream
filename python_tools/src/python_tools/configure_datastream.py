@@ -58,10 +58,8 @@ def config_class2dict(args):
             "end_date"      : end_date,
             "data_dir"      : args.data_dir,
             "geopackage"    : args.geopackage_provided,
-            "resource_path" : args.resource_path,
-            "forcings"      : args.forcings,
+            "resource_dir"  : args.resource_path,
             "nprocs"        : args.nprocs,
-            "forcing_split_vpu"    : args.forcing_split_vpu,
             "ngen_bmi_confs" : args.ngen_bmi_confs,
             "realization"    : args.realization_provided, # this makes sure the realization in the output is the one the user provided directly
             "forcing_source" : args.forcing_source,

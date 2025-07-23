@@ -20,6 +20,8 @@ datastream-metadata/
 │
 ├── datastream.env
 │
+├── datastream_steps.txt
+│
 ├── conf_datastream.json
 │
 ├── conf_fp.json
@@ -39,6 +41,7 @@ datastream-metadata/
 | File Type | Path in Metadata Directory | Description  |
 |-------------|--------|----------|
 | DATASTREAM CONFIGURATION FILE | datastream-metadata/datastream.env | `CONF_FILE` that can be provided directly to datastreamcli as an argument to reproduce the exact run. |
+| DATASTREAM COMMAND STEPS | datastream-metadata/datastream_steps.txt | Text file that logs each command datastream executes. |
 | DATASTREAM CONFIGURATION | datastream-metadata/conf_datastream.json | Holds metadata about the execution |
 | FORCING PROCESSOR CONFIGURATION | datastream-metadata/conf_fp.json | Configuration file for forcingprocessor. See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#example-confjson) |
 | NWM URL CONFIGURATION | datastream-metadata/conf_nwmurl.json | Configuration file for nwmurl. See [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/forcingprocessor#nwm_file) | 
