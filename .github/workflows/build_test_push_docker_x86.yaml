@@ -9,7 +9,7 @@ on:
       - 'forcingprocessor/**'
       - 'scripts/**'  
       - 'python_tools/**'
-      - '.github/workflows/forcingprocessor.yaml'
+      - '.github/workflows/forcingprocessor*.yaml'
       - '.github/workflows/datastream_python.yaml'  
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -f -d
+        ./scripts/docker_builds.sh -e -f -d -t latest
 
     - name: Test docker containers
       run : |
