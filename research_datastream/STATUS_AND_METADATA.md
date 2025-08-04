@@ -1,4 +1,23 @@
 # Status
+Last updated: 08/2025
+
+Changes
+* Processing has scaled back to only regions with community contributed parameters (VPU16 as of now)
+* Implemented all forecast cycles for medium range
+* Metadata improvements detailed in the latest release https://github.com/CIROH-UA/ngen-datastream/releases/tag/v1.0.1 .
+
+Status 
+* Only VPU16 running
+* Run Types - short_range (all init cycles), medium_range (all init cycles, 1st member), analysis_assim_extend
+* Cold start
+* v2.2 hydrofabric
+
+Future Updates
+* Implement community contribution workflow as detailed in issue https://github.com/CIROH-UA/ngen-datastream/issues/170
+* Implement warm state
+* Update to latest hydrofabric when released.
+
+# Status
 Last updated: 05/2025
 
 Status
