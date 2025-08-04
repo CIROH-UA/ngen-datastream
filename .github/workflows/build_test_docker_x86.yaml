@@ -12,6 +12,11 @@ on:
       - '.github/workflows/forcingprocessor.yaml'
       - '.github/workflows/datastream_python.yaml'   
       
+    paths-ignore:
+      - 'docs/**' 
+      - 'scripts/README.md'
+      - 'docker/README.md'            
+
 permissions:
   contents: read      
 

@@ -11,7 +11,10 @@ on:
     branches:
       - main  
     paths-ignore:
-      - 'docs/**'      
+      - 'docs/**'     
+      - 'scripts/README.md'
+      - 'docker/README.md'            
+
       
 permissions:
   contents: read      

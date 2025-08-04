@@ -6,12 +6,16 @@ on:
       - main
     paths-ignore:
      - 'docs/**'
+     - 'scripts/README.md'
+     - 'docker/README.md'
      
   pull_request:
     branches:
       - main  
     paths-ignore:
-      - 'docs/**'       
+      - 'docs/**' 
+      - 'scripts/README.md'
+      - 'docker/README.md'            
 
 permissions:
   contents: read      
@@ -38,10 +42,6 @@ jobs:
         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
         echo $AWS_ACCESS_KEY_ID
         echo $AWS_SECRET_ACCESS_KEY
-
-    - name: Build docker containers
-      run : |        
-        ./scripts/docker_builds.sh -f -d    
 
     - name: Base test and NWM_RETRO_V3
       run: |        
