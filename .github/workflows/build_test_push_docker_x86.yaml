@@ -1,6 +1,7 @@
 name: Build, Test, and Push Datastream Docker Containers
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -9,8 +10,11 @@ on:
       - 'forcingprocessor/**'
       - 'scripts/**'  
       - 'python_tools/**'
-      - '.github/workflows/forcingprocessor*.yaml'
-      - '.github/workflows/datastream_python.yaml'  
+      - '!docs/**'
+      - '!scripts/README.md'    
+      - '!docker/README.md'  
+      - '!forcingprocessor/README.md' 
+      - '!python_tools/README.md'     
 
 permissions:
   contents: read
@@ -40,12 +44,12 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -e -f -d -t latest
+        ./scripts/docker_builds.sh -e -f -d -t latest-x86
 
     - name: Test docker containers
       run : |
         curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
-        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+        export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
 
     - name: Login to Docker Hub
       uses: docker/login-action@v3

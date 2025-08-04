@@ -1,5 +1,6 @@
 name: Build, Test, and Push Datastream Docker Containers on ARM
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -10,15 +11,27 @@ on:
       - 'python_tools/**'
       - 'research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json' 
       - 'research_datastream/terraform/test/docker_loginNpush.sh' 
-      - '.github/workflows/forcingprocessor.yaml'
-      - '.github/workflows/datastream_python.yaml'  
-      - '.github/workflows/build_test_push_docker_arm.yaml'   
+      - '!docs/**'
+      - '!scripts/README.md'    
+      - '!docker/README.md'  
+      - '!forcingprocessor/README.md' 
+      - '!python_tools/README.md'     
 
   pull_request:
     branches:
       - main
     paths: 
-      - '.github/workflows/build_test_push_docker_arm.yaml'      
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - 'research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json' 
+      - 'research_datastream/terraform/test/docker_loginNpush.sh' 
+      - '!docs/**'
+      - '!scripts/README.md'    
+      - '!docker/README.md'  
+      - '!forcingprocessor/README.md' 
+      - '!python_tools/README.md'  
   
 permissions:
   contents: read

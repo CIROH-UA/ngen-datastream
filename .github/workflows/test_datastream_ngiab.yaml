@@ -1,17 +1,36 @@
 name: Test Datastream NGIAB Integration
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-    paths-ignore:
-     - 'docs/**'
+    paths:
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'      
+      - '!docs/**'
+      - '!workflows/**'
+      - '!scripts/README.md'
+      - '!docker/README.md'
+      - '!forcingprocessor/README.md'
+      - '!python_tools/README.md'
      
   pull_request:
     branches:
       - main  
-    paths-ignore:
-      - 'docs/**'       
+    paths:
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'      
+      - '!docs/**'
+      - '!workflows/**'
+      - '!scripts/README.md'
+      - '!docker/README.md'
+      - '!forcingprocessor/README.md'
+      - '!python_tools/README.md'         
 
 permissions:
   contents: read      
@@ -41,7 +60,7 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -f -d    
+        ./scripts/docker_builds.sh -f -d  
 
     - name: Base test and NWM_RETRO_V3
       run: |        

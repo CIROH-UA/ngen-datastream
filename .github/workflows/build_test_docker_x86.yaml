@@ -1,6 +1,8 @@
 name: Build and Test Datastream Docker Containers on x86
 
 on:
+  workflow_dispatch:   
+
   pull_request:
     branches:
       - main    
@@ -9,9 +11,12 @@ on:
       - 'forcingprocessor/**'
       - 'scripts/**'  
       - 'python_tools/**'
-      - '.github/workflows/forcingprocessor.yaml'
-      - '.github/workflows/datastream_python.yaml'   
-      
+      - '!docs/**'
+      - '!scripts/README.md'    
+      - '!docker/README.md'  
+      - '!forcingprocessor/README.md' 
+      - '!python_tools/README.md'            
+
 permissions:
   contents: read      
 

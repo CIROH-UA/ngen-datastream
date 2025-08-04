@@ -1,17 +1,23 @@
 name: Validate research datastream terraform
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
     paths:
-      - 'research_datastream/terraform/**'
-      - '.github/workflows/research_datastream_terraform.yaml'
+      - 'research_datastream/terraform/main.tf'
+      - 'research_datastream/terraform/variables.tfvars'
+      - 'research_datastream/terraform/lambda_functions/**'
+      - 'research_datastream/terraform/test/**'
+
   pull_request:
     branches:
       - main    
     paths:      
-      - 'research_datastream/terraform/**'
-      - '.github/workflows/research_datastream_terraform.yaml'
+      - 'research_datastream/terraform/main.tf'
+      - 'research_datastream/terraform/variables.tfvars'
+      - 'research_datastream/terraform/lambda_functions/**'
+      - 'research_datastream/terraform/test/**'
 
 permissions:
   contents: read

@@ -3,20 +3,19 @@
 
 name: Test Forcing Processor Amazon Cloud Sources
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
     paths:
       - 'forcingprocessor/**'
-      - '.github/workflows/forcingprocessor.yaml'
-      - '.github/workflows/build_test_docker_x86.yaml'
+      - '!forcingprocessor/README.md'      
   pull_request:
     branches:
       - main    
     paths:      
       - 'forcingprocessor/**'
-      - '.github/workflows/forcingprocessor.yaml'
-      - '.github/workflows/build_test_docker_x86.yaml'
+      - '!forcingprocessor/README.md'
 
 permissions:
   contents: read
