@@ -29,10 +29,6 @@ jobs:
         echo $AWS_ACCESS_KEY_ID
         echo $AWS_SECRET_ACCESS_KEY
 
-    - name: Build docker containers
-      run : |        
-        ./scripts/docker_builds.sh -f -d    
-
     - name: Test with v2.2
       run: |        
         sudo rm -rf $(pwd)/data/datastream_test       

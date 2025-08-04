@@ -3,20 +3,20 @@
 
 name: Test Datastream Python
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
     paths:
       - 'python_tools/**'
-      - '.github/workflows/datastream_python.yaml'
-      - '.github/workflows/build_test_docker_x86.yaml'
+      - '!python_tools/README.md'
   pull_request:
     branches:
       - main    
     paths:      
       - 'python_tools/**'
-      - '.github/workflows/datastream_python.yaml'
-      - '.github/workflows/build_test_docker_x86.yaml'
+      - '!python_tools/README.md'
+      
 permissions:
   contents: read
 jobs:
