@@ -40,10 +40,10 @@ on:
 permissions:
   contents: read
 jobs:
-  test-research-datastream-vpu-01:
+  test-research-datastream-vpu-09:
     runs-on: ubuntu-latest
     env:
-      VPU: 09
+      VPU: "09"
       DATE: 20250801
     steps:
       - name: Checkout repository
@@ -71,9 +71,9 @@ jobs:
         run: |
           cd research_datastream/terraform_community
           # Download the execution JSON
-          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_${{ env.VPU }}/datastream-metadata/execution.json execution.json
+          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
           # Remove specified fields, update TagSpecifications, and modify S3 prefix in commands
-          jq 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "VPU_${{ env.VPU }}_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "\'tests/short_range/VPU_${{ env.VPU }}\'"))' execution.json > temp.json
+          jq --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)"))' execution.json > temp.json
           
       - name: Check and create AWS key pair
         run: |
@@ -103,5 +103,9 @@ jobs:
 
       - name: Verify output file
         run: |
-          cd research_datastream/terraform_community
           curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
+
+      - name: Clean up
+        if: always()
+        run: |
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No file to delete"
