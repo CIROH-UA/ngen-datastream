@@ -1,6 +1,18 @@
 name: Test Research DataStream ForcingProcessing
 on:
   workflow_dispatch:     
+  push:
+    branches:
+      - main
+    paths:
+      - 'forcingprocessor/**'
+      - '!forcingprocessor/README.md'      
+  pull_request:
+    branches:
+      - main    
+    paths:      
+      - 'forcingprocessor/**'
+      - '!forcingprocessor/README.md'  
 
 permissions:
   contents: read
@@ -8,21 +20,86 @@ jobs:
   test-research-datastream-forcingprocessing:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-      - name: Configure AWS
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
         run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region us-east-1 
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade awscli
 
-      - name: Test execution
-        run: |   
+      - name: Download and modify execution JSON
+        run: |
           cd research_datastream/terraform_community
-          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; else echo "Key pair 'actions_key' already exists"; fi
-          jq '.commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "'tests/forcing_short_range\''"))' ./executions/short_range/execution_datastream_fp.json > temp.json
-          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name fp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
+          # Download the execution JSON
+          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20250801/forcing_short_range/00/metadata/execution.json execution.json
+          # Remove specified fields and update TagSpecifications
+          jq 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "tests/short_range/fp'\''"))' execution.json > temp.json
+          
+      - name: Check and create AWS key pair
+        run: |
+          cd research_datastream/terraform_community
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; 
+          else 
+            echo "Key pair 'actions_key' already exists"; 
+          fi
+
+      - name: Start and monitor Step Functions execution
+        run: |
+          cd research_datastream/terraform_community
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name fp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
+          echo "Execution ARN: $execution_arn"
+          status="RUNNING"
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
+            if [ "$status" == "FAILED" ]; then
+              echo "State machine execution failed!"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "State machine execution succeeded!"
+
+      - name: Verify output files
+        run: |
+          curl -fSs -o test_01.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_01.nc || { echo "Error: VPU_01 not found"; exit 1; }
+          curl -fSs -o test_02.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_02.nc || { echo "Error: VPU_02 not found"; exit 1; }
+          curl -fSs -o test_03W.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03W.nc || { echo "Error: VPU_03W not found"; exit 1; }
+          curl -fSs -o test_03S.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03S.nc || { echo "Error: VPU_03S not found"; exit 1; }
+          curl -fSs -o test_03N.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03N.nc || { echo "Error: VPU_03N not found"; exit 1; }
+          curl -fSs -o test_04.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_04.nc || { echo "Error: VPU_04 not found"; exit 1; }
+          curl -fSs -o test_05.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_05.nc || { echo "Error: VPU_05 not found"; exit 1; }
+          curl -fSs -o test_06.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_06.nc || { echo "Error: VPU_06 not found"; exit 1; }
+          curl -fSs -o test_07.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_07.nc || { echo "Error: VPU_07 not found"; exit 1; }
+          curl -fSs -o test_08.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_08.nc || { echo "Error: VPU_08 not found"; exit 1; }
+          curl -fSs -o test_09.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_09.nc || { echo "Error: VPU_09 not found"; exit 1; }
+          curl -fSs -o test_10L.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc || { echo "Error: VPU_10L not found"; exit 1; }
+          curl -fSs -o test_10U.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10U.nc || { echo "Error: VPU_10U not found"; exit 1; }
+          curl -fSs -o test_11.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_11.nc || { echo "Error: VPU_11 not found"; exit 1; }
+          curl -fSs -o test_12.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_12.nc || { echo "Error: VPU_12 not found"; exit 1; }
+          curl -fSs -o test_13.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_13.nc || { echo "Error: VPU_13 not found"; exit 1; }
+          curl -fSs -o test_14.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_14.nc || { echo "Error: VPU_14 not found"; exit 1; }
+          curl -fSs -o test_15.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_15.nc || { echo "Error: VPU_15 not found"; exit 1; }
+          curl -fSs -o test_16.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_16.nc || { echo "Error: VPU_16 not found"; exit 1; }
+          curl -fSs -o test_17.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_17.nc || { echo "Error: VPU_17 not found"; exit 1; }
+          curl -fSs -o test_18.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_18.nc || { echo "Error: VPU_18 not found"; exit 1; }
+      
+      - name: Clean up
+        if: always()
+        run: |
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/fp || echo "No file to delete"          
