@@ -1,0 +1,84 @@
+name: Test Release Workflow (No Push)
+
+on:
+  workflow_dispatch:
+    branches:
+      - test-release-workflow  
+    inputs:
+      version:
+        description: "Version tag to use (e.g., v0.0.99-test)"
+        required: true
+        default: v0.0.99-test
+
+permissions:
+  contents: write
+
+jobs:
+  build-test-docker-x86:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2  
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1    
+
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz \
+        && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz \
+        && sudo mv ./hfsubset /usr/bin/hfsubset \
+        && sudo apt-get install git pip pigz -y        
+
+    - name: Build x86 Docker Containers (No Push)
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        ./scripts/docker_builds.sh -e -f -d -t "$VERSION"
+
+    - name: Test docker containers
+      run : |
+        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+        export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+
+
+  update-docker-versions-file:
+    name: Update docker-versions.yml
+    runs-on: ubuntu-latest
+    needs: [build-test-docker-x86]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update docker-versions.yml
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "FP_TAG: \"$VERSION\"" > docker-versions.yml
+          echo "DS_TAG: \"$VERSION\"" >> docker-versions.yml
+          echo "NGIAB_TAG: \"$VERSION\"" >> docker-versions.yml
+          echo "DS_VERSION: \"$VERSION\"" >> docker-versions.yml
+
+      - name: Commit and Push Changes
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add docker-versions.yml
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update docker-versions.yml for test $VERSION [skip ci]"
+            git push origin test-release-workflow
+          fi
+
