@@ -9,10 +9,11 @@
     "runuser -l ec2-user -c 'docker run --rm -e AWS_ACCESS_KEY_ID=$(echo $AWS_ACCESS_KEY_ID) -e AWS_SECRET_ACCESS_KEY=$(echo $AWS_SECRET_ACCESS_KEY) -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/forcingprocessor:latest python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/processor.py /mounted_dir/datastream-metadata/conf_fp.json'"
 ],
 "run_options":{
-  "ii_terminate_instance" : true,
-  "ii_delete_volume"      : true,
-  "ii_check_s3"           : true,
-  "timeout_s"             : 1200
+        "ii_terminate_instance": true,
+        "ii_delete_volume": true,
+        "ii_check_s3": true,
+        "timeout_s": 1200,
+        "n_retries_allowed": 2
 },
 "instance_parameters" :
 {
