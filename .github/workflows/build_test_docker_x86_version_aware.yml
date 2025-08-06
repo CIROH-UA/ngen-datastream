@@ -113,6 +113,7 @@ jobs:
         fi
         
         if [ -n "$BUILD_FLAGS" ]; then
+          echo $BUILD_FLAGS
           ./scripts/docker_builds.sh $BUILD_FLAGS -t latest-x86
         else
           echo "No components changed, skipping build"
