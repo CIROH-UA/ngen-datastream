@@ -10,12 +10,12 @@ This script is what is referred to as by DataStreamCLI. There are numerous ways 
 
 ### One-off execution examples
 1.
-    For a NOM, CFE, PET, troute NextGen execution over Palisade, Colorado on 20200620 using the National Water Model v3 retrospective forcings:
+    For a NOM, CFE, PET, troute NextGen execution over VPU09 on 20200620 using the National Water Model v3 retrospective forcings:
     ```
     ./scripts/datastream -s 202006200100 \
                         -e 202006210000 \
                         -C NWM_RETRO_V3 \
-                        -d ./data/datastream_test \
+                        -d ./data/datastream_test_1 \
                         -g https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/v2.2_resources/VPU_09/config/nextgen_VPU_09.gpkg \
                         -R ./configs/ngen/realization_sloth_nom_cfe_pet_troute.json \
                         -n 4
@@ -23,12 +23,24 @@ This script is what is referred to as by DataStreamCLI. There are numerous ways 
     `-s` and `-e` set the start and end data. `-C` set the forcing source. `-d` sets the local output directory. `-g` sets the geopackage, which defines the spatial domain. `-R` sets the NextGen configuration file, also referred to as a realization file. `-n` sets the maximum number of processes to utilize during the DataStreamCLI execution.
 
 2.
-    To repeat example 1 over a different time period, the resource directroy and be reused in future executions over the same domain.
+    For a simulation with the same NextGen configuration, but over a different time period, we can reuse the resource directory from the prior execution to take advantage of cached spatially dependent files.
 
-    Copy the resource directory
+    First, delete the cached time dependent forcings
+
     ```
-    cp 
+    rm -rf ./data/datastream_test_1/datastream-resources/ngen-forcings
     ```
+
+    Then execute using the resource directory and a different time period
+
+    ```
+    ./scripts/datastream -s 202006250100 \
+                        -e 202006260000 \
+                        -C NWM_RETRO_V3 \
+                        -d ./data/datastream_test_2 \
+                        -r ./data/datastream_test_1/datastream-resources \
+                        -n 4
+    ```    
 
 ### NextGen Research DataStream releated examples:
 The backend software of the NextGen Research DataStream is DataStreamCLI. Several examples are given below to help illustrate the different ways DataStreamCLI can be executed. While the NextGen Research DataStream executions occur within AWS cloud, these commands will execute in a local environment. See the [NextGen Research DataStream docs](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream) for more information on the design.
@@ -61,10 +73,10 @@ This script handles the docker builds for the parent `datastream-deps` and the p
 
 For example.
 ```
-scripts/docker_builds. -e -d -f -t my-local-containers-latest
+scripts/docker_builds.sh -e -d -f -t my-local-containers-latest
 ```
 
-will build the containers locally.
+will build these containers locally
 
 ```
 awiciroh/datastream-deps:my-local-containers-latest
