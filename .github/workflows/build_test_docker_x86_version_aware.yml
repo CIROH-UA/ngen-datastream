@@ -132,3 +132,31 @@ jobs:
         export DS_TAG=$VERSION_TAG-x86
         export FP_TAG=$VERSION_TAG-x86
         ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+
+
+
+
+    # - name: Push docker containers
+    #   run: |
+    #     BUILD_FLAGS=""
+        
+    #     if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+    #       BUILD_FLAGS="$BUILD_FLAGS -e"
+    #       # Build and push versioned tag
+    #       ./scripts/docker_builds.sh -e -t ${{ steps.changes.outputs.deps_version }}-x86 -p
+    #     fi
+    #     if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
+    #       BUILD_FLAGS="$BUILD_FLAGS -f"
+    #       # Build and push versioned tag
+    #       ./scripts/docker_builds.sh -f -t ${{ steps.changes.outputs.fp_version }}-x86 -p
+    #     fi
+    #     if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
+    #       BUILD_FLAGS="$BUILD_FLAGS -d"
+    #       # Build and push versioned tag
+    #       ./scripts/docker_builds.sh -d -t ${{ steps.changes.outputs.ds_version }}-x86 -p
+    #     fi
+        
+    #     # Push latest-x86 tags
+    #     if [ -n "$BUILD_FLAGS" ]; then
+    #       ./scripts/docker_builds.sh $BUILD_FLAGS -t latest-x86 -p
+    #     fi
