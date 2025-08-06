@@ -228,7 +228,7 @@ resource "aws_lambda_function" "commander_lambda" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/commander_lambda.zip"
-  timeout       = 120
+  timeout       = 600
 }
 
 resource "aws_lambda_function" "poller_lambda" {
@@ -347,8 +347,8 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -380,8 +380,8 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -389,7 +389,6 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
     "EC2Poller": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "OutputPath": "$.Payload",
       "OutputPath": "$.Payload",
       "Parameters": {
         "Payload.$": "$",
@@ -410,8 +409,8 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -453,11 +452,47 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
+    },
+    "Retry Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "EC2StarterFromAMI",
+          "And": [
+            {
+              "Variable": "$.ii_s3_object_checked",
+              "BooleanEquals": false
+            },
+            {
+              "Variable": "$.run_options.n_retries_allowed",
+              "NumericGreaterThanPath": "$.retry_attempt"
+            }
+          ]
+        },
+        {
+          "Next": "AlertJordan",
+          "And": [
+            {
+              "Variable": "$.ii_s3_object_checked",
+              "BooleanEquals": false
+            },
+            {
+              "Variable": "$.run_options.n_retries_allowed",
+              "NumericEqualsPath": "$.retry_attempt"
+            }
+          ]
+        }
+      ],
+      "Default": "Success, Go to End"
+    },
+    "Success, Go to End": {
+      "Type": "Pass",
+      "End": true
     },
     "AlertJordan": {
       "Type": "Task",
@@ -466,7 +501,7 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
         "Message.$": "$",
         "TopicArn": "arn:aws:sns:us-east-1:879381264451:AlertJordanOnDataStreamFailure"
       },
-      "Next": "EC2Stopper",
+      "End": true,
       "ResultPath": "$.failedInput"
     },
     "EC2Stopper": {
@@ -477,13 +512,21 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
         "Payload.$": "$",
         "FunctionName": "${aws_lambda_function.stopper_lambda.arn}:$LATEST"
       },
-      "End": true,
       "Retry": [
         {
           "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
           "IntervalSeconds": 1,
           "MaxAttempts": 3,
           "BackoffRate": 2
+        }
+      ],
+      "Next": "Retry Choice",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "AlertJordan"
         }
       ]
     }
@@ -547,12 +590,15 @@ locals {
   init_cycles_config = jsondecode(file("${path.module}/executions/execution_forecast_inputs.json"))
 
   # 01, 07, and 17 removed for now
+  # vpus = [
+  #   "fp","02","03N","03S","03W","04",
+  #   "05","06","08","09","10L",
+  #   "10U","11","12","13","14","15",
+  #   "16","18"
+  # ]
   vpus = [
-    "fp","02","03N","03S","03W","04",
-    "05","06","08","09","10L",
-    "10U","11","12","13","14","15",
-    "16","18"
-  ]
+    "fp","16"
+  ]  
   short_range_paths = {
     for pair in flatten([
       for init in local.init_cycles_config.short_range.init_cycles : [
@@ -584,11 +630,30 @@ locals {
       ]
     ]) : pair.key => pair.value
   }
+
+  analysis_assim_extend_times = {
+    for pair in flatten([
+      for init in local.init_cycles_config.analysis_assim_extend.init_cycles : [
+        for vpu in local.vpus : {
+          key   = "${init}_${vpu}"
+          value = "${vpu}" == "fp"? 15 : 16
+        }
+      ]
+    ]) : pair.key => pair.value
+  }
+
+  # medium_vpus = [
+  #   "fp","02","03N","03S","03W","04","06","08","09","12","13","14","15","16","18"
+  # ] 
+  medium_vpus = [
+    "fp","16"
+  ]    
+
   medium_range_paths = {
     for pair in flatten([
       for init in local.init_cycles_config.medium_range.init_cycles : [
         for member in local.init_cycles_config.medium_range.ensemble_members : [
-          for vpu in local.vpus : {
+          for vpu in local.medium_vpus : {
             key   = "${init}_${member}_${vpu}"
             value = "${path.module}/executions/medium_range/${init}/${member}/execution_datastream_${vpu}.json"
           }
@@ -600,7 +665,7 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config.medium_range.init_cycles : [
         for member in local.init_cycles_config.medium_range.ensemble_members : [
-          for vpu in local.vpus : {
+          for vpu in local.medium_vpus : {
             key   = "${init}_${member}_${vpu}"
             value = "${vpu}" == "fp"? (tonumber("${init}")+4) % 24 : (tonumber("${init}") + 5) % 24
           }
@@ -669,7 +734,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range" {
     mode = "OFF"
   }
 
-  schedule_expression        = "cron(0 17 * * ? *)"
+  schedule_expression        = "cron(0 ${local.analysis_assim_extend_times[each.key]} * * ? *)"
   schedule_expression_timezone = "America/New_York"
 
   target {
