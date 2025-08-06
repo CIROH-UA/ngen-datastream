@@ -129,5 +129,6 @@ jobs:
       if: steps.changes.outputs.build_ds == 'true'
       run: |
         curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+        export DS_TAG=$VERSION_TAG-x86
+        export FP_TAG=$VERSION_TAG-x86
         ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
-
