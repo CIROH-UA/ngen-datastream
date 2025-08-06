@@ -74,19 +74,16 @@ if [ "$PUSH" = "yes" ]; then
     if [ "$BUILD_DEPS" = "yes" ]; then
       echo "Pushing datastream-deps"
       docker push awiciroh/datastream-deps:$TAG
-      docker push awiciroh/datastream-deps:latest-x86
     fi
     
     if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
       echo "Pushing forcingprocessor"
       docker push awiciroh/forcingprocessor:$TAG
-      docker push awiciroh/forcingprocessor:latest-x86
     fi
     
     if [ "$BUILD_DATASTREAM" = "yes" ]; then
       echo "Pushing datastream"
       docker push awiciroh/datastream:$TAG
-      docker push awiciroh/datastream:latest-x86
     fi
     
     echo "Docker containers have been pushed to awiciroh dockerhub!"
