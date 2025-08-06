@@ -41,7 +41,7 @@ cd "$DOCKER_DIR"
 if [ "$BUILD_DEPS" = "yes" ]; then
   echo "Building datastream-deps:$TAG"
   docker build -t awiciroh/datastream-deps:$TAG \
-               -t awiciroh/datastream-deps:latest \
+               -t awiciroh/datastream-deps:latest-x86 \
                -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM
   cleanup_docker_datastream
 fi
@@ -51,7 +51,7 @@ if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   mkdir "$DOCKER_DATASTREAM"
   cp -r "$DATASTREAM_PATH"/forcingprocessor "$DOCKER_DATASTREAM"/forcingprocessor
   docker build -t awiciroh/forcingprocessor:$TAG \
-               -t awiciroh/forcingprocessor:latest \
+               -t awiciroh/forcingprocessor:latest-x86 \
                -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=$TAG
   cleanup_docker_datastream
 fi
@@ -62,7 +62,7 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   cp -r "$DATASTREAM_PATH"/python_tools "$DOCKER_DATASTREAM"/python_tools
   cp -r "$DATASTREAM_PATH"/configs "$DOCKER_DATASTREAM"/configs
   docker build -t awiciroh/datastream:$TAG \
-               -t awiciroh/datastream:latest \
+               -t awiciroh/datastream:latest-x86 \
                -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG
   cleanup_docker_datastream
 fi
@@ -74,19 +74,19 @@ if [ "$PUSH" = "yes" ]; then
     if [ "$BUILD_DEPS" = "yes" ]; then
       echo "Pushing datastream-deps"
       docker push awiciroh/datastream-deps:$TAG
-      docker push awiciroh/datastream-deps:latest
+      docker push awiciroh/datastream-deps:latest-x86
     fi
     
     if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
       echo "Pushing forcingprocessor"
       docker push awiciroh/forcingprocessor:$TAG
-      docker push awiciroh/forcingprocessor:latest
+      docker push awiciroh/forcingprocessor:latest-x86
     fi
     
     if [ "$BUILD_DATASTREAM" = "yes" ]; then
       echo "Pushing datastream"
       docker push awiciroh/datastream:$TAG
-      docker push awiciroh/datastream:latest
+      docker push awiciroh/datastream:latest-x86
     fi
     
     echo "Docker containers have been pushed to awiciroh dockerhub!"
