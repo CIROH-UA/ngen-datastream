@@ -41,10 +41,11 @@ cd "$DOCKER_DIR"
 if [ "$BUILD_DEPS" = "yes" ]; then
   echo "Building datastream-deps:$TAG"
   docker build -t awiciroh/datastream-deps:$TAG \
-               -t awiciroh/datastream-deps:latest-x86 \
                -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM
   cleanup_docker_datastream
 fi
+docker build -t awiciroh/datastream-deps:latest-x86 \
+               -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM
 
 if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   echo "Building forcingprocessor:$TAG"
