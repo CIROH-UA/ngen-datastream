@@ -101,86 +101,32 @@ jobs:
     - name: Build docker containers
       run: |
         chmod +x ./scripts/docker_builds.sh
-        BUILD_FLAGS=" -e -f -d"
-        VERSION_TAG=""
-
-        if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
-          VERSION_TAG="${{ steps.changes.outputs.deps_version }}"
-        fi
-        if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-          VERSION_TAG="${{ steps.changes.outputs.fp_version }}"
-        fi
-        if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-          VERSION_TAG="${{ steps.changes.outputs.ds_version }}"
-        fi
-
-        if [ -n "$BUILD_FLAGS" ]; then
-          echo "Building with flags: $BUILD_FLAGS and version: $VERSION_TAG"
-          ./scripts/docker_builds.sh $BUILD_FLAGS -t $VERSION_TAG-x86
-        else
-          echo "No components changed, skipping build"
-        fi
+        ./scripts/docker_builds.sh -e -f -d -t $VERSION_TAG-x86
 
 
     - name: Prepare and test docker containers
       run: |
         curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+        export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+
+
+    - name: Push docker containers
+      run: |
+        BUILD_FLAGS=""
         
-        # Prepare DS_TAG
-        if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-          DS_TAG="${{ steps.changes.outputs.ds_version }}-x86"
-          echo "Using built datastream: $DS_TAG"
-        else
-          DS_TAG="latest-x86"
-          echo "Pulling existing datastream: $DS_TAG"
-          docker pull awiciroh/datastream:$DS_TAG
+        if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -e"
+          ./scripts/docker_builds.sh -e -t ${{ steps.changes.outputs.deps_version }}-x86 -p
         fi
-        
-        # Prepare FP_TAG
         if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-          FP_TAG="${{ steps.changes.outputs.fp_version }}-x86"
-          echo "Using built forcingprocessor: $FP_TAG"
-        else
-          FP_TAG="latest-x86"
-          echo "Pulling existing forcingprocessor: $FP_TAG"
-          docker pull awiciroh/forcingprocessor:$FP_TAG
+          BUILD_FLAGS="$BUILD_FLAGS -f"
+          ./scripts/docker_builds.sh -f -t ${{ steps.changes.outputs.fp_version }}-x86 -p
+        fi
+        if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -d"
+          ./scripts/docker_builds.sh -d -t ${{ steps.changes.outputs.ds_version }}-x86 -p
         fi
         
-        # Always pull datastream-deps if not built
-        if [ "${{ steps.changes.outputs.build_deps }}" == "false" ]; then
-          echo "Pulling datastream-deps:latest-x86"
-          docker pull awiciroh/datastream-deps:latest-x86
-        fi
-        
-        # Run the test
-        export DS_TAG=$DS_TAG
-        export FP_TAG=$FP_TAG
-        echo "Testing with DS_TAG=$DS_TAG, FP_TAG=$FP_TAG"
-        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
-
-
-
-    # - name: Push docker containers
-    #   run: |
-    #     BUILD_FLAGS=""
-        
-    #     if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
-    #       BUILD_FLAGS="$BUILD_FLAGS -e"
-    #       # Build and push versioned tag
-    #       ./scripts/docker_builds.sh -e -t ${{ steps.changes.outputs.deps_version }}-x86 -p
-    #     fi
-    #     if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-    #       BUILD_FLAGS="$BUILD_FLAGS -f"
-    #       # Build and push versioned tag
-    #       ./scripts/docker_builds.sh -f -t ${{ steps.changes.outputs.fp_version }}-x86 -p
-    #     fi
-    #     if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-    #       BUILD_FLAGS="$BUILD_FLAGS -d"
-    #       # Build and push versioned tag
-    #       ./scripts/docker_builds.sh -d -t ${{ steps.changes.outputs.ds_version }}-x86 -p
-    #     fi
-        
-        # Push latest-x86 tags
         # if [ -n "$BUILD_FLAGS" ]; then
         #   ./scripts/docker_builds.sh $BUILD_FLAGS -t latest-x86 -p
         # fi
