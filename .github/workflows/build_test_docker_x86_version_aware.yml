@@ -136,27 +136,27 @@ jobs:
 
 
 
-    # - name: Push docker containers
-    #   run: |
-    #     BUILD_FLAGS=""
+    - name: Push docker containers
+      run: |
+        BUILD_FLAGS=""
         
-    #     if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
-    #       BUILD_FLAGS="$BUILD_FLAGS -e"
-    #       # Build and push versioned tag
-    #       ./scripts/docker_builds.sh -e -t ${{ steps.changes.outputs.deps_version }}-x86 -p
-    #     fi
-    #     if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-    #       BUILD_FLAGS="$BUILD_FLAGS -f"
-    #       # Build and push versioned tag
-    #       ./scripts/docker_builds.sh -f -t ${{ steps.changes.outputs.fp_version }}-x86 -p
-    #     fi
-    #     if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-    #       BUILD_FLAGS="$BUILD_FLAGS -d"
-    #       # Build and push versioned tag
-    #       ./scripts/docker_builds.sh -d -t ${{ steps.changes.outputs.ds_version }}-x86 -p
-    #     fi
+        if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -e"
+          # Build and push versioned tag
+          ./scripts/docker_builds.sh -e -t ${{ steps.changes.outputs.deps_version }}-x86 -p
+        fi
+        if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -f"
+          # Build and push versioned tag
+          ./scripts/docker_builds.sh -f -t ${{ steps.changes.outputs.fp_version }}-x86 -p
+        fi
+        if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -d"
+          # Build and push versioned tag
+          ./scripts/docker_builds.sh -d -t ${{ steps.changes.outputs.ds_version }}-x86 -p
+        fi
         
-    #     # Push latest-x86 tags
-    #     if [ -n "$BUILD_FLAGS" ]; then
-    #       ./scripts/docker_builds.sh $BUILD_FLAGS -t latest-x86 -p
-    #     fi
+        # Push latest-x86 tags
+        # if [ -n "$BUILD_FLAGS" ]; then
+        #   ./scripts/docker_builds.sh $BUILD_FLAGS -t latest-x86 -p
+        # fi
