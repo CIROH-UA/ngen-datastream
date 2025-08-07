@@ -101,6 +101,28 @@ jobs:
     - name: Build docker containers
       run: |
         chmod +x ./scripts/docker_builds.sh
+        VERSION_TAG=""
+
+        if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -e"
+          VERSION_TAG="${{ steps.changes.outputs.deps_version }}"
+        fi
+        if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -f"
+          VERSION_TAG="${{ steps.changes.outputs.fp_version }}"
+        fi
+        if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
+          BUILD_FLAGS="$BUILD_FLAGS -d"
+          VERSION_TAG="${{ steps.changes.outputs.ds_version }}"
+        fi
+
+        if [ -n "$BUILD_FLAGS" ]; then
+          echo "Building with flags: $BUILD_FLAGS and version: $VERSION_TAG"
+          ./scripts/docker_builds.sh $BUILD_FLAGS -t $VERSION_TAG-x86
+        else
+          echo "No components changed, skipping build"
+        fi
+
         ./scripts/docker_builds.sh -e -f -d -t $VERSION_TAG-x86
 
 
