@@ -101,13 +101,13 @@ jobs:
     - name: Build docker containers
       run: |
         chmod +x ./scripts/docker_builds.sh
-        BUILD_FLAGS=""
+        BUILD_FLAGS=" -e"
         VERSION_TAG=""
 
-        if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
-          BUILD_FLAGS="$BUILD_FLAGS -e"
-          VERSION_TAG="${{ steps.changes.outputs.deps_version }}"
-        fi
+        # if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+        #   BUILD_FLAGS="$BUILD_FLAGS -e"
+        #   VERSION_TAG="${{ steps.changes.outputs.deps_version }}"
+        # fi
         if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
           BUILD_FLAGS="$BUILD_FLAGS -f"
           VERSION_TAG="${{ steps.changes.outputs.fp_version }}"
