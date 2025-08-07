@@ -1,0 +1,66 @@
+name: pull and Test Datastream Docker Containers on x86 (Version Aware)
+
+on:
+  workflow_dispatch:   
+  push:
+    branches:
+      - release_tags
+    paths:
+      - 'versions.yml'
+
+permissions:
+  contents: read      
+
+jobs:
+  build-test-docker-x86:
+    runs-on: ubuntu-latest
+    outputs:
+      build_deps: ${{ steps.changes.outputs.build_deps }}
+      build_fp: ${{ steps.changes.outputs.build_fp }}
+      build_ds: ${{ steps.changes.outputs.build_ds }}
+      deps_version: ${{ steps.changes.outputs.deps_version }}
+      fp_version: ${{ steps.changes.outputs.fp_version }}
+      ds_version: ${{ steps.changes.outputs.ds_version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+        
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
+
+    - name: Pull all latest images and test
+      run: |
+        # Pull all latest images
+        docker pull awiciroh/datastream-deps:latest-x86
+        docker pull awiciroh/forcingprocessor:latest-x86
+        docker pull awiciroh/datastream:latest-x86
+        
+        # Test with consistent latest images
+        export DEPS_TAG="latest-x86"
+        export DS_TAG="latest-x86"
+        export FP_TAG="latest-x86"
+        
+        echo "Testing with all latest images"
+        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
