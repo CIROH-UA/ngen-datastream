@@ -1,15 +1,15 @@
 name: Build, Test, and Push Datastream Docker Containers on ARM (Version Aware)
 
 on:
-  workflow_run:
-    workflows: ["Build and Test Datastream Docker Containers on x86 (Version Aware)"]
-    types:
-      - completed
+  workflow_dispatch:   
+  push:
     branches:
       - release_tags
+    paths:
+      - 'versions.yml'
 
 permissions:
-  contents: read
+  contents: read   
 
 jobs:
   build-test-push-docker-arm:
@@ -108,29 +108,28 @@ jobs:
           
       - name: Build and Test arm docker containers with AWS infra
         run: |
+          BUILD_FLAGS=""
+          DS_Dep_TAG=""
+          FP_TAG=""
+          DS_TAG=""
+          if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+            DS_Dep_TAG="${{ steps.changes.outputs.deps_version }}"
+            BUILD_FLAGS="$BUILD_FLAGS -e"
+          fi
+          if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
+            FP_TAG="${{ steps.changes.outputs.fp_version }}"
+            BUILD_FLAGS="$BUILD_FLAGS -f"
+          fi
+          if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
+            DS_TAG="${{ steps.changes.outputs.ds_version }}"
+            BUILD_FLAGS="$BUILD_FLAGS -d"
+          fi
+          sed -i "s|buildtags |DS_TAG=${DS_TAG} |" release_tags/research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json
+          sed -i "s|FP_TAG=latest-arm64|FP_TAG=${FP_TAG}|" release_tags/research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json
           cd research_datastream/terraform
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
           
-      # - name: Confirm docker push
-      #   run: |
-      #     sleep 30  # Allow time for containers to be available
-          
-      #     if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-      #       docker pull awiciroh/datastream:${{ steps.changes.outputs.ds_version }}-arm64
-      #       CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/datastream:${{ steps.changes.outputs.ds_version }}-arm64)" +%s)
-      #       CURRENT_EPOCH=$(date +%s)
-      #       TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH))
-      #       [ $TIME_DIFF -le 1800 ] && echo "Datastream container created within the past 30 minutes." || { echo "Error: Datastream container was NOT created recently."; exit 1; }
-      #     fi
-          
-      #     if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-      #       docker pull awiciroh/forcingprocessor:${{ steps.changes.outputs.fp_version }}-arm64
-      #       CREATION_EPOCH=$(date --date="$(docker inspect -f '{{.Created}}' awiciroh/forcingprocessor:${{ steps.changes.outputs.fp_version }}-arm64)" +%s)
-      #       CURRENT_EPOCH=$(date +%s)
-      #       TIME_DIFF=$((CURRENT_EPOCH - CREATION_EPOCH))
-      #       [ $TIME_DIFF -le 1800 ] && echo "Forcingprocessor container created within the past 30 minutes." || { echo "Error: Forcingprocessor container was NOT created recently."; exit 1; }
-      #     fi
-          
+
       - name: Tear down infra
         if: always()
         run: |
