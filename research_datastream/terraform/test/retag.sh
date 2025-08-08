@@ -1,43 +1,42 @@
 #!/bin/bash
 set -e
 
-while getopts "fed" flag; do
+# Fixed old tags (change here if needed)
+F_OLD="latest-arm64"
+D_OLD="latest-arm64"
+
+# Flags
+RETAG_F=""
+RETAG_D=""
+
+while getopts "fd" flag; do
   case $flag in
-    f) RETAG_FORCINGPROCESSOR="yes" ;;
-    d) RETAG_DATASTREAM="yes" ;;
-    \?) echo "Invalid option"; exit 1 ;;
+    f) RETAG_F="yes" ;;
+    d) RETAG_D="yes" ;;
   esac
 done
-
 shift $((OPTIND-1))
 
+# Expect two args: new tag for forcingprocessor, new tag for datastream
 if [ $# -ne 2 ]; then
-    echo "Usage: $0 [-f|-d|-e] <old_tag> <new_tag>"
-    echo "  -f : Retag forcingprocessor"
-    echo "  -d : Retag datastream"
-    echo "  -e : Retag datastream-deps"
-    exit 1
+  echo "Usage: $0 [-f] [-d] <f_new_tag> <d_new_tag>"
+  exit 1
 fi
 
-OLD_TAG=$1
-NEW_TAG=$2
+F_NEW=$1
+D_NEW=$2
 
 retag_and_push() {
-    local image=$1
-    echo "Retagging $image from '$OLD_TAG' to '$NEW_TAG'..."
-    docker tag "$image:$OLD_TAG" "$image:$NEW_TAG"
-    echo "Pushing $image:$NEW_TAG..."
-    docker push "$image:$NEW_TAG"
+  local image=$1 old=$2 new=$3
+  docker tag "$image:$old" "$image:$new"
+  docker push "$image:$new"
 }
 
-if [ "$RETAG_DEPS" = "yes" ]; then
-    retag_and_push "awiciroh/datastream-deps"
+if [ "$RETAG_F" = "yes" ]; then
+  retag_and_push "awiciroh/forcingprocessor" "$F_OLD" "$F_NEW"
 fi
 
-if [ "$RETAG_FORCINGPROCESSOR" = "yes" ]; then
-    retag_and_push "awiciroh/forcingprocessor"
+if [ "$RETAG_D" = "yes" ]; then
+  retag_and_push "awiciroh/datastream" "$D_OLD" "$D_NEW"
 fi
-
-if [ "$RETAG_DATASTREAM" = "yes" ]; then
-    retag_and_push "awiciroh/datastream"
-fi
+# ./retag.sh -f -d v1.2.0 v2.3.0
