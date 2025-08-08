@@ -44,15 +44,12 @@ if [ "$BUILD_DEPS" = "yes" ]; then
                -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM
   cleanup_docker_datastream
 fi
-docker build -t awiciroh/datastream-deps:latest-x86 \
-               -f Dockerfile.datastream-deps . --no-cache --build-arg ARCH=$PLATFORM
 
 if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
   echo "Building forcingprocessor:$TAG"
   mkdir "$DOCKER_DATASTREAM"
   cp -r "$DATASTREAM_PATH"/forcingprocessor "$DOCKER_DATASTREAM"/forcingprocessor
   docker build -t awiciroh/forcingprocessor:$TAG \
-               -t awiciroh/forcingprocessor:latest-x86 \
                -f Dockerfile.forcingprocessor . --no-cache --build-arg TAG_NAME=$TAG
   cleanup_docker_datastream
 fi
@@ -63,7 +60,6 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   cp -r "$DATASTREAM_PATH"/python_tools "$DOCKER_DATASTREAM"/python_tools
   cp -r "$DATASTREAM_PATH"/configs "$DOCKER_DATASTREAM"/configs
   docker build -t awiciroh/datastream:$TAG \
-               -t awiciroh/datastream:latest-x86 \
                -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG
   cleanup_docker_datastream
 fi
