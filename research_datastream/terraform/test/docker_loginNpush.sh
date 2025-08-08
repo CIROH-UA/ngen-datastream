@@ -5,7 +5,7 @@ DOCKERHUB_USERNAME="awiciroh"
 
 if [ "$(echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin)" == "Login Succeeded" ]; then             
     echo "Docker login successful"
-    /home/ec2-user/ngen-datastream/scripts/docker_builds.sh buildtags -p -t latest-arm64 >> /home/ec2-user/ngen-datastream/docker_build_log.txt
+    /home/ec2-user/ngen-datastream/scripts/docker_builds.sh buildtags -t latest-arm64 >> /home/ec2-user/ngen-datastream/docker_build_log.txt
     /home/ec2-user/ngen-datastream/research_datastream/terraform/test/retag.sh buildtags DS_DP_Tag FP_Tag DS_Tag  >> /home/ec2-user/ngen-datastream/docker_build_log.txt
     echo "Push complete"
 else
