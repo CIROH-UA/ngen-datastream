@@ -5,7 +5,7 @@ DOCKERHUB_USERNAME="awiciroh"
 
 if [ "$(echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin)" == "Login Succeeded" ]; then             
     echo "Docker login successful"
-    /home/ec2-user/ngen-datastream/scripts/docker_builds.sh -p -t latest-arm64 >> /home/ec2-user/ngen-datastream/docker_build_log.txt
+    /home/ec2-user/ngen-datastream/scripts/docker_builds.sh -p -a -t latest-arm64 >> /home/ec2-user/ngen-datastream/docker_build_log.txt
     echo "Push complete"
 else
     echo "Docker login failed"
