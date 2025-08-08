@@ -123,9 +123,12 @@ jobs:
             DS_TAG="${{ steps.changes.outputs.ds_version }}"
             BUILD_FLAGS="$BUILD_FLAGS -d"
           fi
-          sed -i "s|buildtags |DS_TAG=${DS_TAG} |" release_tags/research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json
-          sed -i "s|FP_TAG=latest-arm64|FP_TAG=${FP_TAG}|" release_tags/research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json
           cd research_datastream/terraform
+          sed -i "s|buildtags |$BUILD_FLAGS |" test/docker_loginNpush.sh
+          sed -i "s|DS_Dep_TAG |$DS_Dep_TAG |" test/docker_loginNpush.sh
+          sed -i "s|FP_Tag |${FP_TAG} |" test/docker_loginNpush.sh
+          sed -i "s|DS_Tag |${DS_TAG} |" test/docker_loginNpush.sh
+          cat test/docker_loginNpush.sh
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
           
 
