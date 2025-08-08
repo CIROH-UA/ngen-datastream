@@ -14,7 +14,6 @@ permissions:
 jobs:
   build-test-push-docker-arm:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
     outputs:
       build_ds: ${{ steps.changes.outputs.build_ds }}
       build_fp: ${{ steps.changes.outputs.build_fp }}
