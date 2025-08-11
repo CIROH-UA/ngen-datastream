@@ -1,5 +1,5 @@
-# Research DataStream
-The Research DataStream is an array of daily [NextGen](https://github.com/NOAA-OWP/ngen)-based hydrolgic simulations in the AWS cloud. An exciting aspect of the Research DataStream is the NextGen configuration is [open-sourced](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/configuration) and [community editable](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/CONTRIBUTE.md), which allows any member of the hydrologic community to contribute to improving streamflow predictions. By making the NextGen forcings, outputs, and configuration publicly available, it is now possible to leverage regional expertise and incrementally improve streamflow predictions configured with the NextGen Framework. 
+# NextGen Research DataStream
+The NextGen Research DataStream is an array of daily [NextGen](https://github.com/NOAA-OWP/ngen)-based hydrolgic simulations in the AWS cloud. An exciting aspect of the Research DataStream is the NextGen configuration is [open-sourced](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/configuration) and [community editable](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/CONTRIBUTE.md), which allows any member of the hydrologic community to contribute to improving streamflow predictions. By making the NextGen forcings, outputs, and configuration publicly available, it is now possible to leverage regional expertise and incrementally improve streamflow predictions configured with the NextGen Framework. 
 See the Research DataStream related documentation:
 * **Find daily output data at:** https://datastream.ciroh.org/index.html
 * **Make improvements to NextGen configuration:**
@@ -9,7 +9,7 @@ Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastre
   * The actual research datastream deployment, which builds upon the template AWS infra, exists [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform_community) and is available for reference only.
 
 # DataStreamCLI
-The software backend of the Research DataStream is DataStreamCLI, which is a stand alone tool that automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion while providing flexibility and integrations like hfsubset, NextGen In A Box, and TEEHR.
+The software backend of the NextGen Research DataStream is DataStreamCLI, which is a stand alone tool that automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion while providing flexibility and integrations like hfsubset, NextGen In A Box, and TEEHR.
 
 ![datastream](docs/images/datastreamcli.jpg)
 
