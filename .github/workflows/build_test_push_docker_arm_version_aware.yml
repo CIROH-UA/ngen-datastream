@@ -25,7 +25,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+        with:
+          fetch-depth: 2
+
       - name: Install yq
         run: |
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
@@ -33,51 +35,52 @@ jobs:
 
       - name: Detect version changes
         id: changes
+        shell: bash
         run: |
-          # Get current versions
-          CURRENT_DEPS=$(yq e '."datastream-deps"' versions.yml)
-          CURRENT_FP=$(yq e '.forcingprocessor' versions.yml)
-          CURRENT_DS=$(yq e '.datastream' versions.yml)
-          
-          # Get previous versions
-          git fetch origin HEAD~1:previous_versions.yml || echo -e "datastream-deps: '0.0.0'\nforcingprocessor: '0.0.0'\ndatastream: '0.0.0'" > previous_versions.yml
-          if [ -f previous_versions.yml ]; then
-            PREVIOUS_DEPS=$(yq e '."datastream-deps"' previous_versions.yml)
-            PREVIOUS_FP=$(yq e '.forcingprocessor' previous_versions.yml)
-            PREVIOUS_DS=$(yq e '.datastream' previous_versions.yml)
+          set -euo pipefail
+      
+          # Current versions (raw)
+          CURRENT_DEPS=$(yq -r e '."datastream-deps"' versions.yml)
+          CURRENT_FP=$(yq -r e '.forcingprocessor' versions.yml)
+          CURRENT_DS=$(yq -r e '.datastream' versions.yml)
+      
+          # Ensure previous commit and file exist
+          if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:versions.yml 2>/dev/null; then
+            git show HEAD~1:versions.yml > previous_versions.yml
           else
-            PREVIOUS_DEPS="0.0.0"
-            PREVIOUS_FP="0.0.0"
-            PREVIOUS_DS="0.0.0"
+            printf "datastream-deps: '0.0.0'\nforcingprocessor: '0.0.0'\ndatastream: '0.0.0'\n" > previous_versions.yml
           fi
-          
-          # Check what changed
+      
+          PREVIOUS_DEPS=$(yq -r e '."datastream-deps"' previous_versions.yml)
+          PREVIOUS_FP=$(yq -r e '.forcingprocessor' previous_versions.yml)
+          PREVIOUS_DS=$(yq -r e '.datastream' previous_versions.yml)
+      
+          # Outputs
           if [ "$CURRENT_DEPS" != "$PREVIOUS_DEPS" ]; then
             echo "datastream-deps changed: $PREVIOUS_DEPS -> $CURRENT_DEPS"
-            echo "build_deps=true" >> $GITHUB_OUTPUT
-            echo "deps_version=$CURRENT_DEPS" >> $GITHUB_OUTPUT
+            echo "build_deps=true" >> "$GITHUB_OUTPUT"
           else
-            echo "build_deps=false" >> $GITHUB_OUTPUT
-            echo "deps_version=$CURRENT_DEPS" >> $GITHUB_OUTPUT
+            echo "build_deps=false" >> "$GITHUB_OUTPUT"
           fi
-          
+          echo "deps_version=$CURRENT_DEPS" >> "$GITHUB_OUTPUT"
+      
           if [ "$CURRENT_FP" != "$PREVIOUS_FP" ]; then
             echo "forcingprocessor changed: $PREVIOUS_FP -> $CURRENT_FP"
-            echo "build_fp=true" >> $GITHUB_OUTPUT
-            echo "fp_version=$CURRENT_FP" >> $GITHUB_OUTPUT
+            echo "build_fp=true" >> "$GITHUB_OUTPUT"
           else
-            echo "build_fp=false" >> $GITHUB_OUTPUT
-            echo "fp_version=$CURRENT_FP" >> $GITHUB_OUTPUT
+            echo "build_fp=false" >> "$GITHUB_OUTPUT"
           fi
-          
+          echo "fp_version=$CURRENT_FP" >> "$GITHUB_OUTPUT"
+      
           if [ "$CURRENT_DS" != "$PREVIOUS_DS" ]; then
             echo "datastream changed: $PREVIOUS_DS -> $CURRENT_DS"
-            echo "build_ds=true" >> $GITHUB_OUTPUT
-            echo "ds_version=$CURRENT_DS" >> $GITHUB_OUTPUT
+            echo "build_ds=true" >> "$GITHUB_OUTPUT"
           else
-            echo "build_ds=false" >> $GITHUB_OUTPUT
-            echo "ds_version=$CURRENT_DS" >> $GITHUB_OUTPUT
+            echo "build_ds=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "ds_version=$CURRENT_DS" >> "$GITHUB_OUTPUT"
+
+
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
