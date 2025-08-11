@@ -112,15 +112,15 @@ jobs:
           FP_TAG=""
           DS_TAG=""
           if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
-            DS_Dep_TAG="${{ steps.changes.outputs.deps_version }}"
+            DS_Dep_TAG="${{ steps.changes.outputs.deps_version }}"-arm64
             BUILD_FLAGS="$BUILD_FLAGS -e"
           fi
           if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-            FP_TAG="${{ steps.changes.outputs.fp_version }}"
+            FP_TAG="${{ steps.changes.outputs.fp_version }}"-arm64
             BUILD_FLAGS="$BUILD_FLAGS -f"
           fi
           if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-            DS_TAG="${{ steps.changes.outputs.ds_version }}"
+            DS_TAG="${{ steps.changes.outputs.ds_version }}"-arm64
             BUILD_FLAGS="$BUILD_FLAGS -d"
           fi
           cd research_datastream/terraform
