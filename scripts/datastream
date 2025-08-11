@@ -572,7 +572,7 @@ log_time "VALIDATION_START"
 VALIDATOR=$DOCKER_PY"run_validator.py"
 DOCKER_TAG="awiciroh/datastream:$DS_TAG"
 echo "Validating " $NGEN_RUN
-if [ "$DRYRUN" == "True" ]; then
+if [ "$DRYRUN" == "True" ] || [ "$SKIP_VALIDATION" == "True" ]; then
     echo "DRYRUN - VALIDATION SKIPPED"
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
         -u $(id -u):$(id -g) \
