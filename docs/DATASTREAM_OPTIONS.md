@@ -68,9 +68,9 @@ For folder like paths (i.e. providing a resource directory)
 Note here that DataStreamCLI will treat a s3 URI prefix like a directory.
 
 ### Environment variables
-DataStreamCLI can find run options in the form of environment variables. The can be set in the `CONF_FILE`. An example file here from the NextGen Research DataStream. 
+DataStreamCLI can find run options in the form of environment variables. These can be set in the `CONF_FILE`. An example file here from the NextGen Research DataStream. 
 
-In addition to the run options documented in the table above, the following enviornment variables can also be set.
+In addition to the run options documented in the table above, the following environment variables can also be set.
 | Environment Variable  | Description         | 
 |---------------------|--------------------|
 | NGIAB_TAG | Sets the NextGen In A Box Docker container tag |

@@ -51,8 +51,7 @@ jobs:
     - name: TEEHR integration test
       if: always()
       run: |        
-        sudo rm -rf $(pwd)/data/datastream_test
-        ./scripts/datastream -s DAILY -C NWM_V3_SHORT_RANGE -d $(pwd)/data/datastream_test -g $(pwd)/vpu-09_subset.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -E True
+        ./scripts/datastream -s 202008080100 -e 202008080200 -C NWM_V3_RETRO -d ./data/outputs -E True -r s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_09 -R https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_09.json
 
         
            
