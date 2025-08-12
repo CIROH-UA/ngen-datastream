@@ -51,6 +51,10 @@ chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
 # done
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
+sed -i "s|${DS_TAG:-"latest"}|ds_tag_from_workflow|" scripts/datastream
+sed -i "s|${FP_TAG:-"latest"}|fp_tag_from_workflow|" scripts/datastream
+sed -i "s|${NGIAB_TAG:-"latest"}|ngiab_tag_from_workflow|" scripts/datastream
+cat scripts/datastream
 '
 
 # Launch instance
