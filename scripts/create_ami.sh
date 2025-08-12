@@ -1,6 +1,4 @@
 #!/bin/bash
-
-# Minimal AMI Creation Script - Creates AMI and outputs ID only
 set -e
 
 # Configuration
@@ -15,7 +13,6 @@ AMI_NAME="datastream_$(date +%Y%m%d_%H%M%S)"
 echo "Creating AMI with key pair: $KEY_NAME and security group: $SECURITY_GROUP" >&2
 echo "Using base AMI: $BASE_AMI" >&2
 
-# User data script
 USER_DATA='#!/bin/bash
 exec > >(tee /var/log/user-data.log)
 exec 2>&1
