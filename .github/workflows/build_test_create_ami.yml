@@ -14,6 +14,9 @@ jobs:
   build-test-push-docker-arm:
     runs-on: ubuntu-latest
     outputs:
+      ds_tag: ${{ steps.changes.outputs.ds_tag }}
+      fp_tag: ${{ steps.changes.outputs.fp_tag }}
+      ngiab_tag: ${{ steps.changes.outputs.ngiab_tag }}
       ds_ami_version: ${{ steps.changes.outputs.ds_ami_version }}
       build_ds_ami: ${{ steps.changes.outputs.build_ds_ami }}
 
@@ -34,8 +37,11 @@ jobs:
         run: |
           set -euo pipefail
       
-          # Current versions (raw)
+          # Current versions
           CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_version.yml)
+          DS_TAG=$(yq -r e '.DS_TAG' ami_version.yml)
+          FP_TAG=$(yq -r e '.FP_TAG' ami_version.yml)
+          NGIAB_TAG=$(yq -r e '.NGIAB_TAG' ami_version.yml)
       
           # Ensure previous commit and file exist
           if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_version.yml 2>/dev/null; then
@@ -46,15 +52,20 @@ jobs:
       
           PREVIOUS_DS_AMI=$(yq -r e '."datastream-ami-version"' previous_versions.yml)
       
-          # Outputs
+          # Outputs for AMI change detection
           if [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
-            echo "datastream-deps changed: $PREVIOUS_DS_AMI -> $CURRENT_DS_AMI"
+            echo "datastream-ami-version changed: $PREVIOUS_DS_AMI -> $CURRENT_DS_AMI"
             echo "build_ds_ami=true" >> "$GITHUB_OUTPUT"
           else
             echo "build_ds_ami=false" >> "$GITHUB_OUTPUT"
           fi
           echo "ds_ami_version=$CURRENT_DS_AMI" >> "$GITHUB_OUTPUT"
-      
+
+          # Outputs for tags
+          echo "ds_tag=$DS_TAG" >> "$GITHUB_OUTPUT"
+          echo "fp_tag=$FP_TAG" >> "$GITHUB_OUTPUT"
+          echo "ngiab_tag=$NGIAB_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Configure AWS
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -64,10 +75,19 @@ jobs:
       - name: Build AMI on AWS (N Virginia)
         run: |
           ami_version=""
+          DS_TAG=${{ steps.changes.outputs.ds_tag }}"
+          FP_TAG=${{ steps.changes.outputs.fp_tag }}"
+          NGIAB_TAG=${{ steps.changes.outputs.ngiab_tag }}"
+
           if [ "${{ steps.changes.outputs.build_ds_ami }}" == "true" ]; then
             ami_version=datastream-"${{ steps.changes.outputs.ds_ami_version }}"
           fi
+          el
           sed -i "s|AMI_NAME=\"ami_tag\"|AMI_NAME=\"$ami_version\"|" scripts/create_ami.sh
+          sed -i "s|ds_tag_from_workflow|$DS_TAG|" scripts/create_ami.sh
+          sed -i "s|fp_tag_from_workflow|$FP_TAG|" scripts/create_ami.sh
+          sed -i "s|ngiab_tag_from_workflow|$NGIAB_TAG|" scripts/create_ami.sh
+
           cat scripts/create_ami.sh
           chmod +x scripts/create_ami.sh
-          ./scripts/create_ami.sh
+          # ./scripts/create_ami.sh
