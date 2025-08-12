@@ -72,21 +72,26 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1        
 
+
       - name: Build AMI on AWS (N Virginia)
         run: |
           ami_version=""
           DS_TAG="${{ steps.changes.outputs.ds_tag }}"
           FP_TAG="${{ steps.changes.outputs.fp_tag }}"
           NGIAB_TAG="${{ steps.changes.outputs.ngiab_tag }}"
-
+          
           if [ "${{ steps.changes.outputs.build_ds_ami }}" == "true" ]; then
             ami_version=datastream-"${{ steps.changes.outputs.ds_ami_version }}"
           fi
+          
+          # Update AMI name
           sed -i "s|AMI_NAME=\"ami_tag\"|AMI_NAME=\"$ami_version\"|" scripts/create_ami.sh
-          sed -i "s|ds_tag_from_workflow|$DS_TAG|" scripts/create_ami.sh
-          sed -i "s|fp_tag_from_workflow|$FP_TAG|" scripts/create_ami.sh
-          sed -i "s|ngiab_tag_from_workflow|$NGIAB_TAG|" scripts/create_ami.sh
-
+          
+          # Update the workflow tag placeholders with actual values
+          sed -i "s|ds_tag_from_workflow|$DS_TAG|g" scripts/create_ami.sh
+          sed -i "s|fp_tag_from_workflow|$FP_TAG|g" scripts/create_ami.sh
+          sed -i "s|ngiab_tag_from_workflow|$NGIAB_TAG|g" scripts/create_ami.sh
+          
           cat scripts/create_ami.sh
           chmod +x scripts/create_ami.sh
           ./scripts/create_ami.sh
