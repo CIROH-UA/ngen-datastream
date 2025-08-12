@@ -59,7 +59,7 @@
       "18":"m8g.2xlarge",
       "fp":"m8g.4xlarge"
       },
-      "volume_size": 32
+      "volume_size": 64
   },
   "analysis_assim_extend": {
     "init_cycles": ["16"],
