@@ -1,0 +1,57 @@
+name: Build, Test, and Push Datastream AMI
+on:
+  workflow_dispatch:   
+  push:
+    branches: 
+      - release_tags
+    paths:
+      - 'ami_version.yml'
+
+permissions:
+  contents: read   
+
+jobs:
+  build-test-push-docker-arm:
+    runs-on: ubuntu-latest
+    outputs:
+      ds_ami_version: ${{ steps.changes.outputs.ds_ami_version }}
+      build_ds: ${{ steps.changes.outputs.build_ds_ami }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Detect version changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+      
+          # Current versions (raw)
+          CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_versions.yml)
+      
+          # Ensure previous commit and file exist
+          if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_versions.yml 2>/dev/null; then
+            git show HEAD~1:ami_versions.yml > previous_versions.yml
+          else
+            printf "datastream-ami-version: '0.0.0'\n" > previous_versions.yml
+          fi
+      
+          PREVIOUS_DS_AMI=$(yq -r e '."datastream-ami-version"' previous_versions.yml)
+      
+          # Outputs
+          if [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
+            echo "datastream-deps changed: $PREVIOUS_DS_AMI -> $CURRENT_DS_AMI"
+            echo "build_ds_ami=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_ds_ami=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "ds_ami_version=$CURRENT_DS_AMI" >> "$GITHUB_OUTPUT"
+      
