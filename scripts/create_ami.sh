@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 # Configuration
 REGION="us-east-1"
 INSTANCE_TYPE="t4g.large"
@@ -9,10 +8,8 @@ BASE_AMI=$(aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2
 KEY_NAME="actions_key_arm"
 SECURITY_GROUP="sg-0fcbe0c6d6faa0117"
 AMI_NAME="ami_tag"
-
 echo "Creating AMI with key pair: $KEY_NAME and security group: $SECURITY_GROUP" >&2
 echo "Using base AMI: $BASE_AMI" >&2
-
 USER_DATA='#!/bin/bash
 exec > >(tee /var/log/user-data.log)
 exec 2>&1
@@ -38,25 +35,14 @@ echo "Cloning ngen-datastream repository..."
 cd /home/ec2-user
 sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
-# echo "Pre-pulling Docker images..."
-# images=(
-#     "awiciroh/datastream:latest-arm64"
-#     "awiciroh/forcingprocessor:latest-arm64" 
-#     "awiciroh/ciroh-ngen-image:latest"
-#     "zwills/merkdir:latest"
-# )
-# for image in "${images[@]}"; do
-#     echo "Pulling $image..."
-#     sudo -u ec2-user docker pull "$image" || echo "Warning: Failed to pull $image"
-# done
+echo "Updating datastream script with placeholder tags..."
+sed -i '\''s|DS_TAG=${DS_TAG:-"latest"}|DS_TAG=${DS_TAG:-"ds_tag_from_workflow"}|'\'' /home/ec2-user/ngen-datastream/scripts/datastream
+sed -i '\''s|FP_TAG=${FP_TAG:-"latest"}|FP_TAG=${FP_TAG:-"fp_tag_from_workflow"}|'\'' /home/ec2-user/ngen-datastream/scripts/datastream
+sed -i '\''s|NGIAB_TAG=${NGIAB_TAG:-"latest"}|NGIAB_TAG=${NGIAB_TAG:-"ngiab_tag_from_workflow"}|'\'' /home/ec2-user/ngen-datastream/scripts/datastream
+grep -E "(DS_TAG|FP_TAG|NGIAB_TAG)" /home/ec2-user/ngen-datastream/scripts/datastream
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
-sed -i "s|${DS_TAG:-"latest"}|ds_tag_from_workflow|" /home/ec2-user/ngen-datastream/scripts/datastream
-sed -i "s|${FP_TAG:-"latest"}|fp_tag_from_workflow|" /home/ec2-user/ngen-datastream/scripts/datastream
-sed -i "s|${NGIAB_TAG:-"latest"}|ngiab_tag_from_workflow|" /home/ec2-user/ngen-datastream/scripts/datastream
-cat scripts/datastream
 '
-
 # Launch instance
 INSTANCE_ID=$(aws ec2 run-instances \
     --region "$REGION" \
@@ -68,15 +54,12 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":32,"VolumeType":"gp3"}}]' \
     --query 'Instances[0].InstanceId' \
     --output text)
-
 # Wait for running and setup
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 sleep 900  # 15 minutes for setup
-
 # Stop instance
 aws ec2 stop-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/null
 aws ec2 wait instance-stopped --region "$REGION" --instance-ids "$INSTANCE_ID"
-
 # Create AMI
 AMI_ID=$(aws ec2 create-image \
     --region "$REGION" \
@@ -85,12 +68,9 @@ AMI_ID=$(aws ec2 create-image \
     --description "ngen-datastream AMI" \
     --query 'ImageId' \
     --output text)
-
 # Wait for AMI
 aws ec2 wait image-available --region "$REGION" --image-ids "$AMI_ID"
-
 # Cleanup
 aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/null
-
 # Output only the AMI ID
 echo "$AMI_ID"
