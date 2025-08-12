@@ -35,11 +35,11 @@ jobs:
           set -euo pipefail
       
           # Current versions (raw)
-          CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_versions.yml)
+          CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_version.yml)
       
           # Ensure previous commit and file exist
-          if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_versions.yml 2>/dev/null; then
-            git show HEAD~1:ami_versions.yml > previous_versions.yml
+          if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_version.yml 2>/dev/null; then
+            git show HEAD~1:ami_version.yml > previous_versions.yml
           else
             printf "datastream-ami-version: '0.0.0'\n" > previous_versions.yml
           fi
