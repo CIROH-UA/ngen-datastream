@@ -8,7 +8,7 @@ INSTANCE_TYPE="t4g.large"
 BASE_AMI=$(aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 --region "$REGION" --query "Parameter.Value" --output text)
 KEY_NAME="actions_key_arm"
 SECURITY_GROUP="sg-0fcbe0c6d6faa0117"
-AMI_NAME="datastream_$(date +%Y%m%d_%H%M%S)"
+AMI_NAME="ami_tag"
 
 echo "Creating AMI with key pair: $KEY_NAME and security group: $SECURITY_GROUP" >&2
 echo "Using base AMI: $BASE_AMI" >&2
