@@ -38,17 +38,17 @@ echo "Cloning ngen-datastream repository..."
 cd /home/ec2-user
 sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
-echo "Pre-pulling Docker images..."
-images=(
-    "awiciroh/datastream:latest-arm64"
-    "awiciroh/forcingprocessor:latest-arm64" 
-    "awiciroh/ciroh-ngen-image:latest"
-    "zwills/merkdir:latest"
-)
-for image in "${images[@]}"; do
-    echo "Pulling $image..."
-    sudo -u ec2-user docker pull "$image" || echo "Warning: Failed to pull $image"
-done
+# echo "Pre-pulling Docker images..."
+# images=(
+#     "awiciroh/datastream:latest-arm64"
+#     "awiciroh/forcingprocessor:latest-arm64" 
+#     "awiciroh/ciroh-ngen-image:latest"
+#     "zwills/merkdir:latest"
+# )
+# for image in "${images[@]}"; do
+#     echo "Pulling $image..."
+#     sudo -u ec2-user docker pull "$image" || echo "Warning: Failed to pull $image"
+# done
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
 '
