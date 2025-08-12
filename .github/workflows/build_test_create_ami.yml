@@ -67,7 +67,7 @@ jobs:
           if [ "${{ steps.changes.outputs.build_ds_ami }}" == "true" ]; then
             ami_version=datastream-"${{ steps.changes.outputs.ds_ami_version }}"
           fi
-          sed -i "s|ami_tag |$ami_version |" scripts/create_ami.sh
+          sed -i "s|AMI_NAME=\"ami_tag\"|AMI_NAME=\"$ami_version\"|" scripts/create_ami.sh
           cat scripts/create_ami.sh
           chmod +x scripts/create_ami.sh
           ./scripts/create_ami.sh
