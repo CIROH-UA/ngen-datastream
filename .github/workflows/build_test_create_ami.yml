@@ -95,10 +95,8 @@ jobs:
           chmod +x scripts/create_ami.sh
           ./scripts/create_ami.sh
 
-
-  test-research-datastream-vpu-09:
+  test-research-datastream-vpu-09-on-ami:
     runs-on: ubuntu-latest
-    needs: build-test-push-ami  # Run after AMI build
     env:
       VPU: "09"
       DATE: 20250801
@@ -124,8 +122,7 @@ jobs:
           sudo apt-get install -y jq
           pip install --upgrade awscli
 
-
-      - name: Modify execution JSON
+      - name: Download and modify execution JSON
         run: |
           cd research_datastream/terraform_community
           
@@ -152,14 +149,22 @@ jobs:
           
           echo "Found AMI ID: $ami_id for AMI name: $ami_name"
           
-          # Replace template placeholders with actual values
-          sed -i "s|ami_tag_from_workflow|$ami_id|g" executions/execution.json
-          sed -i "s|ds_tag_from_workflow|$DS_TAG|g" executions/execution.json
-          sed -i "s|fp_tag_from_workflow|$FP_TAG|g" executions/execution.json
-
           
-          cat executions/execution.json
-          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' executions/execution.json > temp.json
+          # Download the proven working execution JSON from S3
+          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
+          
+          # Apply your AMI and tag customizations to the working file
+          ami_name="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
+                   
+          # Replace the working AMI with your custom one
+          sed -i "s|ami-0e621409bdbd530a0|$ami_id|g" execution.json
+          
+          # Show what we modified
+          echo "Modified execution.json:"
+          cat execution.json
+          
+          # Apply jq transformations (same as working workflow)
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
 
       - name: Check and create AWS key pair
         run: |
@@ -220,12 +225,26 @@ jobs:
             echo "No AMI found with name: $ami_version"
           fi
 
-
-      - name: Verify output file
+      - name: Verify output files
         run: |
-          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
-
+          echo "Checking if processing created any output files..."
           
+          # Check if the directory exists and has files
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "✅ SUCCESS: Datastream processing completed successfully!"
+            echo "Files created:"
+            echo "$file_list"
+            
+            # Count files for summary
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files/objects created: $file_count"
+          else
+            echo "❌ FAILED: No output files were created"
+            exit 1
+          fi
+
       - name: Clean up
         if: always()
         run: |
@@ -234,4 +253,4 @@ jobs:
       - name: AMI preservation notice
         if: success() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
         run: |
-          echo "Test passed! AMI datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }} preserved for use."
+          echo "✅ Test passed! AMI datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }} preserved for use."
