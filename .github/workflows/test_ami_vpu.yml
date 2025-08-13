@@ -1,0 +1,149 @@
+name: Test AMI with updated execution file
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to use'
+        required: true
+        default: 'release_tags'
+        type: string
+
+permissions:
+  contents: read   
+
+jobs:
+  test-research-datastream-vpu-09-on-ami:
+    runs-on: ubuntu-latest
+    env:
+      VPU: "09"
+      DATE: 20250801
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade awscli
+
+      - name: Download and modify execution JSON
+        run: |
+          cd research_datastream/terraform_community
+          
+          # Download the proven working execution JSON from S3
+          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
+          
+          # Apply your AMI and tag customizations to the working file
+          ami_version="datastream-1.6.8"
+          
+          # Replace the working AMI with your custom one
+          sed -i "s|ami-0e621409bdbd530a0|$ami_version|g" execution.json
+          
+          # Show what we modified
+          echo "Modified execution.json:"
+          cat execution.json
+          
+          # Apply jq transformations (same as working workflow)
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
+
+      - name: Check and create AWS key pair
+        run: |
+          cd research_datastream/terraform_community
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; 
+          else 
+            echo "Key pair 'actions_key' already exists"; 
+          fi
+
+      - name: Start and monitor Step Functions execution
+        id: stepfunction
+        run: |
+          cd research_datastream/terraform_community
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
+          echo "Execution ARN: $execution_arn"
+          status="RUNNING"
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
+            if [ "$status" == "FAILED" ]; then
+              echo "State machine execution failed!"
+              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "State machine execution succeeded!"
+          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Deregister AMI on test failure
+        if: failure() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
+        run: |
+          ami_version="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
+          echo "Test failed - deregistering AMI: $ami_version"
+          
+          # Get AMI ID
+          ami_id=$(aws ec2 describe-images --owners self --filters "Name=name,Values=$ami_version" --query 'Images[0].ImageId' --output text --region us-east-1)
+          
+          if [ "$ami_id" != "None" ] && [ "$ami_id" != "" ]; then
+            echo "Found AMI ID: $ami_id"
+            
+            # Get snapshot IDs before deregistering
+            snapshot_ids=$(aws ec2 describe-images --image-ids $ami_id --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text --region us-east-1)
+            
+            # Deregister AMI
+            aws ec2 deregister-image --image-id $ami_id --region us-east-1
+            echo "AMI $ami_id deregistered"
+            
+            # Delete associated snapshots
+            for snapshot_id in $snapshot_ids; do
+              if [ "$snapshot_id" != "None" ] && [ "$snapshot_id" != "" ]; then
+                aws ec2 delete-snapshot --snapshot-id $snapshot_id --region us-east-1
+                echo "Snapshot $snapshot_id deleted"
+              fi
+            done
+          else
+            echo "No AMI found with name: $ami_version"
+          fi
+
+      - name: Verify output files
+        run: |
+          echo "Checking if processing created any output files..."
+          
+          # Check if the directory exists and has files
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "✅ SUCCESS: Datastream processing completed successfully!"
+            echo "Files created:"
+            echo "$file_list"
+            
+            # Count files for summary
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files/objects created: $file_count"
+          else
+            echo "❌ FAILED: No output files were created"
+            exit 1
+          fi
+
+      - name: Clean up
+        if: always()
+        run: |
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No file to delete"
+
+      - name: AMI preservation notice
+        if: success() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
+        run: |
+          echo "✅ Test passed! AMI datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }} preserved for use."
