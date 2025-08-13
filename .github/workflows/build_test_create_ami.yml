@@ -138,7 +138,7 @@ jobs:
           sed -i "s|ami_tag_from_workflow|$ami_version|g" executions/execution.json
           sed -i "s|ds_tag_from_workflow|$DS_TAG|g" executions/execution.json
           sed -i "s|fp_tag_from_workflow|$FP_TAG|g" executions/execution.json
-          
+          cat executions/execution.json
           # Then process with jq
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' executions/execution.json > temp.json
 
