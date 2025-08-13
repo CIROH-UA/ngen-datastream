@@ -208,8 +208,7 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No file to delete
-
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No file to delete"
 
       - name: AMI preservation notice
         if: success() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
