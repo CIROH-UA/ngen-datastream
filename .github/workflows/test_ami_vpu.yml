@@ -50,7 +50,7 @@ jobs:
           ami_version="datastream-1.6.8"
           
           # Replace the working AMI with your custom one
-          sed -i "s|ami-0e621409bdbd530a0|$ami_version|g" execution.json
+          sed -i "s|ami-0e621409bdbd530a0|ami-038f6428a446d34a9|g" execution.json
           
           # Show what we modified
           echo "Modified execution.json:"
