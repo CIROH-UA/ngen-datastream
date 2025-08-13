@@ -1,12 +1,12 @@
 name: Test AMI with updated execution file
+
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to use'
-        required: true
-        default: 'release_tags'
-        type: string
+  workflow_dispatch:   
+  push:
+    branches: 
+      - release_tags
+    paths:
+      - 't_version.yml'
 
 permissions:
   contents: read   
