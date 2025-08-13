@@ -3,7 +3,7 @@ on:
   workflow_dispatch:   
   push:
     branches: 
-      - main
+      - issue_197
     paths:
       - 'ami_version.yml'
 
@@ -13,7 +13,6 @@ permissions:
 jobs:
   build-test-push-ami:
     runs-on: ubuntu-latest
-    env:
     outputs:
       ds_tag: ${{ steps.changes.outputs.ds_tag }}
       fp_tag: ${{ steps.changes.outputs.fp_tag }}
