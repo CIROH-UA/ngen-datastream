@@ -96,6 +96,7 @@ jobs:
           ./scripts/create_ami.sh
 
   test-research-datastream-vpu-09-on-ami:
+    needs: build-test-push-ami
     runs-on: ubuntu-latest
     env:
       VPU: "09"
