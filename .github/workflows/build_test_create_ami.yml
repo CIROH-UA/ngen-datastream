@@ -74,6 +74,7 @@ jobs:
 
 
       - name: Build AMI on AWS (N Virginia)
+        if: steps.changes.outputs.build_ds_ami == 'true'
         run: |
           ami_version=""
           DS_TAG="${{ steps.changes.outputs.ds_tag }}"
@@ -95,12 +96,47 @@ jobs:
           chmod +x scripts/create_ami.sh
           ./scripts/create_ami.sh
 
-  test-research-datastream-vpu-09-on-ami:
+  get-ami-info:
     needs: build-test-push-ami
+    if: needs.build-test-push-ami.outputs.build_ds_ami == 'true'
     runs-on: ubuntu-latest
+    outputs:
+      ami_id: ${{ steps.get-ami.outputs.ami_id }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Get AMI ID
+        id: get-ami
+        run: |
+          ami_name="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
+          ami_id=$(aws ec2 describe-images \
+            --owners self \
+            --filters "Name=name,Values=$ami_name" \
+            --query 'Images[0].ImageId' \
+            --output text \
+            --region us-east-1)
+          echo "ami_id=$ami_id" >> "$GITHUB_OUTPUT"
+
+  test-all-vpus:
+    needs: build-test-push-ami
+    if: needs.build-test-push-ami.outputs.build_ds_ami == 'true' 
+    runs-on: ubuntu-latest
+    outputs:
+      ami_id: ${{ steps.get-ami.outputs.ami_id }} 
+    strategy:
+      fail-fast: false  # Continue testing other VPUs even if one fails
+      matrix:
+        vpu: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18"]
+    
     env:
-      VPU: "09"
+      VPU: ${{ matrix.vpu }}
       DATE: 20250801
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -149,7 +185,8 @@ jobs:
           fi
           
           echo "Found AMI ID: $ami_id for AMI name: $ami_name"
-          
+          echo "ami_id=$ami_id" >> "$GITHUB_OUTPUT"
+ 
           
           # Download the proven working execution JSON from S3
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
@@ -164,9 +201,10 @@ jobs:
           echo "Modified execution.json:"
           cat execution.json
           
-          # Apply jq transformations (same as working workflow)
-          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
-
+          echo "Processing VPU ${{ env.VPU }}..."
+          # Apply jq transformations for this specific VPU
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
+      
       - name: Check and create AWS key pair
         run: |
           cd research_datastream/terraform_community
@@ -187,71 +225,141 @@ jobs:
             status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
             echo "Current status: $status"
             if [ "$status" == "FAILED" ]; then
-              echo "State machine execution failed!"
+              echo "State machine execution failed for VPU ${{ env.VPU }}!"
               echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
               exit 1
             fi
             sleep 5
           done
-          echo "State machine execution succeeded!"
+          echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
           echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
-
-      - name: Deregister AMI on test failure
-        if: failure() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
-        run: |
-          ami_version="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
-          echo "Test failed - deregistering AMI: $ami_version"
-          
-          # Get AMI ID
-          ami_id=$(aws ec2 describe-images --owners self --filters "Name=name,Values=$ami_version" --query 'Images[0].ImageId' --output text --region us-east-1)
-          
-          if [ "$ami_id" != "None" ] && [ "$ami_id" != "" ]; then
-            echo "Found AMI ID: $ami_id"
-            
-            # Get snapshot IDs before deregistering
-            snapshot_ids=$(aws ec2 describe-images --image-ids $ami_id --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text --region us-east-1)
-            
-            # Deregister AMI
-            aws ec2 deregister-image --image-id $ami_id --region us-east-1
-            echo "AMI $ami_id deregistered"
-            
-            # Delete associated snapshots
-            for snapshot_id in $snapshot_ids; do
-              if [ "$snapshot_id" != "None" ] && [ "$snapshot_id" != "" ]; then
-                aws ec2 delete-snapshot --snapshot-id $snapshot_id --region us-east-1
-                echo "Snapshot $snapshot_id deleted"
-              fi
-            done
-          else
-            echo "No AMI found with name: $ami_version"
-          fi
 
       - name: Verify output files
         run: |
-          echo "Checking if processing created any output files..."
+          echo "Checking if processing created any output files for VPU ${{ env.VPU }}..."
           
           # Check if the directory exists and has files
           file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
           
           if [ -n "$file_list" ]; then
-            echo "✅ SUCCESS: Datastream processing completed successfully!"
+            echo "SUCCESS: VPU ${{ env.VPU }} datastream processing completed successfully!"
             echo "Files created:"
             echo "$file_list"
             
             # Count files for summary
             file_count=$(echo "$file_list" | wc -l)
-            echo "Total files/objects created: $file_count"
+            echo "Total files/objects created for VPU ${{ env.VPU }}: $file_count"
           else
-            echo "❌ FAILED: No output files were created"
+            echo "FAILED: No output files were created for VPU ${{ env.VPU }}"
             exit 1
           fi
 
       - name: Clean up
         if: always()
         run: |
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No file to delete"
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No files to delete for VPU ${{ env.VPU }}"
 
-      - name: AMI preservation notice
-        if: success() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
+
+
+  # Summary job that runs after all VPUs complete
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [build-test-push-ami, test-all-vpus, get-ami-info]
+    if: always()  # Run even if some VPUs failed
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Check VPU Test Results and Handle AMI
         run: |
-          echo "✅ Test passed! AMI datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }} preserved for use."
+          echo "VPU Testing Summary:"
+          echo "======================"
+          echo "Date: $(date)"
+          echo "Total VPUs Tested: 18"
+          echo ""
+          
+          # Check if any VPU tests failed
+          # GitHub Actions sets job results in the needs context
+          any_failed=false
+          
+          # Parse the results from the matrix jobs
+          echo "Checking individual VPU results..."
+          
+          # In GitHub Actions, when any job in needs.test-all-vpus fails, 
+          # the overall needs.test-all-vpus.result will be 'failure'
+          if [ "${{ needs.test-all-vpus.result }}" != "success" ]; then
+            any_failed=true
+            echo "One or more VPU tests failed"
+          else
+            echo "All VPU tests passed"
+          fi
+          
+          echo "VPUs tested: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18"
+          echo " Check individual job logs above for detailed results"
+          echo " All test files have been cleaned up from S3"
+          
+          # Set output for next step
+          echo "any_failed=$any_failed" >> $GITHUB_ENV
+
+      - name: Deregister AMI on any test failure
+        if: env.any_failed == 'true'
+        run: |
+          echo " VPU tests failed - checking for custom AMI to deregister..."
+          ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
+          ami_to_deregister=$ami_id
+          
+          if [ "$ami_to_deregister" != "None" ] && [ "$ami_to_deregister" != "" ] && [ "$ami_to_deregister" != "null" ]; then
+            echo "Found AMI to deregister: $ami_to_deregister"
+            
+            ami_name=$(aws ec2 describe-images --image-ids $ami_to_deregister --query 'Images[0].Name' --output text --region us-east-1 2>/dev/null || echo "Unknown")
+            echo "AMI Name: $ami_name"
+            
+            # Get snapshot IDs before deregistering
+            echo "Getting snapshot IDs..."
+            snapshot_ids=$(aws ec2 describe-images --image-ids $ami_to_deregister --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text --region us-east-1 2>/dev/null || echo "")
+            
+            if [ -n "$snapshot_ids" ]; then
+              echo "Found snapshots: $snapshot_ids"
+            fi
+            
+            # Deregister AMI
+            echo "Deregistering AMI: $ami_to_deregister"
+            aws ec2 deregister-image --image-id $ami_to_deregister --region us-east-1
+            echo " AMI $ami_to_deregister deregistered successfully"
+            
+            # Delete associated snapshots
+            if [ -n "$snapshot_ids" ]; then
+              for snapshot_id in $snapshot_ids; do
+                if [ "$snapshot_id" != "None" ] && [ "$snapshot_id" != "" ] && [ "$snapshot_id" != "null" ]; then
+                  echo "Deleting snapshot: $snapshot_id"
+                  aws ec2 delete-snapshot --snapshot-id $snapshot_id --region us-east-1
+                  echo "Snapshot $snapshot_id deleted"
+                fi
+              done
+            else
+              echo "No snapshots found to delete"
+            fi
+            
+            echo "  AMI cleanup completed due to test failures"
+          else
+            echo "No custom AMI found to deregister"
+          fi
+
+      - name: Final Summary
+        run: |
+          echo " Final Results:"
+          
+          if [ "${{ env.any_failed }}" == "true" ]; then
+            echo " OVERALL RESULT: Some VPU tests failed"
+            echo "  Custom AMI has been deregistered due to failures"
+            echo " Review failed VPU logs above for troubleshooting"
+            exit 1
+          else
+            echo " OVERALL RESULT: All VPU tests passed successfully"
+            echo " Custom AMI is validated and preserved"
+            echo " Ready for production deployment"
+          fi
