@@ -123,7 +123,7 @@ jobs:
           echo "ami_id=$ami_id" >> "$GITHUB_OUTPUT"
 
   test-all-vpus:
-    needs: build-test-push-ami
+    needs: get-ami-info
     if: needs.build-test-push-ami.outputs.build_ds_ami == 'true' 
     runs-on: ubuntu-latest
     outputs:
