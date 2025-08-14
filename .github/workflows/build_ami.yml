@@ -1,0 +1,217 @@
+name: Build, Test, and Push Datastream AMI
+on:
+  workflow_dispatch:   
+  push:
+    branches: 
+      - issue_197
+    paths:
+      - 'ami_version.yml'
+
+permissions:
+  contents: read   
+
+jobs:
+  build-test-push-ami:
+    runs-on: ubuntu-latest
+    outputs:
+      ds_tag: ${{ steps.changes.outputs.ds_tag }}
+      fp_tag: ${{ steps.changes.outputs.fp_tag }}
+      ngiab_tag: ${{ steps.changes.outputs.ngiab_tag }}
+      ds_ami_version: ${{ steps.changes.outputs.ds_ami_version }}
+      build_ds_ami: ${{ steps.changes.outputs.build_ds_ami }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Detect version changes
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+      
+          # Current versions
+          CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_version.yml)
+          DS_TAG=$(yq -r e '.DS_TAG' ami_version.yml)
+          FP_TAG=$(yq -r e '.FP_TAG' ami_version.yml)
+          NGIAB_TAG=$(yq -r e '.NGIAB_TAG' ami_version.yml)
+      
+          # Ensure previous commit and file exist
+          if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_version.yml 2>/dev/null; then
+            git show HEAD~1:ami_version.yml > previous_versions.yml
+          else
+            printf "datastream-ami-version: '0.0.0'\n" > previous_versions.yml
+          fi
+      
+          PREVIOUS_DS_AMI=$(yq -r e '."datastream-ami-version"' previous_versions.yml)
+      
+          # Outputs for AMI change detection
+          if [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
+            echo "datastream-ami-version changed: $PREVIOUS_DS_AMI -> $CURRENT_DS_AMI"
+            echo "build_ds_ami=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_ds_ami=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "ds_ami_version=$CURRENT_DS_AMI" >> "$GITHUB_OUTPUT"
+
+          # Outputs for tags
+          echo "ds_tag=$DS_TAG" >> "$GITHUB_OUTPUT"
+          echo "fp_tag=$FP_TAG" >> "$GITHUB_OUTPUT"
+          echo "ngiab_tag=$NGIAB_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1        
+
+
+      - name: Build AMI on AWS (N Virginia)
+        run: |
+          ami_version=""
+          DS_TAG="${{ steps.changes.outputs.ds_tag }}"
+          FP_TAG="${{ steps.changes.outputs.fp_tag }}"
+          NGIAB_TAG="${{ steps.changes.outputs.ngiab_tag }}"
+          
+          if [ "${{ steps.changes.outputs.build_ds_ami }}" == "true" ]; then
+            ami_version=datastream-"${{ steps.changes.outputs.ds_ami_version }}"
+          fi
+          
+          # Update AMI name
+          sed -i "s|AMI_NAME=\"ami_tag\"|AMI_NAME=\"$ami_version\"|" scripts/create_ami.sh
+          
+          # Update the workflow tag placeholders with actual values
+          sed -i "s|ds_tag_from_workflow|$DS_TAG|g" scripts/create_ami.sh
+          sed -i "s|fp_tag_from_workflow|$FP_TAG|g" scripts/create_ami.sh
+          sed -i "s|ngiab_tag_from_workflow|$NGIAB_TAG|g" scripts/create_ami.sh
+          cat scripts/create_ami.sh
+          chmod +x scripts/create_ami.sh
+          ./scripts/create_ami.sh
+
+
+  test-research-datastream-vpu-09:
+    runs-on: ubuntu-latest
+    needs: build-test-push-ami  # Run after AMI build
+    env:
+      VPU: "09"
+      DATE: 20250801
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade awscli
+
+
+      - name: Modify execution JSON
+        run: |
+          cd research_datastream/terraform_community
+          
+          # First, replace template placeholders (add this back)
+          DS_TAG="${{ needs.build-test-push-ami.outputs.ds_tag }}"
+          FP_TAG="${{ needs.build-test-push-ami.outputs.fp_tag }}"
+          NGIAB_TAG="${{ needs.build-test-push-ami.outputs.ngiab_tag }}"
+          ami_version="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
+          
+          sed -i "s|ami_tag_from_workflow|$ami_version|g" executions/execution.json
+          sed -i "s|ds_tag_from_workflow|$DS_TAG|g" executions/execution.json
+          sed -i "s|fp_tag_from_workflow|$FP_TAG|g" executions/execution.json
+          
+          # Then process with jq
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' executions/execution.json > temp.json
+
+      - name: Check and create AWS key pair
+        run: |
+          cd research_datastream/terraform_community
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; 
+          else 
+            echo "Key pair 'actions_key' already exists"; 
+          fi
+
+      - name: Start and monitor Step Functions execution
+        id: stepfunction
+        run: |
+          cd research_datastream/terraform_community
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
+          echo "Execution ARN: $execution_arn"
+          status="RUNNING"
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
+            if [ "$status" == "FAILED" ]; then
+              echo "State machine execution failed!"
+              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "State machine execution succeeded!"
+          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Deregister AMI on test failure
+        if: failure() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
+        run: |
+          ami_version="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
+          echo "Test failed - deregistering AMI: $ami_version"
+          
+          # Get AMI ID
+          ami_id=$(aws ec2 describe-images --owners self --filters "Name=name,Values=$ami_version" --query 'Images[0].ImageId' --output text --region us-east-1)
+          
+          if [ "$ami_id" != "None" ] && [ "$ami_id" != "" ]; then
+            echo "Found AMI ID: $ami_id"
+            
+            # Get snapshot IDs before deregistering
+            snapshot_ids=$(aws ec2 describe-images --image-ids $ami_id --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text --region us-east-1)
+            
+            # Deregister AMI
+            aws ec2 deregister-image --image-id $ami_id --region us-east-1
+            echo "AMI $ami_id deregistered"
+            
+            # Delete associated snapshots
+            for snapshot_id in $snapshot_ids; do
+              if [ "$snapshot_id" != "None" ] && [ "$snapshot_id" != "" ]; then
+                aws ec2 delete-snapshot --snapshot-id $snapshot_id --region us-east-1
+                echo "Snapshot $snapshot_id deleted"
+              fi
+            done
+          else
+            echo "No AMI found with name: $ami_version"
+          fi
+
+      - name: Verify output file
+        run: |
+          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
+
+      - name: Clean up
+        if: always()
+        run: |
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No file to delete"
+
+
+      - name: AMI preservation notice
+        if: success() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
+        run: |
+          echo "Test passed! AMI datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }} preserved for use."
