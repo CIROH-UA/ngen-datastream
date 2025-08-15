@@ -222,6 +222,27 @@ jobs:
 
       - name: Verify output files
         run: |
+          echo "Checking if processing created any output files for VPU ${{ env.VPU }}..."
+          
+          # Check if the directory exists and has files
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "SUCCESS: VPU ${{ env.VPU }} datastream processing completed successfully!"
+            echo "Files created:"
+            echo "$file_list"
+            
+            # Count files for summary
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files/objects created for VPU ${{ env.VPU }}: $file_count"
+          else
+            echo "FAILED: No output files were created for VPU ${{ env.VPU }}"
+            exit 1
+          fi
+
+    
+      - name: Verify output files
+        run: |
           curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
 
       - name: Clean up
@@ -249,7 +270,7 @@ jobs:
           echo "VPU Testing Summary:"
           echo "======================"
           echo "Date: $(date)"
-          echo "Total VPUs Tested: 18"
+          echo "Total VPUs Tested: 21"
           echo ""
           
           # Check if any VPU tests failed
