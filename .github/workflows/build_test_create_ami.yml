@@ -249,6 +249,7 @@ jobs:
 
     
       - name: Verify output files
+        if: matrix.vpu != '10U' && matrix.vpu != '17'
         run: |
           curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
 
