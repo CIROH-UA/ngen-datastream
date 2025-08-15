@@ -180,7 +180,9 @@ jobs:
           
           # Replace the working AMI with your custom one
           sed -i "s|ami-0e621409bdbd530a0|$ami_id|g" execution.json
-          
+          # Replace Docker image tags with specific versions
+          sed -i "s|awiciroh/datastream:latest|awiciroh/datastream:${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|awiciroh/forcingprocessor:latest|awiciroh/forcingprocessor:${{ needs.build-test-push-ami.outputs.fp_tag }}|g" execution.json
           # Show key info (avoid dumping entire JSON to logs)
           echo "AMI replacement completed for VPU ${{ env.VPU }}"
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
@@ -266,7 +268,6 @@ jobs:
             echo "All VPU tests passed"
           fi
           
-          echo "VPUs tested: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18"
           echo " Check individual job logs above for detailed results"
           echo " All test files have been cleaned up from S3"
           
