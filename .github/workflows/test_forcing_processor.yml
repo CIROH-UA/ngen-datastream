@@ -45,6 +45,7 @@ jobs:
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20250801/forcing_short_range/00/metadata/execution.json execution.json
           ami_id="ami-05cbd769f714f109d"
           sed -i "s|ami-038f6428a446d34a9|$ami_id|g" execution.json
+          cat execution.json
           # Remove specified fields and update TagSpecifications
           jq --arg DATE "${{ env.DATE }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "tests/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
           
