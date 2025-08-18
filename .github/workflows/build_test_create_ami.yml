@@ -236,7 +236,26 @@ jobs:
           curl -fSs -o test_16.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_16.nc || { echo "Error: VPU_16 not found"; exit 1; }
           curl -fSs -o test_17.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_17.nc || { echo "Error: VPU_17 not found"; exit 1; }
           curl -fSs -o test_18.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_18.nc || { echo "Error: VPU_18 not found"; exit 1; }
-      
+
+      - name: Debug - Check what files were created
+        run: |
+          echo "Checking what files were actually created..."
+          aws s3 ls s3://ciroh-community-ngen-datastream/tests/ --recursive
+
+      - name: Verify output files
+        run: |
+          echo "Checking if processing created any output files for FP..."
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/fp/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "SUCCESS: FP processing completed successfully!"
+            echo "Files created:"
+            echo "$file_list"
+          else
+            echo "FAILED: No output files were created for FP"
+            exit 1
+          fi
+
       - name: Clean up
         if: always()
         run: |
