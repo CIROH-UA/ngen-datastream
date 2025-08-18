@@ -1,0 +1,136 @@
+name: Build and Test Datastream Docker Containers on x86 (Version Aware)
+
+on:
+  workflow_dispatch:   
+  push:
+    branches:
+      - release_tags
+    paths:
+      - 'ersions.yml'
+
+permissions:
+  contents: read      
+
+jobs:
+  build-test-docker-x86:
+    runs-on: ubuntu-latest
+    outputs:
+      build_deps: ${{ steps.changes.outputs.build_deps }}
+      build_fp: ${{ steps.changes.outputs.build_fp }}
+      build_ds: ${{ steps.changes.outputs.build_ds }}
+      deps_version: ${{ steps.changes.outputs.deps_version }}
+      fp_version: ${{ steps.changes.outputs.fp_version }}
+      ds_version: ${{ steps.changes.outputs.ds_version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+
+    - name: Install yq
+      run: |
+        sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        sudo chmod +x /usr/local/bin/yq
+
+    - name: Detect version changes
+      id: changes
+      run: |
+        # Get current versions
+        CURRENT_DEPS=$(yq e '."datastream-deps"' versions.yml)
+        CURRENT_FP=$(yq e '.forcingprocessor' versions.yml)
+        CURRENT_DS=$(yq e '.datastream' versions.yml)
+        
+        # Get previous versions
+        git show HEAD~1:versions.yml > previous_versions.yml || echo -e "datastream-deps: '0.0.0'\nforcingprocessor: '0.0.0'\ndatastream: '0.0.0'" > previous_versions.yml
+        PREVIOUS_DEPS=$(yq e '."datastream-deps"' previous_versions.yml)
+        PREVIOUS_FP=$(yq e '.forcingprocessor' previous_versions.yml)
+        PREVIOUS_DS=$(yq e '.datastream' previous_versions.yml)
+        
+        # Check what changed
+        if [ "$CURRENT_DEPS" != "$PREVIOUS_DEPS" ]; then
+          echo "datastream-deps changed: $PREVIOUS_DEPS -> $CURRENT_DEPS"
+          echo "build_deps=true" >> $GITHUB_OUTPUT
+          echo "deps_version=$CURRENT_DEPS" >> $GITHUB_OUTPUT
+        else
+          echo "build_deps=false" >> $GITHUB_OUTPUT
+          echo "deps_version=$CURRENT_DEPS" >> $GITHUB_OUTPUT
+        fi
+        
+        if [ "$CURRENT_FP" != "$PREVIOUS_FP" ]; then
+          echo "forcingprocessor changed: $PREVIOUS_FP -> $CURRENT_FP"
+          echo "build_fp=true" >> $GITHUB_OUTPUT
+          echo "fp_version=$CURRENT_FP" >> $GITHUB_OUTPUT
+        else
+          echo "build_fp=false" >> $GITHUB_OUTPUT
+          echo "fp_version=$CURRENT_FP" >> $GITHUB_OUTPUT
+        fi
+        
+        if [ "$CURRENT_DS" != "$PREVIOUS_DS" ]; then
+          echo "datastream changed: $PREVIOUS_DS -> $CURRENT_DS"
+          echo "build_ds=true" >> $GITHUB_OUTPUT
+          echo "ds_version=$CURRENT_DS" >> $GITHUB_OUTPUT
+        else
+          echo "build_ds=false" >> $GITHUB_OUTPUT
+          echo "ds_version=$CURRENT_DS" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+        
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
+
+
+    - name: Build docker containers
+      run: |
+        chmod +x ./scripts/docker_builds.sh
+        ./scripts/docker_builds.sh -e -f -d -t latest-x86
+
+
+    - name: Prepare and test docker containers
+      run: |
+        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+        export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+
+
+    - name: Push docker containers
+      run: |
+        VERSION_TAG=""
+        if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
+          VERSION_TAG="${{ steps.changes.outputs.deps_version }}"
+          docker tag awiciroh/datastream-deps:latest-x86 awiciroh/datastream-deps:${VERSION_TAG}
+          docker push awiciroh/datastream-deps:${VERSION_TAG}
+        fi
+        if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
+          VERSION_TAG="${{ steps.changes.outputs.fp_version }}"
+          docker tag awiciroh/forcingprocessor:latest-x86 awiciroh/forcingprocessor:${VERSION_TAG}
+          docker push awiciroh/forcingprocessor:${VERSION_TAG}
+        fi
+        if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
+          VERSION_TAG="${{ steps.changes.outputs.ds_version }}"
+          docker tag awiciroh/datastream:latest-x86 awiciroh/datastream:${VERSION_TAG}
+          docker push awiciroh/datastream:${VERSION_TAG}
+        fi
+
+
+        # if [ -n "$BUILD_FLAGS" ]; then
+        #   ./scripts/docker_builds.sh $BUILD_FLAGS -t latest-x86 -p
+        # fi
+
