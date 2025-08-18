@@ -59,4 +59,4 @@ jobs:
 
     - name: Push docker containers
       run: |
-        ./scripts/docker_builds.sh -p      
+        ./scripts/docker_builds.sh -p -t latest-x86   
