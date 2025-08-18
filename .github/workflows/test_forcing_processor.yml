@@ -1,21 +1,21 @@
-name: Test forcing processor
-
+name: Test Research DataStream ForcingProcessing
 on:
-  workflow_dispatch:     
+  workflow_dispatch:   
   push:
     branches: 
       - release_tags
     paths:
       - 't_version.yml'
 
+
+
 permissions:
   contents: read
-
 jobs:
-  test-forcing-processor:
+  test-research-datastream-forcingprocessing:
     runs-on: ubuntu-latest
     env:
-      DATE: 20250801
+      DATE: 20250801    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,69 +38,16 @@ jobs:
           sudo apt-get install -y jq
           pip install --upgrade awscli
 
-      - name: Validate Step Functions and AMI
+      - name: Download and modify execution JSON
         run: |
           cd research_datastream/terraform_community
+          # Download the execution JSON
+          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20250801/forcing_short_range/00/metadata/execution.json execution.json
+          ami_id="ami-05cbd769f714f109d"
+          sed -i "s|ami-038f6428a446d34a9|$ami_id|g" execution.json
+          # Remove specified fields and update TagSpecifications
+          jq --arg DATE "${{ env.DATE }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "tests/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
           
-          # Check if state machine exists and get details
-          echo "Checking Step Functions state machine..."
-          if [ -f ./sm_ARN.txt ]; then
-            sm_arn=$(cat ./sm_ARN.txt)
-            echo "State machine ARN: $sm_arn"
-            
-            # Verify state machine exists and is active
-            aws stepfunctions describe-state-machine --state-machine-arn "$sm_arn" --region us-east-1 || {
-              echo "ERROR: State machine not found or not accessible"
-              exit 1
-            }
-          else
-            echo "ERROR: sm_ARN.txt file not found"
-            exit 1
-          fi
-          
-          # Validate AMI
-          ami_id="ami-0777c2decc3f6033f"
-          echo "Validating AMI: $ami_id"
-          aws ec2 describe-images --image-ids $ami_id --region us-east-1 --query 'Images[0].{ImageId:ImageId,State:State,Name:Name,Description:Description}' --output table || {
-            echo "ERROR: AMI not found or not accessible"
-            exit 1
-          }
-
-      - name: Download and modify execution JSON for Forcing Processor
-        run: |
-          cd research_datastream/terraform_community
-          
-          # Use the custom AMI ID
-          ami_id="ami-0777c2decc3f6033f"
-          echo "Using custom AMI ID for forcing processor test: $ami_id"
-          
-          # Download the forcing processor execution JSON
-          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20250801/forcing_short_range/00/metadata/execution.json execution.json || {
-            echo "ERROR: Failed to download execution.json from S3"
-            exit 1
-          }
-          
-          echo "Original execution.json:"
-          cat execution.json | jq '.'
-          
-          # Replace AMI in the execution JSON
-          sed -i "s|ami-[a-z0-9]*|$ami_id|g" execution.json
-          
-          echo "After AMI replacement:"
-          cat execution.json | jq '.'
-          
-          # Remove specified fields and update TagSpecifications with custom AMI info
-          jq --arg DATE "$DATE" --arg AMI_VERSION "ami-0777c2decc3f6033f" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions_custom_ami"}, {"Key": "AMI_Version", "Value": ("datastream-" + $AMI_VERSION)}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "tests/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
-          
-          echo "Final temp.json:"
-          cat temp.json | jq '.'
-          
-          # Validate the JSON is well-formed
-          jq '.' temp.json > /dev/null || {
-            echo "ERROR: Generated JSON is malformed"
-            exit 1
-          }
-
       - name: Check and create AWS key pair
         run: |
           cd research_datastream/terraform_community
@@ -110,332 +57,48 @@ jobs:
             echo "Key pair 'actions_key' already exists"; 
           fi
 
-      - name: Test state machine accessibility
+      - name: Start and monitor Step Functions execution
         run: |
           cd research_datastream/terraform_community
-          sm_arn=$(cat ./sm_ARN.txt)
-          
-          echo "Testing state machine definition..."
-          aws stepfunctions describe-state-machine --state-machine-arn "$sm_arn" --region us-east-1 > sm_definition.json
-          
-          echo "State machine status:"
-          jq '.status' sm_definition.json
-          
-          echo "Recent executions:"
-          aws stepfunctions list-executions --state-machine-arn "$sm_arn" --max-items 3 --region us-east-1
-          
-          echo "State machine definition (first 1000 chars):"
-          jq -r '.definition' sm_definition.json | head -c 1000
-
-      - name: Deep AMI validation
-        run: |
-          ami_id="ami-0777c2decc3f6033f"
-          
-          echo "=== DEEP AMI VALIDATION ==="
-          
-          # Get detailed AMI information
-          aws ec2 describe-images --image-ids $ami_id --region us-east-1 > ami_details.json
-          
-          echo "AMI State:"
-          jq '.Images[0].State' ami_details.json
-          
-          echo "AMI Architecture:"
-          jq '.Images[0].Architecture' ami_details.json
-          
-          echo "AMI Platform:"
-          jq '.Images[0].Platform // "linux"' ami_details.json
-          
-          echo "AMI Root Device Type:"
-          jq '.Images[0].RootDeviceType' ami_details.json
-          
-          echo "AMI Virtualization Type:"
-          jq '.Images[0].VirtualizationType' ami_details.json
-          
-          echo "AMI Owner:"
-          jq '.Images[0].OwnerId' ami_details.json
-          
-          echo "AMI Block Device Mappings:"
-          jq '.Images[0].BlockDeviceMappings' ami_details.json
-          
-          # Check if AMI is public or if we have access
-          echo "Checking AMI launch permissions..."
-          aws ec2 describe-image-attribute --image-id $ami_id --attribute launchPermission --region us-east-1 || echo "Could not check launch permissions"
-          
-          # Test if we can actually launch an instance with this AMI (dry run)
-          echo "Testing AMI launch capability (dry run)..."
-          aws ec2 run-instances \
-            --image-id $ami_id \
-            --instance-type t3.micro \
-            --dry-run \
-            --region us-east-1 2>&1 || echo "AMI launch test completed (expected to fail with dry-run error)"
-
-      - name: Compare with working execution JSON
-        run: |
-          cd research_datastream/terraform_community
-          
-          echo "=== COMPARING EXECUTION CONFIGURATIONS ==="
-          
-          # Download a working execution JSON for comparison
-          echo "Downloading reference execution JSON..."
-          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20250801/forcing_short_range/00/metadata/execution.json reference.json
-          
-          echo "Reference execution JSON structure:"
-          jq 'keys' reference.json
-          
-          echo "Our modified JSON structure:"
-          jq 'keys' temp.json
-          
-          echo "=== KEY DIFFERENCES ==="
-          echo "Reference AMI:"
-          jq '.instance_parameters.ImageId' reference.json
-          
-          echo "Our AMI:"
-          jq '.instance_parameters.ImageId' temp.json
-          
-          echo "Reference instance type:"
-          jq '.instance_parameters.InstanceType' reference.json
-          
-          echo "Our instance type:"
-          jq '.instance_parameters.InstanceType' temp.json
-          
-          echo "Reference security groups:"
-          jq '.instance_parameters.SecurityGroupIds' reference.json
-          
-          echo "Our security groups:"
-          jq '.instance_parameters.SecurityGroupIds' temp.json
-          
-          echo "Reference subnet:"
-          jq '.instance_parameters.SubnetId' reference.json
-          
-          echo "Our subnet:"
-          jq '.instance_parameters.SubnetId' temp.json
-
-      - name: Test minimal execution first
-        run: |
-          cd research_datastream/terraform_community
-          sm_arn=$(cat ./sm_ARN.txt)
-          
-          echo "=== TESTING MINIMAL EXECUTION ==="
-          
-          # Create a minimal test JSON with just the reference execution
-          cp reference.json minimal_test.json
-          
-          # Only change the execution name and tags for testing
-          jq --arg DATE "$DATE" '.instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_minimal_test"}]}]' minimal_test.json > minimal_test_updated.json
-          
-          echo "Minimal test JSON:"
-          cat minimal_test_updated.json | jq '.'
-          
-          # Try to start this minimal execution
-          execution_name="fp_minimal_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')"
-          
-          echo "Starting minimal test execution..."
-          minimal_execution_arn=$(aws stepfunctions start-execution \
-            --state-machine-arn "$sm_arn" \
-            --name "$execution_name" \
-            --input "file://minimal_test_updated.json" \
-            --region us-east-1 \
-            --query 'executionArn' \
-            --output text) || {
-            echo "ERROR: Even minimal execution failed to start"
-            echo "This suggests an issue with the state machine or permissions"
-            exit 1
-          }
-          
-          echo "Minimal execution started successfully: $minimal_execution_arn"
-          
-          # Monitor for a short time
-          sleep 30
-          status=$(aws stepfunctions describe-execution --execution-arn "$minimal_execution_arn" --region us-east-1 --query 'status' --output text)
-          echo "Minimal execution status after 30s: $status"
-          
-          # Stop the minimal test execution to save resources
-          if [ "$status" == "RUNNING" ]; then
-            echo "Stopping minimal test execution..."
-            aws stepfunctions stop-execution --execution-arn "$minimal_execution_arn" --region us-east-1 || echo "Could not stop execution"
-          fi
-
-      - name: Start and monitor Step Functions execution for Forcing Processor
-        run: |
-          cd research_datastream/terraform_community
-          
-          sm_arn=$(cat ./sm_ARN.txt)
-          execution_name="fp_test_custom_ami_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S')"
-          
-          echo "Starting execution with name: $execution_name"
-          echo "State machine ARN: $sm_arn"
-          echo "Input file content:"
-          cat temp.json
-          
-          # Start execution with better error handling
-          execution_arn=$(aws stepfunctions start-execution \
-            --state-machine-arn "$sm_arn" \
-            --name "$execution_name" \
-            --input "file://temp.json" \
-            --region us-east-1 \
-            --query 'executionArn' \
-            --output text) || {
-            echo "ERROR: Failed to start Step Functions execution"
-            echo "Checking recent executions for debugging:"
-            aws stepfunctions list-executions --state-machine-arn "$sm_arn" --max-items 5 --region us-east-1
-            exit 1
-          }
-          
-          echo "Forcing Processor Execution ARN: $execution_arn"
-          
-          # Monitor execution with timeout
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name fp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
+          echo "Execution ARN: $execution_arn"
           status="RUNNING"
-          timeout=1800  # 30 minutes timeout
-          elapsed=0
-          
-          while [ "$status" != "SUCCEEDED" ] && [ $elapsed -lt $timeout ]; do
-            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text 2>/dev/null || echo "UNKNOWN")
-            echo "Current status: $status (${elapsed}s elapsed)"
-            
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
             if [ "$status" == "FAILED" ]; then
-              echo "Forcing processor execution failed with custom AMI!"
-              
-              # Get detailed failure information
-              echo "Getting execution details..."
-              aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1
-              
-              echo "Getting execution history..."
-              aws stepfunctions get-execution-history --execution-arn "$execution_arn" --region us-east-1 > execution_history.json
-              
-              echo "Failed events:"
-              jq '.events[] | select(.type | contains("Failed"))' execution_history.json || echo "No failed events found in history"
-              
-              echo "Last 10 events:"
-              jq '.events[-10:]' execution_history.json || echo "Could not get recent events"
-              
+              echo "State machine execution failed!"
               exit 1
             fi
-            
-            if [ "$status" == "TIMED_OUT" ] || [ "$status" == "ABORTED" ]; then
-              echo "Execution $status"
-              exit 1
-            fi
-            
-            sleep 10
-            elapsed=$((elapsed + 10))
+            sleep 5
           done
-          
-          if [ $elapsed -ge $timeout ]; then
-            echo "Execution timed out after ${timeout} seconds"
-            exit 1
-          fi
-          
-          echo "Forcing processor execution succeeded with custom AMI!"
+          echo "State machine execution succeeded!"
 
-      - name: Verify Forcing Processor output files
+      - name: Verify output files
         run: |
-          echo "Verifying forcing processor outputs..."
-          
-          # Wait longer for files to be fully written
-          echo "Waiting 60 seconds for files to be written..."
-          sleep 60
-          
-          # First, check what actually exists in S3
-          echo "=== CHECKING WHAT EXISTS IN S3 ==="
-          echo "Files in tests/short_range/fp/:"
-          aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/fp/ --recursive || echo "No files found in expected location"
-          
-          echo "Files in tests/short_range/ (all subdirectories):"
-          aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/ --recursive || echo "No files found in tests/short_range/"
-          
-          echo "Files in tests/ (all subdirectories):"
-          aws s3 ls s3://ciroh-community-ngen-datastream/tests/ --recursive || echo "No files found in tests/"
-          
-          # Check if files might be in a different location
-          echo "=== SEARCHING FOR ANY .nc FILES ==="
-          aws s3api list-objects-v2 --bucket ciroh-community-ngen-datastream --query 'Contents[?contains(Key, `.nc`) && contains(Key, `test`)].Key' --output table || echo "No .nc files found with 'test' in name"
-          
-          # Try to find files that might match our execution
-          echo "=== SEARCHING FOR FILES FROM OUR EXECUTION ==="
-          aws s3api list-objects-v2 --bucket ciroh-community-ngen-datastream --query 'Contents[?contains(Key, `fp_test`) || contains(Key, `custom_ami`)].Key' --output table || echo "No files found matching our execution tags"
-          
-          # Check for files created around our execution time (last 10 minutes)
-          echo "=== CHECKING FOR RECENTLY CREATED FILES ==="
-          recent_time=$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%S)
-          echo "Looking for files created after: $recent_time"
-          aws s3api list-objects-v2 --bucket ciroh-community-ngen-datastream --query "Contents[?LastModified>=\`$recent_time\`].{Key:Key,LastModified:LastModified,Size:Size}" --output table || echo "Could not check recent files"
-          
-          # Now try the original verification
-          echo "=== TRYING ORIGINAL FILE VERIFICATION ==="
-          files=(
-            "VPU_01" "VPU_02" "VPU_03W" "VPU_03S" "VPU_03N" 
-            "VPU_04" "VPU_05" "VPU_06" "VPU_07" "VPU_08" 
-            "VPU_09" "VPU_10L" "VPU_10U" "VPU_11" "VPU_12" 
-            "VPU_13" "VPU_14" "VPU_15" "VPU_16" "VPU_17" "VPU_18"
-          )
-          
-          failed_files=()
-          found_files=()
-          
-          for vpu in "${files[@]}"; do
-            url="https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.${vpu}.nc"
-            if curl -fSs -I "$url" > /dev/null 2>&1; then
-              echo "✓ $vpu found"
-              found_files+=("$vpu")
-            else
-              echo "✗ $vpu not found at expected location"
-              failed_files+=("$vpu")
-            fi
-          done
-          
-          echo "=== SUMMARY ==="
-          echo "Found files: ${#found_files[@]}"
-          echo "Missing files: ${#failed_files[@]}"
-          
-          if [ ${#found_files[@]} -gt 0 ]; then
-            echo "Found: ${found_files[*]}"
-          fi
-          
-          if [ ${#failed_files[@]} -gt 0 ]; then
-            echo "Missing: ${failed_files[*]}"
-          fi
-          
-          # If some files are missing, this might still be a success if files are elsewhere
-          if [ ${#found_files[@]} -eq 0 ]; then
-            echo "ERROR: No expected files found, but execution succeeded - files may be in different location"
-            echo "Check the S3 listings above to see where files were actually created"
-            exit 1
-          elif [ ${#failed_files[@]} -gt 0 ]; then
-            echo "WARNING: Some files missing, but ${#found_files[@]} files were found"
-            echo "This might be expected behavior - checking if this is still a success..."
-            
-            # If we found at least half the files, consider it a partial success
-            if [ ${#found_files[@]} -ge 10 ]; then
-              echo "SUCCESS: Found ${#found_files[@]} files - considering this a success"
-            else
-              echo "ERROR: Only found ${#found_files[@]} files - too few for success"
-              exit 1
-            fi
-          else
-            echo "SUCCESS: All forcing processor files found!"
-          fi
-
-      - name: Debug on failure
-        if: failure()
-        run: |
-          echo "=== DEBUG INFORMATION ==="
-          echo "Checking for any instances that might have been launched..."
-          aws ec2 describe-instances \
-            --filters "Name=tag:Project,Values=fp_test_git_actions_custom_ami" \
-            --query 'Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name,AMI:ImageId,LaunchTime:LaunchTime}' \
-            --output table || echo "No instances found"
-          
-          echo "Checking S3 for any partial outputs..."
-          aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/ --recursive || echo "No S3 files found"
-          
-          echo "Recent Step Functions executions:"
-          cd research_datastream/terraform_community
-          if [ -f ./sm_ARN.txt ]; then
-            sm_arn=$(cat ./sm_ARN.txt)
-            aws stepfunctions list-executions --state-machine-arn "$sm_arn" --max-items 5 --region us-east-1 || echo "Could not list executions"
-          fi
-
-      - name: Clean up forcing processor test files
+          curl -fSs -o test_01.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_01.nc || { echo "Error: VPU_01 not found"; exit 1; }
+          curl -fSs -o test_02.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_02.nc || { echo "Error: VPU_02 not found"; exit 1; }
+          curl -fSs -o test_03W.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03W.nc || { echo "Error: VPU_03W not found"; exit 1; }
+          curl -fSs -o test_03S.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03S.nc || { echo "Error: VPU_03S not found"; exit 1; }
+          curl -fSs -o test_03N.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03N.nc || { echo "Error: VPU_03N not found"; exit 1; }
+          curl -fSs -o test_04.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_04.nc || { echo "Error: VPU_04 not found"; exit 1; }
+          curl -fSs -o test_05.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_05.nc || { echo "Error: VPU_05 not found"; exit 1; }
+          curl -fSs -o test_06.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_06.nc || { echo "Error: VPU_06 not found"; exit 1; }
+          curl -fSs -o test_07.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_07.nc || { echo "Error: VPU_07 not found"; exit 1; }
+          curl -fSs -o test_08.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_08.nc || { echo "Error: VPU_08 not found"; exit 1; }
+          curl -fSs -o test_09.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_09.nc || { echo "Error: VPU_09 not found"; exit 1; }
+          curl -fSs -o test_10L.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc || { echo "Error: VPU_10L not found"; exit 1; }
+          curl -fSs -o test_10U.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10U.nc || { echo "Error: VPU_10U not found"; exit 1; }
+          curl -fSs -o test_11.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_11.nc || { echo "Error: VPU_11 not found"; exit 1; }
+          curl -fSs -o test_12.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_12.nc || { echo "Error: VPU_12 not found"; exit 1; }
+          curl -fSs -o test_13.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_13.nc || { echo "Error: VPU_13 not found"; exit 1; }
+          curl -fSs -o test_14.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_14.nc || { echo "Error: VPU_14 not found"; exit 1; }
+          curl -fSs -o test_15.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_15.nc || { echo "Error: VPU_15 not found"; exit 1; }
+          curl -fSs -o test_16.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_16.nc || { echo "Error: VPU_16 not found"; exit 1; }
+          curl -fSs -o test_17.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_17.nc || { echo "Error: VPU_17 not found"; exit 1; }
+          curl -fSs -o test_18.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_18.nc || { echo "Error: VPU_18 not found"; exit 1; }
+      
+      - name: Clean up
         if: always()
         run: |
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/fp || echo "No forcing processor files to delete"
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/fp || echo "No file to delete"          
