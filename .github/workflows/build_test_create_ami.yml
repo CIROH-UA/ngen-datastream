@@ -173,7 +173,7 @@ jobs:
           
           # Download the proven working execution JSON from S3
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/forcing_short_range/00/metadata/execution.json execution.json
-          
+          cat execution.json
           # Replace the working AMI with your custom one
           sed -i "s|ami-0e621409bdbd530a0|$ami_id|g" execution.json
           # Replace Docker image tags with specific versions
@@ -322,9 +322,11 @@ jobs:
           # Replace the working AMI with your custom one
           sed -i "s|ami-0e621409bdbd530a0|$ami_id|g" execution.json
           # Replace Docker image tags with specific versions
+          cat execution.json
           sed -i "s|awiciroh/datastream:latest|awiciroh/datastream:${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
           sed -i "s|awiciroh/forcingprocessor:latest|awiciroh/forcingprocessor:${{ needs.build-test-push-ami.outputs.fp_tag }}|g" execution.json
           # Show key info (avoid dumping entire JSON to logs)
+          cat execution.json
           echo "AMI replacement completed for VPU ${{ env.VPU }}"
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
           
