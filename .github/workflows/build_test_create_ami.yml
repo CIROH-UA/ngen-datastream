@@ -173,12 +173,14 @@ jobs:
           
           # Download the proven working execution JSON from S3
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/forcing_short_range/00/metadata/execution.json execution.json
-          cat execution.json
-          # Replace the working AMI with your custom one
-          sed -i "s|ami-0e621409bdbd530a0|$ami_id|g" execution.json
+          
+          # Replace the working AMI with custom one
+          jq --arg ami "$ami_id" '.instance_parameters.ImageId = $ami' execution.json > execution_updated.json
+          mv execution_updated.json execution.json
+          echo $ami_id
           # Replace Docker image tags with specific versions
-          sed -i "s|awiciroh/datastream:latest|awiciroh/datastream:${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
-          sed -i "s|awiciroh/forcingprocessor:latest|awiciroh/forcingprocessor:${{ needs.build-test-push-ami.outputs.fp_tag }}|g" execution.json
+          sed -i "s|DS_TAG=1.0.1|awiciroh/DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=v${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
           # Show key info (avoid dumping entire JSON to logs)
           echo "AMI replacement completed for VPU ${{ env.VPU }}"
@@ -319,14 +321,16 @@ jobs:
           # Download the proven working execution JSON from S3
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
           
-          # Replace the working AMI with your custom one
-          sed -i "s|ami-0e621409bdbd530a0|$ami_id|g" execution.json
+          # Replace the working AMI with custom one
+          jq --arg ami "$ami_id" '.instance_parameters.ImageId = $ami' execution.json > execution_updated.json
+          mv execution_updated.json execution.json
+          echo $ami_id
           # Replace Docker image tags with specific versions
+          sed -i "s|DS_TAG=1.0.1|awiciroh/DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=v${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
-          sed -i "s|awiciroh/datastream:latest|awiciroh/datastream:${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
-          sed -i "s|awiciroh/forcingprocessor:latest|awiciroh/forcingprocessor:${{ needs.build-test-push-ami.outputs.fp_tag }}|g" execution.json
+
           # Show key info (avoid dumping entire JSON to logs)
-          cat execution.json
           echo "AMI replacement completed for VPU ${{ env.VPU }}"
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
           
