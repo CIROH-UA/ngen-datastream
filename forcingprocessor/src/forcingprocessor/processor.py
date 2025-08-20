@@ -15,7 +15,7 @@ import gzip
 import tarfile, tempfile
 from forcingprocessor.weights_hf2ds import multiprocess_hf2ds
 from forcingprocessor.plot_forcings import plot_ngen_forcings
-from forcingprocessor.utils import get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
+from forcingprocessor.utils import make_forcing_netcdf, get_window, log_time, convert_url2key, report_usage, nwm_variables, ngen_variables
 
 B2MB = 1048576
 
@@ -186,7 +186,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
             txrds += time.perf_counter() - t0
             t0 = time.perf_counter()                     
             shp = nwm_data["U2D"].shape   
-            data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float32)       
+            data_allvars = np.zeros(shape=(nvar, dy, dx), dtype=np.float64)       
             for var_dx, jvar in enumerate(nwm_variables):  
                 if "retrospective-2-1" in nwm_file:
                     data_allvars[var_dx, :, :] = np.flip(np.squeeze(nwm_data[jvar].isel(west_east=slice(x_min, x_max+1), south_north=slice(shp[1] - (y_max+1), shp[1] - y_min)).values),axis=0)
@@ -203,7 +203,7 @@ def forcing_grid2catchment(nwm_files: list, fs=None):
         t0 = time.perf_counter()
         data_allvars = data_allvars.reshape(nvar, dx*dy)
         ncatch = len(weights_df)
-        data_array = np.zeros((nvar,ncatch), dtype=np.float32)
+        data_array = np.zeros((nvar,ncatch), dtype=np.float64)
         jcatch = 0
         for row in weights_df.itertuples(): 
             weights = row.cell_id
@@ -516,16 +516,15 @@ def multiprocess_write_tars(dfs,catchments,filenames,tar_buffs):
         ):
             pass
 
-def write_netcdf(data, vpu, t_ax, catchments):
+def write_netcdf(data:np.ndarray, vpu:str, t_ax:list, catchments:list):
     """
     Write 3D array data to a NetCDF file.
 
     Parameters:
-        data (numpy.ndarray): 3D array with dimensions (catchment-id, time, forcing variable).
+        data (numpy.ndarray): 3D array with dimensions (time, forcing_variable, catchment-id).
         vpu (str): Name or identifier of the Variable Processing Unit (VPU).
-        t_ax (numpy.ndarray): Array representing time axis.
-        catchments (dict.keys()): Keys containing catchment IDs.
-
+        t_ax (list): list representing time axis.
+        catchments (list): list containing catchment IDs.
     Returns:
         None
     """
@@ -539,79 +538,25 @@ def write_netcdf(data, vpu, t_ax, catchments):
     else:
         nc_filename = Path(forcing_path,filename)
 
-    data = np.transpose(data,(2,1,0))
-
+    data = np.transpose(data,(2,0,1))
     t_utc = np.array([datetime.timestamp(datetime.strptime(jt,'%Y-%m-%d %H:%M:%S')) for jt in t_ax],dtype=np.float64)
-
     catchments = np.array(catchments,dtype='str')
-    import netCDF4 as nc
-
     if storage_type == 's3':
         bucket, key = convert_url2key(nc_filename,'s3')
         with tempfile.NamedTemporaryFile(suffix='.nc') as tmpfile:
-            with nc.Dataset(tmpfile.name, 'w', format='NETCDF4') as ds:
-                ds.createDimension('catchment-id', len(catchments))
-                ds.createDimension('time', len(t_utc))
-                ids_var = ds.createVariable('ids', str, ('catchment-id',))
-                time_var = ds.createVariable('Time', 'f8', ('catchment-id', 'time'))
-                ugrd_var = ds.createVariable('UGRD_10maboveground', 'f4', ('catchment-id', 'time'))
-                vgrd_var = ds.createVariable('VGRD_10maboveground', 'f4', ('catchment-id', 'time'))
-                dlwrf_var = ds.createVariable('DLWRF_surface', 'f4', ('catchment-id', 'time'))
-                apcp_var = ds.createVariable('APCP_surface', 'f4', ('catchment-id', 'time'))
-                precip_var = ds.createVariable('precip_rate', 'f4', ('catchment-id', 'time'))
-                tmp_var = ds.createVariable('TMP_2maboveground', 'f4', ('catchment-id', 'time'))
-                spfh_var = ds.createVariable('SPFH_2maboveground', 'f4', ('catchment-id', 'time'))
-                pres_var = ds.createVariable('PRES_surface', 'f4', ('catchment-id', 'time'))
-                dswrf_var = ds.createVariable('DSWRF_surface', 'f4', ('catchment-id', 'time'))
-                ids_var[:] = catchments
-                time_var[:, :] = np.tile(t_utc, (len(catchments), 1))
-                ugrd_var[:, :] = data[:, 0, :]
-                vgrd_var[:, :] = data[:, 1, :]
-                dlwrf_var[:, :] = data[:, 2, :]
-                apcp_var[:, :] = data[:, 3, :]
-                precip_var[:, :] = data[:, 4, :]
-                tmp_var[:, :] = data[:, 5, :]
-                spfh_var[:, :] = data[:, 6, :]
-                pres_var[:, :] = data[:, 7, :]
-                dswrf_var[:, :] = data[:, 8, :]
+            make_forcing_netcdf(tmpfile.name, catchments, t_utc, data)
             netcdf_cat_file_size = os.path.getsize(tmpfile.name) / B2MB
             tmpfile.flush()
             tmpfile.seek(0)
             print(f"Uploading netcdf forcings to S3: bucket={bucket}, key={key}")
             s3_client.upload_file(tmpfile.name, bucket, key)
-
     else:
-        with nc.Dataset(nc_filename, 'w', format='NETCDF4') as ds:
-            ds.createDimension('catchment-id', len(catchments))
-            ds.createDimension('time', len(t_utc))
-            ids_var = ds.createVariable('ids', str, ('catchment-id',))
-            time_var = ds.createVariable('Time', 'f8', ('catchment-id', 'time'))
-            ugrd_var = ds.createVariable('UGRD_10maboveground', 'f4', ('catchment-id', 'time'))
-            vgrd_var = ds.createVariable('VGRD_10maboveground', 'f4', ('catchment-id', 'time'))
-            dlwrf_var = ds.createVariable('DLWRF_surface', 'f4', ('catchment-id', 'time'))
-            apcp_var = ds.createVariable('APCP_surface', 'f4', ('catchment-id', 'time'))
-            precip_var = ds.createVariable('precip_rate', 'f4', ('catchment-id', 'time'))
-            tmp_var = ds.createVariable('TMP_2maboveground', 'f4', ('catchment-id', 'time'))
-            spfh_var = ds.createVariable('SPFH_2maboveground', 'f4', ('catchment-id', 'time'))
-            pres_var = ds.createVariable('PRES_surface', 'f4', ('catchment-id', 'time'))
-            dswrf_var = ds.createVariable('DSWRF_surface', 'f4', ('catchment-id', 'time'))
-            ids_var[:] = catchments
-            time_var[:, :] = np.tile(t_utc, (len(catchments), 1))
-            ugrd_var[:, :] = data[:, 0, :]
-            vgrd_var[:, :] = data[:, 1, :]
-            dlwrf_var[:, :] = data[:, 2, :]
-            apcp_var[:, :] = data[:, 3, :]
-            precip_var[:, :] = data[:, 4, :]
-            tmp_var[:, :] = data[:, 5, :]
-            spfh_var[:, :] = data[:, 6, :]
-            pres_var[:, :] = data[:, 7, :]
-            dswrf_var[:, :] = data[:, 8, :]
+        make_forcing_netcdf(nc_filename, catchments, t_utc, data)
         print(f'netcdf has been written to {nc_filename}')  
         netcdf_cat_file_size = os.path.getsize(nc_filename) / B2MB
-
     return netcdf_cat_file_size  
 
-def multiprocess_write_netcdf(data, jcatchment_dict, t_ax):  
+def multiprocess_write_netcdf(data:np.ndarray, jcatchment_dict:dict, t_ax:np.ndarray):  
     """
     Write DataFrames to tar archives using multiprocessing.
 
@@ -901,6 +846,7 @@ def prep_ngen_data(conf):
     t0 = time.perf_counter()
     if "netcdf" in output_file_type:
         netcdf_cat_file_sizes_MB = multiprocess_write_netcdf(data_array, jcatchment_dict, t_ax)
+        # write_netcdf(data_array,"1", t_ax, jcatchment_dict['1'])
     if ii_verbose: print(f'Writing catchment forcings to {output_path}!', end=None,flush=True)  
     forcing_cat_ids, dfs, filenames, individual_cat_file_sizes_MB, individual_cat_file_sizes_MB_zipped, tar_buffs = multiprocess_write(data_array,t_ax,list(weights_df.index),nprocs,forcing_path)
 
