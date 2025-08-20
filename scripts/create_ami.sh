@@ -74,9 +74,9 @@ sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
 
 echo "Pulling Docker images..."
-docker pull awiciroh/datastream:\$DS_TAG
-docker pull awiciroh/forcingprocessor:\$FP_TAG
-docker pull awiciroh/ciroh-ngen-image:\$NGIAB_TAG
+docker pull awiciroh/datastream:$DS_TAG
+docker pull awiciroh/forcingprocessor:$FP_TAG
+docker pull awiciroh/ciroh-ngen-image:$NGIAB_TAG
 
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
@@ -104,8 +104,8 @@ echo "Instance ID: $INSTANCE_ID"
 echo "Waiting for instance to be running..."
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 
-echo "Waiting 10 minutes for setup to complete..."
-sleep 600  # 10 minutes for setup
+echo "Waiting 20 minutes for setup to complete..."
+sleep 1200  # 10 minutes for setup
 
 # Stop instance
 echo "Stopping instance..."
