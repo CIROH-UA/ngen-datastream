@@ -73,34 +73,10 @@ cd /home/ec2-user
 sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
 
-echo "Checking if datastream script exists..."
-if [ -f "/home/ec2-user/ngen-datastream/scripts/datastream" ]; then
-    echo "Found datastream script, updating with actual tag values..."
-    
-    # Show original content
-    echo "Original tag definitions:"
-    grep -E "(DS_TAG|FP_TAG|NGIAB_TAG)" /home/ec2-user/ngen-datastream/scripts/datastream || echo "No tag definitions found"
-    
-    # Update the tags
-    sed -i "s|DS_TAG=\${DS_TAG:-\"latest\"}|DS_TAG=\${DS_TAG:-\"$DS_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
-    sed -i "s|FP_TAG=\${FP_TAG:-\"latest\"}|FP_TAG=\${FP_TAG:-\"$FP_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
-    sed -i "s|NGIAB_TAG=\${NGIAB_TAG:-\"latest\"}|NGIAB_TAG=\${NGIAB_TAG:-\"$NGIAB_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
-    
-    echo "Updated tag definitions:"
-    grep -E "(DS_TAG|FP_TAG|NGIAB_TAG)" /home/ec2-user/ngen-datastream/scripts/datastream || echo "No tag definitions found after update"
-else
-    echo "ERROR: datastream script not found at expected location!"
-    echo "Checking repository structure..."
-    find /home/ec2-user/ngen-datastream -name "*datastream*" -type f || echo "No datastream files found"
-    echo "Repository contents:"
-    ls -la /home/ec2-user/ngen-datastream/
-    if [ -d "/home/ec2-user/ngen-datastream/scripts" ]; then
-        echo "Scripts directory contents:"
-        ls -la /home/ec2-user/ngen-datastream/scripts/
-    else
-        echo "Scripts directory does not exist"
-    fi
-fi
+echo "Pulling Docker images..."
+docker pull awiciroh/datastream:$DS_TAG
+docker pull awiciroh/forcingprocessor:$FP_TAG
+docker pull awiciroh/ciroh-ngen-image:$NGIAB_TAG
 
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
@@ -128,8 +104,8 @@ echo "Instance ID: $INSTANCE_ID"
 echo "Waiting for instance to be running..."
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 
-echo "Waiting 6 minutes for setup to complete..."
-sleep 400  # 6 minutes for setup
+echo "Waiting 20 minutes for setup to complete..."
+sleep 1200  # 10 minutes for setup
 
 # Stop instance
 echo "Stopping instance..."
