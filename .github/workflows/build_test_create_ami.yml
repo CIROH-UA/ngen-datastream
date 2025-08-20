@@ -175,7 +175,7 @@ jobs:
           mv execution_updated.json execution.json
           echo $ami_id
           # Replace Docker image tags with specific versions
-          sed -i "s|DS_TAG=1.0.1|awiciroh/DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|DS_TAG=1.0.1|DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
           sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
           # Show key info (avoid dumping entire JSON to logs)
@@ -322,7 +322,7 @@ jobs:
           mv execution_updated.json execution.json
           echo $ami_id
           # Replace Docker image tags with specific versions
-          sed -i "s|DS_TAG=1.0.1|awiciroh/DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|DS_TAG=1.0.1|DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
           sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
 
