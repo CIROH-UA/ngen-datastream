@@ -403,104 +403,104 @@ jobs:
 
 
 
-  # # Summary job that runs after all VPUs complete
-  # test-summary:
-  #   runs-on: ubuntu-latest
-  #   needs: [build-test-push-ami, test-all-vpus, get-ami-info]
-  #   if: always() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
-  #   steps:
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #         aws-region: us-east-1
+  # Summary job that runs after all VPUs complete
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [build-test-push-ami, test-all-vpus, get-ami-info]
+    if: always() && needs.build-test-push-ami.outputs.build_ds_ami == 'true'
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-  #     - name: Check VPU Test Results and Handle AMI
-  #       run: |
-  #         echo "VPU Testing Summary:"
-  #         echo "======================"
-  #         echo "Date: $(date)"
-  #         echo "Total VPUs Tested: 21"
-  #         echo ""
+      - name: Check VPU Test Results and Handle AMI
+        run: |
+          echo "VPU Testing Summary:"
+          echo "======================"
+          echo "Date: $(date)"
+          echo "Total VPUs Tested: 21"
+          echo ""
           
-  #         # Check if any VPU tests failed
-  #         # GitHub Actions sets job results in the needs context
-  #         any_failed=false
+          # Check if any VPU tests failed
+          # GitHub Actions sets job results in the needs context
+          any_failed=false
           
-  #         # Parse the results from the matrix jobs
-  #         echo "Checking individual VPU results..."
+          # Parse the results from the matrix jobs
+          echo "Checking individual VPU results..."
           
-  #         # In GitHub Actions, when any job in needs.test-all-vpus fails, 
-  #         # the overall needs.test-all-vpus.result will be 'failure'
-  #         if [ "${{ needs.test-all-vpus.result }}" != "success" ]; then
-  #           any_failed=true
-  #           echo "One or more VPU tests failed"
-  #         else
-  #           echo "All VPU tests passed"
-  #         fi
+          # In GitHub Actions, when any job in needs.test-all-vpus fails, 
+          # the overall needs.test-all-vpus.result will be 'failure'
+          if [ "${{ needs.test-all-vpus.result }}" != "success" ]; then
+            any_failed=true
+            echo "One or more VPU tests failed"
+          else
+            echo "All VPU tests passed"
+          fi
           
-  #         echo " Check individual job logs above for detailed results"
-  #         echo " All test files have been cleaned up from S3"
+          echo " Check individual job logs above for detailed results"
+          echo " All test files have been cleaned up from S3"
           
-  #         # Set output for next step
-  #         echo "any_failed=$any_failed" >> $GITHUB_ENV
+          # Set output for next step
+          echo "any_failed=$any_failed" >> $GITHUB_ENV
 
-  #     - name: Deregister AMI on any test failure
-  #       if: env.any_failed == 'true'
-  #       run: |
-  #         echo " VPU tests failed - checking for custom AMI to deregister..."
-  #         ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
-  #         ami_to_deregister=$ami_id
+      - name: Deregister AMI on any test failure
+        if: env.any_failed == 'true'
+        run: |
+          echo " VPU tests failed - checking for custom AMI to deregister..."
+          ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
+          ami_to_deregister=$ami_id
           
-  #         if [ "$ami_to_deregister" != "None" ] && [ "$ami_to_deregister" != "" ] && [ "$ami_to_deregister" != "null" ]; then
-  #           echo "Found AMI to deregister: $ami_to_deregister"
+          if [ "$ami_to_deregister" != "None" ] && [ "$ami_to_deregister" != "" ] && [ "$ami_to_deregister" != "null" ]; then
+            echo "Found AMI to deregister: $ami_to_deregister"
             
-  #           ami_name=$(aws ec2 describe-images --image-ids $ami_to_deregister --query 'Images[0].Name' --output text --region us-east-1 2>/dev/null || echo "Unknown")
-  #           echo "AMI Name: $ami_name"
+            ami_name=$(aws ec2 describe-images --image-ids $ami_to_deregister --query 'Images[0].Name' --output text --region us-east-1 2>/dev/null || echo "Unknown")
+            echo "AMI Name: $ami_name"
             
-  #           # Get snapshot IDs before deregistering
-  #           echo "Getting snapshot IDs..."
-  #           snapshot_ids=$(aws ec2 describe-images --image-ids $ami_to_deregister --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text --region us-east-1 2>/dev/null || echo "")
+            # Get snapshot IDs before deregistering
+            echo "Getting snapshot IDs..."
+            snapshot_ids=$(aws ec2 describe-images --image-ids $ami_to_deregister --query 'Images[0].BlockDeviceMappings[*].Ebs.SnapshotId' --output text --region us-east-1 2>/dev/null || echo "")
             
-  #           if [ -n "$snapshot_ids" ]; then
-  #             echo "Found snapshots: $snapshot_ids"
-  #           fi
+            if [ -n "$snapshot_ids" ]; then
+              echo "Found snapshots: $snapshot_ids"
+            fi
             
-  #           # Deregister AMI
-  #           echo "Deregistering AMI: $ami_to_deregister"
-  #           aws ec2 deregister-image --image-id $ami_to_deregister --region us-east-1
-  #           echo " AMI $ami_to_deregister deregistered successfully"
+            # Deregister AMI
+            echo "Deregistering AMI: $ami_to_deregister"
+            aws ec2 deregister-image --image-id $ami_to_deregister --region us-east-1
+            echo " AMI $ami_to_deregister deregistered successfully"
             
-  #           # Delete associated snapshots
-  #           if [ -n "$snapshot_ids" ]; then
-  #             for snapshot_id in $snapshot_ids; do
-  #               if [ "$snapshot_id" != "None" ] && [ "$snapshot_id" != "" ] && [ "$snapshot_id" != "null" ]; then
-  #                 echo "Deleting snapshot: $snapshot_id"
-  #                 aws ec2 delete-snapshot --snapshot-id $snapshot_id --region us-east-1
-  #                 echo "Snapshot $snapshot_id deleted"
-  #               fi
-  #             done
-  #           else
-  #             echo "No snapshots found to delete"
-  #           fi
+            # Delete associated snapshots
+            if [ -n "$snapshot_ids" ]; then
+              for snapshot_id in $snapshot_ids; do
+                if [ "$snapshot_id" != "None" ] && [ "$snapshot_id" != "" ] && [ "$snapshot_id" != "null" ]; then
+                  echo "Deleting snapshot: $snapshot_id"
+                  aws ec2 delete-snapshot --snapshot-id $snapshot_id --region us-east-1
+                  echo "Snapshot $snapshot_id deleted"
+                fi
+              done
+            else
+              echo "No snapshots found to delete"
+            fi
             
-  #           echo "  AMI cleanup completed due to test failures"
-  #         else
-  #           echo "No custom AMI found to deregister"
-  #         fi
+            echo "  AMI cleanup completed due to test failures"
+          else
+            echo "No custom AMI found to deregister"
+          fi
 
-  #     - name: Final Summary
-  #       run: |
-  #         echo " Final Results:"
+      - name: Final Summary
+        run: |
+          echo " Final Results:"
           
-  #         if [ "${{ env.any_failed }}" == "true" ]; then
-  #           echo " OVERALL RESULT: Some VPU tests failed"
-  #           echo "  Custom AMI has been deregistered due to failures"
-  #           echo " Review failed VPU logs above for troubleshooting"
-  #           exit 1
-  #         else
-  #           echo " OVERALL RESULT: All VPU tests passed successfully"
-  #           echo " Custom AMI is validated and preserved"
-  #           echo " Ready for production deployment"
-  #         fi
+          if [ "${{ env.any_failed }}" == "true" ]; then
+            echo " OVERALL RESULT: Some VPU tests failed"
+            echo "  Custom AMI has been deregistered due to failures"
+            echo " Review failed VPU logs above for troubleshooting"
+            exit 1
+          else
+            echo " OVERALL RESULT: All VPU tests passed successfully"
+            echo " Custom AMI is validated and preserved"
+            echo " Ready for production deployment"
+          fi
