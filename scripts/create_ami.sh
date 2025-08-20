@@ -104,8 +104,8 @@ echo "Instance ID: $INSTANCE_ID"
 echo "Waiting for instance to be running..."
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 
-echo "Waiting 6 minutes for setup to complete..."
-sleep 400  # 6 minutes for setup
+echo "Waiting 10 minutes for setup to complete..."
+sleep 600  # 10 minutes for setup
 
 # Stop instance
 echo "Stopping instance..."
