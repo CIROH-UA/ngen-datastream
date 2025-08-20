@@ -63,9 +63,9 @@ sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
 
 echo \"Updating datastream script with actual tag values...\"
-sed -i \"s|DS_TAG=\\\${DS_TAG:-\\\"latest\\\"}\|DS_TAG=\\\${DS_TAG:-\\\"\$DS_TAG\\\"}\|\" /home/ec2-user/ngen-datastream/scripts/datastream
-sed -i \"s|FP_TAG=\\\${FP_TAG:-\\\"latest\\\"}\|FP_TAG=\\\${FP_TAG:-\\\"\$FP_TAG\\\"}\|\" /home/ec2-user/ngen-datastream/scripts/datastream
-sed -i \"s|NGIAB_TAG=\\\${NGIAB_TAG:-\\\"latest\\\"}\|NGIAB_TAG=\\\${NGIAB_TAG:-\\\"\$NGIAB_TAG\\\"}\|\" /home/ec2-user/ngen-datastream/scripts/datastream
+sed -i "s|DS_TAG=\${DS_TAG:-\"latest\"}|DS_TAG=\${DS_TAG:-\"$DS_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
+sed -i "s|FP_TAG=\${FP_TAG:-\"latest\"}|FP_TAG=\${FP_TAG:-\"$FP_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
+sed -i "s|NGIAB_TAG=\${NGIAB_TAG:-\"latest\"}|NGIAB_TAG=\${NGIAB_TAG:-\"$NGIAB_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
 
 echo \"Verifying tag updates...\"
 grep -E \"(DS_TAG|FP_TAG|NGIAB_TAG)\" /home/ec2-user/ngen-datastream/scripts/datastream
@@ -93,8 +93,8 @@ echo "Instance ID: $INSTANCE_ID"
 echo "Waiting for instance to be running..."
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 
-echo "Waiting 15 minutes for setup to complete..."
-sleep 900  # 15 minutes for setup
+echo "Waiting 6 minutes for setup to complete..."
+sleep 400  # 6 minutes for setup
 
 # Stop instance
 echo "Stopping instance..."
