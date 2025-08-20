@@ -22,57 +22,92 @@ echo "Using base AMI: $BASE_AMI" >&2
 echo "AMI Name: $AMI_NAME" >&2
 echo "Tags: DS_TAG=$DS_TAG, FP_TAG=$FP_TAG, NGIAB_TAG=$NGIAB_TAG" >&2
 
-# Build user data script with actual tag values embedded
-USER_DATA="#!/bin/bash
+# Create user data script using a here document for better formatting
+cat > /tmp/user_data_script.sh << 'USER_DATA_EOF'
+#!/bin/bash
 exec > >(tee /var/log/user-data.log)
 exec 2>&1
 
+echo "Starting user data execution at $(date)"
+
 # Set the actual tag values from workflow
+USER_DATA_EOF
+
+# Add the environment variables to the script
+cat >> /tmp/user_data_script.sh << USER_DATA_VARS
 export DS_TAG='$DS_TAG'
 export FP_TAG='$FP_TAG'
 export NGIAB_TAG='$NGIAB_TAG'
 
-echo \"Starting setup with tags: DS_TAG=\$DS_TAG, FP_TAG=\$FP_TAG, NGIAB_TAG=\$NGIAB_TAG\"
+echo "Starting setup with tags: DS_TAG=\$DS_TAG, FP_TAG=\$FP_TAG, NGIAB_TAG=\$NGIAB_TAG"
 
-echo \"Updating system packages...\"
+USER_DATA_VARS
+
+# Add the rest of the setup script
+cat >> /tmp/user_data_script.sh << 'USER_DATA_SETUP'
+echo "Updating system packages..."
 dnf update -y
 
-echo \"Installing git...\"
+echo "Installing git..."
 dnf install -y git
 dnf install -y docker
 dnf install -y python3-pip pigz awscli tar wget
 
-echo \"Starting Docker service...\"
+echo "Starting Docker service..."
 systemctl start docker
 systemctl enable docker
 usermod -aG docker ec2-user
 
-echo \"Waiting for Docker to be ready...\"
+echo "Waiting for Docker to be ready..."
 sleep 10
 
-echo \"Installing hfsubset...\"
+echo "Installing hfsubset..."
 cd /tmp
 curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_arm64.tar.gz
 tar -xzvf hfsubset-v1.1.0-linux_arm64.tar.gz
 mv ./hfsubset /usr/bin/hfsubset
 chmod +x /usr/bin/hfsubset
 
-echo \"Cloning ngen-datastream repository...\"
+echo "Cloning ngen-datastream repository..."
 cd /home/ec2-user
 sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
 
-echo \"Updating datastream script with actual tag values...\"
-sed -i "s|DS_TAG=\${DS_TAG:-\"latest\"}|DS_TAG=\${DS_TAG:-\"$DS_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
-sed -i "s|FP_TAG=\${FP_TAG:-\"latest\"}|FP_TAG=\${FP_TAG:-\"$FP_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
-sed -i "s|NGIAB_TAG=\${NGIAB_TAG:-\"latest\"}|NGIAB_TAG=\${NGIAB_TAG:-\"$NGIAB_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
+echo "Checking if datastream script exists..."
+if [ -f "/home/ec2-user/ngen-datastream/scripts/datastream" ]; then
+    echo "Found datastream script, updating with actual tag values..."
+    
+    # Show original content
+    echo "Original tag definitions:"
+    grep -E "(DS_TAG|FP_TAG|NGIAB_TAG)" /home/ec2-user/ngen-datastream/scripts/datastream || echo "No tag definitions found"
+    
+    # Update the tags
+    sed -i "s|DS_TAG=\${DS_TAG:-\"latest\"}|DS_TAG=\${DS_TAG:-\"$DS_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
+    sed -i "s|FP_TAG=\${FP_TAG:-\"latest\"}|FP_TAG=\${FP_TAG:-\"$FP_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
+    sed -i "s|NGIAB_TAG=\${NGIAB_TAG:-\"latest\"}|NGIAB_TAG=\${NGIAB_TAG:-\"$NGIAB_TAG\"}|" /home/ec2-user/ngen-datastream/scripts/datastream
+    
+    echo "Updated tag definitions:"
+    grep -E "(DS_TAG|FP_TAG|NGIAB_TAG)" /home/ec2-user/ngen-datastream/scripts/datastream || echo "No tag definitions found after update"
+else
+    echo "ERROR: datastream script not found at expected location!"
+    echo "Checking repository structure..."
+    find /home/ec2-user/ngen-datastream -name "*datastream*" -type f || echo "No datastream files found"
+    echo "Repository contents:"
+    ls -la /home/ec2-user/ngen-datastream/
+    if [ -d "/home/ec2-user/ngen-datastream/scripts" ]; then
+        echo "Scripts directory contents:"
+        ls -la /home/ec2-user/ngen-datastream/scripts/
+    else
+        echo "Scripts directory does not exist"
+    fi
+fi
 
-echo \"Verifying tag updates...\"
-grep -E \"(DS_TAG|FP_TAG|NGIAB_TAG)\" /home/ec2-user/ngen-datastream/scripts/datastream
+echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
+echo "Setup completed successfully!"
+USER_DATA_SETUP
 
-echo \"=== Setup completed successfully at \$(date) ===\" > /var/log/setup-complete
-echo \"Setup completed successfully!\"
-"
+# Read the complete user data script
+USER_DATA=$(cat /tmp/user_data_script.sh)
 
 # Launch instance
 echo "Launching EC2 instance..."
@@ -82,7 +117,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --instance-type "$INSTANCE_TYPE" \
     --key-name "$KEY_NAME" \
     --security-group-ids "$SECURITY_GROUP" \
-    --user-data "$USER_DATA" \
+    --user-data file:///tmp/user_data_script.sh \
     --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":32,"VolumeType":"gp3"}}]' \
     --query 'Instances[0].InstanceId' \
     --output text)
@@ -120,6 +155,9 @@ aws ec2 wait image-available --region "$REGION" --image-ids "$AMI_ID"
 # Cleanup
 echo "Terminating instance..."
 aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/null
+
+# Clean up temporary file
+rm -f /tmp/user_data_script.sh
 
 # Output only the AMI ID
 echo "$AMI_ID"
