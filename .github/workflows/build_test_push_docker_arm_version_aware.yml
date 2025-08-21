@@ -110,27 +110,34 @@ jobs:
           
       - name: Build and Test arm docker containers with AWS infra
         run: |
-          BUILD_FLAGS="-p "
+          BUILD_FLAGS="-p"
           DS_Dep_TAG=""
           FP_TAG=""
           DS_TAG=""
           if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
             DS_Dep_TAG="${{ steps.changes.outputs.deps_version }}"-arm64
+            TAG="${{ steps.changes.outputs.deps_version }}-arm64"
             BUILD_FLAGS="$BUILD_FLAGS -e"
           fi
           if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
             FP_TAG="${{ steps.changes.outputs.fp_version }}"-arm64
+            TAG="${{ steps.changes.outputs.fp_version }}-arm64"
             BUILD_FLAGS="$BUILD_FLAGS -f"
           fi
           if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
             DS_TAG="${{ steps.changes.outputs.ds_version }}"-arm64
+            TAG="${{ steps.changes.outputs.ds_version }}-arm64"
             BUILD_FLAGS="$BUILD_FLAGS -d"
           fi
           cd research_datastream/terraform
-          sed -e "s/\${TAG}/$DS_TAG/g" -e "s/\${BUILD_ARGS}/$BUILD_FLAGS/g" test/execution_gp_arm_docker_buildNtester.json
-          cat test/execution_gp_arm_docker_buildNtester.json
+          sed -e "s/\${TAG}/$TAG/g" -e "s/\${BUILD_ARGS}/$BUILD_FLAGS/g" \
+              test/execution_gp_arm_docker_buildNtester.json > test/execution_temp.json
+          
+          echo "Generated execution file:"
+          cat test/execution_temp.json
 
-          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
+          echo "Building with TAG: $TAG and FLAGS: $BUILD_FLAGS"
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_temp.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
           docker images
 
       - name: Tear down infra
