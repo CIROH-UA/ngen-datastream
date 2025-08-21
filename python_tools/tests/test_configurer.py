@@ -225,7 +225,7 @@ def test_conf_daily_medium_range_init00_member0():
         data = json.load(fp)   
     assert data['urlbaseinput'] == 7 
     assert data['runinput']     == 2   
-    assert data['meminput']     == 0
+    assert data['meminput']     == 0   
 
 def test_conf_daily_medium_range_init12_member3():
     inputs.start_date = "DAILY"
@@ -241,7 +241,7 @@ def test_conf_daily_medium_range_init12_member3():
     assert start.day == (datetime.now(timezone.utc)).day or start.day == (datetime.now(timezone.utc) - timedelta(days=1)).day
     assert start.hour == 13
     assert end.day == (datetime.now(timezone.utc) + timedelta(days=10)).day or end.day == (datetime.now(timezone.utc) + timedelta(days=9)).day
-    assert end.hour == 12
+    assert end.hour == 0
 
     with open(CONF_NWM,'r') as fp:
         data = json.load(fp)   

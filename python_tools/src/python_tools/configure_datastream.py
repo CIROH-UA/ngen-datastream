@@ -120,7 +120,7 @@ def write_json(conf, out_dir, name):
 def create_conf_nwm(args):    
     start = args.start_date
     end   = args.end_date  
-
+    ens_member = 0 
     fcst_cycle = 0
 
     if "DAILY" in start:
@@ -141,7 +141,8 @@ def create_conf_nwm(args):
     end_str_real = end_dt.strftime('%Y-%m-%d %H:%M:%S')    
     start_str_nwm = start_dt.strftime('%Y%m%d%H%M') 
     end_str_nwm    = start_dt.strftime('%Y%m%d%H%M') 
-                           
+
+                              
     if "RETRO" in args.forcing_source:                    
         if "V2" in args.forcing_source:
             urlbaseinput = 1
@@ -158,7 +159,6 @@ def create_conf_nwm(args):
         }   
     else:
         varinput = 5        
-
         if "HAWAII" in args.forcing_source:
             geoinput=2
         elif "PUERTORICO" in args.forcing_source:
@@ -173,12 +173,11 @@ def create_conf_nwm(args):
         elif "NWM" in args.forcing_source: 
             urlbaseinput = 7
         elif len(args.forcing_source) == 0 and len(args.forcings) > 0:
-            return {}, start_str_real, end_str_real # nextgen forcings have been supplied directly
+            return {}, start_str_real, end_str_real, ens_member # nextgen forcings have been supplied directly
         else:
             raise Exception(f'Forcing source {args.forcing_source} not understood')
         
-        dt = 1
-        ens_member = 0
+        dt = 1        
         if "SHORT_RANGE" in args.forcing_source:
             runinput=1
             num_hrs=18
