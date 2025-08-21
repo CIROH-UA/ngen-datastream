@@ -5,8 +5,7 @@
 import xarray as xr
 from pathlib import Path
 import numpy as np
-import netCDF4 as nc
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 from forcingprocessor.utils import make_forcing_netcdf
 
@@ -30,7 +29,7 @@ def get_shifted_time_axis(ds:xr.Dataset, ens_member:int, time_shift_hours:int=6)
     shift_array = t_shift * np.ones((204,), dtype='float64')
     tax_array = ds.Time.values[0, :-36] + shift_array
     tf = tax_array[0]
-    print(f"First time in time array is {datetime.fromtimestamp(t0)} and was shifed forward {t_shift/3600:.0f} hours to {datetime.fromtimestamp(tf)}")
+    print(f"First time in time array is {datetime.fromtimestamp(t0, tz=timezone.utc)} and was shifed forward {t_shift/3600:.0f} hours to {datetime.fromtimestamp(tf, tz=timezone.utc)}")
     return tax_array
 
 if __name__ == "__main__":
