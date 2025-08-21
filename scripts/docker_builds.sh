@@ -37,7 +37,7 @@ while getopts "pefdt:" flag; do
    ;;
  esac
 done
-
+echo "Using TAG: $TAG"
 cd "$DOCKER_DIR"
 
 if [ "$BUILD_DEPS" = "yes" ]; then
