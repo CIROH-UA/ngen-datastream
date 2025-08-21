@@ -153,7 +153,7 @@ jobs:
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region us-east-1        
+          aws configure set region us-east-1
           
       - name: Build AWS Infra
         run: |
@@ -169,14 +169,7 @@ jobs:
           cd research_datastream/terraform
           aws iam attach-role-policy --role-name datastream_ec2_role_github_actions_arm --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
           aws secretsmanager put-resource-policy --secret-id docker_awiciroh_creds --resource-policy file://test/secret-policy.json --block-public-policy --region us-east-1
-          if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
-            aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text 
-            echo "Key pair 'actions_key_arm' created in AWS"
-          else 
-            echo "Key pair 'actions_key_arm' already exists"
-          fi
-          
-          # Give permissions time to propagate
+          if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text && echo "Key pair 'actions_key_arm' created in AWS"; else echo "Key pair 'actions_key_arm' already exists"; fi
           sleep 60
           
       - name: Build and Test arm docker containers with AWS infra
@@ -215,63 +208,16 @@ jobs:
           
           echo "Generated execution file:"
           cat test/execution_temp.json
-
+          
           echo "Building with TAG: $TAG and FLAGS: $BUILD_FLAGS"
-          
-          # Execute state machine with proper error handling
-          execution_arn=$(aws stepfunctions start-execution \
-            --state-machine-arn $(cat ./sm_ARN.txt) \
-            --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
-            --input "file://test/execution_temp.json" \
-            --region us-east-1 \
-            --query 'executionArn' \
-            --output text)
-          
-          echo "Execution ARN: $execution_arn"
-          
-          # Poll for completion with timeout
-          timeout=3600  # 1 hour timeout
-          elapsed=0
-          status="RUNNING"
-          
-          while [ "$status" = "RUNNING" ] && [ $elapsed -lt $timeout ]; do 
-            status=$(aws stepfunctions describe-execution \
-              --execution-arn "$execution_arn" \
-              --region us-east-1 \
-              --query 'status' \
-              --output text)
-            echo "Current status: $status (${elapsed}s elapsed)"
-            
-            if [ "$status" = "FAILED" ]; then
-              echo "State machine execution failed!"
-              aws stepfunctions describe-execution \
-                --execution-arn "$execution_arn" \
-                --region us-east-1 \
-                --query 'error' \
-                --output text
-              exit 1
-            fi
-            
-            if [ "$status" != "SUCCEEDED" ]; then
-              sleep 30
-              elapsed=$((elapsed + 30))
-            fi
-          done
-          
-          if [ $elapsed -ge $timeout ]; then
-            echo "State machine execution timed out after ${timeout}s"
-            exit 1
-          fi
-          
-          echo "State machine execution succeeded!"
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_temp.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
+
 
       - name: Tear down infra
         if: always()
         run: |
           cd research_datastream/terraform
           terraform destroy -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
-          
-          # Verify cleanup completed
           sleep 30
 
   create-manifest:
