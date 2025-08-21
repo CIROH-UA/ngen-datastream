@@ -110,7 +110,7 @@ jobs:
           
       - name: Build and Test arm docker containers with AWS infra
         run: |
-          BUILD_FLAGS="-p"
+          BUILD_FLAGS=""
           DS_Dep_TAG=""
           FP_TAG=""
           DS_TAG=""
