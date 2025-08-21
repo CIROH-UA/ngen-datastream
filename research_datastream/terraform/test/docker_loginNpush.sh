@@ -50,18 +50,21 @@ if echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-st
         echo "Retagging and pushing datastream-deps"
         docker tag awiciroh/datastream-deps:latest-arm64 awiciroh/datastream-deps:$TAG
         docker push awiciroh/datastream-deps:$TAG
+        docker push awiciroh/datastream-deps:latest-arm64
     fi
     
     if [ "$PUSH_FP" = "yes" ]; then
         echo "Retagging and pushing forcingprocessor"
         docker tag awiciroh/forcingprocessor:latest-arm64 awiciroh/forcingprocessor:$TAG
         docker push awiciroh/forcingprocessor:$TAG
+        docker push awiciroh/forcingprocessor:latest-arm64
     fi
     
     if [ "$PUSH_DS" = "yes" ]; then
         echo "Retagging and pushing datastream"
         docker tag awiciroh/datastream:latest-arm64 awiciroh/datastream:$TAG
         docker push awiciroh/datastream:$TAG
+        docker push awiciroh/datastream:latest-arm64
     fi
     
     # Show what we have after operations
