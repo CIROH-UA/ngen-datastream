@@ -129,6 +129,16 @@ jobs:
             TAG="${{ steps.changes.outputs.ds_version }}-arm64"
             BUILD_FLAGS="$BUILD_FLAGS -d"
           fi
+
+          if [ -z "$BUILD_FLAGS" ]; then
+            echo "No components changed, skipping ARM build"
+            exit 0
+          fi
+          if [ -z "$TAG" ]; then
+            TAG="latest-arm64"  # fallback
+          fi
+          BUILD_FLAGS=$(echo "$BUILD_FLAGS" | sed 's/^ *//')  
+          
           cd research_datastream/terraform
           sed -e "s/\${TAG}/$TAG/g" -e "s/\${BUILD_ARGS}/$BUILD_FLAGS/g" \
               test/execution_gp_arm_docker_buildNtester.json > test/execution_temp.json
