@@ -1,4 +1,4 @@
-name: Build, Test, and Push Datastream Docker Containers on ARM (Version Aware)
+name: Build, Test, and Push Datastream Docker Containers on X86 and ARM (Version Aware)
 
 on:
   workflow_dispatch:   
@@ -12,75 +12,139 @@ permissions:
   contents: read   
 
 jobs:
-  build-test-push-docker-arm:
+  detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      build_ds: ${{ steps.changes.outputs.build_ds }}
-      build_fp: ${{ steps.changes.outputs.build_fp }}
       build_deps: ${{ steps.changes.outputs.build_deps }}
+      build_fp: ${{ steps.changes.outputs.build_fp }}
+      build_ds: ${{ steps.changes.outputs.build_ds }}
       deps_version: ${{ steps.changes.outputs.deps_version }}
       fp_version: ${{ steps.changes.outputs.fp_version }}
       ds_version: ${{ steps.changes.outputs.ds_version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
 
+    - name: Install yq
+      run: |
+        sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        sudo chmod +x /usr/local/bin/yq
+
+    - name: Detect version changes
+      id: changes
+      shell: bash
+      run: |
+        set -euo pipefail
+    
+        # Current versions (raw)
+        CURRENT_DEPS=$(yq -r e '."datastream-deps"' versions.yml)
+        CURRENT_FP=$(yq -r e '.forcingprocessor' versions.yml)
+        CURRENT_DS=$(yq -r e '.datastream' versions.yml)
+    
+        # Ensure previous commit and file exist
+        if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:versions.yml 2>/dev/null; then
+          git show HEAD~1:versions.yml > previous_versions.yml
+        else
+          printf "datastream-deps: '0.0.0'\nforcingprocessor: '0.0.0'\ndatastream: '0.0.0'\n" > previous_versions.yml
+        fi
+    
+        PREVIOUS_DEPS=$(yq -r e '."datastream-deps"' previous_versions.yml)
+        PREVIOUS_FP=$(yq -r e '.forcingprocessor' previous_versions.yml)
+        PREVIOUS_DS=$(yq -r e '.datastream' previous_versions.yml)
+    
+        # Check what changed and set outputs
+        if [ "$CURRENT_DEPS" != "$PREVIOUS_DEPS" ]; then
+          echo "datastream-deps changed: $PREVIOUS_DEPS -> $CURRENT_DEPS"
+          echo "build_deps=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "build_deps=false" >> "$GITHUB_OUTPUT"
+        fi
+        echo "deps_version=$CURRENT_DEPS" >> "$GITHUB_OUTPUT"
+    
+        if [ "$CURRENT_FP" != "$PREVIOUS_FP" ]; then
+          echo "forcingprocessor changed: $PREVIOUS_FP -> $CURRENT_FP"
+          echo "build_fp=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "build_fp=false" >> "$GITHUB_OUTPUT"
+        fi
+        echo "fp_version=$CURRENT_FP" >> "$GITHUB_OUTPUT"
+    
+        if [ "$CURRENT_DS" != "$PREVIOUS_DS" ]; then
+          echo "datastream changed: $PREVIOUS_DS -> $CURRENT_DS"
+          echo "build_ds=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "build_ds=false" >> "$GITHUB_OUTPUT"
+        fi
+        echo "ds_version=$CURRENT_DS" >> "$GITHUB_OUTPUT"
+
+  build-test-docker-x86:
+    needs: [detect-changes]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
+
+    - name: Build docker containers
+      run: |
+        chmod +x ./scripts/docker_builds.sh
+        ./scripts/docker_builds.sh -e -f -d -t latest-x86
+
+    - name: Prepare and test docker containers
+      run: |
+        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+        export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+
+    - name: Push docker containers
+      run: |
+        if [ "${{ needs.detect-changes.outputs.build_deps }}" == "true" ]; then
+          VERSION_TAG="${{ needs.detect-changes.outputs.deps_version }}"
+          docker tag awiciroh/datastream-deps:latest-x86 awiciroh/datastream-deps:${VERSION_TAG}-x86
+          docker push awiciroh/datastream-deps:${VERSION_TAG}-x86
+          docker push awiciroh/datastream-deps:latest-x86
+        fi
+        if [ "${{ needs.detect-changes.outputs.build_fp }}" == "true" ]; then
+          VERSION_TAG="${{ needs.detect-changes.outputs.fp_version }}"
+          docker tag awiciroh/forcingprocessor:latest-x86 awiciroh/forcingprocessor:${VERSION_TAG}-x86
+          docker push awiciroh/forcingprocessor:${VERSION_TAG}-x86
+          docker push awiciroh/forcingprocessor:latest-x86
+        fi
+        if [ "${{ needs.detect-changes.outputs.build_ds }}" == "true" ]; then
+          VERSION_TAG="${{ needs.detect-changes.outputs.ds_version }}"
+          docker tag awiciroh/datastream:latest-x86 awiciroh/datastream:${VERSION_TAG}-x86
+          docker push awiciroh/datastream:${VERSION_TAG}-x86
+          docker push awiciroh/datastream:latest-x86
+        fi
+
+  build-test-push-docker-arm:
+    needs: [detect-changes, build-test-docker-x86]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Install yq
-        run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-
-      - name: Detect version changes
-        id: changes
-        shell: bash
-        run: |
-          set -euo pipefail
-      
-          # Current versions (raw)
-          CURRENT_DEPS=$(yq -r e '."datastream-deps"' versions.yml)
-          CURRENT_FP=$(yq -r e '.forcingprocessor' versions.yml)
-          CURRENT_DS=$(yq -r e '.datastream' versions.yml)
-      
-          # Ensure previous commit and file exist
-          if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:versions.yml 2>/dev/null; then
-            git show HEAD~1:versions.yml > previous_versions.yml
-          else
-            printf "datastream-deps: '0.0.0'\nforcingprocessor: '0.0.0'\ndatastream: '0.0.0'\n" > previous_versions.yml
-          fi
-      
-          PREVIOUS_DEPS=$(yq -r e '."datastream-deps"' previous_versions.yml)
-          PREVIOUS_FP=$(yq -r e '.forcingprocessor' previous_versions.yml)
-          PREVIOUS_DS=$(yq -r e '.datastream' previous_versions.yml)
-      
-          # Outputs
-          if [ "$CURRENT_DEPS" != "$PREVIOUS_DEPS" ]; then
-            echo "datastream-deps changed: $PREVIOUS_DEPS -> $CURRENT_DEPS"
-            echo "build_deps=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build_deps=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "deps_version=$CURRENT_DEPS" >> "$GITHUB_OUTPUT"
-      
-          if [ "$CURRENT_FP" != "$PREVIOUS_FP" ]; then
-            echo "forcingprocessor changed: $PREVIOUS_FP -> $CURRENT_FP"
-            echo "build_fp=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build_fp=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "fp_version=$CURRENT_FP" >> "$GITHUB_OUTPUT"
-      
-          if [ "$CURRENT_DS" != "$PREVIOUS_DS" ]; then
-            echo "datastream changed: $PREVIOUS_DS -> $CURRENT_DS"
-            echo "build_ds=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build_ds=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "ds_version=$CURRENT_DS" >> "$GITHUB_OUTPUT"
-
-
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -105,38 +169,44 @@ jobs:
           cd research_datastream/terraform
           aws iam attach-role-policy --role-name datastream_ec2_role_github_actions_arm --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
           aws secretsmanager put-resource-policy --secret-id docker_awiciroh_creds --resource-policy file://test/secret-policy.json --block-public-policy --region us-east-1
-          if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text && echo "Key pair 'actions_key_arm' created in AWS"; else echo "Key pair 'actions_key_arm' already exists"; fi
-          sleep 60          
+          if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
+            aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text 
+            echo "Key pair 'actions_key_arm' created in AWS"
+          else 
+            echo "Key pair 'actions_key_arm' already exists"
+          fi
+          
+          # Give permissions time to propagate
+          sleep 60
           
       - name: Build and Test arm docker containers with AWS infra
         run: |
           BUILD_FLAGS=""
-          DS_Dep_TAG=""
-          FP_TAG=""
-          DS_TAG=""
-          if [ "${{ steps.changes.outputs.build_deps }}" == "true" ]; then
-            DS_Dep_TAG="${{ steps.changes.outputs.deps_version }}"-arm64
-            TAG="${{ steps.changes.outputs.deps_version }}-arm64"
+          TAG=""
+          
+          # Build flags and determine the most recent version for TAG
+          if [ "${{ needs.detect-changes.outputs.build_deps }}" == "true" ]; then
             BUILD_FLAGS="$BUILD_FLAGS -e"
+            TAG="${{ needs.detect-changes.outputs.deps_version }}-arm64"
           fi
-          if [ "${{ steps.changes.outputs.build_fp }}" == "true" ]; then
-            FP_TAG="${{ steps.changes.outputs.fp_version }}"-arm64
-            TAG="${{ steps.changes.outputs.fp_version }}-arm64"
+          if [ "${{ needs.detect-changes.outputs.build_fp }}" == "true" ]; then
             BUILD_FLAGS="$BUILD_FLAGS -f"
+            TAG="${{ needs.detect-changes.outputs.fp_version }}-arm64"
           fi
-          if [ "${{ steps.changes.outputs.build_ds }}" == "true" ]; then
-            DS_TAG="${{ steps.changes.outputs.ds_version }}"-arm64
-            TAG="${{ steps.changes.outputs.ds_version }}-arm64"
+          if [ "${{ needs.detect-changes.outputs.build_ds }}" == "true" ]; then
             BUILD_FLAGS="$BUILD_FLAGS -d"
+            TAG="${{ needs.detect-changes.outputs.ds_version }}-arm64"
           fi
 
           if [ -z "$BUILD_FLAGS" ]; then
             echo "No components changed, skipping ARM build"
             exit 0
           fi
+          
           if [ -z "$TAG" ]; then
             TAG="latest-arm64"  # fallback
           fi
+          
           BUILD_FLAGS=$(echo "$BUILD_FLAGS" | sed 's/^ *//')  
           
           cd research_datastream/terraform
@@ -147,62 +217,109 @@ jobs:
           cat test/execution_temp.json
 
           echo "Building with TAG: $TAG and FLAGS: $BUILD_FLAGS"
-          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_temp.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
-
+          
+          # Execute state machine with proper error handling
+          execution_arn=$(aws stepfunctions start-execution \
+            --state-machine-arn $(cat ./sm_ARN.txt) \
+            --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --input "file://test/execution_temp.json" \
+            --region us-east-1 \
+            --query 'executionArn' \
+            --output text)
+          
+          echo "Execution ARN: $execution_arn"
+          
+          # Poll for completion with timeout
+          timeout=3600  # 1 hour timeout
+          elapsed=0
+          status="RUNNING"
+          
+          while [ "$status" = "RUNNING" ] && [ $elapsed -lt $timeout ]; do 
+            status=$(aws stepfunctions describe-execution \
+              --execution-arn "$execution_arn" \
+              --region us-east-1 \
+              --query 'status' \
+              --output text)
+            echo "Current status: $status (${elapsed}s elapsed)"
+            
+            if [ "$status" = "FAILED" ]; then
+              echo "State machine execution failed!"
+              aws stepfunctions describe-execution \
+                --execution-arn "$execution_arn" \
+                --region us-east-1 \
+                --query 'error' \
+                --output text
+              exit 1
+            fi
+            
+            if [ "$status" != "SUCCEEDED" ]; then
+              sleep 30
+              elapsed=$((elapsed + 30))
+            fi
+          done
+          
+          if [ $elapsed -ge $timeout ]; then
+            echo "State machine execution timed out after ${timeout}s"
+            exit 1
+          fi
+          
+          echo "State machine execution succeeded!"
 
       - name: Tear down infra
         if: always()
         run: |
           cd research_datastream/terraform
           terraform destroy -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
-          sleep 60
+          
+          # Verify cleanup completed
+          sleep 30
 
-  # create-manifest:
-  #   name: Create and Push Manifest
-  #   needs: [build-test-push-docker-arm]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Log in to Docker Hub
-  #       uses: docker/login-action@v3
-  #       with:
-  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
-  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  create-manifest:
+    name: Create and Push Manifest
+    needs: [detect-changes, build-test-push-docker-arm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  #     - name: Create and push manifest datastream-deps
-  #       if: needs.build-test-push-docker-arm.outputs.build_deps == 'true'
-  #       run: |
-  #         docker manifest create awiciroh/datastream-deps:${{ needs.build-test-push-docker-arm.outputs.deps_version }} \
-  #           --amend awiciroh/datastream-deps:${{ needs.build-test-push-docker-arm.outputs.deps_version }}-x86 \
-  #           --amend awiciroh/datastream-deps:${{ needs.build-test-push-docker-arm.outputs.deps_version }}-arm64
-  #         docker manifest push awiciroh/datastream-deps:${{ needs.build-test-push-docker-arm.outputs.deps_version }}
+      - name: Create and push manifest datastream-deps
+        if: needs.detect-changes.outputs.build_deps == 'true'
+        run: |
+          docker manifest create awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }} \
+            --amend awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}-x86 \
+            --amend awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}-arm64
+          docker manifest push awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}
 
-  #         docker manifest create awiciroh/datastream-deps:latest \
-  #           --amend awiciroh/datastream-deps:latest-x86 \
-  #           --amend awiciroh/datastream-deps:latest-arm64
-  #         docker manifest push awiciroh/datastream-deps:latest
+          docker manifest create awiciroh/datastream-deps:latest \
+            --amend awiciroh/datastream-deps:latest-x86 \
+            --amend awiciroh/datastream-deps:latest-arm64
+          docker manifest push awiciroh/datastream-deps:latest
 
-  #     - name: Create and push manifest datastream
-  #       if: needs.build-test-push-docker-arm.outputs.build_ds == 'true'
-  #       run: |
-  #         docker manifest create awiciroh/datastream:${{ needs.build-test-push-docker-arm.outputs.ds_version }} \
-  #           --amend awiciroh/datastream:${{ needs.build-test-push-docker-arm.outputs.ds_version }}-x86 \
-  #           --amend awiciroh/datastream:${{ needs.build-test-push-docker-arm.outputs.ds_version }}-arm64
-  #         docker manifest push awiciroh/datastream:${{ needs.build-test-push-docker-arm.outputs.ds_version }}
+      - name: Create and push manifest datastream
+        if: needs.detect-changes.outputs.build_ds == 'true'
+        run: |
+          docker manifest create awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }} \
+            --amend awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}-x86 \
+            --amend awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}-arm64
+          docker manifest push awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}
 
-  #         docker manifest create awiciroh/datastream:latest \
-  #           --amend awiciroh/datastream:latest-x86 \
-  #           --amend awiciroh/datastream:latest-arm64
-  #         docker manifest push awiciroh/datastream:latest       
+          docker manifest create awiciroh/datastream:latest \
+            --amend awiciroh/datastream:latest-x86 \
+            --amend awiciroh/datastream:latest-arm64
+          docker manifest push awiciroh/datastream:latest       
 
-  #     - name: Create and push manifest forcingprocessor
-  #       if: needs.build-test-push-docker-arm.outputs.build_fp == 'true'
-  #       run: |
-  #         docker manifest create awiciroh/forcingprocessor:${{ needs.build-test-push-docker-arm.outputs.fp_version }} \
-  #           --amend awiciroh/forcingprocessor:${{ needs.build-test-push-docker-arm.outputs.fp_version }}-x86 \
-  #           --amend awiciroh/forcingprocessor:${{ needs.build-test-push-docker-arm.outputs.fp_version }}-arm64
-  #         docker manifest push awiciroh/forcingprocessor:${{ needs.build-test-push-docker-arm.outputs.fp_version }}
+      - name: Create and push manifest forcingprocessor
+        if: needs.detect-changes.outputs.build_fp == 'true'
+        run: |
+          docker manifest create awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }} \
+            --amend awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}-x86 \
+            --amend awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}-arm64
+          docker manifest push awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}
 
-  #         docker manifest create awiciroh/forcingprocessor:latest \
-  #           --amend awiciroh/forcingprocessor:latest-x86 \
-  #           --amend awiciroh/forcingprocessor:latest-arm64
-  #         docker manifest push awiciroh/forcingprocessor:latest
+          docker manifest create awiciroh/forcingprocessor:latest \
+            --amend awiciroh/forcingprocessor:latest-x86 \
+            --amend awiciroh/forcingprocessor:latest-arm64
+          docker manifest push awiciroh/forcingprocessor:latest
