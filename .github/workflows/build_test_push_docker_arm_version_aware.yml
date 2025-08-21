@@ -127,12 +127,9 @@ jobs:
             BUILD_FLAGS="$BUILD_FLAGS -d"
           fi
           cd research_datastream/terraform
-          sed -i "s|buildtags |$BUILD_FLAGS |" test/docker_loginNpush.sh
-          sed -i "s|DS_DP_Tag |$DS_Dep_TAG |" test/docker_loginNpush.sh
-          sed -i "s|FP_Tag |${FP_TAG} |" test/docker_loginNpush.sh
-          sed -i "s|DS_Tag |${DS_TAG} |" test/docker_loginNpush.sh
-          cat test/docker_loginNpush.sh
-          sleep 10
+          sed -e "s/\${TAG}/$DS_TAG/g" -e "s/\${BUILD_ARGS}/$BUILD_FLAGS/g" test/execution_gp_arm_docker_buildNtester.json
+          cat execution_gp_arm_docker_buildNtester.json
+
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
           docker images
 
