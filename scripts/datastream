@@ -563,10 +563,34 @@ else
         if [ ! -e $$DATASTREAM_RESOURCES_NGENFORCINGS ]; then
             mkdir -p $DATASTREAM_RESOURCES_NGENFORCINGS
         fi
-        cp $NGEN_RUN/forcings/*forcing* $DATASTREAM_RESOURCES_NGENFORCINGS
+        FORCINGS_BASE=$(basename $(find "$NGENRUN_FORCINGS" -type f -name "*forcing*"))
+        cp $NGENRUN_FORCINGS/$FORCINGS_BASE $DATASTREAM_RESOURCES_NGENFORCINGS
         mv "$NGENRUN_METADATA/forcings_metadata" $DATASTREAM_META
     fi
 fi    
+
+if [[ "$FORCING_SOURCE" == *"MEDIUM_RANGE"* ]]; then
+    ENS_MEM=$(echo "$FORCING_SOURCE" | grep -oP '(?<=_)[0-9]$')
+    if [[ "$ENS_MEM" -gt 1 ]]; then
+        echo "Applying lag to forcings for medium range ensemble members > 1"
+        log_time "LAG_FORCINGS_START"
+        DOCKER_TAG="awiciroh/forcingprocessor:$FP_TAG"
+        if [ "$DRYRUN" == "True" ]; then
+            echo "DRYRUN - LAG FORCINGS SKIPPED"
+            echo "COMMAND: docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" \
+                -u $(id -u):$(id -g) \
+                -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+                python3 "$DOCKER_FP"medium_range_time_ax_mod.py --input_file_ens0 $DOCKER_MOUNT/datastream-resources/ngen-forcings/$FORCINGS_BASE --output_dir $DOCKER_MOUNT/ngen-run/forcings --ensemble_member $ENS_MEM"
+        else
+            log_n_run_steps docker run --rm -v "$DATA_DIR":"$DOCKER_MOUNT" \
+                -u $(id -u):$(id -g) \
+                -w "$DOCKER_RESOURCES" $DOCKER_TAG \
+                python3 "$DOCKER_FP"medium_range_time_ax_mod.py --input_file_ens0 $DOCKER_MOUNT/datastream-resources/ngen-forcings/$FORCINGS_BASE --output_dir $DOCKER_MOUNT/ngen-run/forcings --ensemble_member $ENS_MEM
+            rm $NGENRUN_FORCINGS/$FORCINGS_BASE # remove original forcing file
+        fi
+        log_time "LAG_FORCINGS_END"
+    fi
+fi 
 
 log_time "VALIDATION_START"
 VALIDATOR=$DOCKER_PY"run_validator.py"
