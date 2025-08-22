@@ -64,7 +64,7 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
     rm -rf geos-3.12.1 geos-3.12.1.tar.bz2; \
 fi
 
-# --- exactextract Install ---
+# --- exactextract Install and Cleanup build dependencies  ---
 RUN if [ "${ARCH}" = "aarch64" ]; then \
     pip install pybind11 && \
     git clone https://github.com/isciences/exactextract && \
@@ -76,10 +76,6 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
     make install && \
     cd .. && \
     pip install -e .; \
-fi
-
-# --- Cleanup build dependencies ---
-RUN if [ "${ARCH}" = "aarch64" ]; then \
     dnf -y remove gcc-c++ cpp cmake make bzip2 wget git \
                   sqlite-devel python3-devel openssl-devel \
                   libcurl-devel swig libpng-devel libjpeg-turbo-devel \
@@ -88,5 +84,6 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
     pip3 cache purge && \
     rm -rf /var/cache/dnf/* /tmp/* /var/tmp/*; \
 fi
+
 # --- Runtime linker fix ---
 ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"
