@@ -29,8 +29,6 @@ while getopts "pefdt:" flag; do
    ;;
    d) BUILD_DATASTREAM="yes"
    ;;
-   a) BUILD_ALL="yes"
-   ;;
    t) TAG="$OPTARG"
    ;;
    \?)
@@ -82,13 +80,6 @@ if [ "$PUSH" = "yes" ]; then
     
     if [ "$BUILD_DATASTREAM" = "yes" ]; then
       echo "Pushing datastream"
-      docker push awiciroh/datastream:$TAG
-    fi
-
-    if [ "$BUILD_ALL" = "yes" ]; then
-      echo "Pushing all the services"
-      docker push awiciroh/datastream-deps:$TAG
-      docker push awiciroh/forcingprocessor:$TAG
       docker push awiciroh/datastream:$TAG
     fi
     echo "Docker containers have been pushed to awiciroh dockerhub!"
