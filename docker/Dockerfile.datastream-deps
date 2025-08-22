@@ -5,7 +5,6 @@ RUN dnf -y install pigz tar git python3.9 python3-pip
 ARG ARCH="x86"
 RUN if [ "${ARCH}" = "aarch64" ]; then \
         dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
-        dnf clean all && \
         pip3 install setuptools numpy; \
     fi
 
@@ -79,5 +78,15 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
     pip install -e .; \
 fi
 
+# --- Cleanup build dependencies ---
+RUN if [ "${ARCH}" = "aarch64" ]; then \
+    dnf -y remove gcc-c++ cpp cmake make bzip2 wget git \
+                  sqlite-devel python3-devel openssl-devel \
+                  libcurl-devel swig libpng-devel libjpeg-turbo-devel \
+                  expat-devel python3.11-devel python3-Cython && \
+    dnf clean all && \
+    pip3 cache purge && \
+    rm -rf /var/cache/dnf/* /tmp/* /var/tmp/*; \
+fi
 # --- Runtime linker fix ---
 ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"
