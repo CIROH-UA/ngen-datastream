@@ -87,3 +87,33 @@ def convert_url2key(nwm_file,fs_type):
         bucket = _nc_file_parts[2]
     
     return bucket, bucket_key
+
+
+def make_forcing_netcdf(out_path:str,
+                        catchments:np.ndarray,
+                        t_ax:np.ndarray,
+                        input_array:np.ndarray) -> None:
+    """
+    Create a netcdf file with the forcing data.
+    
+    Parameters:
+    out_path (str): Path to save the netcdf file.
+    catchments (np.ndarray): Array of catchment IDs.
+    t_ax (np.ndarray): Time axis array with shape (nt,).
+    input_array (np.ndarray): Forcing data array with shape (ncat, nt, forcing variables).
+    """
+    import netCDF4 as nc
+    
+    with nc.Dataset(out_path, 'w', format='NETCDF4') as ds:
+        ds.createDimension('catchment-id', len(catchments))
+        ds.createDimension('time', len(t_ax))
+        
+        ids_var = ds.createVariable('ids', str, ('catchment-id',))
+        ids_var[:] = catchments
+
+        time_var = ds.createVariable('Time', 'f8', ('catchment-id', 'time'))
+        time_var[:] =  t_ax
+        
+        for i, var_name in enumerate(ngen_variables):
+            var = ds.createVariable(var_name, 'f8', ('catchment-id', 'time'))
+            var[:] = input_array[:, :, i]
