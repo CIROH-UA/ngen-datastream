@@ -16,22 +16,6 @@ on:
       - '!docker/README.md'  
       - '!forcingprocessor/README.md' 
       - '!python_tools/README.md'     
-
-  pull_request:
-    branches:
-      - main
-    paths: 
-      - 'docker/**'
-      - 'forcingprocessor/**'
-      - 'scripts/**'  
-      - 'python_tools/**'
-      - 'research_datastream/terraform/test/execution_gp_arm_docker_buildNtester.json' 
-      - 'research_datastream/terraform/test/docker_loginNpush.sh' 
-      - '!docs/**'
-      - '!scripts/README.md'    
-      - '!docker/README.md'  
-      - '!forcingprocessor/README.md' 
-      - '!python_tools/README.md'  
   
 permissions:
   contents: read

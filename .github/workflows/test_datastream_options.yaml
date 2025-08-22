@@ -157,6 +157,13 @@ jobs:
         sudo rm -rf $(pwd)/data/datastream_test
         ./scripts/datastream -s DAILY -C NWM_MEDIUM_RANGE_00_0 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
     
+    - name: DAILY medium_range today test 00 3
+      if: always()
+      run: |        
+        sudo rm -rf $(pwd)/data/datastream_test
+        YESTERDAY=$(date -d '-1 day' '+%Y%m%d')
+        ./scripts/datastream -s DAILY -n 1 -F s3://ciroh-community-ngen-datastream/v2.2/ngen.$YESTERDAY/forcing_medium_range/18/ngen.t18z.medium_range.forcing.f001_f240.VPU_09.nc --FORCING_SOURCE NWM_V3_MEDIUM_RANGE_06_3 -d $(pwd)/data/datastream_test -r s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_09 -R https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_09.json
+            
     - name: DAILY analysis assim extend today test
       if: always()
       run: |        
