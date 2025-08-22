@@ -1,0 +1,35 @@
+name: Build, Test, and Push Datastream Docker Containers
+
+on:
+  workflow_dispatch:   
+  push:
+    branches:
+      - docker_enhancements
+    paths:
+      - 'trigger.yml'
+
+permissions:
+  contents: read   
+
+jobs:
+  build-test-docker:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Install packages for datastream
+      run: |
+        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
+
+    - name: Build docker containers
+      run: |
+        chmod +x ./scripts/docker_builds.sh
+        ./scripts/docker_builds.sh -e -f -d -t test
+        docker images
