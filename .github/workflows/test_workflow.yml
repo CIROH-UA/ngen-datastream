@@ -31,5 +31,6 @@ jobs:
     - name: Build docker containers
       run: |
         chmod +x ./scripts/docker_builds.sh
+        cat ./scripts/docker_builds.sh
         ./scripts/docker_builds.sh -e -f -d -t test
         docker images
