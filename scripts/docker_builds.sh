@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATASTREAM_PATH="$(dirname "$SCRIPT_DIR")"
 DOCKER_DIR="$DATASTREAM_PATH"/docker
 DOCKER_DATASTREAM=$DOCKER_DIR/ngen-datastream
-PLATFORM=$(uname -m)
+PLATFORM=aarch64
 TAG="latest"
 
 cleanup_docker_datastream() {
@@ -62,25 +62,4 @@ if [ "$BUILD_DATASTREAM" = "yes" ]; then
   docker build -t awiciroh/datastream:$TAG \
                -f Dockerfile.datastream . --no-cache --build-arg TAG_NAME=$TAG
   cleanup_docker_datastream
-fi
-
-if [ "$PUSH" = "yes" ]; then
-    echo "Pushing docker containers"
-    
-    # Only push what was actually built
-    if [ "$BUILD_DEPS" = "yes" ]; then
-      echo "Pushing datastream-deps"
-      docker push awiciroh/datastream-deps:$TAG
-    fi
-    
-    if [ "$BUILD_FORCINGPROCESSOR" = "yes" ]; then
-      echo "Pushing forcingprocessor"
-      docker push awiciroh/forcingprocessor:$TAG
-    fi
-    
-    if [ "$BUILD_DATASTREAM" = "yes" ]; then
-      echo "Pushing datastream"
-      docker push awiciroh/datastream:$TAG
-    fi
-    echo "Docker containers have been pushed to awiciroh dockerhub!"
 fi
