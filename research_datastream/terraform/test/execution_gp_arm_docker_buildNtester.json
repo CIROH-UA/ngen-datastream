@@ -22,7 +22,6 @@
     "IamInstanceProfile": {
       "Name": "datastream_ec2_profile_github_actions_arm"
     },
-    // Add spot instance configuration
     "InstanceMarketOptions": {
       "MarketType": "spot",
       "SpotOptions": {
