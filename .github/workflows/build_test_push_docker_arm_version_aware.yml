@@ -79,68 +79,68 @@ jobs:
         fi
         echo "ds_version=$CURRENT_DS" >> "$GITHUB_OUTPUT"
 
-  build-test-docker-x86:
-    needs: [detect-changes]
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  # build-test-docker-x86:
+  #   needs: [detect-changes]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+  #   - name: Set up QEMU
+  #     uses: docker/setup-qemu-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+  #   - name: Set up Docker Buildx
+  #     uses: docker/setup-buildx-action@v3
 
-    - name: Configure AWS
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-1
+  #   - name: Configure AWS
+  #     run: |
+  #       aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       aws configure set region us-east-1
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #   - name: Login to Docker Hub
+  #     uses: docker/login-action@v3
+  #     with:
+  #       username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #       password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Install packages for datastream
-      run: |
-        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
+  #   - name: Install packages for datastream
+  #     run: |
+  #       curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
 
-    - name: Build docker containers
-      run: |
-        chmod +x ./scripts/docker_builds.sh
-        ./scripts/docker_builds.sh -e -f -d -t latest-x86
+  #   - name: Build docker containers
+  #     run: |
+  #       chmod +x ./scripts/docker_builds.sh
+  #       ./scripts/docker_builds.sh -e -f -d -t latest-x86
 
-    - name: Prepare and test docker containers
-      run: |
-        curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
-        export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
+  #   - name: Prepare and test docker containers
+  #     run: |
+  #       curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
+  #       export DS_TAG=latest-x86 FP_TAG=latest-x86 && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g $(pwd)/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json -n 4
 
-    - name: Push docker containers
-      run: |
-        if [ "${{ needs.detect-changes.outputs.build_deps }}" == "true" ]; then
-          VERSION_TAG="${{ needs.detect-changes.outputs.deps_version }}"
-          docker tag awiciroh/datastream-deps:latest-x86 awiciroh/datastream-deps:${VERSION_TAG}-x86
-          docker push awiciroh/datastream-deps:${VERSION_TAG}-x86
-          docker push awiciroh/datastream-deps:latest-x86
-        fi
-        if [ "${{ needs.detect-changes.outputs.build_fp }}" == "true" ]; then
-          VERSION_TAG="${{ needs.detect-changes.outputs.fp_version }}"
-          docker tag awiciroh/forcingprocessor:latest-x86 awiciroh/forcingprocessor:${VERSION_TAG}-x86
-          docker push awiciroh/forcingprocessor:${VERSION_TAG}-x86
-          docker push awiciroh/forcingprocessor:latest-x86
-        fi
-        if [ "${{ needs.detect-changes.outputs.build_ds }}" == "true" ]; then
-          VERSION_TAG="${{ needs.detect-changes.outputs.ds_version }}"
-          docker tag awiciroh/datastream:latest-x86 awiciroh/datastream:${VERSION_TAG}-x86
-          docker push awiciroh/datastream:${VERSION_TAG}-x86
-          docker push awiciroh/datastream:latest-x86
-        fi
+  #   - name: Push docker containers
+  #     run: |
+  #       if [ "${{ needs.detect-changes.outputs.build_deps }}" == "true" ]; then
+  #         VERSION_TAG="${{ needs.detect-changes.outputs.deps_version }}"
+  #         docker tag awiciroh/datastream-deps:latest-x86 awiciroh/datastream-deps:${VERSION_TAG}-x86
+  #         docker push awiciroh/datastream-deps:${VERSION_TAG}-x86
+  #         docker push awiciroh/datastream-deps:latest-x86
+  #       fi
+  #       if [ "${{ needs.detect-changes.outputs.build_fp }}" == "true" ]; then
+  #         VERSION_TAG="${{ needs.detect-changes.outputs.fp_version }}"
+  #         docker tag awiciroh/forcingprocessor:latest-x86 awiciroh/forcingprocessor:${VERSION_TAG}-x86
+  #         docker push awiciroh/forcingprocessor:${VERSION_TAG}-x86
+  #         docker push awiciroh/forcingprocessor:latest-x86
+  #       fi
+  #       if [ "${{ needs.detect-changes.outputs.build_ds }}" == "true" ]; then
+  #         VERSION_TAG="${{ needs.detect-changes.outputs.ds_version }}"
+  #         docker tag awiciroh/datastream:latest-x86 awiciroh/datastream:${VERSION_TAG}-x86
+  #         docker push awiciroh/datastream:${VERSION_TAG}-x86
+  #         docker push awiciroh/datastream:latest-x86
+  #       fi
 
   build-test-push-docker-arm:
-    needs: [detect-changes, build-test-docker-x86]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -220,52 +220,52 @@ jobs:
           terraform destroy -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
           sleep 30
 
-  create-manifest:
-    name: Create and Push Manifest
-    needs: [detect-changes, build-test-push-docker-arm]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+  # create-manifest:
+  #   name: Create and Push Manifest
+  #   needs: [detect-changes, build-test-push-docker-arm]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Log in to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Create and push manifest datastream-deps
-        if: needs.detect-changes.outputs.build_deps == 'true'
-        run: |
-          docker manifest create awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }} \
-            --amend awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}-x86 \
-            --amend awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}-arm64
-          docker manifest push awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}
+  #     - name: Create and push manifest datastream-deps
+  #       if: needs.detect-changes.outputs.build_deps == 'true'
+  #       run: |
+  #         docker manifest create awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }} \
+  #           --amend awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}-x86 \
+  #           --amend awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}-arm64
+  #         docker manifest push awiciroh/datastream-deps:${{ needs.detect-changes.outputs.deps_version }}
 
-          docker manifest create awiciroh/datastream-deps:latest \
-            --amend awiciroh/datastream-deps:latest-x86 \
-            --amend awiciroh/datastream-deps:latest-arm64
-          docker manifest push awiciroh/datastream-deps:latest
+  #         docker manifest create awiciroh/datastream-deps:latest \
+  #           --amend awiciroh/datastream-deps:latest-x86 \
+  #           --amend awiciroh/datastream-deps:latest-arm64
+  #         docker manifest push awiciroh/datastream-deps:latest
 
-      - name: Create and push manifest datastream
-        if: needs.detect-changes.outputs.build_ds == 'true'
-        run: |
-          docker manifest create awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }} \
-            --amend awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}-x86 \
-            --amend awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}-arm64
-          docker manifest push awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}
+  #     - name: Create and push manifest datastream
+  #       if: needs.detect-changes.outputs.build_ds == 'true'
+  #       run: |
+  #         docker manifest create awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }} \
+  #           --amend awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}-x86 \
+  #           --amend awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}-arm64
+  #         docker manifest push awiciroh/datastream:${{ needs.detect-changes.outputs.ds_version }}
 
-          docker manifest create awiciroh/datastream:latest \
-            --amend awiciroh/datastream:latest-x86 \
-            --amend awiciroh/datastream:latest-arm64
-          docker manifest push awiciroh/datastream:latest       
+  #         docker manifest create awiciroh/datastream:latest \
+  #           --amend awiciroh/datastream:latest-x86 \
+  #           --amend awiciroh/datastream:latest-arm64
+  #         docker manifest push awiciroh/datastream:latest       
 
-      - name: Create and push manifest forcingprocessor
-        if: needs.detect-changes.outputs.build_fp == 'true'
-        run: |
-          docker manifest create awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }} \
-            --amend awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}-x86 \
-            --amend awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}-arm64
-          docker manifest push awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}
+  #     - name: Create and push manifest forcingprocessor
+  #       if: needs.detect-changes.outputs.build_fp == 'true'
+  #       run: |
+  #         docker manifest create awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }} \
+  #           --amend awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}-x86 \
+  #           --amend awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}-arm64
+  #         docker manifest push awiciroh/forcingprocessor:${{ needs.detect-changes.outputs.fp_version }}
 
-          docker manifest create awiciroh/forcingprocessor:latest \
-            --amend awiciroh/forcingprocessor:latest-x86 \
-            --amend awiciroh/forcingprocessor:latest-arm64
-          docker manifest push awiciroh/forcingprocessor:latest
+  #         docker manifest create awiciroh/forcingprocessor:latest \
+  #           --amend awiciroh/forcingprocessor:latest-x86 \
+  #           --amend awiciroh/forcingprocessor:latest-arm64
+  #         docker manifest push awiciroh/forcingprocessor:latest
