@@ -595,7 +595,7 @@ def multiprocess_write_netcdf(data:np.ndarray, jcatchment_dict:dict, t_ax:np.nda
 
     return netcdf_cat_file_sizes
 
-def write_df(df, filename, storage_type, s3=None, bucket=None, key_prefix=None, local_path=None):
+def write_df(df:pd.DataFrame, filename:str, storage_type:str, client:boto3.client=None, bucket:str=None, key_prefix:str=None, local_path:str=None):
     """
     Write a DataFrame to S3 or local storage as a CSV or Parquet file.
     The file type is inferred from the filename extension.
@@ -604,7 +604,7 @@ def write_df(df, filename, storage_type, s3=None, bucket=None, key_prefix=None, 
         df (pd.DataFrame): DataFrame to write.
         filename (str): Name of the file (e.g., 'metadata.csv' or 'metadata.parquet').
         storage_type (str): 's3' or 'local'.
-        s3 (boto3.client, optional): S3 client if using S3.
+        client (boto3.client, optional): S3 client if using S3.
         bucket (str, optional): S3 bucket name.
         key_prefix (str, optional): S3 key prefix (folder path).
         local_path (str, optional): Local directory path.
@@ -615,7 +615,7 @@ def write_df(df, filename, storage_type, s3=None, bucket=None, key_prefix=None, 
             buf = BytesIO()
             df.to_csv(buf, index=False)
             key_name = f"{key_prefix}/{filename}"
-            s3.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())
+            client.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())
             buf.close()
         else:
             out_path = Path(local_path, filename)
@@ -625,7 +625,7 @@ def write_df(df, filename, storage_type, s3=None, bucket=None, key_prefix=None, 
             buf = BytesIO()
             df.to_parquet(buf, index=False)
             key_name = f"{key_prefix}/{filename}"
-            s3.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())
+            client.put_object(Bucket=bucket, Key=key_name, Body=buf.getvalue())
             buf.close()
         else:
             out_path = Path(local_path, filename)
@@ -940,13 +940,20 @@ def prep_ngen_data(conf):
         del data_array   
 
         metadata_df = pd.DataFrame.from_dict(metadata)
+        meta_key = None
+        meta_bucket = None
+        local_metapath = None
         if storage_type == 's3':
             bucket, key = convert_url2key(output_path,storage_type)
             meta_path = f"{key}/metadata/forcings_metadata/"
+            meta_key = meta_path + 'metadata.csv'
+            meta_bucket = bucket
+        else:
+            local_metapath = metaf_path
 
-        write_df(metadata_df, "metadata.csv", storage_type, local_path=metaf_path)
-        write_df(avg_df, "catchments_avg.csv", storage_type, local_path=metaf_path)
-        write_df(med_df, "catchments_median.csv", storage_type, local_path=metaf_path)
+        write_df(metadata_df, "metadata.csv", storage_type, local_path=local_metapath, key_prefix=meta_key, bucket=meta_bucket, client=s3)
+        write_df(avg_df, "catchments_avg.csv", storage_type, local_path=local_metapath, key_prefix=meta_key, bucket=meta_bucket, client=s3)
+        write_df(med_df, "catchments_median.csv", storage_type, local_path=local_metapath, key_prefix=meta_key, bucket=meta_bucket, client=s3)
 
         meta_time = time.perf_counter() - t000
         log_time("METADATA_END", log_file)
