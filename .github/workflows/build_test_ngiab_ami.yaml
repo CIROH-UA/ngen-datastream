@@ -81,7 +81,7 @@ jobs:
         current_version=$(grep 'datastream-ami-version:' ./ami_version.yml | sed 's/.*"\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)".*/\1.\2.\3/')
         major=$(echo $current_version | cut -d. -f1)
         minor=$(echo $current_version | cut -d. -f2)
-        patch=$(echo $current_version | cut -d. -f3)
+        patch=0
         new_minor=$((minor + 1))
         new_version="$major.$new_minor.$patch"
         
