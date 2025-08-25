@@ -733,6 +733,7 @@ def prep_ngen_data(conf):
 
     log_time("STORE_METADATA_START", log_file)            
     global forcing_path
+    s3 = None
     if storage_type == "local":
         if output_path == "":
             output_path = os.path.join(os.getcwd(),datentime)        
