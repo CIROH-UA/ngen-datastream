@@ -20,7 +20,7 @@ jobs:
   test-research-datastream-forcingprocessing:
     runs-on: ubuntu-latest
     env:
-      DATE: 20250801    
+      DATE: 20250803    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
         run: |
           cd research_datastream/terraform_community
           # Download the execution JSON
-          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20250801/forcing_short_range/00/metadata/execution.json execution.json
+          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen."${{ env.DATE }}"/forcing_short_range/00/metadata/execution.json execution.json
           # Remove specified fields and update TagSpecifications
           jq --arg DATE "${{ env.DATE }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "tests/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
           
