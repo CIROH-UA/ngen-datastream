@@ -2,6 +2,22 @@ name: Test Datastream NGIAB AMI Integration
 
 on:
   workflow_dispatch:
+    inputs:
+      ds_tag:
+        description: 'Datastream Docker tag'
+        required: false
+        default: 'latest'
+        type: string
+      fp_tag:
+        description: 'Forcing Processor Docker tag'
+        required: false
+        default: 'latest'
+        type: string
+      ngiab_tag:
+        description: 'NGIAB Docker tag'
+        required: false
+        default: 'latest'
+        type: string
 
 permissions:
   contents: write
@@ -12,9 +28,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Display trigger information
-      run: echo "Workflow triggered manually"
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
@@ -32,7 +45,8 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -f -d  
+        ./scripts/docker_builds.sh -f -d
+        docker images
 
     - name: Base test and NWM_RETRO_V3
       run: |        
@@ -52,6 +66,13 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3      
 
+    - name: Display trigger information
+      run: |
+        echo "Workflow triggered manually with versions:"
+        echo "DS_TAG: ${{ inputs.ds_tag }}"
+        echo "FP_TAG: ${{ inputs.fp_tag }}"
+        echo "NGIAB_TAG: ${{ inputs.ngiab_tag }}"
+
     - name: Configure AWS
       run: |
         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -62,9 +83,12 @@ jobs:
 
     - name: Base test and NWM_RETRO_V3
       run: |        
-        sudo rm -rf $(pwd)/data/datastream_test        
+        sudo rm -rf $(pwd)/data/datastream_test
+        # Export version tags for datastream script
+        export DS_TAG="${{ inputs.ds_tag }}"
+        export FP_TAG="${{ inputs.fp_tag }}"
+        export NGIAB_TAG="${{ inputs.ngiab_tag }}"        
         ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
-
 
 
   bump-version:
@@ -99,11 +123,10 @@ jobs:
     needs: bump-version
     runs-on: ubuntu-latest
     outputs:
-      ds_tag: ${{ steps.changes.outputs.ds_tag }}
-      fp_tag: ${{ steps.changes.outputs.fp_tag }}
-      ngiab_tag: ${{ steps.changes.outputs.ngiab_tag }}
+      ds_tag: ${{ inputs.ds_tag }}
+      fp_tag: ${{ inputs.fp_tag }}
+      ngiab_tag: ${{ inputs.ngiab_tag }}
       ds_ami_version: ${{ steps.changes.outputs.ds_ami_version }}
-      build_ds_ami: ${{ steps.changes.outputs.build_ds_ami }}
 
     steps:
       - name: Checkout code
@@ -117,22 +140,17 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Detect version changes
+      - name: Get version info
         id: changes
         shell: bash
         run: |
           set -euo pipefail
-      
-          # Current versions
           CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_version.yml)
-          DS_TAG=latest
-          FP_TAG=latest
-          NGIAB_TAG=latest
+          echo "Using Docker tags:"
+          echo "DS_TAG=${{ inputs.ds_tag }}"
+          echo "FP_TAG=${{ inputs.fp_tag }}"
+          echo "NGIAB_TAG=${{ inputs.ngiab_tag }}"
           echo "ds_ami_version=$CURRENT_DS_AMI" >> "$GITHUB_OUTPUT"
-          # Outputs for tags
-          echo "ds_tag=$DS_TAG" >> "$GITHUB_OUTPUT"
-          echo "fp_tag=$FP_TAG" >> "$GITHUB_OUTPUT"
-          echo "ngiab_tag=$NGIAB_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS
         run: |
@@ -142,15 +160,13 @@ jobs:
 
       - name: Build AMI on AWS (N Virginia)
         run: |
-          DS_TAG="${{ steps.changes.outputs.ds_tag }}"
-          FP_TAG="${{ steps.changes.outputs.fp_tag }}"
-          NGIAB_TAG="${{ steps.changes.outputs.ngiab_tag }}"
-          ami_version=datastream-"${{ steps.changes.outputs.ds_ami_version }}"     
-          echo $ami_version  
+          ami_version=datastream-"${{ steps.changes.outputs.ds_ami_version }}"
+          echo "Building AMI: $ami_version"
+          echo "With Docker tags: DS=${{ inputs.ds_tag }}, FP=${{ inputs.fp_tag }}, NGIAB=${{ inputs.ngiab_tag }}"
           export AMI_NAME="$ami_version"
-          export DS_TAG="$DS_TAG"
-          export FP_TAG="$FP_TAG"
-          export NGIAB_TAG="$NGIAB_TAG"
+          export DS_TAG="${{ inputs.ds_tag }}"
+          export FP_TAG="${{ inputs.fp_tag }}"
+          export NGIAB_TAG="${{ inputs.ngiab_tag }}"
           chmod +x scripts/create_ami.sh
           ./scripts/create_ami.sh
           
