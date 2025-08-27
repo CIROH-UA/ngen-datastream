@@ -1,6 +1,6 @@
 FROM amazonlinux:2023 AS datastream-base
 
-RUN dnf -y install pigz tar git python3.9 python3-pip
+RUN dnf -y install pigz tar git python3.10 python3-pip
 
 ARG ARCH="x86"
 RUN if [ "${ARCH}" = "aarch64" ]; then \
