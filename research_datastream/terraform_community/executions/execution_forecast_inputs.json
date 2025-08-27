@@ -13,14 +13,14 @@
       "03S": "m8g.xlarge",
       "03W": "m8g.xlarge",
       "04": "m8g.xlarge",
-      "05": "m8g.xlarge",
+      "05": "m8g.2xlarge",
       "06": "m8g.xlarge",
-      "07": "m8g.xlarge",
+      "07": "m8g.2xlarge",
       "08": "m8g.xlarge",
       "09": "m8g.xlarge",
-      "10L": "m8g.xlarge",
+      "10L": "m8g.2xlarge",
       "10U": "m8g.2xlarge",
-      "11": "m8g.xlarge",
+      "11": "m8g.2xlarge",
       "12": "m8g.xlarge",
       "13": "m8g.xlarge",
       "14": "m8g.xlarge",
@@ -30,11 +30,11 @@
       "18": "m8g.xlarge",
       "fp":"m8g.2xlarge"
       },
-      "volume_size": 32
+      "volume_size": 64
   },
   "medium_range": {
     "init_cycles": ["00", "06", "12", "18"],
-    "ensemble_members": ["0"],
+    "ensemble_members": ["1","2","3","4","5","6","7"],
     "instance_types": {
       "01":"m8g.2xlarge",
       "02":"m8g.2xlarge",
@@ -70,14 +70,14 @@
       "03S": "m8g.xlarge",
       "03W": "m8g.xlarge",
       "04": "m8g.xlarge",
-      "05": "m8g.xlarge",
+      "05": "m8g.2xlarge",
       "06": "m8g.xlarge",
-      "07": "m8g.xlarge",
+      "07": "m8g.2xlarge",
       "08": "m8g.xlarge",
       "09": "m8g.xlarge",
-      "10L": "m8g.xlarge",
+      "10L": "m8g.2xlarge",
       "10U": "m8g.2xlarge",
-      "11": "m8g.xlarge",
+      "11": "m8g.2xlarge",
       "12": "m8g.xlarge",
       "13": "m8g.xlarge",
       "14": "m8g.xlarge",
@@ -87,6 +87,6 @@
       "18": "m8g.xlarge",
       "fp":"m8g.2xlarge"
       },
-      "volume_size": 32
+      "volume_size": 64
   }
 }
