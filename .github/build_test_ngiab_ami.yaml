@@ -1,3 +1,0 @@
-name: Test Datastream NGIAB AMI Integration
-on:
-  workflow_dispatch:
