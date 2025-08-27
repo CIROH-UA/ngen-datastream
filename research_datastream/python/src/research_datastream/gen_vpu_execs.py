@@ -35,9 +35,9 @@ PATTERN_FORECAST={
 }
 
 TIMEOUTS={    
-    "short_range"  : 1200,
+    "short_range"  : 3600,
     "medium_range" : 7200,
-    "analysis_assim_extend"  : 1200
+    "analysis_assim_extend"  : 3600
     }
 
 def get_ncores_from_instance_type(instance_type, cache_file):
@@ -76,11 +76,16 @@ def get_ncores_from_instance_type(instance_type, cache_file):
         return 0
     
 def remove_left_n_chars(text, pattern, n):
-    match = re.search(pattern, text)
-    if match:
+    matches = list(re.finditer(pattern, text))
+    if not matches:
+        return text
+
+    # Work from right to left to avoid index shifting
+    for match in reversed(matches):
         start_index = match.start()
         slice_start = max(0, start_index - n)
-        return text[:slice_start] + text[start_index:]
+        text = text[:slice_start] + text[start_index:]
+
     return text
 
 def edit_dict(execution_template,ami,instance_type,jvpu,out_dir,run_type,init,member,volume_size):
@@ -121,7 +126,30 @@ def edit_dict(execution_template,ami,instance_type,jvpu,out_dir,run_type,init,me
         if member == "":
             stream_command = remove_left_n_chars(stream_command, PATTERN_MEMBER, 1)     
         cmds[j] = re.sub(PATTERN_MEMBER, member, stream_command)
-                                   
+
+    # HACK
+    # Edit whole path realization if medium range and vpu is 17
+    # https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/refs/heads/main/configs/ngen/realization_sloth_nom_cfe_pet.json
+    if jvpu == "17":
+        for j, jcmd in enumerate(cmds):
+            stream_command = copy.deepcopy(jcmd)
+            cmds[j] = re.sub(
+                r'https://ciroh-community-ngen-datastream\.s3\.amazonaws\.com/realizations/realization_VPU_[0-9]{2}[A-Z]?\.json',
+                'https://raw.githubusercontent.com/CIROH-UA/ngen-datastream/refs/heads/main/configs/ngen/realization_sloth_nom_cfe_pet.json',
+                stream_command
+            )
+    # HACK
+    # edit ens to zero for forcing source NWM_V3_MEDIUM_RANGE_<00,06,12, or 18>_X 
+    # when ens member is 0 and jvpu is fp
+    if run_type == "medium_range" and member == "1" and jvpu == "fp":
+        for j, jcmd in enumerate(cmds):
+            stream_command = copy.deepcopy(jcmd)
+            cmds[j] = re.sub(
+                r'NWM_V3_MEDIUM_RANGE_(00|06|12|18)_[0-9]+',
+                r'NWM_V3_MEDIUM_RANGE_\1_0',
+                stream_command
+            )
+
     if "datastream_command_options" in exec_jvpu.keys():
         exec_jvpu[key] = dict([[key, value] for key, value in zip(exec_jvpu[key].keys(), cmds)])
     else:
@@ -167,6 +195,9 @@ def generate_vpu_execs(inputs,conf,conf_fp,out_dir,arch,arch_file):
                         exec_jvpu = copy.deepcopy(execution_template)
                         edit_dict(exec_jvpu,ami,instance_types[jvpu],jvpu,out_dir,jrun,jinit,jmember,volume_size)
                     else:
+                        if len(members) > 1 and int(jmember) > 1 and jvpu == "fp":
+                            # don't need to do forcings processing for members other than the first
+                            continue
                         instance_type_fp = instance_types['fp']
                         with open(conf_fp,"r") as fp:
                             execution_template = json.load(fp)
