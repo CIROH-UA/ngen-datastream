@@ -1,12 +1,23 @@
-FROM amazonlinux:2023 AS datastream-base
+FROM ubuntu:22.04 AS datastream-base
 
-RUN dnf -y install pigz tar git python3.10 python3-pip
+# Install basic tools and Python 3.10 (default in Ubuntu 22.04)
+RUN apt-get update && apt-get install -y \
+    pigz tar git python3 python3-pip python3-dev \
+    wget gcc g++ make cmake \
+    zlib1g-dev libssl-dev libffi-dev libsqlite3-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Verify Python version
+RUN python3 --version && pip3 --version
 
 ARG ARCH="x86"
 RUN if [ "${ARCH}" = "aarch64" ]; then \
-        dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
-        dnf clean all && \
-        pip3 install setuptools numpy; \
+        apt-get update && apt-get install -y \
+        wget g++ cpp libsqlite3-dev libtiff-dev cmake python3-dev \
+        libssl-dev tcl libtiff5-dev libcurl4-openssl-dev swig \
+        libpng-dev libjpeg-turbo8-dev libexpat1-dev \
+        && apt-get clean && rm -rf /var/lib/apt/lists/* \
+        && pip3 install setuptools numpy; \
     fi
 
 # --- PROJ Install ---
@@ -37,7 +48,7 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
 
 # --- HDF5 Install ---
 RUN if [ "${ARCH}" = "aarch64" ]; then \
-        dnf -y install python3.11-devel python3-Cython && \
+        apt-get update && apt-get install -y python3-dev cython3 && \
         wget https://hdf-wordpress-1.s3.amazonaws.com/wp-content/uploads/manual/HDF5/HDF5_1_14_3/src/hdf5-1.14.3.tar.gz && \
         tar zxvf hdf5-1.14.3.tar.gz && \
         cd hdf5-1.14.3 && \
@@ -52,7 +63,7 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
 
 # --- GEOS Install ---
 RUN if [ "${ARCH}" = "aarch64" ]; then \
-    dnf -y install wget gcc-c++ make cmake bzip2 && \
+    apt-get update && apt-get install -y wget g++ make cmake bzip2 && \
     wget https://download.osgeo.org/geos/geos-3.12.1.tar.bz2 && \
     tar xvjf geos-3.12.1.tar.bz2 && \
     cd geos-3.12.1 && \
