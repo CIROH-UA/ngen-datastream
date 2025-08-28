@@ -64,7 +64,7 @@ jobs:
               ]
             }] |
             .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
           ' "$short_range_execution_file" > temp_short_range_execution.json
           
           mv temp_short_range_execution.json "$short_range_execution_file"
@@ -85,7 +85,7 @@ jobs:
               ]
             }] |
             .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/medium_range/VPU_\($VPU)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
           ' "$medium_range_execution_file" > temp_medium_range_execution.json
           
           mv temp_medium_range_execution.json "$medium_range_execution_file"
@@ -105,9 +105,11 @@ jobs:
           cd research_datastream
           short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
+          TS=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S%3N')   # ms resolution
+          NAME="sr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
           execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
-            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --name "$NAME" \
             --input "file://$short_range_execution_file" \
             --region us-east-1 \
             --query 'executionArn' --output text)
@@ -134,9 +136,11 @@ jobs:
           cd research_datastream
           medium_range_execution_file="test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json
+          TS=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S%3N')   # ms resolution
+          NAME="mr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
           execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
-            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --name "$NAME" \
             --input "file://$medium_range_execution_file" \
             --region us-east-1 \
             --query 'executionArn' --output text)
