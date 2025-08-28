@@ -260,6 +260,7 @@ jobs:
         run: |
           aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/fp || echo "No file to delete"
 
+
   test-all-vpus:
     needs: [build-test-push-ami, get-ami-info]
     if: needs.build-test-push-ami.outputs.build_ds_ami == 'true' 
@@ -303,10 +304,13 @@ jobs:
             echo "Invalid AMI ID: $ami_id"
             exit 1
           fi
-          
-          echo "arm: $ami_id" > terraform_community/executions/community_ami.txt
+          if grep -q "^arm:" terraform_community/executions/community_ami.txt; then
+            sed -i "s/^arm:.*/arm: $ami_id/" terraform_community/executions/community_ami.txt
+          else
+            echo "arm: $ami_id" >> terraform_community/executions/community_ami.txt
+          fi
+          cat terraform_community/executions/community_ami.txt
           echo "Using AMI ID: $ami_id"
-
 
       - name: Generate execution files using Python script
         run: |
@@ -319,10 +323,10 @@ jobs:
             --exec_template_fp terraform_community/executions/execution_datastream_fp_template.json \
             --out_dir test_executions
 
-      - name: Modify execution for testing
+      - name: Modify execution for testing (Short Range)
         run: |
           cd research_datastream
-          execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
+          short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
       
           # Update for testing with custom tags and S3 prefix
@@ -338,9 +342,32 @@ jobs:
             .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
             .commands |= map(gsub("DS_TAG=1.0.1"; "DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}")) |
             .commands |= map(gsub("NGIAB_TAG=v0.0.0"; "NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}"))
-          ' "$execution_file" > temp_execution.json
+          ' "$short_range_execution_file" > temp_short_range_execution.json
           
-          mv temp_execution.json "$execution_file"
+          mv temp_short_range_execution.json "$short_range_execution_file"
+
+      - name: Modify execution for testing (Medium Range)
+        run: |
+          cd research_datastream
+          medium_range_execution_file="test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json
+      
+          # Update for testing with custom tags and S3 prefix
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
+            .instance_parameters.TagSpecifications = [{
+              "ResourceType": "instance", 
+              "Tags": [
+                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
+                {"Key": "AMI_Version", "Value": "datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"}
+              ]
+            }] |
+            .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/medium_range/VPU_\($VPU)")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+            .commands |= map(gsub("DS_TAG=1.0.1"; "DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}")) |
+            .commands |= map(gsub("NGIAB_TAG=v0.0.0"; "NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}"))
+          ' "$medium_range_execution_file" > temp_medium_range_execution.json
+          
+          mv temp_medium_range_execution.json "$medium_range_execution_file"
 
       - name: Check and create AWS key pair
         run: |
@@ -351,16 +378,45 @@ jobs:
             echo "Key pair 'actions_key' already exists"
           fi
 
-      - name: Start and monitor Step Functions execution
-        id: stepfunction
+      - name: Start and monitor Step Functions execution (Short Range)
+        id: stepfunction_short
         run: |
           cd research_datastream
-          execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
+          short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
           execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
             --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
-            --input "file://$execution_file" \
+            --input "file://$short_range_execution_file" \
+            --region us-east-1 \
+            --query 'executionArn' --output text)
+          
+          echo "Execution ARN: $execution_arn"
+          
+          status="RUNNING"
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
+            if [ "$status" == "FAILED" ]; then
+              echo "State machine execution failed for VPU ${{ env.VPU }}!"
+              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
+          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Start and monitor Step Functions execution (Medium Range)
+        id: stepfunction_medium
+        run: |
+          cd research_datastream
+          medium_range_execution_file="test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json
+          execution_arn=$(aws stepfunctions start-execution \
+            --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
+            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --input "file://$medium_range_execution_file" \
             --region us-east-1 \
             --query 'executionArn' --output text)
           
@@ -391,9 +447,21 @@ jobs:
             echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
             echo "$file_list"
             file_count=$(echo "$file_list" | wc -l)
-            echo "Total files created for VPU ${{ env.VPU }}: $file_count"
+            echo "Total files created for VPU ${{ env.VPU }}: $file_count (short_range) "
           else
-            echo "FAILED: No output files created for VPU ${{ env.VPU }}"
+            echo "FAILED: No output files created for Short Range VPU ${{ env.VPU }}"
+            exit 1
+          fi
+
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
+            echo "$file_list"
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files created for VPU ${{ env.VPU }}: $file_count (medium_range) "
+          else
+            echo "FAILED: No output files created for Medium Range VPU ${{ env.VPU }}"
             exit 1
           fi
 
@@ -407,12 +475,15 @@ jobs:
         run: |
           curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { 
             echo "Error: File not found or request failed"; exit 1; 
+          } 
+          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/medium_range/VPU_${{ env.VPU }}/merkdir.file || { 
+            echo "Error: File not found or request failed"; exit 1; 
           }
-
       - name: Clean up
         if: always()
         run: |
           aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No files to delete"
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }} || echo "No files to delete"
 
 
   # Summary job that runs after all VPUs complete
