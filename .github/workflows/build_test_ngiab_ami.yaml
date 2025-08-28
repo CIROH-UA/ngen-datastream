@@ -18,11 +18,7 @@ on:
         required: false
         default: 'latest'
         type: string
-  push:
-    branches:
-      - issue213
-    paths:
-      - 'tversion.yml'
+
 
 permissions:
   contents: write
