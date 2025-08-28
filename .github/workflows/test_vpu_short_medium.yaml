@@ -53,21 +53,25 @@ jobs:
           cd research_datastream
           short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
-      
           # Update for testing with custom tags and S3 prefix
+        
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
             .instance_parameters.TagSpecifications = [{
-              "ResourceType": "instance", 
+              "ResourceType": "instance",
               "Tags": [
-                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
+                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"},
                 {"Key": "AMI_Version", "Value": "test-version"}
               ]
             }] |
-            .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
+            .commands |= map(
+                # swap placeholder only; no regex near quotes
+                gsub("__S3_PREFIX__"; "tests/short_range/VPU_\($VPU)")
+              | sub("-s DAILY"; "-s DAILY -e \($DATE)0000")
+            )
           ' "$short_range_execution_file" > temp_short_range_execution.json
-          
           mv temp_short_range_execution.json "$short_range_execution_file"
+          
+                    
 
       - name: Modify execution for testing (Medium Range)
         run: |
@@ -78,17 +82,21 @@ jobs:
           # Update for testing with custom tags and S3 prefix
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
             .instance_parameters.TagSpecifications = [{
-              "ResourceType": "instance", 
+              "ResourceType": "instance",
               "Tags": [
-                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
+                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"},
                 {"Key": "AMI_Version", "Value": "test-version"}
               ]
             }] |
-            .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/medium_range/VPU_\($VPU)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
-          ' "$medium_range_execution_file" > temp_medium_range_execution.json
+            .commands |= map(
+                # swap placeholder only; no regex near quotes
+                gsub("__S3_PREFIX__"; "tests/medium_range/VPU_\($VPU)")
+              | sub("-s DAILY"; "-s DAILY -e \($DATE)0000")
+            )
+          ' "$short_range_execution_file" > temp_short_range_execution.json
+          mv temp_short_range_execution.json "$short_range_execution_file"
           
-          mv temp_medium_range_execution.json "$medium_range_execution_file"
+                    
 
       - name: Check and create AWS key pair
         run: |
