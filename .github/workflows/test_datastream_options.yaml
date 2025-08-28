@@ -61,7 +61,7 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -e -f -d -t test-python310    
+        ./scripts/docker_builds.sh -e -f -d    
 
     - name: Get geopackage 
       run: |
