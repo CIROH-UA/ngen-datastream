@@ -11,6 +11,7 @@ PACAKGE_DIR=$(dirname $SCRIPT_DIR)
 START_TIME_UTC=$(date -u +'%Y%m%d%H%M%S')
 START_DATE_UTC=$(date -u +'%Y%m%d')
 run_date=$START_DATE_UTC
+DATASTREAM_VERBOSE="False"
 
 is_s3_key() {
   [[ "$1" =~ ^s3:// ]]
@@ -615,9 +616,13 @@ log_time "NGEN_START"
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS" local
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS" local$PIPE_DEV_NULL
 else    
-    log_n_run_steps docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS local > /dev/null 2>&1
+    PIPE_DEV_NULL=""
+    if [ "$DATASTREAM_VERBOSE" == "False" ]; then
+        PIPE_DEV_NULL=" > /dev/null 2>&1"
+    fi
+    log_n_run_steps docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS local$PIPE_DEV_NULL
     NGIAB_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $NIGAB_TAG --format "{{.ID}}") | tr -d '"')
     cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_NGENCONF/
 fi
