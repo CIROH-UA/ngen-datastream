@@ -298,17 +298,15 @@ jobs:
       - name: Update AMI in community_ami.txt
         run: |
           cd research_datastream
-          ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
-          
+          ami_id="${{ needs.get-ami-info.outputs.ami_id }}"        
           if [ "$ami_id" == "None" ] || [ "$ami_id" == "" ] || [ "$ami_id" == "null" ]; then
             echo "Invalid AMI ID: $ami_id"
             exit 1
           fi
-          if grep -q "^arm:" terraform_community/executions/community_ami.txt; then
-            sed -i "s/^arm:.*/arm: $ami_id/" terraform_community/executions/community_ami.txt
-          else
-            echo "arm: $ami_id" >> terraform_community/executions/community_ami.txt
-          fi
+          /^arm:/ { print "arm: " new_ami; next }
+          { print }
+          ' terraform_community/executions/community_ami.txt > temp_file && \
+          mv temp_file terraform_community/executions/community_ami.txt
           cat terraform_community/executions/community_ami.txt
           echo "Using AMI ID: $ami_id"
 
