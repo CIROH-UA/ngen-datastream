@@ -2,10 +2,9 @@ name: Test VPU's Short Range and Medium Range
 on:
   workflow_dispatch:   
 
-
 permissions:
   contents: read   
-
+jobs:
   test-all-vpus:
     runs-on: ubuntu-latest
     strategy:
@@ -61,11 +60,11 @@ permissions:
               "ResourceType": "instance", 
               "Tags": [
                 {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
-                {"Key": "AMI_Version", "Value": "datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"}
+                {"Key": "AMI_Version", "Value": "test-version"}
               ]
             }] |
             .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
           ' "$short_range_execution_file" > temp_short_range_execution.json
           
           mv temp_short_range_execution.json "$short_range_execution_file"
@@ -73,8 +72,8 @@ permissions:
       - name: Modify execution for testing (Medium Range)
         run: |
           cd research_datastream
-          medium_range_execution_file="test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json"
-          cat test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json
+          medium_range_execution_file="test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json
       
           # Update for testing with custom tags and S3 prefix
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
@@ -82,11 +81,11 @@ permissions:
               "ResourceType": "instance", 
               "Tags": [
                 {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
-                {"Key": "AMI_Version", "Value": "datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"}
+                {"Key": "AMI_Version", "Value": "test-version"}
               ]
             }] |
             .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/medium_range/VPU_\($VPU)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
           ' "$medium_range_execution_file" > temp_medium_range_execution.json
           
           mv temp_medium_range_execution.json "$medium_range_execution_file"
@@ -106,9 +105,11 @@ permissions:
           cd research_datastream
           short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
+          TS=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S%3N')   # ms resolution
+          NAME="sr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
           execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
-            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --name "$NAME" \
             --input "file://$short_range_execution_file" \
             --region us-east-1 \
             --query 'executionArn' --output text)
@@ -135,9 +136,11 @@ permissions:
           cd research_datastream
           medium_range_execution_file="test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json"
           cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json
+          TS=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S%3N')   # ms resolution
+          NAME="mr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
           execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
-            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --name "$NAME" \
             --input "file://$medium_range_execution_file" \
             --region us-east-1 \
             --query 'executionArn' --output text)
