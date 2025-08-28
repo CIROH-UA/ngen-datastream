@@ -3,6 +3,5 @@ FROM awiciroh/datastream-deps:${TAG_NAME} AS datastream_base
 COPY ./ngen-datastream/ /ngen-datastream
 RUN pip3 install -e /ngen-datastream/python_tools && \
     groupadd -r mygroup && \
-    useradd -r -g mygroup myuser && \
-    chown -R myuser:mygroup /ngen-datastream
-
+    useradd -r -g mygroup myuser
+COPY --chown=myuser:mygroup . /ngen-datastream
