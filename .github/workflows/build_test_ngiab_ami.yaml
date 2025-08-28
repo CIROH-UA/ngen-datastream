@@ -18,6 +18,11 @@ on:
         required: false
         default: 'latest'
         type: string
+  push:
+    branches:
+      - issue213
+    paths:
+      - 'tversion.yml'
 
 permissions:
   contents: write
@@ -44,17 +49,12 @@ jobs:
         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     - name: Build docker containers
-      run : |
-        ./scripts/docker_builds.sh -f -d
+      run : |        
+        ./scripts/docker_builds.sh -e -f -d
         docker images
 
-    - name: Base test and NWM_RETRO_V3
-      run: |
-        sudo rm -rf $(pwd)/data/datastream_test        
-        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
-
-  test-ngiab-ds-latest-integration:
+  test-ngiab-ds-integration-with-workflow-tags:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -82,7 +82,7 @@ jobs:
         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     - name: Base test and NWM_RETRO_V3
-      run: |
+      run: |        
         sudo rm -rf $(pwd)/data/datastream_test
         # Export version tags for datastream script
         export DS_TAG="${{ inputs.ds_tag }}"
@@ -92,8 +92,8 @@ jobs:
 
 
   bump-version:
-    needs: [test-ngiab-dev-integration, test-ngiab-ds-latest-integration]
-    if: always() && (needs.test-ngiab-dev-integration.result == 'success' || needs.test-ngiab-ds-latest-integration.result == 'success')
+    needs: [test-ngiab-dev-integration, test-ngiab-ds-integration-with-workflow-tags]
+    if: always() && (needs.test-ngiab-dev-integration.result == 'success' || needs.test-ngiab-ds-integration-with-workflow-tags.result == 'success')
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
