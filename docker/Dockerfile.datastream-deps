@@ -5,7 +5,6 @@ RUN dnf -y install pigz tar git python3.9 python3-pip
 ARG ARCH="x86"
 RUN if [ "${ARCH}" = "aarch64" ]; then \
         dnf -y install wget gcc-c++ cpp sqlite-devel libtiff cmake python3-devel openssl-devel tcl libtiff-devel libcurl-devel swig libpng-devel libjpeg-turbo-devel expat-devel && \
-        dnf clean all && \
         pip3 install setuptools numpy; \
     fi
 
@@ -76,6 +75,7 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
     make && \
     make install && \
     cd .. && \
+    dnf clean all && \
     pip install -e .; \
 fi
 
