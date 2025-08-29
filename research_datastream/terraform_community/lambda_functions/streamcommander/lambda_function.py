@@ -36,48 +36,49 @@ def lambda_handler(event, context):
 
     instance_id = event['instance_parameters']['InstanceId']
 
+
+    if "datastream_command_options" in event:
+        ds_options = event["datastream_command_options"]
+        event['commands'] = []
+        if "s3_bucket" in ds_options:
+            bucket = ds_options["s3_bucket"]
+            prefix = ds_options["s3_prefix"]
+        nprocs = ds_options["nprocs"]
+        start = ds_options["start_time"]
+        end = ds_options["end_time"]
+        forcing_source = ds_options["forcing_source"]
+        realization = ds_options["realization"]
+        hf_version = ds_options["hydrofabric_version"]
+        subset_id = ds_options["subset_id"]
+        subset_type = ds_options["subset_id_type"]
+        command_str = f"runuser -l ec2-user -c 'cd /home/ec2-user/datastream && ./scripts/datastream -s {start} -e {end} -C {forcing_source} -I {subset_id} -i {subset_type} -v {hf_version} -d $(pwd)/data/datastream -R {realization} -n {nprocs}"
+        if "s3_bucket" in ds_options: 
+            command_str += f" -S {bucket} -o {prefix}"
+        command_str += '\''
+        event['commands'].append(command_str) 
+        event.pop("datastream_command_options")  
+
+    forcing_file = None
+    for jcmd in event["commands"]:
+        bucket_pattern = r"(?i)--s3_bucket[=\s']+([^\s']+)"
+        match = re.search(bucket_pattern, jcmd)
+        if match: 
+            bucket = match.group(1)
+        prefix_pattern = r"(?i)--s3_prefix[=\s']+([^\s']+)"
+        match = re.search(prefix_pattern, jcmd)
+        if match: 
+            prefix = match.group(1)   
+        forcing_source_pattern = r"(?i)--forcing_source[=\s']+([^\s']+)"
+        match = re.search(forcing_source_pattern, jcmd)
+        if match: 
+            forcing_source = match.group(1)      
+
+        forcing_file_pattern = r"(?i)-F[=\s']+([^\s']+)"
+        match = re.search(forcing_file_pattern, jcmd)
+        if match: 
+            forcing_file = match.group(1) 
+            
     if event.get("retry_attempt",0) == 0:
-        if "datastream_command_options" in event:
-            ds_options = event["datastream_command_options"]
-            event['commands'] = []
-            if "s3_bucket" in ds_options:
-                bucket = ds_options["s3_bucket"]
-                prefix = ds_options["s3_prefix"]
-            nprocs = ds_options["nprocs"]
-            start = ds_options["start_time"]
-            end = ds_options["end_time"]
-            forcing_source = ds_options["forcing_source"]
-            realization = ds_options["realization"]
-            hf_version = ds_options["hydrofabric_version"]
-            subset_id = ds_options["subset_id"]
-            subset_type = ds_options["subset_id_type"]
-            command_str = f"runuser -l ec2-user -c 'cd /home/ec2-user/datastream && ./scripts/datastream -s {start} -e {end} -C {forcing_source} -I {subset_id} -i {subset_type} -v {hf_version} -d $(pwd)/data/datastream -R {realization} -n {nprocs}"
-            if "s3_bucket" in ds_options: 
-                command_str += f" -S {bucket} -o {prefix}"
-            command_str += '\''
-            event['commands'].append(command_str) 
-            event.pop("datastream_command_options")  
-
-        forcing_file = None
-        for jcmd in event["commands"]:
-            bucket_pattern = r"(?i)--s3_bucket[=\s']+([^\s']+)"
-            match = re.search(bucket_pattern, jcmd)
-            if match: 
-                bucket = match.group(1)
-            prefix_pattern = r"(?i)--s3_prefix[=\s']+([^\s']+)"
-            match = re.search(prefix_pattern, jcmd)
-            if match: 
-                prefix = match.group(1)   
-            forcing_source_pattern = r"(?i)--forcing_source[=\s']+([^\s']+)"
-            match = re.search(forcing_source_pattern, jcmd)
-            if match: 
-                forcing_source = match.group(1)      
-
-            forcing_file_pattern = r"(?i)-F[=\s']+([^\s']+)"
-            match = re.search(forcing_file_pattern, jcmd)
-            if match: 
-                forcing_file = match.group(1) 
-
         if "DAILY" in prefix: 
             # Create s3 path with DAILY replaced
             prefix_daily = prefix
@@ -120,8 +121,7 @@ def lambda_handler(event, context):
                     new_hour = shifted_raw % 24
 
                     if shifted_raw < 0:
-                        ndays = (abs(shifted_raw) // 24) + 1
-                        today = (datetime.strptime(today, '%Y%m%d') - timedelta(days=ndays)).strftime('%Y%m%d')
+                        today = (datetime.strptime(today+m.group(1)+"00", '%Y%m%d%H%M') - timedelta(hours=nhrs_shift)).strftime('%Y%m%d')
 
                     shifted_forcing = forcing_file
                     shifted_forcing = re.sub(r'/\d{2}/', f'/{new_hour:02d}/', shifted_forcing, count=1)
