@@ -10,7 +10,7 @@ import re
 from forcingprocessor.utils import make_forcing_netcdf
 
 
-def get_shifted_time_axis(ds:xr.Dataset, ens_member:int, time_shift_hours:int=6) -> np.ndarray:
+def cut_forcing_data_for_ensemble(ds:xr.Dataset, ens_member:int, time_shift_hours:int=6) -> np.ndarray:
     """
     Shift the time axis of the dataset based on the ensemble member.
 
@@ -24,13 +24,11 @@ def get_shifted_time_axis(ds:xr.Dataset, ens_member:int, time_shift_hours:int=6)
     Returns:
     np.ndarray: Shifted time axis.
     """
-    t_shift = 3600 * (ens_member - 1) * time_shift_hours
-    t0 = ds_in.Time.values[0, 0]
-    shift_array = t_shift * np.ones((204,), dtype='float64')
-    tax_array = ds.Time.values[0, :-36] + shift_array
-    tf = tax_array[0]
-    print(f"First time in time array is {datetime.fromtimestamp(t0, tz=timezone.utc)} and was shifed forward {t_shift/3600:.0f} hours to {datetime.fromtimestamp(tf, tz=timezone.utc)}")
-    return tax_array
+    start_cut = ((ens_member-1) * time_shift_hours)
+    end_cut = 204 + start_cut
+    print(f"Member {ens_member}, cutting data from time axis index {start_cut} to {end_cut}")
+    out_ds = ds.isel(time=slice(start_cut, end_cut))
+    return out_ds
 
 if __name__ == "__main__":
     import argparse
@@ -63,14 +61,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
     assert Path(args.output_dir).is_dir(), "Output directory does not exist"
 
-    # Shift time axis
+    # Cut dataset based on ensemble member
     ds_in = xr.open_dataset(args.input_file_ens0)
     ens_member = int(args.ensemble_member)
     if ens_member > 1 and ens_member < 8:
-        tax_array = get_shifted_time_axis(ds_in, ens_member, time_shift_hours)
+        ds_mod = cut_forcing_data_for_ensemble(ds_in, ens_member, time_shift_hours)
     else: 
         raise ValueError("Ensemble member must be between 2 and 7")
     
+    # Choose filename
     pattern = r'^ngen\.t\d{2}z\.medium_range\.forcing\.f001_f240\.VPU_\d+\.nc$'
     input_file = Path(args.input_file_ens0).name
     if re.match(pattern, input_file):
@@ -79,16 +78,18 @@ if __name__ == "__main__":
         out_filename = "forcings_ens_" + str(ens_member) + ".nc"
     out_path = Path(args.output_dir) / out_filename 
 
+    # Create data array for make_forcing_netcdf
     nvar = len(ds_in.variables) - 2  # Exclude the time and catchment ids variable
     ncat= ds_in["UGRD_10maboveground"].shape[0]
     data_array = np.ones((ncat,204,nvar),dtype='float64')
-    vars = list(ds_in.keys())
+    vars = list(ds_mod.keys())
     vars.remove('Time')
     vars.remove('ids')
     for j, jvar in enumerate(vars):
-        data_array[:,:,j] = ds_in[jvar].values[:, :-36]
+        data_array[:,:,j] = ds_mod[jvar].values
 
+    # create netcdf and write it
     make_forcing_netcdf(out_path,
-                        catchments=ds_in.ids.values,
-                        t_ax=tax_array,
+                        catchments=ds_mod.ids.values,
+                        t_ax=ds_mod.Time.values[0,:],
                         input_array=data_array)
