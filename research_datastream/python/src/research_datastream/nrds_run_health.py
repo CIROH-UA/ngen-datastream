@@ -7,6 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
+plt.style.use('dark_background')
+
 BASE_URL = "https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2"
 
 # Allowed init cycles
@@ -45,18 +47,55 @@ def fetch_execution_metadata(url: str):
         pass
     return None, None
 
-def plot_grouped_counts(df, group_col, output_file, title):
-    counts = df.groupby([group_col, "status"]).size().unstack(fill_value=0)
-    if "success" in counts.columns and "failure" in counts.columns:
-        counts = counts[["success", "failure"]]
-    ax = counts.plot(kind="bar", figsize=(10, 6))
-    ax.set_title(title)
-    ax.set_xlabel(group_col)
-    ax.set_ylabel("Count")
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
+def plot_all_grouped_counts(df, output_file, title, start_date, end_date, custom_cycles, vpus, run_types, ensembles):
+    group_cols = [
+        ("vpu",        f"By VPU"),
+        ("run_type",   f"By Run Type"),
+        ("init_cycle", f"By Init Cycle"),
+        ("ensemble",   f"By Ensemble"),
+    ]
+
+    color_map = {
+        "success": "limegreen",   # vibrant green
+        "failure": "darkred"      # deep red
+    }
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))  # 2x2 grid
+    axes = axes.flatten()
+
+    for ax, (group_col, subtitle) in zip(axes, group_cols):
+        counts = df.groupby([group_col, "status"]).size().unstack(fill_value=0)
+        if "success" in counts.columns and "failure" in counts.columns:
+            counts = counts[["success", "failure"]]
+
+        counts.plot(
+            kind="bar",
+            ax=ax,
+            color=[color_map.get(col, "gray") for col in counts.columns]
+        )
+
+        ax.set_title(subtitle, fontsize=12)
+        ax.set_xlabel(group_col)
+        ax.set_ylabel("Count")
+        ax.set_yscale("log")
+        ax.tick_params(axis="x", rotation=45)
+
+        # Annotate bars
+        for container in ax.containers:
+            ax.bar_label(container, label_type="edge", fontsize=8)
+
+    # Big overall title
+    fig.suptitle(
+        f"NRDS START {start_date} END {end_date}\n"
+        f"INITs: {custom_cycles}\nVPUs: {vpus}\nRUN TYPES: {run_types}\nEnsembles: {ensembles}\n\n"
+        "Success vs Failure Across VPU, Run Type, Init Cycle, Ensemble",
+        fontsize=14, fontweight="bold"
+    )
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])  # leave space for the suptitle
     plt.savefig(output_file)
     plt.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description="Check datastream outputs and record results in CSV with charts.")
@@ -156,14 +195,30 @@ def main():
     else:
         df_combined = df_new
 
-    df_combined.to_csv(args.csv, index=False)
+    if not os.path.exists(os.path.dirname(args.csv)):
+        os.makedirs(os.path.dirname(args.csv), exist_ok=True)
+    if not os.path.exists(args.csv):
+        df_combined.to_csv(args.csv, index=False)
     print(f"Wrote {len(df_combined)} rows to {args.csv}")
 
+    ii_n_retry_g_0 = any(df_combined['retry_attempt'] >= 1)
+    if ii_n_retry_g_0:
+        print("Runs with retry_attempt >= 1:")
+        print(df_combined[df_combined['retry_attempt'] >= 1])
+
     os.makedirs(args.charts_dir, exist_ok=True)
-    plot_grouped_counts(df_combined, "vpu", os.path.join(args.charts_dir, "success_failure_by_vpu.png"), "Success vs Failure by VPU")
-    plot_grouped_counts(df_combined, "run_type", os.path.join(args.charts_dir, "success_failure_by_run_type.png"), "Success vs Failure by Run Type")
-    plot_grouped_counts(df_combined, "init_cycle", os.path.join(args.charts_dir, "success_failure_by_init.png"), "Success vs Failure by Init Cycle")
-    plot_grouped_counts(df_combined, "ensemble", os.path.join(args.charts_dir, "success_failure_by_ens.png"), "Success vs Failure by Ensemble")
+    plot_all_grouped_counts(
+        df_combined,
+        os.path.join(args.charts_dir, "success_failure_all.png"),
+        "Success vs Failure Summary",
+        start_date,
+        end_date,
+        custom_cycles,
+        vpus,
+        run_types,
+        ensembles
+    )
+
     print(f"Charts saved to {args.charts_dir}/")
 
 if __name__ == "__main__":
