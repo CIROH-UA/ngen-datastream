@@ -602,9 +602,6 @@ locals {
     "10U","11","12","13","14","15",
     "16","17","18"
   ]
-  # vpus = [
-  #   "fp","16"
-  # ]  
 
   short_range_paths = {
     for pair in flatten([
@@ -654,11 +651,7 @@ locals {
     "05","06","08","07","09","10L",
     "10U","11","12","13","14","15",
     "16","17","18"
-  ]  
-
-  # medium_vpus = [
-  #   "fp","16"
-  # ]    
+  ]    
   
   medium_range_paths = {
     for pair in flatten([
@@ -683,7 +676,7 @@ locals {
             vpu == "fp" ? [1] : local.init_cycles_config.medium_range.ensemble_members
           ) : {
             key   = "${init}_${member}_${vpu}"
-            value = vpu == "fp" ? (tonumber(init) + 4) % 24 : (tonumber(init) + 5) % 24
+            value = vpu == "fp" ? (tonumber(init) + 2) % 24 : (tonumber(init) + 3) % 24
           }
         ]
       ]
@@ -697,7 +690,7 @@ locals {
         for member in local.init_cycles_config.medium_range.ensemble_members : [
           for vpu in local.medium_vpus : {
             key   = "${init}_${member}_${vpu}"
-            value = ((tonumber("${member}") - 1) * (1/6) * 60) % 60
+            value = ((tonumber("${member}") - 1) * (1/7) * 60) % 60
           }
         ]
       ]
