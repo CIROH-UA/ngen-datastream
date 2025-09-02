@@ -3,7 +3,7 @@ on:
   workflow_dispatch:   
   push:
     branches: 
-      - main
+      - update_python_version_workflows
     paths:
       - 'ami_version.yml'
 
