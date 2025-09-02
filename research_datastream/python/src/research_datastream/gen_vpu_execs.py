@@ -195,13 +195,14 @@ def generate_vpu_execs(inputs,conf,conf_fp,out_dir,arch,arch_file):
                         exec_jvpu = copy.deepcopy(execution_template)
                         edit_dict(exec_jvpu,ami,instance_types[jvpu],jvpu,out_dir,jrun,jinit,jmember,volume_size)
                     else:
-                        if len(members) > 1 and int(jmember) > 1 and jvpu == "fp":
-                            # don't need to do forcings processing for members other than the first
-                            continue
-                        instance_type_fp = instance_types['fp']
-                        with open(conf_fp,"r") as fp:
-                            execution_template = json.load(fp)
-                        edit_dict(execution_template,ami,instance_type_fp,'fp',out_dir,jrun,jinit,jmember,volume_size)    
+                        if not conf_fp is None:
+                            if len(members) > 1 and int(jmember) > 1 and jvpu == "fp":
+                                # don't need to do forcings processing for members other than the first
+                                continue
+                            instance_type_fp = instance_types['fp']
+                            with open(conf_fp,"r") as fp:
+                                execution_template = json.load(fp)
+                            edit_dict(execution_template,ami,instance_type_fp,'fp',out_dir,jrun,jinit,jmember,volume_size)    
                
 
 def generate_vpu_sizes():
@@ -217,7 +218,7 @@ def generate_vpu_sizes():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--exec_template_fp", type=str, help="A statemachine execution json file for ngen-datastream forcingprocessor")
+    parser.add_argument("--exec_template_fp", default=None, type=str, help="A statemachine execution json file for ngen-datastream forcingprocessor")
     parser.add_argument("--exec_template_vpu", type=str, help="A statemachine execution json file for ngen-datastream")
     parser.add_argument("--ami_file", type=str, help="Text file that holds the AMIs for each architecture")
     parser.add_argument("--arch", type=str, help="x86 or arm")
