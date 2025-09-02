@@ -49,6 +49,7 @@ or run with cli args
 | NPROCS              | `-n` | Maximum number of processes to use in any step of  `ngen-datastream`. Defaults to `nprocs - 2` |  |
 | CONF_FILE            | `-c` | Store CLI args as env variables in a file. |  |
 | EVAL | `-E` | Set to "True" to run the TEEHR automated evaluation service on NextGen outputs. |  |
+| VERBOSE | `-V` | Set to "True" to output all of forcingprocessor and NGIAB outputs |  |
 
 ### Note for supplying file(s) paths
 DataStreamCLI is designed to pick up files or folder whether they are local, public, or in AWS s3 object storage.
