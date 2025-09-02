@@ -38,7 +38,7 @@ get_file() {
     if [[ "$IN_STRING" == ./* ]]; then
         IN_STRING=$(realpath "$IN_STRING")
     fi
-    
+
     IN_STRING_BASE=$(basename $IN_STRING)
     echo "Retrieving "$IN_STRING" and storing it here "$OUT_STRING
     if is_directory "$IN_STRING"; then
@@ -53,15 +53,15 @@ get_file() {
             rm "$(pwd)/$IN_STRING_BASE"
         else
             log_n_run_steps aws s3 sync $IN_STRING $OUT_STRING
-        fi 
+        fi
+    elif is_url "$IN_STRING"; then
+        log_n_run_steps curl -# -L -o "$OUT_STRING" "$IN_STRING"
     elif is_tarball "$IN_STRING"; then
         log_n_run_steps tar --use-compress-program=pigz -xf $IN_STRING -C "${OUT_STRING%/}"
-    elif is_url "$IN_STRING"; then
-        log_n_run_steps curl -# -L -o "$OUT_STRING" "$IN_STRING"        
     elif is_netcdf "$IN_STRING"; then
         log_n_run_steps cp $IN_STRING $OUT_STRING
     elif is_file "$IN_STRING"; then
-        log_n_run_steps cp $IN_STRING $OUT_STRING        
+        log_n_run_steps cp $IN_STRING $OUT_STRING
     else
         echo "ngen-datastream doesn't know how to deal with $IN_STRING"
     fi
@@ -242,6 +242,7 @@ touch $DATASTREAM_PROFILING
 echo "DATASTREAM_START: $START_TIME_UTC" > $DATASTREAM_PROFILING
 
 NGENRUN_CONFIG="${NGEN_RUN%/}/config"
+NGENRUN_CONFIG_CAT_CONFIG="${NGENRUN_CONFIG%/}/cat_config"
 NGENRUN_FORCINGS="${NGEN_RUN%/}/forcings"
 NGENRUN_OUTPUT="${NGEN_RUN%/}/outputs"
 NGENRUN_METADATA="${NGEN_RUN%/}/metadata"
@@ -251,6 +252,7 @@ NGENRUN_OUTPUT_TROUTE="${NGEN_RUN%/}/outputs/troute"
 NGENRUN_RESTART="${NGEN_RUN%/}/restart"
 NGENRUN_LAKEOUT="${NGEN_RUN%/}/lakeout"
 mkdir -p $NGENRUN_CONFIG
+mkdir -p $NGENRUN_CONFIG_CAT_CONFIG
 mkdir -p $NGENRUN_FORCINGS
 mkdir -p $NGENRUN_OUTPUT
 mkdir -p $NGENRUN_OUTPUT_NGEN
@@ -306,18 +308,21 @@ fi
 
 if [ ! -z $RESOURCE_DIR ]; then  
 
-    if [ -f "$NGEN_BMI_CONFS" ]; then
-        echo "Using" $NGEN_BMI_CONFS
-        tar -xf $NGEN_BMI_CONFS -C "${NGENRUN_CONFIG%/}"
-    else
-        NGEN_BMI_CONFS_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz")
-        NBMI=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz"| wc -l)
-        if [ ${NBMI} -gt 0 ]; then
-            echo "Using "$NGEN_BMI_CONFS_RESOURCES "for BMI configs"
-            tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
-        fi
+    # If BMI configs are explicitly provided, untar those
+    if [ ! -z $NGEN_BMI_CONFS ]; then
+        BMI_CONFS_BASE_NAME="$(basename $NGEN_BMI_CONFS)"
+        BMI_CONFS_RESOURCES="$DATASTREAM_RESOURCES/$BMI_CONFS_BASE_NAME"
+        get_file "$NGEN_BMI_CONFS" "$BMI_CONFS_RESOURCES"
+        tar -xf $BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG_CAT_CONFIG%/}"
+    fi
 
-    fi    
+    # Check resources for *ngen-bmi-configs*.tar.gz
+    NGEN_BMI_CONFS_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz")
+    NBMI=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*ngen-bmi-configs*.tar.gz"| wc -l)
+    if [ ${NBMI} -gt 0 ]; then
+        echo "Using "$NGEN_BMI_CONFS_RESOURCES "for BMI configs"
+        tar -xf $NGEN_BMI_CONFS_RESOURCES -C "${NGENRUN_CONFIG%/}"
+    fi  
 
     if [ -z $REALIZATION ]; then
         REALIZATION_RESOURCES=$(find "$DATASTREAM_RESOURCES_NGENCONF" -type f -name "*realization*.json")
@@ -488,7 +493,7 @@ fi
 
 echo "Generating NGEN configs"
 NGEN_CONFGEN=$DOCKER_PY"ngen_configs_gen.py"
-if [ "$DRYRUN" == "True" ]; then
+if [ "$DRYRUN" == "True" ] || [ "$SKIP_BMI_CONFIG_GEN" == "True" ]; then
     echo "DRYRUN - NGEN BMI CONFIGURATION FILE CREATION SKIPPED"
     echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" \
         -u $(id -u):$(id -g) \
