@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  build-test-push-docker-arm:
+  build-test-docker-arm:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
