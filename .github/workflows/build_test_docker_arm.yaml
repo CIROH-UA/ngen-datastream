@@ -37,20 +37,20 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1        
 
-      - name: Prepare execution config with branch
+      - name: Prepare execution config
         run: |
-          # Determine the branch name
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ inputs.branch_name }}" ]; then
             BRANCH_NAME="${{ inputs.branch_name }}"
-            echo "Using manual input branch: $BRANCH_NAME"
           else
             BRANCH_NAME="${{ github.ref_name }}"
-            echo "Using current branch: $BRANCH_NAME"
           fi
           
-          # Replace ${BRANCH_NAME} with actual branch name in the file
           cd research_datastream/terraform/test
           sed -i "s/\${BRANCH_NAME}/$BRANCH_NAME/g" test_execution_gp_arm_docker_buildNtester.json
+          
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/'; then
+            sed -i '/docker_builds\.sh/d' test_execution_gp_arm_docker_buildNtester.json
+          fi
           cat test_execution_gp_arm_docker_buildNtester.json
 
       - name: Build AWS Infra
@@ -61,6 +61,12 @@ jobs:
           ../scripts/import_resources.sh ./test/variables_gitactions_arm.tfvars
           terraform apply -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
           sleep 60
+
+      - name: Special Docker Processing
+        if: steps.docker_changes.outputs.docker_changed == 'true'
+        run: |
+          echo "🐳 Docker files have changed! Running special docker processing..."
+          # Add your docker-specific logic here
 
       - name: Set permissions
         run : |
@@ -74,7 +80,7 @@ jobs:
         run : |
           cd research_datastream/terraform
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/test_execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
-          
+
       - name: Tear down infra
         if: always()
         run : |
