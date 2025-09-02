@@ -109,12 +109,23 @@ def lambda_handler(event, context):
     event['instance_parameters']['MaxCount'] = 1
     event['instance_parameters']['MinCount'] = 1
     params             = event['instance_parameters']
-    response = client_ec2.run_instances(**params)
-    instance_id = response['Instances'][0]['InstanceId']
+    try:
+        response = client_ec2.run_instances(**params)
+        instance_id = response['Instances'][0]['InstanceId']
+    except:
+        if event['instance_parameters'].get('InstanceMarketOptions', None):
+            print(f'Spot instance request failed, falling back to on-demand instance')
+            event['instance_parameters'].pop('InstanceMarketOptions', None)
+            response = client_ec2.run_instances(**event['instance_parameters'])
+            instance_id = response['Instances'][0]['InstanceId']
+        else:
+            print(f'Instance request failed, no fallback available')
+            instance_id = None
 
-    if not wait_for_instance_running(instance_id):
-        raise Exception(f"EC2 instance {instance_id} did not reach 'Online' state")
-    print(f'{instance_id} has been launched and running')
+    if not instance_id is None:
+        if not wait_for_instance_running(instance_id):
+            raise Exception(f"EC2 instance {instance_id} did not reach 'Online' state")
+        print(f'{instance_id} has been launched and running')
 
     event['instance_parameters']['InstanceId']  = instance_id
 

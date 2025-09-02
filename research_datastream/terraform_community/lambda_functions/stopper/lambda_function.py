@@ -38,6 +38,9 @@ def lambda_handler(event, context):
     """
 
     instance_id = event['instance_parameters']['InstanceId']
+    if instance_id is None:
+        print('No InstanceId found in event, exiting')
+        return event
     response = client_ec2.describe_volumes(
         Filters=[
         {
@@ -76,7 +79,6 @@ def lambda_handler(event, context):
         if event['retry_attempt'] == event['run_options']['n_retries_allowed']:
             pass
         else:
-            event['retry_attempt'] += 1
             if "InstanceId" in event['instance_parameters']: del event['instance_parameters']['InstanceId']
             if "volume_id" in event: del event['volume_id']
             if "command_id" in event: del event['command_id']        
