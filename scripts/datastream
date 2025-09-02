@@ -141,6 +141,11 @@ S3_PREFIX=""
 NPROCS=4
 DRYRUN="False"
 DO_TEEHR="False"
+VERBOSE="False"
+PIPE=""
+if [[ $VERBOSE == "True" ]]; then
+    PIPE=" > /dev/stdout 2>&1"
+fi
 
 PKL_FILE=""
 DATASTREAM_WEIGHTS=""
@@ -192,6 +197,7 @@ while [ "$#" -gt 0 ]; do
         -n|--NPROCS) NPROCS="$2"; shift 2;;
         -y|--DRYRUN) DRYRUN="$2"; shift 2;;
         -E|--EVAL) EVAL="$2"; shift 2;;
+        -V|--VERBOSE) EVAL="$2"; shift 2;;
         *) usage;;
     esac
 done
@@ -551,12 +557,12 @@ else
         echo "COMMAND: docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-            python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json"
+            python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json" $PIPE
     else
         log_n_run_steps docker run --rm -v "$DATA_DIR:"$DOCKER_MOUNT"" \
             -u $(id -u):$(id -g) \
             -w "$DOCKER_RESOURCES" $DOCKER_TAG \
-            python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json
+            python3 "$DOCKER_FP"processor.py "$DOCKER_META"/conf_fp.json $PIPE
         FP_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $DOCKER_TAG --format "{{.ID}}") | tr -d '"')
         # mv $DATASTREAM_RESOURCES/profile_fp.txt $DATASTREAM_META 
         log_time "FORCINGPROCESSOR_END"
@@ -615,9 +621,9 @@ log_time "NGEN_START"
 echo "Running NextGen in AUTO MODE from CIROH-UA/NGIAB-CloudInfra"
 if [ "$DRYRUN" == "True" ]; then
     echo "DRYRUN - NEXTGEN EXECUTION SKIPPED"
-    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS" local
+    echo "COMMAND: docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS" local $PIPE
 else    
-    log_n_run_steps docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS local > /dev/null 2>&1
+    log_n_run_steps docker run --rm -v "$NGEN_RUN":"$DOCKER_MOUNT" -u $(id -u):$(id -g) $NIGAB_TAG "$DOCKER_MOUNT" auto $NPROCS local $PIPE
     NGIAB_HASH=$(docker inspect --format='{{json .Id}}' $(docker image ls $NIGAB_TAG --format "{{.ID}}") | tr -d '"')
     cp -r $NGEN_RUN/*partitions* $DATASTREAM_RESOURCES_NGENCONF/
 fi
