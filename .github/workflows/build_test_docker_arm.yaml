@@ -62,12 +62,6 @@ jobs:
           terraform apply -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
           sleep 60
 
-      - name: Special Docker Processing
-        if: steps.docker_changes.outputs.docker_changed == 'true'
-        run: |
-          echo "🐳 Docker files have changed! Running special docker processing..."
-          # Add your docker-specific logic here
-
       - name: Set permissions
         run : |
           cd research_datastream/terraform
