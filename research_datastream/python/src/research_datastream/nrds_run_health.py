@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import argparse
-import csv
 import datetime
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 plt.style.use('dark_background')
 
@@ -23,6 +23,36 @@ ALL_VPUS = ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08",
             "09", "10U", "10L", "11", "12", "13", "14", "15", "16", "17", "18"]
 
 ALL_ENSEMBLES = ["1", "2", "3", "4", "5", "6", "7"]
+
+def process_run(date_str, run_type, hour, vpu, ens, cached_urls, df_cache):
+    if run_type == "medium_range":
+        run_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/{ens}/VPU_{vpu}/ngen-run.tar.gz"
+        exec_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/{ens}/VPU_{vpu}/datastream-metadata/execution.json"
+    else:
+        run_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/ngen-run.tar.gz"
+        exec_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/datastream-metadata/execution.json"
+
+    if run_url in cached_urls:
+        row = df_cache[df_cache["run_url"] == run_url].iloc[0].to_dict()
+        print(f"Using cached {run_url}")
+        return row
+
+    status = check_url(run_url)
+    retry, retries_allowed = fetch_execution_metadata(exec_url)
+    print(f"Checked {run_url}: status {status}, retry {retry}, allowed {retries_allowed}")
+    return {
+        "date": date_str,
+        "run_type": run_type,
+        "init_cycle": hour,
+        "ensemble": ens if run_type == "medium_range" else None,
+        "vpu": vpu,
+        "run_url": run_url,
+        "status_code": status,
+        "status": "success" if status == 200 else "failure",
+        "retry_attempt": retry,
+        "retries_allowed": retries_allowed
+    }
+
 
 def daterange(start_date: datetime.date, end_date: datetime.date):
     for n in range((end_date - start_date).days + 1):
@@ -128,65 +158,29 @@ def main():
         cached_urls = set()
 
     rows = []
+    tasks = []
 
-    for current_date in daterange(start_date, end_date):
-        date_str = current_date.strftime("%Y%m%d")
-
-        for run_type in run_types:
-            allowed_hours = INIT_CYCLES_ALLOWED[run_type]
-            hours_to_check = allowed_hours if custom_cycles is None else [h for h in custom_cycles if h in allowed_hours]
-
-            for hour in hours_to_check:
-                for vpu in vpus:
-                    if run_type == "medium_range":
-                        for ens in ensembles:
-                            run_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/{ens}/VPU_{vpu}/ngen-run.tar.gz"
-                            exec_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/{ens}/VPU_{vpu}/datastream-metadata/execution.json"
-
-                            if run_url in cached_urls:
-                                row = df_cache[df_cache["run_url"] == run_url].iloc[0].to_dict()
-                                print(f"Using cached {run_url}")
-                            else:
-                                status = check_url(run_url)
-                                retry, retries_allowed = fetch_execution_metadata(exec_url)
-                                print(f"Checked {run_url}: status {status}, retry {retry}, allowed {retries_allowed}")
-                                row = {
-                                    "date": date_str,
-                                    "run_type": run_type,
-                                    "init_cycle": hour,
-                                    "ensemble": ens,
-                                    "vpu": vpu,
-                                    "run_url": run_url,
-                                    "status_code": status,
-                                    "status": "success" if status == 200 else "failure",
-                                    "retry_attempt": retry,
-                                    "retries_allowed": retries_allowed
-                                }
-                            rows.append(row)
-                    else:
-                        run_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/ngen-run.tar.gz"
-                        exec_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/datastream-metadata/execution.json"
-
-                        if run_url in cached_urls:
-                            row = df_cache[df_cache["run_url"] == run_url].iloc[0].to_dict()
-                            print(f"Using cached {run_url}")
+    with ThreadPoolExecutor(max_workers=20) as executor:  # adjust worker count if needed
+        for current_date in daterange(start_date, end_date):
+            date_str = current_date.strftime("%Y%m%d")
+            for run_type in run_types:
+                allowed_hours = INIT_CYCLES_ALLOWED[run_type]
+                hours_to_check = allowed_hours if custom_cycles is None else [h for h in custom_cycles if h in allowed_hours]
+                for hour in hours_to_check:
+                    for vpu in vpus:
+                        if run_type == "medium_range":
+                            for ens in ensembles:
+                                tasks.append(
+                                    executor.submit(process_run, date_str, run_type, hour, vpu, ens, cached_urls, df_cache)
+                                )
                         else:
-                            status = check_url(run_url)
-                            retry, retries_allowed = fetch_execution_metadata(exec_url)
-                            print(f"Checked {run_url}: status {status}, retry {retry}, allowed {retries_allowed}")
-                            row = {
-                                "date": date_str,
-                                "run_type": run_type,
-                                "init_cycle": hour,
-                                "ensemble": None,
-                                "vpu": vpu,
-                                "run_url": run_url,
-                                "status_code": status,
-                                "status": "success" if status == 200 else "failure",
-                                "retry_attempt": retry,
-                                "retries_allowed": retries_allowed
-                            }
-                        rows.append(row)
+                            tasks.append(
+                                executor.submit(process_run, date_str, run_type, hour, vpu, None, cached_urls, df_cache)
+                            )
+
+        for future in as_completed(tasks):
+            row = future.result()
+            rows.append(row)
 
     # Combine with cache and write CSV
     df_new = pd.DataFrame(rows)
