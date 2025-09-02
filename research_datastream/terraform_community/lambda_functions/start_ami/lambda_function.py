@@ -1,4 +1,5 @@
 import boto3
+import botocore
 import time, os, json
 
 global client_ec2
@@ -112,15 +113,21 @@ def lambda_handler(event, context):
     try:
         response = client_ec2.run_instances(**params)
         instance_id = response['Instances'][0]['InstanceId']
-    except:
+    except botocore.exceptions.ClientError as e:
+        error_msg = e.response['Error']['Message']
+        print(f"run_instances failed: {error_msg}")
+        
         if event['instance_parameters'].get('InstanceMarketOptions', None):
-            print(f'Spot instance request failed, falling back to on-demand instance')
+            print("Spot instance request failed, falling back to on-demand instance")
             event['instance_parameters'].pop('InstanceMarketOptions', None)
             response = client_ec2.run_instances(**event['instance_parameters'])
             instance_id = response['Instances'][0]['InstanceId']
         else:
-            print(f'Instance request failed, no fallback available')
-            instance_id = None
+            raise Exception(f"Instance request failed, no fallback available. Error: {error_msg}")
+    except Exception as e:
+        # Catch any other unexpected errors
+        print(f"Unexpected error: {e}")
+        raise
 
     if not instance_id is None:
         if not wait_for_instance_running(instance_id):
