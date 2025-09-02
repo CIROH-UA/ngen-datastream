@@ -2,8 +2,6 @@ name: Build, Test, and Push Datastream AMI
 on:
   workflow_dispatch:   
   push:
-    branches: 
-      - update_python_version_workflows
     paths:
       - 'ami_version.yml'
 
