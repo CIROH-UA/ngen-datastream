@@ -144,7 +144,7 @@ DO_TEEHR="False"
 VERBOSE="False"
 PIPE=""
 if [[ $VERBOSE == "True" ]]; then
-    PIPE=" > /dev/stdout 2>&1"
+    PIPE="> /dev/stdout 2>&1"
 fi
 
 PKL_FILE=""
