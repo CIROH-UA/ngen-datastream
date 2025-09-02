@@ -1,6 +1,12 @@
 name: Build, Test, and Push Datastream Docker Containers on ARM
 on:
   workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to build from (leave empty to use current branch)'
+        required: false
+        default: ''
+        type: string
   push:
     branches:
       - main
@@ -33,6 +39,23 @@ jobs:
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1        
+
+      - name: Prepare execution config with branch
+        run: |
+          # Determine the branch name
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ inputs.branch_name }}" ]; then
+            BRANCH_NAME="${{ inputs.branch_name }}"
+            echo "Using manual input branch: $BRANCH_NAME"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+            echo "Using current branch: $BRANCH_NAME"
+          fi
+          
+          # Replace ${BRANCH_NAME} with actual branch name in the file
+          cd research_datastream/terraform/test
+          sed -i "s/\${BRANCH_NAME}/$BRANCH_NAME/g" execution_gp_arm_docker_buildNtester.json
+          cat execution_gp_arm_docker_buildNtester.json
+
       - name: Build AWS Infra
         run: |
           cd research_datastream/terraform
