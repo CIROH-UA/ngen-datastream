@@ -38,13 +38,13 @@ pwd      = Path.cwd()
 filenamelist = str((pwd/"filenamelist.txt").resolve())
 
 weight_files = [f"https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/weights/nextgen_VPU_{x}_weights.json" for x in vpus]
+local_weight_files = [str((data_dir/f"nextgen_VPU_{x}_weights.json").resolve()) for x in vpus]
 
 # download weight files
-for wf in weight_files:
-    if not os.path.exists(data_dir/f"nextgen_VPU_{x}_weights.json"):
+for j, wf in enumerate(weight_files):
+    local_file = local_weight_files[j]
+    if not os.path.exists(local_file):
         os.system(f"wget {wf} -P {data_dir}")
-
-local_weight_files = [str((data_dir/f"nextgen_VPU_{x}_weights.json").resolve()) for x in vpus]
 
 conf = {
     "forcing"  : {
