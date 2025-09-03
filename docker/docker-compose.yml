@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  datastream-deps:
+    build:
+      dockerfile: Dockerfile.datastream-deps
+    image: awiciroh/datastream-deps:${TAG:-latest}
+
+  datastream:
+    build:
+      dockerfile: Dockerfile.datastream
+    image: awiciroh/datastream:${TAG:-latest}
+
+  forcingprocessor:
+    build:
+      dockerfile: Dockerfile.forcingprocessor
+    image: awiciroh/forcingprocessor:${TAG:-latest}
