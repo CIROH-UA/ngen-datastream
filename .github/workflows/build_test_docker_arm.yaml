@@ -48,17 +48,17 @@ jobs:
           cd research_datastream/terraform/test
           sed -i "s/\${BRANCH_NAME}/$BRANCH_NAME/g" test_execution_gp_arm_docker_buildNtester.json
 
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.datastream$'; then
-            sed -i "/runuser -l ec2-user -c 'TAG=latest-arm64 docker compose.*datastream'/d" test_execution_gp_arm_docker_buildNtester.json
-          fi
+          # if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.datastream$'; then
+          #   sed -i "/runuser -l ec2-user -c 'TAG=latest-arm64 docker compose.*datastream'/d" test_execution_gp_arm_docker_buildNtester.json
+          # fi
 
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.datastream-deps$'; then
-            sed -i "/runuser -l ec2-user -c 'TAG=latest-arm64 docker compose.*datastream-deps'/d" test_execution_gp_arm_docker_buildNtester.json
-          fi
+          # if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.datastream-deps$'; then
+          #   sed -i "/runuser -l ec2-user -c 'TAG=latest-arm64 docker compose.*datastream-deps'/d" test_execution_gp_arm_docker_buildNtester.json
+          # fi
 
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.forcingprocessor$'; then
-            sed -i "/runuser -l ec2-user -c 'TAG=latest-arm64 docker compose.*forcingprocessor'/d" test_execution_gp_arm_docker_buildNtester.json
-          fi
+          # if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.forcingprocessor$'; then
+          #   sed -i "/runuser -l ec2-user -c 'TAG=latest-arm64 docker compose.*forcingprocessor'/d" test_execution_gp_arm_docker_buildNtester.json
+          # fi
 
           cat test_execution_gp_arm_docker_buildNtester.json
 
