@@ -29,7 +29,6 @@ test_dir = Path(__file__).parent
 data_dir = (test_dir/'data').resolve()
 forcings_dir = (data_dir/'forcings').resolve()
 pwd      = Path.cwd()
-pwd      = pwd
 data_dir = data_dir
 if os.path.exists(data_dir):
     os.system(f"rm -rf {data_dir}")
@@ -53,7 +52,7 @@ conf = {
     },
 
     "storage":{
-        "output_path"       : "s3://ciroh-community-ngen-datastream/test/nrds_fp_test/",
+        "output_path"       : "s3://ciroh-community-ngen-datastream/test/nrds_fp_test",
         "output_file_type"  : ["netcdf"]
     },    
 
@@ -108,6 +107,9 @@ def test_nrds_fp():
         url = f"s3://ciroh-community-ngen-datastream/test/nrds_fp_test/ngen.t00z.short_range.forcing.f001_f018.VPU_{vpu}.nc"
         print(f"Checking for {url}")
         assert s3_object_exists(url)
+
+    os.system("aws s3 rm s3://ciroh-community-ngen-datastream/test/nrds_fp_test/ --recursive")
+
 
 if __name__ == "__main__":
     test_nrds_fp()
