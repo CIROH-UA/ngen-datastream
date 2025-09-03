@@ -45,6 +45,7 @@ jobs:
     - name: Build docker containers
       run: |
         export ARCH=$(uname -m)
+        docker compose -f docker/docker-compose.yml build datastream-deps
         docker compose -f docker/docker-compose.yml build datastream
         docker compose -f docker/docker-compose.yml build forcingprocessor
 
