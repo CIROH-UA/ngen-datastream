@@ -60,8 +60,9 @@ jobs:
         echo $AWS_SECRET_ACCESS_KEY
 
     - name: Build docker containers
-      run : |        
-        ./scripts/docker_builds.sh -f -d    
+      run : |
+        docker compose -f docker/docker-compose.yml build datastream
+        docker compose -f docker/docker-compose.yml build forcingprocessor
 
     - name: Get geopackage 
       run: |
