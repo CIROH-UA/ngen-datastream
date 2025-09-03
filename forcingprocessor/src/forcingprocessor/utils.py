@@ -27,6 +27,8 @@ ngen_variables = [
         "DSWRF_surface",
     ] 
 
+vpus = ["01","02","03W","03S","03N","04","05","06","07","08","09","10L","10U","11","12","13","14","15","16","17","18"]
+
 def get_window(weights_df):
     """
     Providing window on weights for which number of catchments is over 50,000
