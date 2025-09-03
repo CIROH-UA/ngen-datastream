@@ -15,5 +15,3 @@ services:
     build:
       dockerfile: Dockerfile.forcingprocessor
     image: awiciroh/forcingprocessor:${TAG:-latest}
-
-
