@@ -44,7 +44,8 @@ jobs:
 
     - name: Build docker containers
       run: |
-        docker compose -f docker/docker-compose.yml build
+        export ARCH=$(uname -m)
+        docker-compose -f docker/docker-compose.yml build
 
     - name: Test docker containers
       run : |
