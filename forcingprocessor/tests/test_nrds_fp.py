@@ -72,7 +72,7 @@ nwmurl_conf = {
         "geoinput"     : 1,
         "meminput"     : 0,
         "urlbaseinput" : 7,
-        "fcst_cycle"   : [0],
+        "fcst_cycle"   : [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
         "lead_time"    : [1]
     }
 
