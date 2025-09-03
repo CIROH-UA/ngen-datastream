@@ -26,17 +26,15 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Extract Python version from setup.py
+    - name: Extract Python version from setup.cfg
       id: pyver
       run: |
-        # Extract the python_requires line
-        VERSION=$(python -c "import re; text=open('forcingprocessor/setup.py').read(); m=re.search(r'python_requires\s*=\s*[\"\\']([^\"\\']+)[\"\\']', text); print(m.group(1) if m else '')")
-        # Pick the lowest supported version
-        VERSION=$(echo $VERSION | sed -E 's/[^0-9.<>!=, ]//g' | awk -F'[<>=, ]+' '{print $2}')
+        # Read python_requires from setup.cfg
+        VERSION=$(awk -F'>=' '/^python_requires/ {print $2}' forcingprocessor/setup.cfg | tr -d ' ')
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ steps.pyver.outputs.version }}
 
@@ -44,8 +42,8 @@ jobs:
       run: |
         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-1
-
+        aws configure set region us-east-1           
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
