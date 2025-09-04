@@ -19,7 +19,6 @@ services:
         TAG_NAME: ${TAG:-latest}
     image: awiciroh/datastream:${TAG:-latest}
 
-
   forcingprocessor:
     build:
       context: ..
