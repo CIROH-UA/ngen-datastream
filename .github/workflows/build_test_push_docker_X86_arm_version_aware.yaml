@@ -9,6 +9,8 @@ on:
         default: ''
         type: string
   push:
+    # branches:
+    #   - main
     paths:
       - 'versions.yml'
 
