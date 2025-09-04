@@ -11,6 +11,7 @@ services:
         - awiciroh/datastream-deps:latest
     image: awiciroh/datastream-deps:${TAG:-latest}
 
+
   datastream:
     build:
       context: ..
