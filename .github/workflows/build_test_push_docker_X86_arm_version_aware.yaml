@@ -116,7 +116,7 @@ jobs:
 
     - name: Build docker containers
       run: |
-        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream-deps
+        ARCH=$(uname -m) TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream-deps
         TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream
         TAG=latest-x86 docker compose -f docker/docker-compose.yml build forcingprocessor
 
