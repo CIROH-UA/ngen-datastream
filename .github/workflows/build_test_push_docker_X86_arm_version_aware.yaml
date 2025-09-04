@@ -85,7 +85,7 @@ jobs:
         fi
         echo "ds_version=$CURRENT_DS" >> "$GITHUB_OUTPUT"
 
-  build-test-docker-x86:
+  build-test-push-docker-x86:
     needs: [detect-changes]
     runs-on: ubuntu-latest
     steps:
