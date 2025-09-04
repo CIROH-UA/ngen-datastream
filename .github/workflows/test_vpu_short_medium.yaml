@@ -1,0 +1,207 @@
+name: Test VPU's Short Range and Medium Range
+on:
+  workflow_dispatch:   
+
+permissions:
+  contents: read   
+jobs:
+  test-all-vpus:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vpu: ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09", "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"]    
+    env:
+      VPU: ${{ matrix.vpu }}
+      DATE: 20250801
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade awscli boto3 pandas
+
+      - name: Generate execution files using Python script
+        run: |
+          cd research_datastream
+          python python/src/research_datastream/gen_vpu_execs.py \
+            --arch arm \
+            --inputs terraform_community/executions/execution_forecast_inputs.json \
+            --ami_file terraform_community/executions/community_ami.txt \
+            --exec_template_vpu terraform_community/executions/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform_community/executions/execution_datastream_fp_template.json \
+            --out_dir test_executions
+
+      - name: Modify execution for testing (Short Range)
+        run: |
+          cd research_datastream
+          short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
+      
+          # Update for testing with custom tags and S3 prefix
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
+            .instance_parameters.TagSpecifications = [{
+              "ResourceType": "instance", 
+              "Tags": [
+                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
+                {"Key": "AMI_Version", "Value": "test-version"}
+              ]
+            }] |
+            .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+          ' "$short_range_execution_file" > temp_short_range_execution.json
+          
+          mv temp_short_range_execution.json "$short_range_execution_file"
+
+      - name: Modify execution for testing (Medium Range)
+        run: |
+          cd research_datastream
+          medium_range_execution_file="test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json
+      
+          # Update for testing with custom tags and S3 prefix
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
+            .instance_parameters.TagSpecifications = [{
+              "ResourceType": "instance", 
+              "Tags": [
+                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, 
+                {"Key": "AMI_Version", "Value": "test-version"}
+              ]
+            }] |
+            .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/medium_range/VPU_\($VPU)")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+          ' "$medium_range_execution_file" > temp_medium_range_execution.json
+          
+          mv temp_medium_range_execution.json "$medium_range_execution_file"
+
+      - name: Check and create AWS key pair
+        run: |
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text
+            echo "Key pair 'actions_key' created"
+          else 
+            echo "Key pair 'actions_key' already exists"
+          fi
+
+      - name: Start and monitor Step Functions execution (Short Range)
+        id: stepfunction_short
+        run: |
+          cd research_datastream
+          short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
+          execution_arn=$(aws stepfunctions start-execution \
+            --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
+            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --input "file://$short_range_execution_file" \
+            --region us-east-1 \
+            --query 'executionArn' --output text)
+          
+          echo "Execution ARN: $execution_arn"
+          
+          status="RUNNING"
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
+            if [ "$status" == "FAILED" ]; then
+              echo "State machine execution failed for VPU ${{ env.VPU }}!"
+              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
+          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Start and monitor Step Functions execution (Medium Range)
+        id: stepfunction_medium
+        run: |
+          cd research_datastream
+          medium_range_execution_file="test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json"
+          cat test_executions/medium_range/00/execution_datastream_${{ env.VPU }}.json
+          execution_arn=$(aws stepfunctions start-execution \
+            --state-machine-arn $(cat terraform_community/sm_ARN.txt) \
+            --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') \
+            --input "file://$medium_range_execution_file" \
+            --region us-east-1 \
+            --query 'executionArn' --output text)
+          
+          echo "Execution ARN: $execution_arn"
+          
+          status="RUNNING"
+          while [ "$status" != "SUCCEEDED" ]; do
+            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
+            echo "Current status: $status"
+            if [ "$status" == "FAILED" ]; then
+              echo "State machine execution failed for VPU ${{ env.VPU }}!"
+              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
+          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
+
+      - name: Verify output files
+        if: matrix.vpu != '10U' && matrix.vpu != '17'
+        run: |
+          echo "Checking if processing created output files for VPU ${{ env.VPU }}..."
+          
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
+            echo "$file_list"
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files created for VPU ${{ env.VPU }}: $file_count (short_range) "
+          else
+            echo "FAILED: No output files created for Short Range VPU ${{ env.VPU }}"
+            exit 1
+          fi
+
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
+            echo "$file_list"
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files created for VPU ${{ env.VPU }}: $file_count (medium_range) "
+          else
+            echo "FAILED: No output files created for Medium Range VPU ${{ env.VPU }}"
+            exit 1
+          fi
+
+      - name: Skip verification notice
+        if: matrix.vpu == '10U' || matrix.vpu == '17'
+        run: |
+          echo "NOTICE: Skipping output verification for VPU ${{ env.VPU }} (known issues)"
+
+      - name: Verify specific file
+        if: matrix.vpu != '10U' && matrix.vpu != '17'
+        run: |
+          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { 
+            echo "Error: File not found or request failed"; exit 1; 
+          } 
+          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/medium_range/VPU_${{ env.VPU }}/merkdir.file || { 
+            echo "Error: File not found or request failed"; exit 1; 
+          }
+      - name: Clean up
+        if: always()
+        run: |
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No files to delete"
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }} || echo "No files to delete"

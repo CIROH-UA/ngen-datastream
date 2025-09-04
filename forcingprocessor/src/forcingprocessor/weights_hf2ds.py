@@ -151,15 +151,19 @@ def hf2ds(files : list, raster : str, nf):
     """
     jcatchment_dict = {}
     count = 0
+    weights_dfs = []
     for jgpkg in files:
-        pattern = r"(?i)vpu[-_](\d+)"
+        pattern = r"(?i)vpu[-_](\d{2}[A-Z]?)"
         match = re.search(pattern, jgpkg)
         if match: jname = "VPU_" + match.group(1)
         else:
             count +=1
             jname = str(count)    
-        weights_df = hydrofabric2datastream_weights(jgpkg,raster,nf)
-        jcatchment_dict[jname] = list(weights_df.index)
+        jweights_df = hydrofabric2datastream_weights(jgpkg,raster,nf)
+        weights_dfs.append(jweights_df)
+        jcatchment_dict[jname] = list(jweights_df.index)
+
+    weights_df = pd.concat(weights_dfs)
 
     return weights_df, jcatchment_dict
 

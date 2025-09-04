@@ -87,6 +87,7 @@ RUN if [ "${ARCH}" = "aarch64" ]; then \
     make && \
     make install && \
     cd .. && \
+    dnf clean all && \
     pip install -e .; \
 fi
 
