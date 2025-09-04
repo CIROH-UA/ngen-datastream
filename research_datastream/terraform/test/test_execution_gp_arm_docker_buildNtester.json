@@ -1,67 +1,47 @@
-{
+{  
   "commands": [
-    "set -x",
-    "exec > >(tee -a /var/log/datastream-debug.log) 2>&1",
-    "echo '=== DEBUG: Environment Information ===' && env | sort && echo '=== END ENV ==='",
-    "echo '=== DEBUG: System Information ===' && uname -a && df -h && free -h && echo '=== END SYSTEM ==='",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Starting cleanup\" && set -e",
-    "runuser -l ec2-user -c 'echo \"User: $(whoami), Home: $HOME, PWD: $(pwd)\" && rm -rf /home/ec2-user/ngen-datastream && docker rmi -f $(docker images -aq)' || { echo \"Cleanup failed with code $?\"; exit 1; }",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Cloning repository\"",
-    "runuser -l ec2-user -c 'cd /home/ec2-user && echo \"Cloning branch: ${BRANCH_NAME}\" && git clone -v -b ${BRANCH_NAME} https://github.com/CIROH-UA/ngen-datastream.git' || { echo \"Git clone failed with code $?\"; exit 1; }",
-    "runuser -l ec2-user -c 'ls -la /home/ec2-user/ngen-datastream/ && ls -la /home/ec2-user/ngen-datastream/docker/'",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Building datastream-deps\"",
-    "runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && ARCH=$(uname -m) && echo \"Architecture: $ARCH\" && TAG=latest-arm64 docker compose -f /home/ec2-user/ngen-datastream/docker/docker-compose.yml build --progress=plain --verbose datastream-deps' || { echo \"datastream-deps build failed with code $?\"; docker images; exit 1; }",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Building datastream\"",
-    "runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && TAG=latest-arm64 docker compose -f /home/ec2-user/ngen-datastream/docker/docker-compose.yml build --progress=plain --verbose datastream' || { echo \"datastream build failed with code $?\"; docker images; exit 1; }",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Building forcingprocessor\"",
-    "runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && TAG=latest-arm64 docker compose -f /home/ec2-user/ngen-datastream/docker/docker-compose.yml build --progress=plain --verbose forcingprocessor' || { echo \"forcingprocessor build failed with code $?\"; docker images; exit 1; }",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Docker images after builds\" && docker images",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Starting datastream execution\"",
-    "runuser -l ec2-user -c 'cd /home/ec2-user/ngen-datastream && export DS_TAG=latest-arm64 FP_TAG=latest-arm64 && echo \"DS_TAG=$DS_TAG, FP_TAG=$FP_TAG\" && ls -la scripts/ && ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d /home/ec2-user/ngen-datastream/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json' || { echo \"Datastream execution failed with code $?\"; exit 1; }",
-    
-    "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] DEBUG: Final system state\" && docker ps -a && docker images && ls -la /home/ec2-user/ngen-datastream/data/",
-    
-    "aws s3 cp /var/log/datastream-debug.log s3://ciroh-community-ngen-datastream/docker_login_log.txt --region us-east-1 || echo 'Failed to upload debug logs'"
+    "runuser -l ec2-user -c 'rm -rf /home/ec2-user/ngen-datastream && docker rmi -f $(docker images -aq)' > /home/ec2-user/ngen-datastream-setup.log 2>&1",
+    "runuser -l ec2-user -c 'cd /home/ec2-user && git clone -b ${BRANCH_NAME} https://github.com/CIROH-UA/ngen-datastream.git' >> /home/ec2-user/ngen-datastream-setup.log 2>&1",
+    "runuser -l ec2-user -c 'ARCH=$(uname -m) TAG=latest-arm64 docker compose -f /home/ec2-user/ngen-datastream/docker/docker-compose.yml build datastream-deps' >> /home/ec2-user/ngen-datastream-setup.log 2>&1",
+    "runuser -l ec2-user -c 'TAG=latest-arm64 docker compose -f /home/ec2-user/ngen-datastream/docker/docker-compose.yml build datastream' >> /home/ec2-user/ngen-datastream-setup.log 2>&1",
+    "runuser -l ec2-user -c 'TAG=latest-arm64 docker compose -f /home/ec2-user/ngen-datastream/docker/docker-compose.yml build forcingprocessor' >> /home/ec2-user/ngen-datastream-setup.log 2>&1",
+    "runuser -l ec2-user -c 'export DS_TAG=latest-arm64 FP_TAG=latest-arm64 && /home/ec2-user/ngen-datastream/scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d /home/ec2-user/ngen-datastream/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json' >> /home/ec2-user/ngen-datastream-setup.log 2>&1",
+    "runuser -l ec2-user -c 'cp /home/ec2-user/ngen-datastream-setup.log /home/ec2-user/ngen-datastream/docker_login_log.txt'",
+    "runuser -l ec2-user -c 'aws s3 cp /home/ec2-user/ngen-datastream/docker_login_log.txt s3://ciroh-community-ngen-datastream/docker_login_log.txt'"
   ],
-  "run_options": {
-    "ii_terminate_instance": true,
-    "ii_delete_volume": true,
-    "ii_check_s3": false,
-    "timeout_s": 3600
+  "run_options":{
+    "ii_terminate_instance" : true,
+    "ii_delete_volume"      : true,
+    "ii_check_s3"           : false,
+    "timeout_s"             : 3600
   },
-  "instance_parameters": {
-    "ImageId": "ami-01fc4c78425e127e6",
-    "InstanceType": "t4g.large",
-    "KeyName": "actions_key_arm",
-    "SecurityGroupIds": ["sg-0fcbe0c6d6faa0117"],
+  "instance_parameters" :
+  {
+    "ImageId"            : "ami-01fc4c78425e127e6",
+    "InstanceType"       : "t4g.large",
+    "KeyName"            : "actions_key_arm",
+    "SecurityGroupIds"   : ["sg-0fcbe0c6d6faa0117"],
     "IamInstanceProfile": {
       "Name": "datastream_ec2_profile_github_actions_arm"
     },
-    "TagSpecifications": [
+    "TagSpecifications"   :[
       {
-        "ResourceType": "instance",
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "arm_docker_buildNtester_debug"
-          }
-        ]
+          "ResourceType": "instance",
+          "Tags": [
+              {
+                  "Key"   : "Name",
+                  "Value" : "arm_docker_buildNtester"
+              }
+          ]
       }
     ],
-    "BlockDeviceMappings": [
+    "BlockDeviceMappings":[
       {
-        "DeviceName": "/dev/xvda",
-        "Ebs": {
-          "VolumeSize": 32,
-          "VolumeType": "gp3"
-        }
+          "DeviceName": "/dev/xvda",  
+          "Ebs": {
+              "VolumeSize": 32,
+              "VolumeType": "gp3"  
+          }
       }
     ]
   }
