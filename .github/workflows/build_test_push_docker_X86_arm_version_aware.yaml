@@ -147,7 +147,7 @@ jobs:
         fi
 
   build-test-push-docker-arm:
-    needs: [detect-changes, build-test-docker-x86]
+    needs: [detect-changes, build-test-push-docker-x86]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
