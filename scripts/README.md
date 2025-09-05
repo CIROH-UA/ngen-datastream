@@ -67,28 +67,3 @@ Additionally, the NextGen Research DataStream executions riot set the following 
 export DS_TAG=1.0.1 NGIAB_TAG=v0.0.0
 ```
 in order to override the default tag of "latest". 
-
-# scripts/docker_builds.sh
-This script handles the docker builds for the parent `datastream-deps` and the primary `datastream` and `forcingprocessor` docker containers. The script will build from the files locally, so it is easy for users to build their own variant containers and tag them readily. 
-
-For example.
-```
-scripts/docker_builds.sh -e -d -f -t my-local-containers-latest
-```
-
-will build these containers locally
-
-```
-awiciroh/datastream-deps:my-local-containers-latest
-awiciroh/datastream:my-local-containers-latest
-awiciroh/forcingprocessor:my-local-containers-latest
-```
-
-Options
-```
--e builds datastream-deps
--d builds datastream
--f builds forcingprocessor
--p pushes containers to dockerhub (for admin use only)
--t sets the tag
-```
