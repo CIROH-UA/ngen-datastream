@@ -52,7 +52,6 @@ jobs:
         run: |
           cd research_datastream
           short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
-          cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
           # Update for testing with custom tags and S3 prefix
         
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
@@ -70,14 +69,14 @@ jobs:
             )
           ' "$short_range_execution_file" > temp_short_range_execution.json
           mv temp_short_range_execution.json "$short_range_execution_file"
-          
+          cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
+         
                     
 
       - name: Modify execution for testing (Medium Range)
         run: |
           cd research_datastream
           medium_range_execution_file="test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json"
-          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json
       
           # Update for testing with custom tags and S3 prefix
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
@@ -95,7 +94,8 @@ jobs:
             )
           ' "$medium_range_execution_file" > temp_medium_range_execution.json
           mv temp_medium_range_execution.json "$medium_range_execution_file"
-          
+          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json
+      
                     
 
       - name: Check and create AWS key pair
