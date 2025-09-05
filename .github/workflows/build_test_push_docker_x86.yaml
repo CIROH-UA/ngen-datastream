@@ -44,7 +44,9 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -e -f -d -t latest-x86
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream-deps
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build forcingprocessor
 
     - name: Test docker containers
       run : |
@@ -59,4 +61,6 @@ jobs:
 
     - name: Push docker containers
       run: |
-        ./scripts/docker_builds.sh -p -t latest-x86   
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml push datastream-deps
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml push datastream
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml push forcingprocessor

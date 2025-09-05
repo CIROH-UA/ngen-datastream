@@ -1,6 +1,8 @@
 ARG TAG_NAME="latest"
 FROM awiciroh/datastream-deps:${TAG_NAME} AS datastream_base
-COPY ./ngen-datastream/ /ngen-datastream
+# Copy files directly from the parent context
+COPY python_tools/ /ngen-datastream/python_tools/
+COPY configs/ /ngen-datastream/configs/
 RUN pip3 install -e /ngen-datastream/python_tools && \
     groupadd -r mygroup && \
     useradd -r -g mygroup myuser

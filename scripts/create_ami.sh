@@ -61,6 +61,18 @@ usermod -aG docker ec2-user
 echo "Waiting for Docker to be ready..."
 sleep 10
 
+echo "Installing Docker Compose..."
+# Install Docker Compose v2 for ARM64
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Create symlink for backward compatibility
+ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/bin/docker-compose
+
+echo "Verifying Docker Compose installation..."
+docker compose version
+
 echo "Installing hfsubset..."
 cd /tmp
 curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_arm64.tar.gz

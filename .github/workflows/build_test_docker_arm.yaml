@@ -1,0 +1,92 @@
+name: Build, Test Datastream Docker Containers on ARM
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to build from (leave empty to use current branch)'
+        required: false
+        default: ''
+        type: string
+  push:
+    paths:
+      - 'docker/**'
+      - 'forcingprocessor/**'
+      - 'scripts/**'  
+      - 'python_tools/**'
+      - 'research_datastream/terraform/test/test_execution_gp_arm_docker_buildNtester.json' 
+      - '!docs/**'
+      - '!scripts/README.md'    
+      - '!docker/README.md'  
+      - '!forcingprocessor/README.md' 
+      - '!python_tools/README.md'     
+  
+permissions:
+  contents: read
+
+jobs:
+  build-test-docker-arm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+      - name: Configure AWS
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1        
+
+      - name: Prepare execution config
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ inputs.branch_name }}" ]; then
+            BRANCH_NAME="${{ inputs.branch_name }}"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+          fi
+          
+          cd research_datastream/terraform/test
+          sed -i "s/\${BRANCH_NAME}/$BRANCH_NAME/g" test_execution_gp_arm_docker_buildNtester.json
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.datastream$'; then
+            sed -i "/docker-compose\.yml build datastream/d" test_execution_gp_arm_docker_buildNtester.json
+          fi
+
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.datastream-deps$'; then
+            sed -i "/docker-compose\.yml build datastream-deps/d" test_execution_gp_arm_docker_buildNtester.json
+          fi
+          
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && ! git diff --name-only HEAD~1 HEAD | grep -q '^docker/Dockerfile\.forcingprocessor$'; then
+            sed -i "/docker-compose\.yml build forcingprocessor/d" test_execution_gp_arm_docker_buildNtester.json
+          fi
+
+          cat test_execution_gp_arm_docker_buildNtester.json
+
+      - name: Build AWS Infra
+        run: |
+          cd research_datastream/terraform
+          terraform init
+          terraform validate
+          ../scripts/import_resources.sh ./test/variables_gitactions_arm.tfvars
+          terraform apply -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
+          sleep 60
+
+      - name: Set permissions
+        run : |
+          cd research_datastream/terraform
+          aws iam attach-role-policy --role-name datastream_ec2_role_github_actions_arm --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
+          aws secretsmanager put-resource-policy --secret-id docker_awiciroh_creds --resource-policy file://test/secret-policy.json --block-public-policy --region us-east-1
+          if ! aws ec2 describe-key-pairs --key-names "actions_key_arm" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then aws ec2 create-key-pair --key-name "actions_key_arm" --query 'KeyName' --output text && echo "Key pair 'actions_key_arm' created in AWS"; else echo "Key pair 'actions_key_arm' already exists"; fi
+          sleep 60
+
+      - name: Build and Test arm docker containers with AWS infra
+        run : |
+          cd research_datastream/terraform
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/test_execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
+
+      - name: Tear down infra
+        if: always()
+        run : |
+          cd research_datastream/terraform
+          terraform destroy -var-file=./test/variables_gitactions_arm.tfvars -auto-approve
+          sleep 60
