@@ -155,6 +155,13 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
       {
         Effect   = "Allow",
         Action   = [
+          "pricing:GetProducts"  
+        ],
+        Resource = "*"
+      },      
+      {
+        Effect   = "Allow",
+        Action   = [
           "s3:*"  
         ],
         Resource = "*"
@@ -219,7 +226,7 @@ resource "aws_lambda_function" "starter_lambda" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/starter_lambda.zip"
-  timeout       = 360
+  timeout       = 900
 }
 
 resource "aws_lambda_function" "commander_lambda" {
@@ -228,7 +235,7 @@ resource "aws_lambda_function" "commander_lambda" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = "${path.module}/lambda_functions/commander_lambda.zip"
-  timeout       = 120
+  timeout       = 600
 }
 
 resource "aws_lambda_function" "poller_lambda" {
@@ -347,8 +354,8 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -380,8 +387,8 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -389,7 +396,6 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
     "EC2Poller": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
-      "OutputPath": "$.Payload",
       "OutputPath": "$.Payload",
       "Parameters": {
         "Payload.$": "$",
@@ -410,8 +416,8 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
@@ -453,11 +459,47 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "ErrorEquals": [
             "States.ALL"
           ],
-          "Comment": "AlertJordan",
-          "Next": "AlertJordan",
+          "Comment": "",
+          "Next": "EC2Stopper",
           "ResultPath": "$.failedInput"
         }
       ]
+    },
+    "Retry Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "EC2StarterFromAMI",
+          "And": [
+            {
+              "Variable": "$.ii_s3_object_checked",
+              "BooleanEquals": false
+            },
+            {
+              "Variable": "$.run_options.n_retries_allowed",
+              "NumericGreaterThanPath": "$.retry_attempt"
+            }
+          ]
+        },
+        {
+          "Next": "AlertJordan",
+          "And": [
+            {
+              "Variable": "$.ii_s3_object_checked",
+              "BooleanEquals": false
+            },
+            {
+              "Variable": "$.run_options.n_retries_allowed",
+              "NumericEqualsPath": "$.retry_attempt"
+            }
+          ]
+        }
+      ],
+      "Default": "Success, Go to End"
+    },
+    "Success, Go to End": {
+      "Type": "Pass",
+      "End": true
     },
     "AlertJordan": {
       "Type": "Task",
@@ -466,7 +508,7 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
         "Message.$": "$",
         "TopicArn": "arn:aws:sns:us-east-1:879381264451:AlertJordanOnDataStreamFailure"
       },
-      "Next": "EC2Stopper",
+      "End": true,
       "ResultPath": "$.failedInput"
     },
     "EC2Stopper": {
@@ -477,13 +519,21 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
         "Payload.$": "$",
         "FunctionName": "${aws_lambda_function.stopper_lambda.arn}:$LATEST"
       },
-      "End": true,
       "Retry": [
         {
           "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
           "IntervalSeconds": 1,
           "MaxAttempts": 3,
           "BackoffRate": 2
+        }
+      ],
+      "Next": "Retry Choice",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "AlertJordan"
         }
       ]
     }
@@ -546,13 +596,13 @@ resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
 locals {
   init_cycles_config = jsondecode(file("${path.module}/executions/execution_forecast_inputs.json"))
 
-  # 01, 07, and 17 removed for now
   vpus = [
-    "fp","02","03N","03S","03W","04",
-    "05","06","08","09","10L",
+    "fp","01","02","03N","03S","03W","04",
+    "05","06","08","07","09","10L",
     "10U","11","12","13","14","15",
-    "16","18"
+    "16","17","18"
   ]
+
   short_range_paths = {
     for pair in flatten([
       for init in local.init_cycles_config.short_range.init_cycles : [
@@ -584,11 +634,32 @@ locals {
       ]
     ]) : pair.key => pair.value
   }
+
+  analysis_assim_extend_times = {
+    for pair in flatten([
+      for init in local.init_cycles_config.analysis_assim_extend.init_cycles : [
+        for vpu in local.vpus : {
+          key   = "${init}_${vpu}"
+          value = "${vpu}" == "fp"? 15 : 16
+        }
+      ]
+    ]) : pair.key => pair.value
+  }
+
+  medium_vpus = [
+    "fp","01","02","03N","03S","03W","04",
+    "05","06","08","07","09","10L",
+    "10U","11","12","13","14","15",
+    "16","17","18"
+  ]    
+  
   medium_range_paths = {
     for pair in flatten([
       for init in local.init_cycles_config.medium_range.init_cycles : [
-        for member in local.init_cycles_config.medium_range.ensemble_members : [
-          for vpu in local.vpus : {
+        for vpu in local.medium_vpus : [
+          for member in (
+            vpu == "fp" ? [1] : local.init_cycles_config.medium_range.ensemble_members
+          ) : {
             key   = "${init}_${member}_${vpu}"
             value = "${path.module}/executions/medium_range/${init}/${member}/execution_datastream_${vpu}.json"
           }
@@ -596,18 +667,35 @@ locals {
       ]
     ]) : pair.key => pair.value
   }
+
   medium_range_times = {
     for pair in flatten([
       for init in local.init_cycles_config.medium_range.init_cycles : [
-        for member in local.init_cycles_config.medium_range.ensemble_members : [
-          for vpu in local.vpus : {
+        for vpu in local.medium_vpus : [
+          for member in (
+            vpu == "fp" ? [1] : local.init_cycles_config.medium_range.ensemble_members
+          ) : {
             key   = "${init}_${member}_${vpu}"
-            value = "${vpu}" == "fp"? (tonumber("${init}")+4) % 24 : (tonumber("${init}") + 5) % 24
+            value = vpu == "fp" ? (tonumber(init) + 2) % 24 : (tonumber(init) + 3) % 24
           }
         ]
       ]
     ]) : pair.key => pair.value
-  }  
+  }
+
+
+  medium_range_member_offsets = {
+    for pair in flatten([
+      for init in local.init_cycles_config.medium_range.init_cycles : [
+        for member in local.init_cycles_config.medium_range.ensemble_members : [
+          for vpu in local.medium_vpus : {
+            key   = "${init}_${member}_${vpu}"
+            value = ((tonumber("${member}") - 1) * (1/7) * 60) % 60
+          }
+        ]
+      ]
+    ]) : pair.key => pair.value
+  }
 }
 
 resource "aws_scheduler_schedule" "datastream_schedule_short_range" {
@@ -646,7 +734,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range" {
     mode = "OFF"
   }
 
-  schedule_expression        = "cron(15 ${local.medium_range_times[each.key]} * * ? *)"
+  schedule_expression        = "cron(${local.medium_range_member_offsets[each.key]} ${local.medium_range_times[each.key]} * * ? *)"
   schedule_expression_timezone = "America/New_York"
 
   target {
@@ -669,7 +757,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range" {
     mode = "OFF"
   }
 
-  schedule_expression        = "cron(0 17 * * ? *)"
+  schedule_expression        = "cron(0 ${local.analysis_assim_extend_times[each.key]} * * ? *)"
   schedule_expression_timezone = "America/New_York"
 
   target {
