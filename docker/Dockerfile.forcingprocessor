@@ -1,5 +1,4 @@
-ARG TAG_NAME="latest"
-FROM awiciroh/datastream-deps:${TAG_NAME} AS datastream_base
+FROM awiciroh/datastream-deps AS datastream_base
 COPY forcingprocessor/ /ngen-datastream/forcingprocessor/
 RUN pip3 install -e /ngen-datastream/forcingprocessor && \
     groupadd -r mygroup && useradd -r -g mygroup myuser && \

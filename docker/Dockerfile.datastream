@@ -1,5 +1,4 @@
-ARG TAG_NAME="latest"
-FROM awiciroh/datastream-deps:${TAG_NAME} AS datastream_base
+FROM awiciroh/datastream-deps AS datastream_base
 # Copy files directly from the parent context
 COPY python_tools/ /ngen-datastream/python_tools/
 COPY configs/ /ngen-datastream/configs/
