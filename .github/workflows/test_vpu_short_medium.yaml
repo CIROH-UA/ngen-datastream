@@ -73,7 +73,7 @@ jobs:
           cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
          
                     
-
+      
       - name: Modify execution for testing (Medium Range)
         run: |
           cd research_datastream
@@ -89,16 +89,13 @@ jobs:
               ]
             }] |
             .commands |= map(
-                # swap placeholder only; no regex near quotes
                 gsub("__S3_PREFIX__"; "tests/medium_range/VPU_\($VPU)")
               | gsub("ngen.DAILY"; "ngen.\($DATE)")
-              | gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
+              | gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")
             )
           ' "$medium_range_execution_file" > temp_medium_range_execution.json
           mv temp_medium_range_execution.json "$medium_range_execution_file"
-          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json
-      
-                    
+          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json          
 
       - name: Check and create AWS key pair
         run: |
