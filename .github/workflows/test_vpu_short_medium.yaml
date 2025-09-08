@@ -65,7 +65,7 @@ jobs:
             .commands |= map(
                 # swap placeholder only; no regex near quotes
                 gsub("__S3_PREFIX__"; "tests/short_range/VPU_\($VPU)")
-              | sub("-s DAILY"; "-s DAILY -e \($DATE)0000")
+              | gsub("ngen.DAILY"; "ngen.\($DATE)")
             )
           ' "$short_range_execution_file" > temp_short_range_execution.json
           mv temp_short_range_execution.json "$short_range_execution_file"
@@ -90,7 +90,7 @@ jobs:
             .commands |= map(
                 # swap placeholder only; no regex near quotes
                 gsub("__S3_PREFIX__"; "tests/medium_range/VPU_\($VPU)")
-              | sub("-s DAILY"; "-s DAILY -e \($DATE)0000")
+              | gsub("ngen.DAILY"; "ngen.\($DATE)")
             )
           ' "$medium_range_execution_file" > temp_medium_range_execution.json
           mv temp_medium_range_execution.json "$medium_range_execution_file"
