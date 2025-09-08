@@ -32,7 +32,8 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        ./scripts/docker_builds.sh -e -f -d    
+        docker compose -f docker/docker-compose.yml build datastream
+        docker compose -f docker/docker-compose.yml build forcingprocessor
         
     - name: Install packages for datastream
       run: |

@@ -1,10 +1,16 @@
 name: Build, Test, and Push Datastream Docker Containers on X86 and ARM (Version Aware)
 
 on:
-  workflow_dispatch:   
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to build from (leave empty to use current branch)'
+        required: false
+        default: ''
+        type: string
   push:
-    branches:
-      - main
+    # branches:
+    #   - main
     paths:
       - 'versions.yml'
 
@@ -79,7 +85,7 @@ jobs:
         fi
         echo "ds_version=$CURRENT_DS" >> "$GITHUB_OUTPUT"
 
-  build-test-docker-x86:
+  build-test-push-docker-x86:
     needs: [detect-changes]
     runs-on: ubuntu-latest
     steps:
@@ -104,14 +110,15 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Install packages for datastream
-      run: |
-        curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
+    # - name: Install packages for datastream
+    #   run: |
+    #     curl -L -O https://github.com/lynker-spatial/hfsubsetCLI/releases/download/v1.1.0/hfsubset-v1.1.0-linux_amd64.tar.gz && tar -xzvf hfsubset-v1.1.0-linux_amd64.tar.gz && sudo mv ./hfsubset /usr/bin/hfsubset && sudo apt-get update && sudo apt-get install git pip pigz -y        
 
     - name: Build docker containers
       run: |
-        chmod +x ./scripts/docker_builds.sh
-        ./scripts/docker_builds.sh -e -f -d -t latest-x86
+        ARCH=$(uname -m) TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream-deps
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build forcingprocessor
 
     - name: Prepare and test docker containers
       run: |
@@ -140,7 +147,7 @@ jobs:
         fi
 
   build-test-push-docker-arm:
-    needs: [detect-changes, build-test-docker-x86]
+    needs: [detect-changes, build-test-push-docker-x86]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -155,6 +162,23 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
           
+      - name: Prepare execution config with branch
+        run: |
+          # Determine the branch name
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ inputs.branch_name }}" ]; then
+            BRANCH_NAME="${{ inputs.branch_name }}"
+            echo "Using manual input branch: $BRANCH_NAME"
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+            echo "Using current branch: $BRANCH_NAME"
+          fi
+          
+          # Replace ${BRANCH_NAME} with actual branch name in the file
+          cd research_datastream/terraform/test
+          sed -i "s/\${BRANCH_NAME}/$BRANCH_NAME/g" execution_gp_arm_docker_buildNtester.json
+          cat execution_gp_arm_docker_buildNtester.json
+
+
       - name: Build AWS Infra
         run: |
           cd research_datastream/terraform
@@ -203,14 +227,15 @@ jobs:
           BUILD_FLAGS=$(echo "$BUILD_FLAGS" | sed 's/^ *//')  
           
           cd research_datastream/terraform
-          sed -e "s/\${TAG}/$TAG/g" -e "s/\${BUILD_ARGS}/$BUILD_FLAGS/g" \
-              test/execution_gp_arm_docker_buildNtester.json > test/execution_temp.json
+
+          sed -i -e "s/\${TAG}/$TAG/g" -e "s/\${BUILD_ARGS}/$BUILD_FLAGS/g" \
+            test/execution_gp_arm_docker_buildNtester.json
           
           echo "Generated execution file:"
-          cat test/execution_temp.json
+          cat test/execution_gp_arm_docker_buildNtester.json
           
           echo "Building with TAG: $TAG and FLAGS: $BUILD_FLAGS"
-          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_temp.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name docker_builder_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://test/execution_gp_arm_docker_buildNtester.json" --region us-east-1 --query 'executionArn' --output text); echo "Execution ARN: $execution_arn"; status="RUNNING"; while [ "$status" != "SUCCEEDED" ]; do status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text); echo "Current status: $status"; if [ "$status" == "FAILED" ]; then echo "State machine execution failed!"; exit 1; fi; sleep 5; done; echo "State machine execution succeeded!"
 
 
       - name: Tear down infra
