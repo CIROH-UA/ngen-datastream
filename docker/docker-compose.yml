@@ -24,4 +24,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.forcingprocessor
+      args:
+        TAG_NAME: ${TAG:-latest}
     image: awiciroh/forcingprocessor:${TAG:-latest}
