@@ -154,6 +154,14 @@ jobs:
             exit 1
           fi
 
+      - name: Verify specific file (Short Range)
+        if: matrix.vpu != '10U' && matrix.vpu != '17'
+        run: |
+          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { 
+            echo "Error: File not found or request failed"; exit 1; 
+          } 
+
+
       - name: Start and monitor Step Functions execution (Medium Range)
         id: stepfunction_medium
         run: |
@@ -201,20 +209,13 @@ jobs:
             exit 1
           fi
 
-      - name: Skip verification notice
-        if: matrix.vpu == '10U' || matrix.vpu == '17'
-        run: |
-          echo "NOTICE: Skipping output verification for VPU ${{ env.VPU }} (known issues)"
-
-      - name: Verify specific file
+      - name: Verify specific file (Medium Range)
         if: matrix.vpu != '10U' && matrix.vpu != '17'
         run: |
           curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { 
             echo "Error: File not found or request failed"; exit 1; 
           } 
-          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/medium_range/VPU_${{ env.VPU }}/merkdir.file || { 
-            echo "Error: File not found or request failed"; exit 1; 
-          }
+          
       - name: Clean up
         if: always()
         run: |
