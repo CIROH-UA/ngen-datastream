@@ -137,6 +137,23 @@ jobs:
           done
           echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
           echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
+           
+      - name: Verify output files (Short Range)
+        if: matrix.vpu != '10U' && matrix.vpu != '17'
+        run: |
+          echo "Checking if processing created output files for VPU ${{ env.VPU }}..."
+          
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          
+          if [ -n "$file_list" ]; then
+            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
+            echo "$file_list"
+            file_count=$(echo "$file_list" | wc -l)
+            echo "Total files created for VPU ${{ env.VPU }}: $file_count (short_range) "
+          else
+            echo "FAILED: No output files created for Short Range VPU ${{ env.VPU }}"
+            exit 1
+          fi
 
       - name: Start and monitor Step Functions execution (Medium Range)
         id: stepfunction_medium
@@ -169,23 +186,10 @@ jobs:
           echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
           echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
 
-      - name: Verify output files
+      - name: Verify output files Medium Range
         if: matrix.vpu != '10U' && matrix.vpu != '17'
         run: |
           echo "Checking if processing created output files for VPU ${{ env.VPU }}..."
-          
-          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
-          
-          if [ -n "$file_list" ]; then
-            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
-            echo "$file_list"
-            file_count=$(echo "$file_list" | wc -l)
-            echo "Total files created for VPU ${{ env.VPU }}: $file_count (short_range) "
-          else
-            echo "FAILED: No output files created for Short Range VPU ${{ env.VPU }}"
-            exit 1
-          fi
-
           file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
           
           if [ -n "$file_list" ]; then
