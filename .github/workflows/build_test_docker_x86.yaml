@@ -52,9 +52,9 @@ jobs:
     - name: Build docker containers
       run : |        
         docker system prune -a
-        TAG=latest docker compose -f docker/docker-compose.yml build datastream-deps
-        TAG=latest docker compose -f docker/docker-compose.yml build forcingprocessor
-        TAG=latest docker compose -f docker/docker-compose.yml build datastream
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream-deps
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build forcingprocessor
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream
         docker images
         
     - name: Test docker containers
