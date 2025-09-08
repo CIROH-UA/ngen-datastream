@@ -51,8 +51,8 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        export ARCH=$(uname -m)
-        docker system prune -a --volumes -f
+        # export ARCH=$(uname -m)
+        # docker system prune -a --volumes -f
         docker compose -f docker/docker-compose.yml build datastream-deps --no-cache
         docker compose -f docker/docker-compose.yml build datastream --no-cache
         docker compose -f docker/docker-compose.yml build forcingprocessor --no-cache
