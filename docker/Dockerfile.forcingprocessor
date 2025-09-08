@@ -1,5 +1,5 @@
 FROM awiciroh/datastream-deps AS datastream_base
 COPY forcingprocessor/ /ngen-datastream/forcingprocessor/
-RUN pip3 install -e /ngen-datastream/forcingprocessor && \
+RUN pip3 install --break-system-packages -e /ngen-datastream/forcingprocessor && \
     groupadd -r mygroup && useradd -r -g mygroup myuser && \
     chown -R myuser:mygroup /ngen-datastream

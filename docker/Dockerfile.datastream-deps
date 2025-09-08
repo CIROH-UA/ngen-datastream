@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS datastream-base
+FROM ubuntu:24.04 AS datastream-base
 
 # Install basic tools and Python 3.10 (default in Ubuntu 22.04)
 RUN apt-get update && apt-get install -y \
