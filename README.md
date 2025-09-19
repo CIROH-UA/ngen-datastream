@@ -8,7 +8,19 @@ Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastre
 * **Infrastructure as Code:** See the template AWS architecture [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/ARCHITECTURE.md), which users can deploy within their own AWS account to issue and manage AWS server-based jobs. 
   * The actual research datastream deployment, which builds upon the template AWS infra, exists [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform_community) and is available for reference only.
 
-# DataStreamCLI
+> ## NOTICE
+> NRDS is currently in the process of being refactored so that its constituent components can be accessed separately.
+> - The Terraform-based Infrastructure-as-Code (IaC) architecture of the project will remain here, at [CIROH-UA/ngen-datastream](https://github.com/Sheargrub/ngen-datastream).
+> - A parallel OpenStack-based configuration of the project's IaC is now in development at [CIROH-UA/nrds-onprem](https://github.com/CIROH-UA/nrds-onprem).
+> - The DataStreamCLI tool is being relocated to [CIROH-UA/datastreamcli](https://github.com/CIROH-UA/datastreamcli).
+> - The Forcing Processor tool is being relocated to [CIROH-UA/forcingprocessor](https://github.com/CIROH-UA/forcingprocessor).
+> 
+> The remaining contents of this README should be considered legacy content. They will be replaced with IaC-specific documentation soon.  
+> The original README content, which discusses DataStreamCLI, will be relocated to the DataStreamCLI repository.  
+
+----
+
+## DataStreamCLI
 The software backend of the NextGen Research DataStream is DataStreamCLI, which is a stand alone tool that automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion while providing flexibility and integrations like hfsubset, NextGen In A Box, and TEEHR.
 
 ![datastream](docs/images/datastreamcli.jpg)
