@@ -1,24 +1,11 @@
 name: Build, Test, and Push Datastream Docker Containers
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   
   push:
-    branches:
-      - main
     paths:
-      - 'docker/**'
-      - 'forcingprocessor/**'
-      - 'scripts/**'  
-      - 'python_tools/**'
-      - '!docs/**'
-      - '!scripts/README.md'    
-      - '!docker/README.md'  
-      - '!forcingprocessor/README.md' 
-      - '!python_tools/README.md'     
-
-permissions:
-  contents: read
-
+      - 'versions.yml'
+      
 jobs:
   build-test-push-docker-x86:
     runs-on: ubuntu-latest
