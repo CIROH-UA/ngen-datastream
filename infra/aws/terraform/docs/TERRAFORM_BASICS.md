@@ -18,7 +18,7 @@ Terraform provides several key advantages for managing infrastructure:
 
 ## How Terraform Works
 At its core, Terraform operates in three stages:
-1. **Write**: Define the infrastructure you need in `.tf` files. For the Research Datastream, this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/main.tf) is provided and does not need to be editted. 
+1. **Write**: Define the infrastructure you need in `.tf` files. For the Research Datastream, this [file](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/main.tf) is provided and does not need to be editted. 
 2. **Plan**: Preview the changes Terraform will make before applying them.
 3. **Apply**: Execute the changes to create, update, or destroy resources. 
 
