@@ -1,1 +1,0 @@
-arn:aws:states:us-east-1:879381264451:stateMachine:datastream_community_sm

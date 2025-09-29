@@ -1,2 +1,0 @@
-x86: nothing
-arm: ami-0a7ad69c081342737
