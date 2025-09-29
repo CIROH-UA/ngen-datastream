@@ -4,19 +4,19 @@ This script will generate all required execution files for the NextGen Research 
 Run the script with:
 
 ```
-cd research_datastream
+cd infra/aws
 python python/src/research_datastream/gen_vpu_execs.py \
 --arch arm \
---inputs terraform_community/executions/execution_forecast_inputs.json \
---ami_file terraform_community/executions/community_ami.txt \
---exec_template_vpu terraform_community/executions/execution_datastream_VPU_template.json \
---exec_template_fp terraform_community/executions/execution_datastream_fp_template.json \
---out_dir terraform_community/executions
+--inputs executions/execution_forecast_inputs.json \
+--ami_file executions/community_ami.txt \
+--exec_template_vpu terraform/modules/schedules/executions/execution_datastream_VPU_template.json \
+--exec_template_fp terraform/modules/schedules/executions/execution_datastream_fp_template.json \
+--out_dir terraform/modules/schedules/executions
 ```
 
 Where the platform architecture is set by `--arch`. Choices are arm or x86
 
-The `--inputs` options provides the forecast inputs file which takes the form below. See the [file in this repository](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform_community/executions/execution_forecast_inputs.json) for a completed file.
+The `--inputs` options provides the forecast inputs file which takes the form below. See the [file in this repository](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/modules/schedules/config/execution_forecast_inputs.json) for a completed file.
 ```
 {
   "short_range": {

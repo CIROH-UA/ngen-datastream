@@ -134,7 +134,7 @@ The directory structure follows the standard [here](https://github.com/CIROH-UA/
 
 1) the `ngen-run` folder is available as a tarball
 2) `datastream-resources` is missing, but available in the datastream resources bucket https://datastream-resources.s3.us-east-1.amazonaws.com/VPU_09/config/nextgen_VPU_09.gpkg
-3) The AWS execution json is available, which provides the DataStreamCLI command and other execution details https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2/ngen.20250513/short_range/04/VPU_09/datastream-metadata/execution.json . For more on the execution file, see the [Research DataStream docs](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/terraform/GETTING_STARTED.md#3-configure-execution-file).
+3) The AWS execution json is available, which provides the DataStreamCLI command and other execution details https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2/ngen.20250513/short_range/04/VPU_09/datastream-metadata/execution.json . For more on the execution file, see the [Research DataStream docs](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/GETTING_STARTED.md#3-configure-execution-file).
 
 ### iv) [Tethys Visualizer](https://github.com/CIROH-UA/ngiab-client)
 

@@ -1,4 +1,17 @@
 # Status
+Last Updated: 20250929
+
+Changes
+* On September 1st, the NRDS scaled out to full conus simulation with a NextGen configuration of NOM, CFE, and troute.
+* Lagged forcings medium range ensembling implemented
+
+Status
+* All VPUs
+* Run Types - short_range (all init cycles), medium_range (all init cycles, all members), analysis_assim_extend
+* Cold start
+* v2.2 hydrofabric
+
+# Status
 Last updated: 08/2025
 
 Changes
@@ -54,7 +67,7 @@ Status
 * Run Types - short_range (00 init cycle), medium_range (00 init cycle, 1st member), analysis_assim_extend
 * Cold start
 * NextGen configuration - NOAH-OWP, PET, CFE template for all of [CONUS](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/configuration/CONUS)
-* Executions - Link [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform_community/executions)
+* Executions - Link [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/infra/aws/terraform/modules/schedules/executions)
 
 Planned Updates
 * Begin integrated community proposed edits to NextGen configuration
@@ -65,4 +78,4 @@ Planned Updates
 
 ------
 # Metadata
-The metadata stored during a research datastream execution ensures transparency and thereby reproducibility. The research datastream metadata includes the standard [datastream metadata](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/STANDARD_DIRECTORIES.md#datastream-metadata) which is normally generated in any execution. The difference for the research datastream comes with the additional execution.json file that is used to start the AWS state machine. This file is described in the documentation [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/GETTING_STARTED.md#3-configure-execution-file).
+The metadata stored during a research datastream execution ensures transparency and thereby reproducibility. The research datastream metadata includes the standard [datastream metadata](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/STANDARD_DIRECTORIES.md#datastream-metadata) which is normally generated in any execution. The difference for the research datastream comes with the additional execution.json file that is used to start the AWS state machine. This file is described in the documentation [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/GETTING_STARTED.md#3-configure-execution-file).

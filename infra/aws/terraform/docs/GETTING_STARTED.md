@@ -5,10 +5,10 @@ This document will step users through the following
 4) Executing the the State Machine
 
 ## 1. Build the infrastructure
-You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/research_datastream/terraform#build-aws-infrastructure)
+You can find that back in the [terraform README](https://github.com/CIROH-UA/ngen-datastream/tree/main/infra/aws/terraform#build-aws-infrastructure)
 
 ## 2. Build an Amazon Machine Image
-Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/blob/main/research_datastream/terraform/AWS_BASICS.md#6-amazon-machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream. The following steps are shown through the AWS Console.
+Before we can issue an execution, we must first have an [AMI](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/AWS_BASICS.md#6-amazon-machine-images-amis) to spawn an instance from. To create an AMI, we will launch an instance from the template AWS Linux 2023 AMI and install ngen-datastream. The following steps are shown through the AWS Console.
 
 ### Launch instance
 Pick a region to launch your instance in, here it is `us-east-2`. Also pick a name, here `terraform_demo`. Select the Amazon Linux 2023 AMI as seen below.
@@ -64,7 +64,7 @@ Hold on to the AMI ID.
 ![ami](./images/create_AMI2.jpg)
 
 ## 3. Configure Execution File
-Create an execution json. The user has 2 templates to begin from. These templates are identical, with the exception that execution_template_datastream.json has the field "datastream_command_options", whereas execution_template_general_purpose.json has the field "commands". The reason for this is to make the executions as readable as possible, while still preserving the general purpose nature of this architecture. The following commands are performed in a local linux terminal with the working directory being `/ngen-datastream/research_datastream/terraform`. 
+Create an execution json. The user has 2 templates to begin from. These templates are identical, with the exception that execution_template_datastream.json has the field "datastream_command_options", whereas execution_template_general_purpose.json has the field "commands". The reason for this is to make the executions as readable as possible, while still preserving the general purpose nature of this architecture. The following commands are performed in a local linux terminal with the working directory being `/ngen-datastream/infra/aws/terraform`. 
 
 ```
 cp ./executions/execution_template_<pick_one>.json  ./executions/execution_test_1.json
@@ -76,7 +76,7 @@ vi ./executions/execution_test_1.json
 ```
 
 Provide the commands you want the instance to execute. 
-Starting from execution_template_datastream. These options correspond directly to the cli args for `ngen-datastream/scripts/ngen-datastream`
+Starting from execution_template_datastream. These options correspond directly to the cli args for `ngen-datastream/scripts/datastream`
 ```
   "datastream_command_options" : {
     "start_time"          : "202006200100",
