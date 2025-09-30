@@ -34,12 +34,6 @@
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_hfsubset_v2_2.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_teehr_integration.yaml/badge.svg)
 
-# DataStreamCLI ForcingProcessor Tools
-* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/forcingprocessor_aws_sources.yaml/badge.svg)
-* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/forcingprocessor_gcs_sources.yaml/badge.svg)
-* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/forcingprocessor_plotting.yaml/badge.svg)
-* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/forcingprocessor_weights.yaml/badge.svg)
-
 # DataStreamCLI Python Tools
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/datastream_python.yaml/badge.svg)
 

@@ -8,6 +8,9 @@ Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastre
 * **Infrastructure as Code:** See the NRDS AWS architecture [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/ARCHITECTURE.md). 
 * **Open Discussions**: Check out our discussions [here](https://github.com/CIROH-UA/ngen-datastream/discussions)! Feel free to start your own discussion, or participate in any that are ongoing. 
 
+# ForcingProcessor
+ForcingProcessor has moved to https://github.com/CIROH-UA/forcingprocessor
+
 # DataStreamCLI
 The software backend of the NextGen Research DataStream is DataStreamCLI, which is a stand alone tool that automates the process of collecting and formatting input data for NextGen, orchestrating the NextGen run through NextGen In a Box (NGIAB), and handling outputs. This software allows users to run NextGen in an efficient, _relatively_ painless, and reproducible fashion while providing flexibility and integrations like hfsubset, NextGen In A Box, and TEEHR.
 
