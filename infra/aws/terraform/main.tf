@@ -39,7 +39,6 @@ module "nrds_orchestration" {
   profile_name              = var.profile_name
 }
 
-
 # module "nrds_schedules" {
 #     source = "./modules/schedules"
 

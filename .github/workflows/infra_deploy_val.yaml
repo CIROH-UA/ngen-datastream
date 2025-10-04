@@ -138,29 +138,31 @@ jobs:
         path: infra/aws/terraform/plan_output.txt
         retention-days: 30
     
-    - name: Setup Infracost
-      uses: infracost/actions/setup@v3
-      with:
-        api-key: ${{ secrets.INFRACOST_API_KEY }}
-    
-    - name: Generate Infracost JSON
+    - name: Install Terracost
       run: |
-        infracost breakdown \
-          --path=. \
-          --terraform-plan-flags="-var-file=${{ env.TF_VAR_FILE }}" \
-          --format=json \
-          --out-file=/tmp/infracost.json
+        wget -q https://github.com/cycloidio/terracost/releases/download/v0.4.5/terracost-linux-amd64
+        chmod +x terracost-linux-amd64
+        sudo mv terracost-linux-amd64 /usr/local/bin/terracost
     
-    - name: Post Infracost Summary
+    - name: Generate Cost Estimate with Terracost
+      id: terracost
       run: |
-        infracost output \
-          --path=/tmp/infracost.json \
-          --format=github-comment \
-          --show-skipped \
-          --out-file=/tmp/infracost_comment.md
+        # Convert plan to JSON
+        terraform show -json tfplan > plan.json
         
-        echo "## 💰 Infracost Estimate" >> $GITHUB_STEP_SUMMARY
-        cat /tmp/infracost_comment.md >> $GITHUB_STEP_SUMMARY
+        # Run terracost
+        terracost estimate \
+          --tfplan plan.json \
+          --provider aws \
+          --region ${{ env.AWS_REGION }} > terracost_output.txt || echo "Terracost estimation failed" > terracost_output.txt
+        
+        # Display in workflow summary
+        echo "## Terracost Estimate" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat terracost_output.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+      continue-on-error: true
     
     - name: Check for Plan Failures
       if: steps.plan.outcome == 'failure'
