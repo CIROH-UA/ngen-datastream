@@ -2,7 +2,13 @@ name: Terraform PR Validation
 
 on:
   workflow_dispatch:   
-
+  push:
+    branches:
+      - main
+      - infra_deployment
+    paths:
+      - 'infra/aws/terraform/**'
+      - '.github/workflows/terraform-*.yml'
   pull_request:
     branches:
       - main
