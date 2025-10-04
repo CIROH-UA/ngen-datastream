@@ -1,8 +1,8 @@
 # IAM Role and Policy for EC2 Instances
 
 resource "aws_iam_role" "ec2_role" {
-  name                = var.ec2_role
-    assume_role_policy = jsonencode({
+  name = var.ec2_role
+  assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow",
@@ -21,12 +21,12 @@ resource "aws_iam_policy" "ec2_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "ssmmessages:CreateControlChannel",
           "ssmmessages:CreateDataChannel",
           "ssmmessages:OpenControlChannel",
-          "ssmmessages:OpenDataChannel",          
+          "ssmmessages:OpenDataChannel",
           "ssm:DescribeInstanceInformation",
           "ssm:SendCommand",
           "ssm:GetCommandInvocation",
@@ -36,22 +36,22 @@ resource "aws_iam_policy" "ec2_policy" {
         Resource = "*"
       },
       {
-        Effect   = "Allow",
-        Action   = [
-          "iam:PassRole"  
+        Effect = "Allow",
+        Action = [
+          "iam:PassRole"
         ],
         Resource = "*"
       },
       {
-        Effect   = "Allow",
-        Action   = [
-          "s3:*"  
+        Effect = "Allow",
+        Action = [
+          "s3:*"
         ],
         Resource = "*"
-      },      
+      },
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "ec2:DescribeInstances",
           "ec2:DescribeTags"
         ],

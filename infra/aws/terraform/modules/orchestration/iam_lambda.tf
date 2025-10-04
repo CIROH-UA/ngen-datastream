@@ -19,8 +19,8 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "ec2:RunInstances",
           "ec2:StartInstances",
           "ec2:StopInstances",
@@ -35,8 +35,8 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
         Resource = "*"
       },
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow",
+        Action = [
           "ssm:SendCommand",
           "ssm:GetCommandInvocation",
           "ssm:DescribeInstanceInformation"
@@ -44,35 +44,35 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
         Resource = "*"
       },
       {
-        Effect   = "Allow",
-        Action   = [
-          "iam:PassRole"  
+        Effect = "Allow",
+        Action = [
+          "iam:PassRole"
         ],
         Resource = "*"
       },
       {
-        Effect   = "Allow",
-        Action   = [
-          "pricing:GetProducts"  
+        Effect = "Allow",
+        Action = [
+          "pricing:GetProducts"
         ],
         Resource = "*"
-      },      
+      },
       {
-        Effect   = "Allow",
-        Action   = [
-          "s3:*"  
+        Effect = "Allow",
+        Action = [
+          "s3:*"
         ],
         Resource = "*"
-      },      
+      },
       {
-      "Effect": "Deny",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "*"
-    }    
+        "Effect" : "Deny",
+        "Action" : [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource" : "*"
+      }
     ]
   })
 }
