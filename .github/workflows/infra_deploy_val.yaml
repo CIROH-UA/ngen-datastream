@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - infra_deployment
     paths:
       - 'infra/aws/terraform/**'
       - '.github/workflows/terraform-*.yml'
