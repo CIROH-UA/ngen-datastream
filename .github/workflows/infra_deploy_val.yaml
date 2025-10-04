@@ -138,6 +138,30 @@ jobs:
         path: infra/aws/terraform/plan_output.txt
         retention-days: 30
     
+    - name: Setup Infracost
+      uses: infracost/actions/setup@v3
+      with:
+        api-key: ${{ secrets.INFRACOST_API_KEY }}
+    
+    - name: Generate Infracost JSON
+      run: |
+        infracost breakdown \
+          --path=. \
+          --terraform-plan-flags="-var-file=${{ env.TF_VAR_FILE }}" \
+          --format=json \
+          --out-file=/tmp/infracost.json
+    
+    - name: Post Infracost Summary
+      run: |
+        infracost output \
+          --path=/tmp/infracost.json \
+          --format=github-comment \
+          --show-skipped \
+          --out-file=/tmp/infracost_comment.md
+        
+        echo "## 💰 Infracost Estimate" >> $GITHUB_STEP_SUMMARY
+        cat /tmp/infracost_comment.md >> $GITHUB_STEP_SUMMARY
+    
     - name: Check for Plan Failures
       if: steps.plan.outcome == 'failure'
       run: exit 1
