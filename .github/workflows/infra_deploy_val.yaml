@@ -187,59 +187,14 @@ jobs:
       with:
         name: terraform-plan-${{ github.sha }}
         path: infra/aws/terraform/tfplan
-        retention-days: 30
+        retention-days: 10
     
     - name: Upload Plan Output
       uses: actions/upload-artifact@v4
       with:
         name: terraform-plan-output-${{ github.sha }}
         path: infra/aws/terraform/plan_output.txt
-        retention-days: 30
-    
-    - name: Install Terracost
-      run: |
-        # Get latest release
-        TERRACOST_VERSION=$(curl -s https://api.github.com/repos/cycloidio/terracost/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-        echo "Installing Terracost ${TERRACOST_VERSION}"
-        
-        wget -q "https://github.com/cycloidio/terracost/releases/download/${TERRACOST_VERSION}/terracost-linux-amd64" || {
-          echo "::warning::Failed to download Terracost, skipping cost estimation"
-          exit 0
-        }
-        chmod +x terracost-linux-amd64
-        sudo mv terracost-linux-amd64 /usr/local/bin/terracost
-      continue-on-error: true
-    
-    - name: Generate Cost Estimate with Terracost
-      id: terracost
-      run: |
-        # Check if terracost is installed
-        if ! command -v terracost &> /dev/null; then
-          echo "::warning::Terracost not installed, skipping cost estimation"
-          echo "## Cost Estimate" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Terracost installation failed - cost estimation skipped" >> $GITHUB_STEP_SUMMARY
-          exit 0
-        fi
-        
-        # Convert plan to JSON
-        terraform show -json tfplan > plan.json
-        
-        # Run terracost
-        terracost estimate \
-          --tfplan plan.json \
-          --provider aws \
-          --region ${{ env.AWS_REGION }} > terracost_output.txt 2>&1 || {
-          echo "Terracost estimation completed with warnings" > terracost_output.txt
-        }
-        
-        # Display in workflow summary
-        echo "## Terracost Cost Estimate" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        cat terracost_output.txt >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-      continue-on-error: true
+        retention-days: 10
     
     - name: Check for Plan Failures
       if: steps.plan.outcome == 'failure'
