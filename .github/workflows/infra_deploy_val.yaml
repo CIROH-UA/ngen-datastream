@@ -22,7 +22,7 @@ env:
   TF_VAR_FILE: variables.tfvars
   AWS_REGION: us-east-2
   TERRAFORM_VERSION: 1.9.0
-
+  ENVIRONMENT: dev 
 
 jobs:
   generate-executions:
@@ -118,7 +118,7 @@ jobs:
     
     - name: Terraform Init
       id: init
-      run: terraform init
+      run: terraform init -backend-config=backend-${ENVIRONMENT}.hcl
  
     - name: Terraform Validate
       id: validate
@@ -268,7 +268,8 @@ jobs:
         terraform_wrapper: false
     
     - name: Terraform Init
-      run: terraform init
+      run:  terraform init -backend-config=backend-${ENVIRONMENT}.hcl
+
     
     - name: Download Plan Artifact
       uses: actions/download-artifact@v4
@@ -584,7 +585,7 @@ jobs:
 
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config=backend-${ENVIRONMENT}.hcl
         continue-on-error: true
 
       - name: Verify State Has Resources
