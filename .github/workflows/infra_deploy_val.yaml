@@ -544,12 +544,39 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+    
+      - name: Install Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade pip
+          pip install --upgrade awscli boto3 pandas
       
       - name: Configure AWS
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region ${{ env.AWS_REGION }}
+
+      - name: Generate execution files
+        working-directory: infra/aws
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "Generating VPU execution files..."
+          python python/src/research_datastream/gen_vpu_execs.py \
+          --arch arm \
+          --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+          --ami_file terraform/modules/schedules/config/community_ami.txt \
+          --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+          --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+          --out_dir terraform/modules/schedules/executions
+
+          echo "::notice::Execution files generated successfully"
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

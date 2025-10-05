@@ -77,9 +77,8 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
   })
 }
 
-resource "aws_iam_policy_attachment" "datastream_attachment" {
-  name       = "datastream_attachment"
-  roles      = [aws_iam_role.lambda_role.name]
+resource "aws_iam_role_policy_attachment" "datastream_attachment" {
+  role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.datastreamlambda_policy.arn
 }
 
