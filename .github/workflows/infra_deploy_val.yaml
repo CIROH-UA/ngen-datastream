@@ -280,8 +280,7 @@ jobs:
       id: apply
       run: |
         echo "::notice::Starting Terraform Apply..."
-        terraform plan -var-file="variables.tfvars" -out=tfplan
-        terraform apply -auto-approve tfplan
+        terraform apply -var-file="variables.tfvars" -auto-approve
         echo "::notice::Terraform Apply completed successfully"
     
     - name: Terraform Output
