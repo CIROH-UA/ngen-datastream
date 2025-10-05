@@ -1,3 +1,24 @@
+terraform {
+  backend "s3" {
+    bucket  = "ciroh-terraform-state"
+    key     = "ngen-datastream/terraform.tfstate"
+    region  = "us-east-2"
+    encrypt = true
+    
+    # Enable S3 native state locking (Terraform 1.9.0+)
+    use_lockfile = true
+  }
+
+  required_version = ">= 1.9.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.region
 }

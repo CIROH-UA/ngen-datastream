@@ -118,7 +118,7 @@ jobs:
     
     - name: Terraform Init
       id: init
-      run: terraform init -backend-config="key=terraform/${{ github.repository }}.tfstate"
+      run: terraform init
  
     - name: Terraform Validate
       id: validate
@@ -268,7 +268,7 @@ jobs:
         terraform_wrapper: false
     
     - name: Terraform Init
-      run: terraform init -backend-config="key=terraform/${{ github.repository }}.tfstate"
+      run: terraform init
     
     - name: Download Plan Artifact
       uses: actions/download-artifact@v4
@@ -544,24 +544,29 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-    
-      - name: Install Python dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-          pip install --upgrade pip
-          pip install --upgrade awscli boto3 pandas
       
       - name: Configure AWS
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region ${{ env.AWS_REGION }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade pip awscli boto3 pandas
 
       - name: Generate execution files
         working-directory: infra/aws
@@ -569,24 +574,30 @@ jobs:
           echo "Working directory: $(pwd)"
           echo "Generating VPU execution files..."
           python python/src/research_datastream/gen_vpu_execs.py \
-          --arch arm \
-          --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
-          --ami_file terraform/modules/schedules/config/community_ami.txt \
-          --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
-          --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
-          --out_dir terraform/modules/schedules/executions
-
+            --arch arm \
+            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+            --ami_file terraform/modules/schedules/config/community_ami.txt \
+            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+            --out_dir terraform/modules/schedules/executions
           echo "::notice::Execution files generated successfully"
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
-      
+
+
       - name: Terraform Init
-        run: terraform init -backend-config="key=terraform/${{ github.repository }}.tfstate"
+        run: terraform init
         continue-on-error: true
+
+      - name: Verify State Has Resources
+        run: |
+          RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l)
+          echo "::notice::Found $RESOURCE_COUNT resources in state"
+          if [ "$RESOURCE_COUNT" -eq 0 ]; then
+            echo "::warning::No resources in state to destroy!"
+          else
+            terraform state list
+          fi
+        continue-on-error: true
+        
       
       - name: Stop Test Step Functions Executions
         run: |
