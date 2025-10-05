@@ -2,22 +2,22 @@ name: Terraform PR Validation
 
 on:
   workflow_dispatch:   
-  push:
-    branches:
-      - main
-      - infra_deployment
-    paths:
-      - 'infra/aws/terraform/**'
-      - '.github/workflows/terraform-*.yml'
-      - 'infra/aws/python/src/research_datastream/**'
-  pull_request:
-    branches:
-      - main
-      - infra_deployment
-    paths:
-      - 'infra/aws/terraform/**'
-      - '.github/workflows/terraform-*.yml'
-      - 'infra/aws/python/src/research_datastream/**'
+  # push:
+  #   branches:
+  #     - main
+  #     - infra_deployment
+  #   paths:
+  #     - 'infra/aws/terraform/**'
+  #     - '.github/workflows/terraform-*.yml'
+  #     - 'infra/aws/python/src/research_datastream/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #     - infra_deployment
+  #   paths:
+  #     - 'infra/aws/terraform/**'
+  #     - '.github/workflows/terraform-*.yml'
+      # - 'infra/aws/python/src/research_datastream/**'
 env:
   TF_VAR_FILE: variables.tfvars
   AWS_REGION: us-east-2
