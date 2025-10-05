@@ -401,6 +401,17 @@ jobs:
             echo "Key pair 'actions_key' already exists"
           fi
 
+      - name: Get State Machine ARN
+        id: get_sm_arn
+        run: |
+          ARN=$(aws ssm get-parameter \
+            --name "/datastream/state-machine-arn" \
+            --query 'Parameter.Value' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+          echo "State Machine ARN: $ARN"
+
       - name: Start and monitor Step Functions execution (Short Range)
         id: stepfunction_short
         run: |
@@ -550,60 +561,61 @@ jobs:
         run: terraform init -backend-config="key=terraform/${{ github.repository }}.tfstate"
         continue-on-error: true
       
-      - name: Pre-Destroy Cleanup - Stop All Running Resources
+      - name: Stop Test Step Functions Executions
         run: |
-          echo "::group::Pre-destroy cleanup of dynamic resources"
+          echo "Stopping test Step Functions executions..."
           
-          # Stop all running Step Functions executions
-          echo "Stopping all running Step Functions executions..."
-          STATE_MACHINE_ARN=$(aws ssm get-parameter --name "/datastream/state-machine-arn" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+          # Get state machine ARN
+          STATE_MACHINE_ARN=$(aws ssm get-parameter \
+            --name "/datastream/state-machine-arn" \
+            --query 'Parameter.Value' \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
           
           if [ -n "$STATE_MACHINE_ARN" ]; then
+            # Stop all running executions matching test pattern
             aws stepfunctions list-executions \
               --state-machine-arn "$STATE_MACHINE_ARN" \
               --status-filter RUNNING \
               --region ${{ env.AWS_REGION }} \
-              --query 'executions[*].executionArn' \
-              --output text | while read -r arn; do
-                if [ -n "$arn" ]; then
-                  echo "Stopping execution: $arn"
-                  aws stepfunctions stop-execution --execution-arn "$arn" --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Already stopped"
+              --query 'executions[*].[executionArn,name]' \
+              --output text | while read arn name; do
+                if [[ "$name" =~ ^(sr|mr)-vpu-.* ]]; then
+                  echo "Stopping test execution: $name"
+                  aws stepfunctions stop-execution \
+                    --execution-arn "$arn" \
+                    --region ${{ env.AWS_REGION }} 2>/dev/null || true
                 fi
               done
           fi
+        continue-on-error: true
+      
+      - name: Terminate Test EC2 Instances
+        run: |
+          echo "Terminating test EC2 instances..."
           
-          # Terminate all test instances
-          echo "Terminating all test EC2 instances..."
-          TEST_INSTANCE_IDS=$(aws ec2 describe-instances \
+          # Find all instances with test tags
+          TEST_INSTANCES=$(aws ec2 describe-instances \
             --filters \
               "Name=tag:Project,Values=fp_test_git_actions_vpu_*" \
-              "Name=instance-state-name,Values=running,pending,stopping,stopped" \
+              "Name=instance-state-name,Values=running,pending,stopped,stopping" \
             --query 'Reservations[*].Instances[*].InstanceId' \
             --output text \
             --region ${{ env.AWS_REGION }})
           
-          if [ -n "$TEST_INSTANCE_IDS" ]; then
-            echo "Terminating instances: $TEST_INSTANCE_IDS"
-            aws ec2 terminate-instances --instance-ids $TEST_INSTANCE_IDS --region ${{ env.AWS_REGION }} || echo "Some instances already terminating"
+          if [ -n "$TEST_INSTANCES" ]; then
+            echo "Terminating instances: $TEST_INSTANCES"
+            aws ec2 terminate-instances \
+              --instance-ids $TEST_INSTANCES \
+              --region ${{ env.AWS_REGION }}
+            
             echo "Waiting for instances to terminate..."
             sleep 30
           else
             echo "No test instances found"
           fi
-          
-          # Clean up all test S3 data
-          echo "Cleaning up all test S3 data..."
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/ 2>/dev/null || echo "No test files to delete"
-          
-          echo "::endgroup::"
         continue-on-error: true
-
-      - name: Wait for Resources to Stabilize
-        run: |
-          echo "Waiting 60 seconds for resources to stabilize before destroy..."
-          sleep 60
-        continue-on-error: true
-
+      
       - name: Terraform Destroy - Attempt 1
         id: destroy_attempt1
         run: |
@@ -611,128 +623,24 @@ jobs:
           terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
           echo "::notice::Terraform Destroy completed successfully"
         continue-on-error: true
-
-      - name: Terraform Destroy - Attempt 2 (if first failed)
+      
+      - name: Terraform Destroy - Attempt 2
         if: steps.destroy_attempt1.outcome == 'failure'
         id: destroy_attempt2
         run: |
-          echo "::warning::First destroy attempt failed, waiting 30s and retrying..."
+          echo "::warning::Retrying destroy after 30s..."
           sleep 30
           terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
         continue-on-error: true
-
-      - name: Terraform Destroy - Attempt 3 (if second failed)
-        if: steps.destroy_attempt2.outcome == 'failure'
-        id: destroy_attempt3
-        run: |
-          echo "::warning::Second destroy attempt failed, waiting 60s and retrying..."
-          sleep 60
-          terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
-        continue-on-error: true
-
-      - name: Force Cleanup Remaining Resources
-        if: steps.destroy_attempt3.outcome == 'failure'
-        run: |
-          echo "::group::Force cleanup of remaining resources"
-          
-          echo "Checking for remaining resources in Terraform state..."
-          terraform state list || echo "Could not list state"
-          
-          echo "Attempting targeted destroys for common problem resources..."
-          
-          # Get actual resources from state and try targeted destroy
-          terraform state list 2>/dev/null | grep -E "(aws_lambda_|aws_iam_role|aws_security_group)" | while read resource; do
-            echo "Attempting to destroy: $resource"
-            terraform destroy -target="$resource" -auto-approve 2>/dev/null || echo "Could not destroy $resource"
-          done
-          
-          echo "::endgroup::"
-        continue-on-error: true
-
-      - name: Manual Cleanup of Orphaned Resources
-        if: always()
-        run: |
-          echo "::group::Manual cleanup of any orphaned resources"
-          
-          # Delete any remaining EBS volumes
-          echo "Checking for orphaned EBS volumes..."
-          VOLUMES=$(aws ec2 describe-volumes \
-            --filters "Name=status,Values=available" \
-            --query 'Volumes[*].VolumeId' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-          
-          if [ -n "$VOLUMES" ]; then
-            for vol in $VOLUMES; do
-              echo "Deleting volume: $vol"
-              aws ec2 delete-volume --volume-id "$vol" --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Could not delete $vol"
-            done
-          else
-            echo "No orphaned volumes found"
-          fi
-          
-          # Delete any remaining snapshots
-          echo "Checking for orphaned snapshots..."
-          SNAPSHOTS=$(aws ec2 describe-snapshots \
-            --owner-ids self \
-            --query 'Snapshots[*].SnapshotId' \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -n "$SNAPSHOTS" ]; then
-            for snap in $SNAPSHOTS; do
-              echo "Deleting snapshot: $snap"
-              aws ec2 delete-snapshot --snapshot-id "$snap" --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Could not delete $snap"
-            done
-          else
-            echo "No orphaned snapshots found"
-          fi
-          
-          # Delete any remaining network interfaces
-          echo "Checking for orphaned network interfaces..."
-          ENIS=$(aws ec2 describe-network-interfaces \
-            --filters "Name=status,Values=available" \
-            --query 'NetworkInterfaces[*].NetworkInterfaceId' \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -n "$ENIS" ]; then
-            for eni in $ENIS; do
-              echo "Deleting network interface: $eni"
-              aws ec2 delete-network-interface --network-interface-id "$eni" --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Could not delete $eni"
-            done
-          else
-            echo "No orphaned network interfaces found"
-          fi
-          
-          echo "::endgroup::"
-        continue-on-error: true
-
+      
       - name: Final State Check
         if: always()
         run: |
-          echo "::group::Final Terraform State"
           REMAINING=$(terraform state list 2>/dev/null | wc -l)
           if [ "$REMAINING" -gt 0 ]; then
-            echo "⚠️  WARNING: $REMAINING resources still in state:"
+            echo "::warning::$REMAINING resources still in state"
             terraform state list
           else
-            echo "✓ State is clean - all resources destroyed"
+            echo "::notice::All Terraform resources destroyed"
           fi
-          echo "::endgroup::"
         continue-on-error: true
-
-      - name: Report Destroy Status
-        if: always()
-        run: |
-          if [ "${{ steps.destroy_attempt1.outcome }}" == "success" ]; then
-            echo "::notice::✓ Terraform destroy completed successfully on first attempt"
-          elif [ "${{ steps.destroy_attempt2.outcome }}" == "success" ]; then
-            echo "::warning::✓ Terraform destroy completed successfully on second attempt"
-          elif [ "${{ steps.destroy_attempt3.outcome }}" == "success" ]; then
-            echo "::warning::✓ Terraform destroy completed successfully on third attempt"
-          else
-            echo "::error::✗ Terraform destroy failed after 3 attempts. Manual cleanup may be required."
-            echo "::error::Check the workflow logs and AWS console for remaining resources"
-            exit 1
-          fi
