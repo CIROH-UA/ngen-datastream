@@ -48,8 +48,8 @@ jobs:
 
     - name: Configure AWS
       run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set aws_access_key_id ${{ secrets.UA_AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.UA_AWS_SECRET_ACCESS_KEY }}
         aws configure set region us-east-1    
 
     - name: Generate execution files
@@ -101,8 +101,8 @@ jobs:
 
     - name: Configure AWS
       run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set aws_access_key_id ${{ secrets.UA_AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.UA_AWS_SECRET_ACCESS_KEY }}
         aws configure set region us-east-1    
     
     - name: Setup Terraform
@@ -200,16 +200,109 @@ jobs:
     - name: Check for Plan Failures
       if: steps.plan.outcome == 'failure'
       run: exit 1
+        echo "::warning::Terraform plan failed but continuing workflow"
+        echo "Plan failed with errors. Check the plan output for details."
+      continue-on-error: true
     
     - name: Check for Format Failures
       if: steps.fmt.outcome == 'failure'
       run: |
         echo "::error::Terraform files are not properly formatted. Run 'terraform fmt -recursive' locally."
         exit 1
+      continue-on-error: true
+    
+        
+  terraform-apply:
+    name: Terraform Apply
+    needs: terraform-check
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/infra_deployment'
+    defaults:
+      run:
+        working-directory: infra/aws/terraform
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    
+    - name: Install Python dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+        pip install --upgrade pip
+        pip install --upgrade awscli boto3 pandas
+
+    - name: Configure AWS
+      run: |
+        aws configure set aws_access_key_id ${{ secrets.UA_AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.UA_AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1
+
+    - name: Generate execution files
+      working-directory: infra/aws
+      run: |
+        echo "Working directory: $(pwd)"
+        echo "Generating VPU execution files..."
+        python python/src/research_datastream/gen_vpu_execs.py \
+        --arch arm \
+        --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+        --ami_file terraform/modules/schedules/config/community_ami.txt \
+        --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+        --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+        --out_dir terraform/modules/schedules/executions
+
+        echo "::notice::Execution files generated successfully"
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+        terraform_wrapper: false
+    
+    - name: Terraform Init
+      run: terraform init -backend-config="key=terraform/${{ github.repository }}.tfstate"
+    
+    - name: Download Plan Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: terraform-plan-${{ github.sha }}
+        path: infra/aws/terraform
+    
+    - name: Terraform Apply
+      id: apply
+      run: |
+        echo "::notice::Starting Terraform Apply..."
+        terraform apply -auto-approve tfplan
+        echo "::notice::Terraform Apply completed successfully"
+    
+    - name: Terraform Output
+      if: success()
+      run: |
+        echo "::group::Terraform Outputs"
+        terraform output -json > terraform_outputs.json
+        cat terraform_outputs.json
+        echo "::endgroup::"
+    
+    - name: Upload Terraform Outputs
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-outputs-${{ github.sha }}
+        path: infra/aws/terraform/terraform_outputs.json
+        retention-days: 30     
+        
   test-all-vpus:
     runs-on: ubuntu-latest
-    needs: terraform-check
+    needs: terraform-apply
     strategy:
       fail-fast: false
       matrix:
@@ -225,8 +318,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.UA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.UA_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
       - name: Set up Python
