@@ -9,6 +9,7 @@ on:
     paths:
       - 'infra/aws/terraform/**'
       - '.github/workflows/terraform-*.yml'
+      - 'infra/aws/python/src/research_datastream/**'
   pull_request:
     branches:
       - main
@@ -16,13 +17,54 @@ on:
     paths:
       - 'infra/aws/terraform/**'
       - '.github/workflows/terraform-*.yml'
-
+      - 'infra/aws/python/src/research_datastream/**'
 env:
   TF_VAR_FILE: variables.tfvars
   AWS_REGION: us-east-1
   TERRAFORM_VERSION: 1.9.0
 
+
 jobs:
+  generate-executions:
+    name: Generate VPU Execution Files
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    
+    - name: Install Python dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+        pip install --upgrade pip
+        pip install --upgrade awscli
+        pip install --upgrade awscli boto3 pandas
+
+
+    - name: Generate execution files
+      working-directory: infra/aws
+      run: |
+        echo "Working directory: $(pwd)"
+        echo "Generating VPU execution files..."
+        
+        python python/src/research_datastream/gen_vpu_execs.py \
+          --arch arm \
+          --inputs terraform_community/executions/execution_forecast_inputs.json \
+          --ami_file terraform_community/executions/community_ami.txt \
+          --exec_template_vpu terraform_community/executions/execution_datastream_VPU_template.json \
+          --exec_template_fp terraform_community/executions/execution_datastream_fp_template.json \
+          --out_dir terraform_community/executions/generated
+        
+        echo "::notice::Execution files generated successfully"
+    
+    
+
   terraform-check:
     name: Terraform Quality Checks
     runs-on: ubuntu-latest
@@ -39,7 +81,21 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
     
+    - name: Install Python dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+        pip install --upgrade pip
+        pip install --upgrade awscli
+        pip install --upgrade awscli boto3 pandas
+
+
     - name: Configure AWS
       run: |
         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}

@@ -39,10 +39,10 @@ module "nrds_orchestration" {
   profile_name              = var.profile_name
 }
 
-# module "nrds_schedules" {
-#     source = "./modules/schedules"
+module "nrds_schedules" {
+    source = "./modules/schedules"
 
-#     region = var.region
-#     scheduler_policy_name = var.scheduler_policy_name
-#     scheduler_role_name = var.scheduler_role_name
-# }
+    region = var.region
+    scheduler_policy_name = var.scheduler_policy_name
+    scheduler_role_name = var.scheduler_role_name
+}
