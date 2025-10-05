@@ -1,4 +1,4 @@
-region                    = "us-east-1"
+region                    = "us-east-2"
 sm_name                   = "nrds_dev_sm"
 sm_role_name              = "nrds_dev_sm_role"
 starter_lambda_name       = "nrds_dev_start_ec2"
