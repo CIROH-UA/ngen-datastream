@@ -17,8 +17,8 @@ variable "ec2_role" {}
 variable "ec2_policy_name" {}
 variable "profile_name" {}
 
-variable "scheduler_policy_name" {}
-variable "scheduler_role_name" {}
+# variable "scheduler_policy_name" {}
+# variable "scheduler_role_name" {}
 
 module "nrds_orchestration" {
   source = "./modules/orchestration"
@@ -39,12 +39,12 @@ module "nrds_orchestration" {
   profile_name              = var.profile_name
 }
 
-module "nrds_schedules" {
-  source = "./modules/schedules"
-
-  region                = var.region
-  scheduler_policy_name = var.scheduler_policy_name
-  scheduler_role_name   = var.scheduler_role_name
-
-  depends_on = [module.nrds_orchestration]
-}
+# module "nrds_schedules" {
+#   source = "./modules/schedules"
+# 
+#   region                = var.region
+#   scheduler_policy_name = var.scheduler_policy_name
+#   scheduler_role_name   = var.scheduler_role_name
+# 
+#   depends_on = [module.nrds_orchestration]
+# }
