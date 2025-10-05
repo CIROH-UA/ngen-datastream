@@ -69,6 +69,7 @@ jobs:
 
   terraform-check:
     name: Terraform Quality Checks
+    needs: generate-executions
     runs-on: ubuntu-latest
     defaults:
       run:
