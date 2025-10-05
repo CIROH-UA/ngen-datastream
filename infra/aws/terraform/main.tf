@@ -4,9 +4,6 @@ terraform {
     key     = "ngen-datastream/terraform.tfstate"
     region  = "us-east-2"
     encrypt = true
-    
-    # Enable S3 native state locking (Terraform 1.9.0+)
-    use_lockfile = true
   }
 
   required_version = ">= 1.9.0"
