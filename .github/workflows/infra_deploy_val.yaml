@@ -24,11 +24,14 @@ env:
   TERRAFORM_VERSION: 1.9.0
   ENVIRONMENT: dev 
 
+
 jobs:
   generate-executions:
     name: Generate VPU Execution Files
     runs-on: ubuntu-latest
-    
+    permissions:
+      id-token: write
+      contents: read
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -46,11 +49,13 @@ jobs:
         pip install --upgrade awscli
         pip install --upgrade awscli boto3 pandas
 
-    - name: Configure AWS
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-2    
+    - name: Configure AWS Credentials (OIDC)
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+        role-session-name: GitHubActions-GenerateExecutions
+ 
 
     - name: Generate execution files
       working-directory: infra/aws
@@ -98,13 +103,13 @@ jobs:
         pip install --upgrade awscli
         pip install --upgrade awscli boto3 pandas
 
+    - name: Configure AWS Credentials (OIDC)
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+        role-session-name: GitHubActions-TerraformCheck
 
-    - name: Configure AWS
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-2    
-    
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
@@ -240,11 +245,12 @@ jobs:
         pip install --upgrade pip
         pip install --upgrade awscli boto3 pandas
 
-    - name: Configure AWS
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-2
+    - name: Configure AWS Credentials (OIDC)
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+        role-session-name: GitHubActions-TerraformApply
 
     - name: Generate execution files
       working-directory: infra/aws
@@ -306,7 +312,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        vpu: ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09", "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"]    
+        vpu: ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09", "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"]   
+    permissions:
+      id-token: write
+      contents: read
+     
     env:
       VPU: ${{ matrix.vpu }}
       DATE: 20250905
@@ -315,12 +325,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-TestVPU-${{ matrix.vpu }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -423,7 +433,7 @@ jobs:
           NAME="sr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
           execution_arn=$(aws stepfunctions start-execution \
             --state-machine-arn $(aws ssm get-parameter --name "/datastream/state-machine-arn" --query 'Parameter.Value' --output text) \
-            --name "$NAME" \
+            --name "$NAME" \ 
             --input "file://$short_range_execution_file" \
             --region us-east-2 \
             --query 'executionArn' --output text)
@@ -545,12 +555,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Configure AWS
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region ${{ env.AWS_REGION }}
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-TerraformDestroy
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
