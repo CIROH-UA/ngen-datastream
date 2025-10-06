@@ -7,10 +7,10 @@ Run the script with:
 cd infra/aws
 python python/src/research_datastream/gen_vpu_execs.py \
 --arch arm \
---inputs executions/execution_forecast_inputs.json \
---ami_file executions/community_ami.txt \
---exec_template_vpu terraform/modules/schedules/executions/execution_datastream_VPU_template.json \
---exec_template_fp terraform/modules/schedules/executions/execution_datastream_fp_template.json \
+--inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+--ami_file terraform/modules/schedules/config/community_ami.txt \
+--exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+--exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
 --out_dir terraform/modules/schedules/executions
 ```
 
