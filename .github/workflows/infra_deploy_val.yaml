@@ -16,7 +16,7 @@ on:
   #     - infra_deployment
   #   paths:
   #     - 'infra/aws/terraform/**'
-  #     - '.github/workflows/terraform-*.yml'
+  #     - '.github/workflows/terraform-*infra_deployment.yml'
       # - 'infra/aws/python/src/research_datastream/**'
 env:
   TF_VAR_FILE: variables.tfvars
