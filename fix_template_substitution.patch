@@ -1,0 +1,18 @@
+--- a/.github/workflows/nrds_health_check.yaml
++++ b/.github/workflows/nrds_health_check.yaml
+@@ -415,10 +415,20 @@
+             }] |
+             .commands |= map(
+-              gsub("__S3_PREFIX__"; $S3_PREFIX)
++              gsub("\\$VPU"; $VPU)
+               | gsub("ngen.DAILY"; "ngen.\($DATE)")
+               | gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")
++              | gsub("\\$RUN_TYPE_L"; if $type == "short_range" then "short_range" elif $type == "medium_range" then "medium_range" else "analysis_assim_extend" end)
++              | gsub("\\$RUN_TYPE_H"; if $type == "short_range" then "SHORT_RANGE" elif $type == "medium_range" then "MEDIUM_RANGE" else "ANALYSIS_ASSIM_EXTEND" end)
++              | gsub("\\$INIT"; $cycle)
++              | gsub("\\$MEMBER"; if $ensemble == "0" then "" else $ensemble end)
++              | gsub("\\$FCST"; if $type == "short_range" then "f001_f018" elif $type == "medium_range" then "f001_f240" else "tm27_tm00" end)
++              | gsub("\\$NPROCS"; "4")
+             )
+-          ' "$source_file" > "$output_file"
++          ' --arg TYPE "$type" --arg CYCLE "$cycle" --arg ENSEMBLE "$ensemble" "$source_file" > "$output_file"

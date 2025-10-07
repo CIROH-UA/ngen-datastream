@@ -123,3 +123,48 @@ jobs:
           if [ $count -gt 0 ]; then
             echo "$failures" | jq '.'
           fi
+
+
+  prepare-reruns:
+    name: Prepare Rerun Execution Files
+    needs: health-check
+    if: needs.health-check.outputs.has_failures == 'true' && needs.health-check.outputs.auto_rerun == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      rerun_matrix: ${{ steps.create_matrix.outputs.matrix }}
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade awscli boto3 pandas
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-PrepareReruns
+
+      - name: Generate Base Execution Files
+        run: |
+          cd infra/aws
+          python python/src/research_datastream/gen_vpu_execs.py \
+            --arch arm \
+            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+            --ami_file terraform/modules/schedules/config/community_ami.txt \
+            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+            --out_dir rerun_executions
