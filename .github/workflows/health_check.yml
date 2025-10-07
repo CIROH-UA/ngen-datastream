@@ -87,7 +87,7 @@ jobs:
       - name: Run Health Check and Capture Failures
         id: health_check
         run: |
-          ./check_datastream_outputs.sh \
+          ./infra/aws/shell/check_datastream_outputs.sh \
             --start ${{ steps.params.outputs.start_date }} \
             --end ${{ steps.params.outputs.end_date }} \
             --vpus ${{ steps.params.outputs.vpus }} \
