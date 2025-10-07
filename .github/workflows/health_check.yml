@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: '0 0 * * *'  # Every day at midnight UTC
 
 permissions:
   contents: read
