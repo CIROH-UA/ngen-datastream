@@ -1,3 +1,7 @@
+provider "aws" {
+  region = var.region
+}
+
 terraform {
   required_version = ">= 0.12"
 }
@@ -5,7 +9,3 @@ terraform {
 variable "region" {}
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
-
-data "aws_ssm_parameter" "state_machine_arn" {
-  name = "/datastream/state-machine-arn"
-}

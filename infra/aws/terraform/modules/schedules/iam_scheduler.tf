@@ -7,15 +7,15 @@ resource "aws_iam_policy" "scheduler_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-        "Effect" : "Allow",
-        Action = [
-          "states:StartExecution",
-          "events:PutTargets",
-          "events:PutRule",
-          "events:PutPermission"
-        ],
-        "Resource" : ["*"]
-      }
+            "Effect": "Allow",
+            Action = [
+                "states:StartExecution",
+                "events:PutTargets",
+                "events:PutRule",
+                "events:PutPermission"
+              ],
+            "Resource": ["*"]
+        }
     ]
   })
 }
