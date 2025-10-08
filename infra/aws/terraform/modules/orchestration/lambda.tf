@@ -1,30 +1,30 @@
-data "archive_file" "python_lambda_starter" {
-  type        = "zip"
-  source_file = "${path.module}/lambdas/start_ami/lambda_function.py"
+data "archive_file" "python_lambda_starter" {  
+  type = "zip"  
+  source_file = "${path.module}/lambdas/start_ami/lambda_function.py" 
   output_path = "${path.module}/lambdas/starter_lambda.zip"
 }
 
-data "archive_file" "python_lambda_commander" {
-  type        = "zip"
-  source_file = "${path.module}/lambdas/streamcommander/lambda_function.py"
+data "archive_file" "python_lambda_commander" {  
+  type = "zip"  
+  source_file = "${path.module}/lambdas/streamcommander/lambda_function.py" 
   output_path = "${path.module}/lambdas/commander_lambda.zip"
 }
 
-data "archive_file" "python_lambda_poller" {
-  type        = "zip"
-  source_file = "${path.module}/lambdas/poller/lambda_function.py"
+data "archive_file" "python_lambda_poller" {  
+  type = "zip"  
+  source_file = "${path.module}/lambdas/poller/lambda_function.py" 
   output_path = "${path.module}/lambdas/poller_lambda.zip"
 }
 
-data "archive_file" "python_lambda_checker" {
-  type        = "zip"
-  source_file = "${path.module}/lambdas/checker/lambda_function.py"
+data "archive_file" "python_lambda_checker" {  
+  type = "zip"  
+  source_file = "${path.module}/lambdas/checker/lambda_function.py" 
   output_path = "${path.module}/lambdas/checker_lambda.zip"
 }
 
-data "archive_file" "python_lambda_stopper" {
-  type        = "zip"
-  source_file = "${path.module}/lambdas/stopper/lambda_function.py"
+data "archive_file" "python_lambda_stopper" {  
+  type = "zip"  
+  source_file = "${path.module}/lambdas/stopper/lambda_function.py" 
   output_path = "${path.module}/lambdas/stopper_lambda.zip"
 }
 

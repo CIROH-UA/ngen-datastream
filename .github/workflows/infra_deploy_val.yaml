@@ -2,79 +2,29 @@ name: Terraform PR Validation
 
 on:
   workflow_dispatch:   
-  # push:
-  #   branches:
-  #     - main
-  #     - infra_deployment
-  #   paths:
-  #     - 'infra/aws/terraform/**'
-  #     - '.github/workflows/terraform-*.yml'
-  #     - 'infra/aws/python/src/research_datastream/**'
-  # pull_request:
-  #   branches:
-  #     - main
-  #     - infra_deployment
-  #   paths:
-  #     - 'infra/aws/terraform/**'
-  #     - '.github/workflows/terraform-*infra_deployment.yml'
-      # - 'infra/aws/python/src/research_datastream/**'
+  push:
+    branches:
+      - main
+      - infra_deployment
+    paths:
+      - 'infra/aws/terraform/**'
+      - '.github/workflows/terraform-*.yml'
+  pull_request:
+    branches:
+      - main
+      - infra_deployment
+    paths:
+      - 'infra/aws/terraform/**'
+      - '.github/workflows/terraform-*.yml'
+
 env:
   TF_VAR_FILE: variables.tfvars
-  AWS_REGION: us-east-2
+  AWS_REGION: us-east-1
   TERRAFORM_VERSION: 1.9.0
-  ENVIRONMENT: dev 
-
 
 jobs:
-  generate-executions:
-    name: Generate VPU Execution Files
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-    
-    - name: Install Python dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y jq
-        pip install --upgrade pip
-        pip install --upgrade awscli
-        pip install --upgrade awscli boto3 pandas
-
-    - name: Configure AWS Credentials (OIDC)
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
-        role-session-name: GitHubActions-GenerateExecutions
- 
-
-    - name: Generate execution files
-      working-directory: infra/aws
-      run: |
-        echo "Working directory: $(pwd)"
-        echo "Generating VPU execution files..."
-        python python/src/research_datastream/gen_vpu_execs.py \
-        --arch arm \
-        --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
-        --ami_file terraform/modules/schedules/config/community_ami.txt \
-        --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
-        --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
-        --out_dir terraform/modules/schedules/executions
-
-        echo "::notice::Execution files generated successfully"
-
   terraform-check:
     name: Terraform Quality Checks
-    needs: generate-executions
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -84,32 +34,17 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-      security-events: write
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
     
-    - name: Install Python dependencies
+    - name: Configure AWS
       run: |
-        sudo apt-get update
-        sudo apt-get install -y jq
-        pip install --upgrade pip
-        pip install --upgrade awscli
-        pip install --upgrade awscli boto3 pandas
-
-    - name: Configure AWS Credentials (OIDC)
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
-        role-session-name: GitHubActions-TerraformCheck
-
+        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws configure set region us-east-1    
+    
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
@@ -123,38 +58,11 @@ jobs:
     
     - name: Terraform Init
       id: init
-      run: terraform init -backend-config=backend-${ENVIRONMENT}.hcl
- 
+      run: terraform init -backend-config="key=terraform/${{ github.repository }}.tfstate"
+    
     - name: Terraform Validate
       id: validate
       run: terraform validate -no-color
-    
-    - name: Check for tfvars files
-      id: check_tfvars
-      run: |
-        echo "Checking for required tfvars files..."
-        
-        # Check if the main tfvars file exists
-        if [ ! -f "${{ env.TF_VAR_FILE }}" ]; then
-          echo "::error::Missing required tfvars file: ${{ env.TF_VAR_FILE }}"
-          exit 1
-        fi
-        
-        echo "::notice::Found tfvars file: ${{ env.TF_VAR_FILE }}"
-        
-        # Validate tfvars syntax
-        terraform fmt -check "${{ env.TF_VAR_FILE }}" || {
-          echo "::warning::File ${{ env.TF_VAR_FILE }} is not properly formatted"
-        }
-        
-        # Optionally check for environment-specific tfvars if they exist
-        if [ -d "environments" ]; then
-          tfvars_count=$(find environments -name "*.tfvars" -type f | wc -l)
-          if [ "$tfvars_count" -gt 0 ]; then
-            echo "::notice::Found $tfvars_count additional environment tfvars file(s)"
-            find environments -name "*.tfvars" -type f
-          fi
-        fi
 
     - name: Run tfsec Security Scan
       id: tfsec
@@ -179,7 +87,6 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: results.sarif
-      continue-on-error: true
     
     - name: Terraform Plan
       id: plan
@@ -193,504 +100,21 @@ jobs:
       with:
         name: terraform-plan-${{ github.sha }}
         path: infra/aws/terraform/tfplan
-        retention-days: 10
+        retention-days: 30
     
     - name: Upload Plan Output
       uses: actions/upload-artifact@v4
       with:
         name: terraform-plan-output-${{ github.sha }}
         path: infra/aws/terraform/plan_output.txt
-        retention-days: 10
+        retention-days: 30
     
     - name: Check for Plan Failures
       if: steps.plan.outcome == 'failure'
-      run: |
-        echo "::warning::Terraform plan failed but continuing workflow"
-        echo "Plan failed with errors. Check the plan output for details."
-      continue-on-error: true
+      run: exit 1
     
     - name: Check for Format Failures
       if: steps.fmt.outcome == 'failure'
       run: |
         echo "::error::Terraform files are not properly formatted. Run 'terraform fmt -recursive' locally."
-      continue-on-error: true
-    
-        
-  terraform-apply:
-    name: Terraform Apply
-    needs: terraform-check
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/infra_deployment'
-    defaults:
-      run:
-        working-directory: infra/aws/terraform
-    
-    permissions:
-      contents: read
-      id-token: write
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-    
-    - name: Install Python dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y jq
-        pip install --upgrade pip
-        pip install --upgrade awscli boto3 pandas
-
-    - name: Configure AWS Credentials (OIDC)
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
-        role-session-name: GitHubActions-TerraformApply
-
-    - name: Generate execution files
-      working-directory: infra/aws
-      run: |
-        echo "Working directory: $(pwd)"
-        echo "Generating VPU execution files..."
-        python python/src/research_datastream/gen_vpu_execs.py \
-        --arch arm \
-        --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
-        --ami_file terraform/modules/schedules/config/community_ami.txt \
-        --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
-        --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
-        --out_dir terraform/modules/schedules/executions
-
-        echo "::notice::Execution files generated successfully"
-    
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{ env.TERRAFORM_VERSION }}
-        terraform_wrapper: false
-    
-    - name: Terraform Init
-      run:  terraform init -backend-config=backend-${ENVIRONMENT}.hcl
-
-    
-    - name: Download Plan Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: terraform-plan-${{ github.sha }}
-        path: infra/aws/terraform
-    
-    - name: Terraform Apply
-      id: apply
-      run: |
-        echo "::notice::Starting Terraform Apply..."
-        terraform apply -var-file="variables.tfvars" -auto-approve
-        echo "::notice::Terraform Apply completed successfully"
-    
-    - name: Terraform Output
-      if: success()
-      run: |
-        echo "::group::Terraform Outputs"
-        terraform output -json > terraform_outputs.json
-        cat terraform_outputs.json
-        echo "::endgroup::"
-    
-    - name: Upload Terraform Outputs
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: terraform-outputs-${{ github.sha }}
-        path: infra/aws/terraform/terraform_outputs.json
-        retention-days: 30     
-        
-  test-all-vpus:
-    runs-on: ubuntu-latest
-    needs: terraform-apply
-    strategy:
-      fail-fast: false
-      matrix:
-        vpu: ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09", "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"]   
-    permissions:
-      id-token: write
-      contents: read
-     
-    env:
-      VPU: ${{ matrix.vpu }}
-      DATE: 20250905
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-TestVPU-${{ matrix.vpu }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-          pip install --upgrade awscli boto3 pandas
-
-      - name: Generate execution files using Python script
-        run: |
-          cd infra/aws
-          python python/src/research_datastream/gen_vpu_execs.py \
-            --arch arm \
-            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
-            --ami_file terraform/modules/schedules/config/community_ami.txt \
-            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
-            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
-            --out_dir test_executions
-
-      - name: Modify execution for testing (Short Range)
-        run: |
-          cd infra/aws
-          short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
-          # Update for testing with custom tags and S3 prefix
-        
-          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
-            .instance_parameters.TagSpecifications = [{
-              "ResourceType": "instance",
-              "Tags": [
-                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"},
-                {"Key": "AMI_Version", "Value": "test-version"}
-              ]
-            }] |
-            .commands |= map(
-                # swap placeholder only; no regex near quotes
-                gsub("__S3_PREFIX__"; "tests/short_range/VPU_\($VPU)")
-              | gsub("ngen.DAILY"; "ngen.\($DATE)")
-              | gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")
-            )
-          ' "$short_range_execution_file" > temp_short_range_execution.json
-          mv temp_short_range_execution.json "$short_range_execution_file"
-          cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
-         
-                    
-      
-      - name: Modify execution for testing (Medium Range)
-        run: |
-          cd infra/aws
-          medium_range_execution_file="test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json"
-      
-          # Update for testing with custom tags and S3 prefix
-          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" '
-            .instance_parameters.TagSpecifications = [{
-              "ResourceType": "instance",
-              "Tags": [
-                {"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"},
-                {"Key": "AMI_Version", "Value": "test-version"}
-              ]
-            }] |
-            .commands |= map(
-                gsub("__S3_PREFIX__"; "tests/medium_range/VPU_\($VPU)")
-              | gsub("ngen.DAILY"; "ngen.\($DATE)")
-              | gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")
-            )
-          ' "$medium_range_execution_file" > temp_medium_range_execution.json
-          mv temp_medium_range_execution.json "$medium_range_execution_file"
-          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json          
-
-      - name: Check and create AWS key pair
-        run: |
-          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
-            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text
-            echo "Key pair 'actions_key' created"
-          else 
-            echo "Key pair 'actions_key' already exists"
-          fi
-
-      - name: Get State Machine ARN
-        id: get_sm_arn
-        run: |
-          ARN=$(aws ssm get-parameter \
-            --name "/datastream/state-machine-arn" \
-            --query 'Parameter.Value' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
-          echo "State Machine ARN: $ARN"
-
-      - name: Start and monitor Step Functions execution (Short Range)
-        id: stepfunction_short
-        run: |
-          cd infra/aws
-          short_range_execution_file="test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json"
-          cat test_executions/short_range/00/execution_datastream_${{ env.VPU }}.json
-          TS=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S%3N')   # ms resolution
-          NAME="sr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
-          execution_arn=$(aws stepfunctions start-execution \
-            --state-machine-arn $(aws ssm get-parameter --name "/datastream/state-machine-arn" --query 'Parameter.Value' --output text) \
-            --name "$NAME" \ 
-            --input "file://$short_range_execution_file" \
-            --region us-east-2 \
-            --query 'executionArn' --output text)
-          
-          echo "Execution ARN: $execution_arn"
-          
-          status="RUNNING"
-          while [ "$status" != "SUCCEEDED" ]; do
-            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-2 --query 'status' --output text)
-            echo "Current status: $status"
-            if [ "$status" == "FAILED" ]; then
-              echo "State machine execution failed for VPU ${{ env.VPU }}!"
-              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-            sleep 5
-          done
-          echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
-          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
-           
-      - name: Verify output files (Short Range)
-        if: matrix.vpu != '10U' && matrix.vpu != '17'
-        run: |
-          echo "Checking if processing created output files for VPU ${{ env.VPU }}..."
-          
-          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
-          
-          if [ -n "$file_list" ]; then
-            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
-            echo "$file_list"
-            file_count=$(echo "$file_list" | wc -l)
-            echo "Total files created for VPU ${{ env.VPU }}: $file_count (short_range) "
-          else
-            echo "FAILED: No output files created for Short Range VPU ${{ env.VPU }}"
-            exit 1
-          fi
-
-      - name: Verify specific file (Short Range)
-        if: matrix.vpu != '10U' && matrix.vpu != '17'
-        run: |
-          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { 
-            echo "Error: File not found or request failed"; exit 1; 
-          } 
-
-
-      - name: Start and monitor Step Functions execution (Medium Range)
-        id: stepfunction_medium
-        run: |
-          cd infra/aws
-          medium_range_execution_file="test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json"
-          cat test_executions/medium_range/00/1/execution_datastream_${{ env.VPU }}.json
-          TS=$(env TZ=US/Eastern date +'%Y%m%d%H%M%S%3N')   # ms resolution
-          NAME="mr-vpu-${{ env.VPU }}-${TS}-${{ github.run_id }}-${{ github.run_attempt }}"
-          execution_arn=$(aws stepfunctions start-execution \
-            --state-machine-arn $(aws ssm get-parameter --name "/datastream/state-machine-arn" --query 'Parameter.Value' --output text) \
-            --name "$NAME" \
-            --input "file://$medium_range_execution_file" \
-            --region us-east-2 \
-            --query 'executionArn' --output text)
-          
-          echo "Execution ARN: $execution_arn"
-          
-          status="RUNNING"
-          while [ "$status" != "SUCCEEDED" ]; do
-            status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-2 --query 'status' --output text)
-            echo "Current status: $status"
-            if [ "$status" == "FAILED" ]; then
-              echo "State machine execution failed for VPU ${{ env.VPU }}!"
-              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-            sleep 5
-          done
-          echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
-          echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
-
-      - name: Verify output files Medium Range
-        if: matrix.vpu != '10U' && matrix.vpu != '17'
-        run: |
-          echo "Checking if processing created output files for VPU ${{ env.VPU }}..."
-          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
-          
-          if [ -n "$file_list" ]; then
-            echo "SUCCESS: VPU ${{ env.VPU }} processing completed!"
-            echo "$file_list"
-            file_count=$(echo "$file_list" | wc -l)
-            echo "Total files created for VPU ${{ env.VPU }}: $file_count (medium_range) "
-          else
-            echo "FAILED: No output files created for Medium Range VPU ${{ env.VPU }}"
-            exit 1
-          fi
-
-      - name: Verify specific file (Medium Range)
-        if: matrix.vpu != '10U' && matrix.vpu != '17'
-        run: |
-          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/medium_range/VPU_${{ env.VPU }}/merkdir.file || { 
-            echo "Error: File not found or request failed"; exit 1; 
-          } 
-          
-      - name: Clean up
-        if: always()
-        run: |
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No files to delete"
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/medium_range/VPU_${{ env.VPU }} || echo "No files to delete"
-
-  terraform-destroy:
-    name: Terraform Destroy Test Resources
-    needs: test-all-vpus
-    runs-on: ubuntu-latest
-    if: always()
-    defaults:
-      run:
-        working-directory: infra/aws/terraform
-
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-TerraformDestroy
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install Python dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-          pip install --upgrade pip awscli boto3 pandas
-
-      - name: Generate execution files
-        working-directory: infra/aws
-        run: |
-          echo "Working directory: $(pwd)"
-          echo "Generating VPU execution files..."
-          python python/src/research_datastream/gen_vpu_execs.py \
-            --arch arm \
-            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
-            --ami_file terraform/modules/schedules/config/community_ami.txt \
-            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
-            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
-            --out_dir terraform/modules/schedules/executions
-          echo "::notice::Execution files generated successfully"
-
-
-      - name: Terraform Init
-        run: terraform init -backend-config=backend-${ENVIRONMENT}.hcl
-        continue-on-error: true
-
-      - name: Verify State Has Resources
-        run: |
-          RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l)
-          echo "::notice::Found $RESOURCE_COUNT resources in state"
-          if [ "$RESOURCE_COUNT" -eq 0 ]; then
-            echo "::warning::No resources in state to destroy!"
-          else
-            terraform state list
-          fi
-        continue-on-error: true
-        
-      
-      - name: Stop Test Step Functions Executions
-        run: |
-          echo "Stopping test Step Functions executions..."
-          
-          # Get state machine ARN
-          STATE_MACHINE_ARN=$(aws ssm get-parameter \
-            --name "/datastream/state-machine-arn" \
-            --query 'Parameter.Value' \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -n "$STATE_MACHINE_ARN" ]; then
-            # Stop all running executions matching test pattern
-            aws stepfunctions list-executions \
-              --state-machine-arn "$STATE_MACHINE_ARN" \
-              --status-filter RUNNING \
-              --region ${{ env.AWS_REGION }} \
-              --query 'executions[*].[executionArn,name]' \
-              --output text | while read arn name; do
-                if [[ "$name" =~ ^(sr|mr)-vpu-.* ]]; then
-                  echo "Stopping test execution: $name"
-                  aws stepfunctions stop-execution \
-                    --execution-arn "$arn" \
-                    --region ${{ env.AWS_REGION }} 2>/dev/null || true
-                fi
-              done
-          fi
-        continue-on-error: true
-      
-      - name: Terminate Test EC2 Instances
-        run: |
-          echo "Terminating test EC2 instances..."
-          
-          # Find all instances with test tags
-          TEST_INSTANCES=$(aws ec2 describe-instances \
-            --filters \
-              "Name=tag:Project,Values=fp_test_git_actions_vpu_*" \
-              "Name=instance-state-name,Values=running,pending,stopped,stopping" \
-            --query 'Reservations[*].Instances[*].InstanceId' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-          
-          if [ -n "$TEST_INSTANCES" ]; then
-            echo "Terminating instances: $TEST_INSTANCES"
-            aws ec2 terminate-instances \
-              --instance-ids $TEST_INSTANCES \
-              --region ${{ env.AWS_REGION }}
-            
-            echo "Waiting for instances to terminate..."
-            sleep 30
-          else
-            echo "No test instances found"
-          fi
-        continue-on-error: true
-      
-      - name: Terraform Destroy - Attempt 1
-        id: destroy_attempt1
-        run: |
-          echo "::notice::Starting Terraform Destroy (Attempt 1)..."
-          terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
-          echo "::notice::Terraform Destroy completed successfully"
-        continue-on-error: true
-      
-      - name: Terraform Destroy - Attempt 2
-        if: steps.destroy_attempt1.outcome == 'failure'
-        id: destroy_attempt2
-        run: |
-          echo "::warning::Retrying destroy after 30s..."
-          sleep 30
-          terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
-        continue-on-error: true
-      
-      - name: Final State Check
-        if: always()
-        run: |
-          REMAINING=$(terraform state list 2>/dev/null | wc -l)
-          if [ "$REMAINING" -gt 0 ]; then
-            echo "::warning::$REMAINING resources still in state"
-            terraform state list
-          else
-            echo "::notice::All Terraform resources destroyed"
-          fi
-        continue-on-error: true
+        exit 1
