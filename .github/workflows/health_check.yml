@@ -125,3 +125,46 @@ jobs:
           if [ $count -gt 0 ]; then
             echo "$failures" | jq '.'
           fi
+
+
+  rerun-summary:
+    name: Rerun Summary
+    needs: [health-check]
+    if: always() && needs.health-check.outputs.has_failures == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# NRDS Health Check & Rerun Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Failures Detected:** ${{ needs.health-check.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          failures='${{ needs.health-check.outputs.failures }}'
+          
+          echo "## Failures Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Date | Type | Cycle | VPU | Ensemble |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|-------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          
+          echo "$failures" | jq -r '.[] | "| \(.date) | \(.type) | \(.cycle) | \(.vpu) | \(.ensemble // "N/A") |"' >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Rerun Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.execute-reruns.result }}" = "success" ]; then
+            echo "✅ **All reruns completed successfully**" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.execute-reruns.result }}" = "failure" ]; then
+            echo "❌ **Some reruns failed - check individual job logs for details**" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.execute-reruns.result }}" = "skipped" ]; then
+            echo "⏭️ **Reruns were skipped (auto_rerun was disabled)**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Reruns were cancelled or encountered an error**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow Run:** [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
