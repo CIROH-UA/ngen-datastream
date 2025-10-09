@@ -1,10 +1,5 @@
 terraform {
-  backend "s3" {
-    bucket  = "ciroh-terraform-state"
-    key     = "ngen-datastream/terraform.tfstate"
-    region  = "us-east-2"
-    encrypt = true
-  }
+  backend "s3" {}
 
   required_version = ">= 1.9.0"
 
