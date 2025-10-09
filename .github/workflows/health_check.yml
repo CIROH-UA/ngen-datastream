@@ -1,4 +1,4 @@
-name: NRDS Health Check and Auto-Rerun
+name: NRDS Health Check
 
 on:
   workflow_dispatch:
@@ -19,10 +19,6 @@ on:
         description: 'Run types (comma-separated or "all")'
         required: false
         default: 'all'
-      auto_rerun:
-        description: 'Automatically trigger reruns for failures'
-        type: boolean
-        default: false
   schedule:
     - cron: '0 0 * * *'  # Every day at midnight UTC
 
@@ -37,13 +33,19 @@ jobs:
       has_failures: ${{ steps.health_check.outputs.has_failures }}
       failure_count: ${{ steps.health_check.outputs.failure_count }}
       failures: ${{ steps.health_check.outputs.failures }}
-      auto_rerun: ${{ steps.params.outputs.auto_rerun }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Verify health check script exists
+        run: |
+          if [ ! -f ./infra/aws/shell/check_datastream_outputs.sh ]; then
+            echo "ERROR: Health check script not found at ./infra/aws/shell/check_datastream_outputs.sh"
+            exit 1
+          fi
 
       - name: Set Parameters
         id: params
@@ -64,31 +66,28 @@ jobs:
             
             VPUS="${{ github.event.inputs.vpus }}"
             RUN_TYPES="${{ github.event.inputs.run_types }}"
-            AUTO_RERUN="${{ github.event.inputs.auto_rerun }}"
           else
             # Scheduled run - check yesterday only
             START_DATE=$(date -d 'yesterday' +%Y%m%d)
             END_DATE=$(date -d 'yesterday' +%Y%m%d)
             VPUS="all"
             RUN_TYPES="all"
-            AUTO_RERUN="true"
           fi
           
           echo "start_date=$START_DATE" >> $GITHUB_OUTPUT
           echo "end_date=$END_DATE" >> $GITHUB_OUTPUT
           echo "vpus=$VPUS" >> $GITHUB_OUTPUT
           echo "run_types=$RUN_TYPES" >> $GITHUB_OUTPUT
-          echo "auto_rerun=$AUTO_RERUN" >> $GITHUB_OUTPUT
           
           echo "Health check parameters:"
           echo "  Date range: $START_DATE to $END_DATE"
           echo "  VPUs: $VPUS"
           echo "  Run types: $RUN_TYPES"
-          echo "  Auto rerun: $AUTO_RERUN"
 
       - name: Run Health Check and Capture Failures
         id: health_check
         run: |
+          set +e  # Don't exit on error
           chmod +x ./infra/aws/shell/check_datastream_outputs.sh
           ./infra/aws/shell/check_datastream_outputs.sh \
             --start ${{ steps.params.outputs.start_date }} \
@@ -96,20 +95,44 @@ jobs:
             --vpus ${{ steps.params.outputs.vpus }} \
             --run_types ${{ steps.params.outputs.run_types }} 2>&1 | tee health_output.txt
           
-          # Parse failures into JSON array
+          SCRIPT_EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+          
+          if [ $SCRIPT_EXIT_CODE -ne 0 ]; then
+            echo "WARNING: Health check script exited with code $SCRIPT_EXIT_CODE"
+            echo "Attempting to parse any available output..."
+          fi
+          
+          # Parse failures into JSON array with validation
           failures=$(grep "missing" health_output.txt | awk '{print $1}' | while read url; do
+            if [ -z "$url" ]; then
+              continue
+            fi
+            
             date=$(echo "$url" | sed -n 's/.*ngen\.\([0-9]\{8\}\).*/\1/p')
             type=$(echo "$url" | sed -n 's/.*ngen\.[0-9]\{8\}\/\([^\/]*\).*/\1/p')
             cycle=$(echo "$url" | sed -n "s/.*\/$type\/\([0-9]\{2\}\).*/\1/p")
             vpu=$(echo "$url" | sed -n 's/.*VPU_\([^\/]*\).*/\1/p')
             
+            # Skip if we couldn't parse required fields
+            if [ -z "$date" ] || [ -z "$type" ] || [ -z "$cycle" ] || [ -z "$vpu" ]; then
+              echo "WARNING: Failed to parse URL: $url" >&2
+              continue
+            fi
+            
             if [[ "$type" == "medium_range" ]]; then
               ens=$(echo "$url" | sed -n 's/.*\/[0-9]\{2\}\/\([0-9]\)\/VPU.*/\1/p')
-              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"ensemble\":\"$ens\",\"vpu\":\"$vpu\"}"
+              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"ensemble\":\"$ens\",\"vpu\":\"$vpu\",\"url\":\"$url\"}"
             else
-              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"vpu\":\"$vpu\"}"
+              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"vpu\":\"$vpu\",\"url\":\"$url\"}"
             fi
           done | jq -s '.')
+          
+          # Handle jq failure
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to parse failures with jq"
+            failures="[]"
+          fi
           
           # Set outputs
           echo "failures<<EOF" >> $GITHUB_OUTPUT
@@ -123,45 +146,38 @@ jobs:
           echo ""
           echo "Total failures found: $count"
           if [ $count -gt 0 ]; then
+            echo "Failures:"
             echo "$failures" | jq '.'
           fi
 
-
-  rerun-summary:
-    name: Rerun Summary
+  failure-summary:
+    name: Failure Summary
     needs: [health-check]
-    if: always() && needs.health-check.outputs.has_failures == 'true'
+    if: always()
     runs-on: ubuntu-latest
     
     steps:
       - name: Generate Summary
         run: |
-          echo "# NRDS Health Check & Rerun Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Total Failures Detected:** ${{ needs.health-check.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "# NRDS Health Check Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          failures='${{ needs.health-check.outputs.failures }}'
-          
-          echo "## Failures Detected" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Date | Type | Cycle | VPU | Ensemble |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|-------|-----|----------|" >> $GITHUB_STEP_SUMMARY
-          
-          echo "$failures" | jq -r '.[] | "| \(.date) | \(.type) | \(.cycle) | \(.vpu) | \(.ensemble // "N/A") |"' >> $GITHUB_STEP_SUMMARY
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Rerun Status" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.execute-reruns.result }}" = "success" ]; then
-            echo " **All reruns completed successfully**" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ needs.execute-reruns.result }}" = "failure" ]; then
-            echo " **Some reruns failed - check individual job logs for details**" >> $GITHUB_STEP_SUMMARY
-          elif [ "${{ needs.execute-reruns.result }}" = "skipped" ]; then
-            echo " **Reruns were skipped (auto_rerun was disabled)**" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.health-check.outputs.has_failures }}" = "true" ]; then
+            echo "## Failures Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Total Failures:** ${{ needs.health-check.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            failures='${{ needs.health-check.outputs.failures }}'
+            
+            echo "| Date | Type | Cycle | VPU | Ensemble |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|------|-------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+            
+            echo "$failures" | jq -r '.[] | "| \(.date) | \(.type) | \(.cycle) | \(.vpu) | \(.ensemble // "N/A") |"' >> $GITHUB_STEP_SUMMARY
           else
-            echo " **Reruns were cancelled or encountered an error**" >> $GITHUB_STEP_SUMMARY
+            echo "##  No Failures Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All datastream outputs are present and healthy." >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
