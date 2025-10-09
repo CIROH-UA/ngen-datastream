@@ -5,7 +5,11 @@ provider "aws" {
 terraform {
   required_version = ">= 0.12"
 }
-
+resource "aws_ssm_parameter" "state_machine_arn" {
+  name  = "/datastream/state-machine-arn"
+  type  = "String"
+  value = aws_sfn_state_machine.datastream_state_machine.arn
+}
 variable "region" {}
 variable "starter_lambda_name" {}
 variable "commander_lambda_name" {}
