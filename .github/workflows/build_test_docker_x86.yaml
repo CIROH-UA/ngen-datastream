@@ -51,10 +51,12 @@ jobs:
 
     - name: Build docker containers
       run : |        
-        # export ARCH=$(uname -m)
-        # docker compose -f docker/docker-compose.yml build datastream-deps
-        docker compose -f docker/docker-compose.yml build datastream
-        docker compose -f docker/docker-compose.yml build forcingprocessor
+        docker system prune -a
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream-deps --no-cache
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build forcingprocessor --no-cache
+        TAG=latest-x86 docker compose -f docker/docker-compose.yml build datastream --no-cache
+        docker images
+        
     - name: Test docker containers
       run : |
         curl -L -O https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg
