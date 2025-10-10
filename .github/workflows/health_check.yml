@@ -169,16 +169,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             
             failures='${{ needs.health-check.outputs.failures }}'
-            
-            echo "| Date | Type | Cycle | VPU | Ensemble |" >> $GITHUB_STEP_SUMMARY
-            echo "|------|------|-------|-----|----------|" >> $GITHUB_STEP_SUMMARY
-            
-            echo "$failures" | jq -r '.[] | "| \(.date) | \(.type) | \(.cycle) | \(.vpu) | \(.ensemble // "N/A") |"' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "##  No Failures Detected" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "All datastream outputs are present and healthy." >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "_Rerun status unavailable: no rerun job was executed in this workflow run._" >> $GITHUB_STEP_SUMMARY
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
