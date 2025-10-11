@@ -163,13 +163,29 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ needs.health-check.outputs.has_failures }}" = "true" ]; then
-            echo "## Failures Detected" >> $GITHUB_STEP_SUMMARY
+            echo "## ⚠️ Failures Detected" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Total Failures:** ${{ needs.health-check.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
-            failures='${{ needs.health-check.outputs.failures }}'
-          echo "_Rerun status unavailable: no rerun job was executed in this workflow run._" >> $GITHUB_STEP_SUMMARY
+            # Display failures in a table
+            echo "| Date | Type | Cycle | VPU | Ensemble | URL |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|------|-------|-----|----------|-----|" >> $GITHUB_STEP_SUMMARY
+            
+            echo '${{ needs.health-check.outputs.failures }}' | jq -r '.[] | 
+              if .ensemble then 
+                "| \(.date) | \(.type) | \(.cycle) | \(.vpu) | \(.ensemble) | [Link](\(.url)) |"
+              else 
+                "| \(.date) | \(.type) | \(.cycle) | \(.vpu) | N/A | [Link](\(.url)) |"
+              end' >> $GITHUB_STEP_SUMMARY
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "_Rerun status unavailable: no rerun job was executed in this workflow run._" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ No Failures Detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All health checks passed successfully!" >> $GITHUB_STEP_SUMMARY
+          fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
