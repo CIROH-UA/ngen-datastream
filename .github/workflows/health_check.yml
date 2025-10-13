@@ -19,8 +19,8 @@ on:
         description: 'Run types (comma-separated or "all")'
         required: false
         default: 'all'
-  schedule:
-    - cron: '0 0 * * *'  # Every day at midnight UTC
+  # schedule:
+  #   - cron: '0 0 * * *'  # Every day at midnight UTC
 
 permissions:
   contents: read
