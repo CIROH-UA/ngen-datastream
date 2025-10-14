@@ -1,4 +1,16 @@
 # Status
+Last Updated: 20251014
+
+Changes
+* On October 14th, the NRDS scaled back by turning off all medium range members besides the first.
+
+Status
+* All VPUs
+* Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
+* Cold start
+* v2.2 hydrofabric
+
+# Status
 Last Updated: 20250929
 
 Changes
