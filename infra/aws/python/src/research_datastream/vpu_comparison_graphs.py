@@ -92,7 +92,7 @@ def main():
             start_key = f"{step}_START"
             end_key = f"{step}_END"
 
-            duration = (profile[end_key] - profile[start_key]).seconds
+            duration = (profile[end_key] - profile[start_key]).total_seconds()
             if durations.get(step) is None:
                 durations[step] = np.array([])
             durations[step] = np.append(durations[step], duration)
