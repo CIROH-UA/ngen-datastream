@@ -3,9 +3,9 @@ Generates datastream VPU performance comparison graphs from profile metadata fil
 for a specified date, run type, and time.
 
 Usage:
-    python3 vpu_comparison.py -d YYYYMMDD -r runtype -t time
+    python3 vpu_comparison_graphs.py -d YYYYMMDD -r runtype -t time
     example:
-        python3 vpu_comparison.py -d 20251009 -r short_range -t 14
+        python3 vpu_comparison_graphs.py -d 20251009 -r short_range -t 14
 
 Run type options:
     analysis_assim_extend
