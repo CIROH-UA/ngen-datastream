@@ -33,27 +33,27 @@ def main():
     runtype = args.runtype 
     time = args.time
 
-    vpu_areas = {'VPU_01': np.float64(169506.94567295208),
-    'VPU_02': np.float64(277762.650207525),
-    'VPU_03N': np.float64(251265.12994153082),
-    'VPU_03S': np.float64(182296.01595399337),
-    'VPU_03W': np.float64(242246.5998014469),
-    'VPU_04': np.float64(324439.98450048204),
-    'VPU_05': np.float64(421969.3497738968),
-    'VPU_06': np.float64(105953.98609154101),
-    'VPU_07': np.float64(492039.5078722859),
-    'VPU_08': np.float64(285361.28012152814),
-    'VPU_09': np.float64(213494.848377173),
-    'VPU_10L': np.float64(540260.5528299824),
-    'VPU_10U': np.float64(811320.0216991806),
-    'VPU_11': np.float64(642313.8817198629),
-    'VPU_12': np.float64(464411.5282732017),
-    'VPU_13': np.float64(564896.7216874297),
-    'VPU_14': np.float64(293580.3838511146),
-    'VPU_15': np.float64(366915.49905261456),
-    'VPU_16': np.float64(367296.8106658667),
-    'VPU_17': np.float64(814521.4465534835),
-    'VPU_18': np.float64(422084.5544481264)}
+    vpu_num_cats = {'VPU_01': 20567,
+    'VPU_02': 35494,
+    'VPU_03N': 31326,
+    'VPU_03S': 30844,
+    'VPU_03W': 14138,
+    'VPU_04': 36312,
+    'VPU_05': 51582,
+    'VPU_06': 14167,
+    'VPU_07': 57595,
+    'VPU_08': 32993,
+    'VPU_09': 11204,
+    'VPU_10L': 55050,
+    'VPU_10U': 84376,
+    'VPU_11': 63177,
+    'VPU_12': 36611,
+    'VPU_13': 25471,
+    'VPU_14': 32977,
+    'VPU_15': 39696,
+    'VPU_16': 34401,
+    'VPU_17': 81841,
+    'VPU_18': 41955}
 
     s3 = S3FileSystem(anon=True)
     url = f"s3://ciroh-community-ngen-datastream/v2.2/ngen.{date}/{runtype}/{time}/"
@@ -102,7 +102,7 @@ def main():
             if durations_normed.get(step) is None:
                 durations_normed[step] = np.array([])
             durations_normed[step] = np.append(durations_normed[step],
-                                               durations[step][-1] / vpu_areas[vpu])
+                                               durations[step][-1] / vpu_num_cats[vpu])
 
     # unnormed graph
     fig, ax = plt.subplots()
@@ -129,8 +129,8 @@ def main():
         ax.bar(vpus, length, bottom=bottom, label=step)
         bottom += length
 
-    ax.set_title(f"VPU Performance Comparison for {runtype} {date} {time}z Normalized by VPU Area")
-    ax.set_ylabel("Duration (s/km^2)")
+    ax.set_title(f"VPU Performance Comparison for {runtype} {date} {time}z Normalized by Number of Catchments")
+    ax.set_ylabel("Duration (s/# catchments)")
     ax.set_xlabel("VPUs")
     ax.legend()
     fig.set_figwidth(20)
