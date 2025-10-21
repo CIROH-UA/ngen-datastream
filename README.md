@@ -8,6 +8,9 @@ Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastre
 * **Infrastructure as Code:** See the NRDS AWS architecture [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/ARCHITECTURE.md). 
 * **Open Discussions**: Check out our discussions [here](https://github.com/CIROH-UA/ngen-datastream/discussions)! Feel free to start your own discussion, or participate in any that are ongoing. 
 
+# ForcingProcessor
+ForcingProcessor has moved to https://github.com/CIROH-UA/forcingprocessor
+
 # DataStreamCLI
 DataStreamCLI has moved to https://github.com/CIROH-UA/datastreamcli
 
