@@ -1,7 +1,7 @@
-# Terraform configuration for AWS Scheduler to trigger Step Functions executions for NRDS CFE NOM
+# Terraform configuration for AWS Scheduler to trigger Step Functions executions for NRDS LSTM
 
 locals {
-  init_cycles_config = jsondecode(file("${path.module}/executions/execution_forecast_inputs_cfe_nom.json"))
+  init_cycles_config = jsondecode(file("${path.module}/executions/execution_forecast_inputs_lstm.json"))
 
   vpus = [
     "fp","01","02","03N","03S","03W","04",
@@ -15,7 +15,7 @@ locals {
       for init in local.init_cycles_config.short_range.init_cycles : [
         for vpu in local.vpus : {
           key   = "${init}_${vpu}"
-          value = "${path.module}/executions/cfe_nom/short_range/${init}/execution_datastream_${vpu}.json"
+          value = "${path.module}/executions/lstm/short_range/${init}/execution_datastream_${vpu}.json"
         }
       ]
     ]) : pair.key => pair.value
@@ -37,7 +37,7 @@ locals {
       for init in local.init_cycles_config.analysis_assim_extend.init_cycles : [
         for vpu in local.vpus : {
           key   = "${init}_${vpu}"
-          value = "${path.module}/executions/cfe_nom/analysis_assim_extend/${init}/execution_datastream_${vpu}.json"
+          value = "${path.module}/executions/lstm/analysis_assim_extend/${init}/execution_datastream_${vpu}.json"
         }
       ]
     ]) : pair.key => pair.value
@@ -62,7 +62,7 @@ locals {
             vpu == "fp" ? [1] : local.init_cycles_config.medium_range.ensemble_members
           ) : {
             key   = "${init}_${member}_${vpu}"
-            value = "${path.module}/executions/cfe_nom/medium_range/${init}/${member}/execution_datastream_${vpu}.json"
+            value = "${path.module}/executions/lstm/medium_range/${init}/${member}/execution_datastream_${vpu}.json"
           }
         ]
       ]
