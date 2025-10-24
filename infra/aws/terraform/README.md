@@ -4,7 +4,7 @@ The Terraform in this folder will build the NextGen Research Datastream (NRDS) A
 ## Orchestration
 With the orchestration module built, users can issue AWS StepFunction executions (via the CLI) that execute an AWS State Machine responsible for managing individual NextGen simulations on an AWS EC2 instance. This infra effectively gives users the ability to execute NextGen simulations in AWS cloud. 
 
-If desired, the commands are editable in an execution file, allowing this infra to be all-purpose (non-NextGen). Users can use this infrastrcutre to run any sort of ec2 based job in AWS cloud. An example for doing so has been demonstrated in the forcingprocessor repository to help in CI/CD ([link](https://github.com/CIROH-UA/forcingprocessor/blob/main/.github/executions/fp_ds_test_execution_arm.json)).
+If desired, the commands are editable in an execution file, allowing this infra to be all-purpose (non-NextGen). Users can use this infrastructure to run any sort of ec2 based job in AWS cloud. An example for doing so has been demonstrated in the forcingprocessor repository to help in CI/CD ([link](https://github.com/CIROH-UA/forcingprocessor/blob/main/.github/executions/fp_ds_test_execution_arm.json)).
 
 Note that this orchestration does not cost anything to build. A user's account will only incur costs when the AWS State Machine is executed. 
 
