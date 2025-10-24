@@ -11,7 +11,7 @@ Note that this orchestration does not cost anything to build. A user's account w
 ## Scheduling
 The NRDS infrastructure contains AWS EventBridge Schedules that trigger executions daily. 
 
-A "datastream" is created and scheduled by adding a schedule file similar to the [NRDS CFE NOM schedule Terraform file](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/modules/schedules/nrds_cfe_nom_schedules.tf), the accompanying [execution file templates](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json), and a [generation script](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/python/src/research_datastream/gen_vpu_execs.py) to create those exection files.
+A "datastream" is created and scheduled by adding a schedule file similar to the [NRDS CFE NOM schedule Terraform file](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/modules/schedules/nrds_cfe_nom_schedules.tf), the accompanying [execution file templates](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json), and a [generation script](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/python/src/research_datastream/gen_vpu_execs.py) to create those execution files.
 
 # AWS
 In order to go from cloning this repository to executing NextGen simulations in AWS cloud, see this [document](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/GETTING_STARTED.md).
