@@ -648,14 +648,14 @@ jobs:
           echo "::notice::Terraform Destroy completed successfully"
         continue-on-error: true
       
-      - name: Terraform Destroy - Attempt 2
-        if: steps.destroy_attempt1.outcome == 'failure'
-        id: destroy_attempt2
-        run: |
-          echo "::warning::Retrying destroy after 30s..."
-          sleep 30
-          terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
-        continue-on-error: true
+      # - name: Terraform Destroy - Attempt 2
+      #   if: steps.destroy_attempt1.outcome == 'failure'
+      #   id: destroy_attempt2
+      #   run: |
+      #     echo "::warning::Retrying destroy after 30s..."
+      #     sleep 30
+      #     terraform destroy -var-file=./${{ env.TF_VAR_FILE }} -auto-approve
+      #   continue-on-error: true
       
       - name: Final State Check
         if: always()
