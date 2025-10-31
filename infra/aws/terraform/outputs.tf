@@ -1,8 +1,8 @@
 output "datastream_arns" {
-  value = aws_sfn_state_machine.datastream_state_machine.arn
+  value = module.nrds_orchestration.datastream_arns
 }
 
 resource "local_file" "write_arn" {
-  content  = aws_sfn_state_machine.datastream_state_machine.arn
+  content  = module.nrds_orchestration.datastream_arns
   filename = "${path.module}/sm_ARN.txt"
 }
