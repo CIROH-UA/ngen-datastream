@@ -304,7 +304,7 @@ jobs:
       with:
         name: terraform-outputs-${{ github.sha }}
         path: infra/aws/terraform/terraform_outputs.json
-        retention-days: 30     
+        retention-days: 10
         
   test-all-vpus:
     runs-on: ubuntu-latest
@@ -637,32 +637,6 @@ jobs:
                     --region ${{ env.AWS_REGION }} 2>/dev/null || true
                 fi
               done
-          fi
-        continue-on-error: true
-      
-      - name: Terminate Test EC2 Instances
-        run: |
-          echo "Terminating test EC2 instances..."
-          
-          # Find all instances with test tags
-          TEST_INSTANCES=$(aws ec2 describe-instances \
-            --filters \
-              "Name=tag:Project,Values=fp_test_git_actions_vpu_*" \
-              "Name=instance-state-name,Values=running,pending,stopped,stopping" \
-            --query 'Reservations[*].Instances[*].InstanceId' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-          
-          if [ -n "$TEST_INSTANCES" ]; then
-            echo "Terminating instances: $TEST_INSTANCES"
-            aws ec2 terminate-instances \
-              --instance-ids $TEST_INSTANCES \
-              --region ${{ env.AWS_REGION }}
-            
-            echo "Waiting for instances to terminate..."
-            sleep 30
-          else
-            echo "No test instances found"
           fi
         continue-on-error: true
       
