@@ -1,124 +1,112 @@
-name: NRDS Health Check and Auto-Rerun
+name: Test VPUs and Run Types (Standalone)
 
 on:
   workflow_dispatch:
-    inputs:
-      start_date:
-        description: 'Start date (YYYYMMDD)'
-        required: false
-        default: ''
-      end_date:
-        description: 'End date (YYYYMMDD)'
-        required: false
-        default: ''
-      vpus:
-        description: 'VPUs (comma-separated or "all")'
-        required: false
-        default: 'all'
-      run_types:
-        description: 'Run types (comma-separated or "all")'
-        required: false
-        default: 'all'
-      auto_rerun:
-        description: 'Automatically trigger reruns for failures'
-        type: boolean
-        default: false
-  schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
 
-permissions:
-  contents: read
+env:
+  AWS_REGION: us-east-1
+  DATE: 20250905
 
 jobs:
-  health-check:
+  test-all-vpus-and-run-types:
     runs-on: ubuntu-latest
-    outputs:
-      has_failures: ${{ steps.health_check.outputs.has_failures }}
-      failure_count: ${{ steps.health_check.outputs.failure_count }}
-      failures: ${{ steps.health_check.outputs.failures }}
+    strategy:
+      fail-fast: false
+      matrix:
+        vpu: ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09", "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"]
+        run_type: ["short_range", "medium_range"] 
+    permissions:
+      id-token: write
+      contents: read
+     
+    env:
+      VPU: ${{ matrix.vpu }}
+      RUN_TYPE: ${{ matrix.run_type }}
+      DATE: 20250905
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Test-${{ matrix.run_type }}-VPU-${{ matrix.vpu }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Set Parameters
-        id: params
         run: |
-          # Default: check last 7 days for manual runs, yesterday for scheduled
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "${{ github.event.inputs.start_date }}" ]; then
-              START_DATE="${{ github.event.inputs.start_date }}"
-            else
-              START_DATE=$(date -d '7 days ago' +%Y%m%d)
-            fi
-            
-            if [ -n "${{ github.event.inputs.end_date }}" ]; then
-              END_DATE="${{ github.event.inputs.end_date }}"
-            else
-              END_DATE=$(date -d 'yesterday' +%Y%m%d)
-            fi
-            
-            VPUS="${{ github.event.inputs.vpus }}"
-            RUN_TYPES="${{ github.event.inputs.run_types }}"
-            AUTO_RERUN="${{ github.event.inputs.auto_rerun }}"
-          else
-            # Scheduled run - check yesterday only
-            START_DATE=$(date -d 'yesterday' +%Y%m%d)
-            END_DATE=$(date -d 'yesterday' +%Y%m%d)
-            VPUS="all"
-            RUN_TYPES="all"
-            AUTO_RERUN="true"
+          sudo apt-get update
+          sudo apt-get install -y jq
+          pip install --upgrade awscli boto3 pandas
+
+      - name: Generate execution files using Python script
+        run: |
+          cd infra/aws
+          python python/src/research_datastream/gen_vpu_execs.py \
+            --arch arm \
+            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+            --ami_file terraform/modules/schedules/config/community_ami.txt \
+            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+            --out_dir test_executions
+
+      - name: Determine execution file path
+        id: exec_path
+        run: |
+          cd infra/aws
+          
+          # Find the execution file for this run_type and VPU
+          # The file structure varies by run_type (e.g., short_range/00/, medium_range/00/1/, etc.)
+          exec_file=$(find test_executions/${{ env.RUN_TYPE }} -name "execution_datastream_${{ env.VPU }}.json" | head -n 1)
+          
+          if [ -z "$exec_file" ]; then
+            echo "::error::Could not find execution file for run_type=${{ env.RUN_TYPE }}, VPU=${{ env.VPU }}"
+            exit 1
           fi
           
-          echo "start_date=$START_DATE" >> $GITHUB_OUTPUT
-          echo "end_date=$END_DATE" >> $GITHUB_OUTPUT
-          echo "vpus=$VPUS" >> $GITHUB_OUTPUT
-          echo "run_types=$RUN_TYPES" >> $GITHUB_OUTPUT
-          echo "auto_rerun=$AUTO_RERUN" >> $GITHUB_OUTPUT
-          
-          echo "Health check parameters:"
-          echo "  Date range: $START_DATE to $END_DATE"
-          echo "  VPUs: $VPUS"
-          echo "  Run types: $RUN_TYPES"
-          echo "  Auto rerun: $AUTO_RERUN"
+          echo "Found execution file: $exec_file"
+          echo "exec_file=$exec_file" >> "$GITHUB_OUTPUT"
 
-      - name: Run Health Check and Capture Failures
-        id: health_check
+      - name: Modify execution for testing
         run: |
-          ./check_datastream_outputs.sh \
-            --start ${{ steps.params.outputs.start_date }} \
-            --end ${{ steps.params.outputs.end_date }} \
-            --vpus ${{ steps.params.outputs.vpus }} \
-            --run_types ${{ steps.params.outputs.run_types }} 2>&1 | tee health_output.txt
+          cd infra/aws
+          exec_file="${{ steps.exec_path.outputs.exec_file }}"
           
-          # Parse failures into JSON array
-          failures=$(grep "missing" health_output.txt | awk '{print $1}' | while read url; do
-            date=$(echo "$url" | sed -n 's/.*ngen\.\([0-9]\{8\}\).*/\1/p')
-            type=$(echo "$url" | sed -n 's/.*ngen\.[0-9]\{8\}\/\([^\/]*\).*/\1/p')
-            cycle=$(echo "$url" | sed -n "s/.*\/$type\/\([0-9]\{2\}\).*/\1/p")
-            vpu=$(echo "$url" | sed -n 's/.*VPU_\([^\/]*\).*/\1/p')
-            
-            if [[ "$type" == "medium_range" ]]; then
-              ens=$(echo "$url" | sed -n 's/.*\/[0-9]\{2\}\/\([0-9]\)\/VPU.*/\1/p')
-              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"ensemble\":\"$ens\",\"vpu\":\"$vpu\"}"
-            else
-              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"vpu\":\"$vpu\"}"
-            fi
-          done | jq -s '.')
+          # Update for testing with custom tags and S3 prefix
+          jq --arg DATE "${{ env.DATE }}" \
+             --arg VPU "${{ env.VPU }}" \
+             --arg RUN_TYPE "${{ env.RUN_TYPE }}" '
+            .instance_parameters.TagSpecifications = [{
+              "ResourceType": "instance",
+              "Tags": [
+                {"Key": "Project", "Value": "test_\($RUN_TYPE)_vpu_\($VPU)"},
+                {"Key": "AMI_Version", "Value": "test-version"},
+                {"Key": "TestRunType", "Value": $RUN_TYPE}
+              ]
+            }] |
+            .commands |= map(
+                gsub("__S3_PREFIX__"; "tests/\($RUN_TYPE)/VPU_\($VPU)")
+              | gsub("ngen.DAILY"; "ngen.\($DATE)")
+              | gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")
+            )
+          ' "$exec_file" > temp_execution.json
           
-          # Set outputs
-          echo "failures<<EOF" >> $GITHUB_OUTPUT
-          echo "$failures" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          count=$(echo "$failures" | jq 'length')
-          echo "has_failures=$([ $count -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "failure_count=$count" >> $GITHUB_OUTPUT
-          
-          echo ""
-          echo "Total failures found: $count"
-          if [ $count -gt 0 ]; then
-            echo "$failures" | jq '.'
-          fi
+          mv temp_execution.json "$exec_file"
+          echo "::group::Modified execution file for ${{ env.RUN_TYPE }} VPU ${{ env.VPU }}"
+          cat "$exec_file"
+          echo "::endgroup::"
+      
+      - name: Verify file was created successfully
+        run: |
+          cd infra/aws
+          exec_file="${{ steps.exec_path.outputs.exec_file }}"
+          echo "✅ Successfully processed: ${{ env.RUN_TYPE }} / VPU ${{ env.VPU }}"
+          echo "📁 File location: $exec_file"
+          echo "📊 File size: $(wc -c < "$exec_file") bytes"
