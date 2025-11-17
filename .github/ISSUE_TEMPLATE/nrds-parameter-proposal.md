@@ -55,7 +55,7 @@ Attach or provide links:
 ---
 
 ## Parameters schema (required)
-List columns in your parameters file 
+List columns in your parameters file.
 
 ---
 
