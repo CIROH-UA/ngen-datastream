@@ -46,11 +46,11 @@ Briefly describe what you're proposing and expected impact.
 
 ## Files (required)
 Attach or provide links:
-- .parquet or .csv: 
-- hydrofabric file(s) (if changed): 
-- README/metadata: 
-- Generation scripts/repo: 
-- Evaluation artifacts: 
+- .parquet or .csv:
+- hydrofabric file(s) (if changed):
+- README/metadata:
+- Generation scripts/repo:
+- Evaluation artifacts:
 
 ---
 
