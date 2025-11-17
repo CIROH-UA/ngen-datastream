@@ -33,7 +33,7 @@ Briefly describe what you're proposing and expected impact.
 ---
 
 ## Target NRDS configuration (required)
-- s3 path/ HydroShare url (with details)
+- S3 path/HydroShare URL (with details)
 - Hydrofabric name & version:
 
 ---
