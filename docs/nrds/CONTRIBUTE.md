@@ -3,4 +3,4 @@ The current configuration of the NextGen Research DataStream (NRDS) is public [h
 To contribute to this realization file follow these steps.
 1) Improve upon parameterization in the VPU realization file
 2) Go to Issues and click on New Issue. Select "Propose NRDS/NextGen Research DataStream parameter update" template.
-3) Add details in this ticket containing your updated NextGen configuration and add the label "NRDS Community Contributions"
+3) Add details in the issue containing your updated NextGen configuration and add the label "NRDS Community Contributions"
