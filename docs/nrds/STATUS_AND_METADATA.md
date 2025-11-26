@@ -1,4 +1,26 @@
 # Status
+Last Updated: 20251126
+
+Changes
+* All datastream output data is now being written to the prefix `outputs/<DATASTREAM_NAME>/v2.2_hydrofabric/ngen.<DATE>/<RUN_TYPE>/<INIT>/<VPU>`
+* The troute file has been separated from the tar file and exists at the additional prefix of `ngen-run/outputs/troute/*.nc`
+* A development lstm datastream has been deployed with this [NextGen Rust-base LSTM realization.](https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_rust_lstm_troute.json) 
+
+Status LSTM DataStream (DEV)
+* Output data exists at `outputs/lstm/v2.2_hydrofabric/...`
+* VPU 09 only
+* Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
+* Cold start
+* v2.2 hydrofabric
+
+Status CFE NOM DataStream
+* Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
+* All VPUs
+* Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
+* Cold start
+* v2.2 hydrofabric
+  
+# Status
 Last Updated: 20251014
 
 Changes
