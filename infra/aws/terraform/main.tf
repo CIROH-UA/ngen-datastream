@@ -20,6 +20,10 @@ variable "profile_name" {}
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
 
+variable "state_machine_arn" {
+  type = string
+}
+
 module "nrds_orchestration" {
     source = "./modules/orchestration"
 
@@ -45,4 +49,6 @@ module "nrds_schedules" {
     region = var.region
     scheduler_policy_name = var.scheduler_policy_name
     scheduler_role_name = var.scheduler_role_name
+    state_machine_arn = module.nrds_orchestration.datastream_arn
+
 }

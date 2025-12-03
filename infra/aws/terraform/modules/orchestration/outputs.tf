@@ -1,4 +1,4 @@
-output "datastream_arns" {
+output "datastream_arn" {
   value = aws_sfn_state_machine.datastream_state_machine.arn
 }
 
