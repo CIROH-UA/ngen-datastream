@@ -7,15 +7,15 @@ resource "aws_iam_policy" "scheduler_policy" {
     Version = "2012-10-17",
     Statement = [
       {
-            "Effect": "Allow",
-            Action = [
-                "states:StartExecution",
-                "events:PutTargets",
-                "events:PutRule",
-                "events:PutPermission"
-              ],
-            "Resource": ["*"]
-        }
+        "Effect" : "Allow",
+        Action = [
+          "states:StartExecution",
+          "events:PutTargets",
+          "events:PutRule",
+          "events:PutPermission"
+        ],
+        "Resource" : ["*"]
+      }
     ]
   })
 }
@@ -34,8 +34,7 @@ resource "aws_iam_role" "scheduler_role" {
   })
 }
 
-resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
-  name       = "datastream_scheduler_attachment"
-  roles      = [aws_iam_role.scheduler_role.name]
+resource "aws_iam_role_policy_attachment" "datastream_scheduler_attachment" {
+  role       = aws_iam_role.scheduler_role.name
   policy_arn = aws_iam_policy.scheduler_policy.arn
 }

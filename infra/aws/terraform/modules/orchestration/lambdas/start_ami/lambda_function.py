@@ -109,7 +109,12 @@ def lambda_handler(event, context):
 
     event['instance_parameters']['MaxCount'] = 1
     event['instance_parameters']['MinCount'] = 1
-    params             = event['instance_parameters']
+
+    # Remove InstanceId if present (can happen on retries after a previous successful run)
+    # run_instances() does not accept InstanceId as a parameter - it's only for tracking
+    params = event['instance_parameters'].copy()
+    params.pop('InstanceId', None)
+
     try:
         response = client_ec2.run_instances(**params)
         instance_id = response['Instances'][0]['InstanceId']
