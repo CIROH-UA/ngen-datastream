@@ -53,3 +53,39 @@ terraform destroy -var-file=./variables.tfvars
 ```
 import_resources.sh <path-to-variables.tfvars>
 ```
+
+## Environments
+
+Multiple environments are supported via separate backend and variable files:
+
+| Environment | Backend Config | Variables | State Machine | Purpose |
+|-------------|----------------|-----------|---------------|---------|
+| dev | `backend-dev.hcl` | `variables.tfvars` | `nrds_dev_sm` | Local development |
+| test | `backend-test.hcl` | `variables-test.tfvars` | `nrds_test_sm` | CI/CD testing (`infra_deploy.yml`) |
+| healthcheck | `backend-healthcheck.hcl` | `variables-healthcheck.tfvars` | `nrds_healthcheck_sm` | Auto-rerun failures (`health_check.yml`) |
+
+### Using an Environment
+
+```bash
+# Initialize with specific backend
+terraform init -backend-config=backend-test.hcl
+
+# Apply with matching variables
+terraform apply -var-file=variables-test.tfvars
+
+# Destroy
+terraform destroy -var-file=variables-test.tfvars
+```
+
+### State Isolation
+
+Each environment has isolated Terraform state to prevent conflicts:
+- **dev**: `ciroh-terraform-state` bucket (us-east-2)
+- **test**: `ciroh-ngen-datastream-test-tfstate` bucket
+- **healthcheck**: `ciroh-ngen-datastream-test-tfstate` bucket (separate key)
+
+### Adding a New Environment
+
+1. Create `backend-{env}.hcl` with S3 state configuration
+2. Create `variables-{env}.tfvars` with unique resource names (prefix: `nrds_{env}_`)
+3. Update this table
