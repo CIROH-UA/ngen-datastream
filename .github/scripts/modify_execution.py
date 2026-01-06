@@ -30,20 +30,21 @@ def modify_execution(input_file, output_file, run_type, vpu, date, github_run_id
         # Match both $NPROCS and numeric values (gen_vpu_execs.py may have already replaced it)
         cmd = re.sub(r'-n (?:\$NPROCS|-?\d+)', '-n 7', cmd)
 
-        # Replace S3_PREFIX - handle both short paths and full paths
-        # For VPU templates: --S3_PREFIX v2.2/ngen.DAILY/$RUN_TYPE_L/$INIT/$MEMBER/VPU_$VPU
-        # For FP templates: --s3_prefix v2.2/ngen.DAILY/forcing_$RUN_TYPE_L/$INIT
-        if '--S3_PREFIX v2.2/ngen.' in cmd:
-            # VPU template pattern
+        # Replace S3_PREFIX - handle various path patterns
+        # Pattern 1: --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/...
+        # Pattern 2: --S3_PREFIX v2.2/ngen.DAILY/...
+        # Pattern 3: --s3_prefix (lowercase for FP templates)
+        if '--S3_PREFIX ' in cmd:
+            # Match any S3_PREFIX value up to the next quote or whitespace
             cmd = re.sub(
-                r'--S3_PREFIX v2\.2/ngen\.[^/]+/[^\s"\\]+',
+                r'--S3_PREFIX [^\s"\\]+',
                 f'--S3_PREFIX tests/{run_type}/VPU_{vpu}',
                 cmd
             )
-        elif '--s3_prefix v2.2/ngen.' in cmd:
-            # FP template pattern
+        elif '--s3_prefix ' in cmd:
+            # FP template pattern (lowercase)
             cmd = re.sub(
-                r'--s3_prefix v2\.2/ngen\.[^/]+/forcing_[^\s"\\]+',
+                r'--s3_prefix [^\s"\\]+',
                 f'--s3_prefix tests/{run_type}/VPU_{vpu}',
                 cmd
             )
