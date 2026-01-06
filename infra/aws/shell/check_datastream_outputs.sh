@@ -29,16 +29,43 @@ if [ -z "$RUN_TYPES" ]; then RUN_TYPES="all"; fi
 if [ -z "$INIT_CYCLES" ]; then INIT_CYCLES="all"; fi
 if [ -z "$ENSEMBLES" ]; then ENSEMBLES="all"; fi
 
-start_epoch=$(date -d "$START_DATE" +%s)
-end_epoch=$(date -d "$END_DATE" +%s)
+# Cross-platform date conversion
+date_to_epoch() {
+    local dt="$1"
+    if date --version >/dev/null 2>&1; then
+        # GNU date (Linux)
+        date -d "$dt" +%s
+    else
+        # BSD date (macOS)
+        date -j -f "%Y%m%d" "$dt" +%s
+    fi
+}
 
-BASE_URL="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2"
+epoch_to_date() {
+    local ep="$1"
+    if date --version >/dev/null 2>&1; then
+        # GNU date (Linux)
+        date -d "@$ep" +%Y%m%d
+    else
+        # BSD date (macOS)
+        date -j -f "%s" "$ep" +%Y%m%d
+    fi
+}
 
-# --- Define valid init cycles for each type ---
-declare -A INIT_CYCLES_ALLOWED
-INIT_CYCLES_ALLOWED[short_range]="00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23"
-INIT_CYCLES_ALLOWED[medium_range]="00 06 12 18"
-INIT_CYCLES_ALLOWED[analysis_assim_extend]="16"
+start_epoch=$(date_to_epoch "$START_DATE")
+end_epoch=$(date_to_epoch "$END_DATE")
+
+BASE_URL="https://ciroh-community-ngen-datastream.s3.amazonaws.com/outputs/cfe_nom/v2.2_hydrofabric"
+
+# Init cycles for each type
+get_init_cycles() {
+    local type="$1"
+    case "$type" in
+        short_range) echo "00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23";;
+        medium_range) echo "00 06 12 18";;
+        analysis_assim_extend) echo "16";;
+    esac
+}
 
 # VPU list
 if [ "$VPUS" = "all" ]; then
@@ -49,9 +76,9 @@ fi
 
 # Run types
 if [ "$RUN_TYPES" = "all" ]; then
-    TYPES=("short_range" "medium_range" "analysis_assim_extend")
+    TYPES="short_range medium_range analysis_assim_extend"
 else
-    TYPES=($(echo "$RUN_TYPES" | sed 's/,/ /g'))
+    TYPES=$(echo "$RUN_TYPES" | sed 's/,/ /g')
 fi
 
 # Custom init cycles
@@ -67,22 +94,31 @@ fi
 
 # Ensembles
 if [ "$ENSEMBLES" = "all" ]; then
-    ENSEMBLE_LIST="1 2 3 4 5 6 7"
+    ENSEMBLE_LIST="1"
 else
     ENSEMBLE_LIST=$(echo "$ENSEMBLES" | sed 's/,/ /g')
 fi
 
-# Counters
-declare -A SUCCESS FAIL
-declare -A SUCCESS_INIT FAIL_INIT
-declare -A SUCCESS_VPU_TYPE FAIL_VPU_TYPE   # NEW: per-VPU per-type
+# Counters - use simple variables instead of associative arrays
+success_total=0
+fail_total=0
+success_short_range=0
+fail_short_range=0
+success_medium_range=0
+fail_medium_range=0
+success_analysis_assim_extend=0
+fail_analysis_assim_extend=0
+
+# Track failures
+FAILURES=""
 
 # Loop dates
-for (( epoch = start_epoch; epoch <= end_epoch; epoch += 86400 )); do
-    current_date=$(date -d @"$epoch" +%Y%m%d)
+epoch=$start_epoch
+while [ "$epoch" -le "$end_epoch" ]; do
+    current_date=$(epoch_to_date "$epoch")
 
-    for type in "${TYPES[@]}"; do
-        allowed_hours=${INIT_CYCLES_ALLOWED[$type]}
+    for type in $TYPES; do
+        allowed_hours=$(get_init_cycles "$type")
 
         # Determine hours to check
         if [ "$INIT_CYCLES" = "all" ]; then
@@ -90,7 +126,7 @@ for (( epoch = start_epoch; epoch <= end_epoch; epoch += 86400 )); do
         else
             type_hours=""
             for h in $CUSTOM_HOURS; do
-                if [[ " $allowed_hours " =~ " $h " ]]; then
+                if echo " $allowed_hours " | grep -q " $h "; then
                     type_hours="$type_hours $h"
                 fi
             done
@@ -105,80 +141,61 @@ for (( epoch = start_epoch; epoch <= end_epoch; epoch += 86400 )); do
                         url="${BASE_URL}/ngen.${current_date}/${type}/${hour}/${ens}/VPU_${vpu}/ngen-run.tar.gz"
                         status=$(curl -I -s -o /dev/null -w "%{http_code}" "$url")
                         if [ "$status" = "200" ]; then
-                            ((SUCCESS["vpu_${vpu}"]++))
-                            ((SUCCESS["type_${type}"]++))
-                            ((SUCCESS_VPU_TYPE["${vpu}_${type}"]++))
-                            ((SUCCESS_INIT["${type}_${hour}"]++))
+                            success_total=$((success_total + 1))
+                            success_medium_range=$((success_medium_range + 1))
                         else
                             echo "$url missing (status: $status)"
-                            ((FAIL["vpu_${vpu}"]++))
-                            ((FAIL["type_${type}"]++))
-                            ((FAIL_VPU_TYPE["${vpu}_${type}"]++))
-                            ((FAIL_INIT["${type}_${hour}"]++))
+                            fail_total=$((fail_total + 1))
+                            fail_medium_range=$((fail_medium_range + 1))
+                            FAILURES="$FAILURES\n$url"
                         fi
                     done
                 else
                     url="${BASE_URL}/ngen.${current_date}/${type}/${hour}/VPU_${vpu}/ngen-run.tar.gz"
                     status=$(curl -I -s -o /dev/null -w "%{http_code}" "$url")
                     if [ "$status" = "200" ]; then
-                        ((SUCCESS["vpu_${vpu}"]++))
-                        ((SUCCESS["type_${type}"]++))
-                        ((SUCCESS_VPU_TYPE["${vpu}_${type}"]++))
-                        ((SUCCESS_INIT["${type}_${hour}"]++))
+                        success_total=$((success_total + 1))
+                        case "$type" in
+                            short_range) success_short_range=$((success_short_range + 1));;
+                            analysis_assim_extend) success_analysis_assim_extend=$((success_analysis_assim_extend + 1));;
+                        esac
                     else
                         echo "$url missing (status: $status)"
-                        ((FAIL["vpu_${vpu}"]++))
-                        ((FAIL["type_${type}"]++))
-                        ((FAIL_VPU_TYPE["${vpu}_${type}"]++))
-                        ((FAIL_INIT["${type}_${hour}"]++))
+                        fail_total=$((fail_total + 1))
+                        case "$type" in
+                            short_range) fail_short_range=$((fail_short_range + 1));;
+                            analysis_assim_extend) fail_analysis_assim_extend=$((fail_analysis_assim_extend + 1));;
+                        esac
+                        FAILURES="$FAILURES\n$url"
                     fi
                 fi
             done
         done
     done
+
+    # Increment by one day (86400 seconds)
+    epoch=$((epoch + 86400))
 done
 
-# --- Summary function ---
-print_summary() {
-    echo
-    echo "===== OVERALL SUMMARY ====="
-    echo "--- Run Types ---"
-    for type in "${TYPES[@]}"; do
-        key="type_${type}"
-        s=${SUCCESS[$key]:-0}
-        f=${FAIL[$key]:-0}
-        echo "${type}: successes=$s, failures=$f"
-    done
-    echo
+# Summary
+echo ""
+echo "===== OVERALL SUMMARY ====="
+echo "--- Run Types ---"
+for type in $TYPES; do
+    case "$type" in
+        short_range) echo "short_range: successes=$success_short_range, failures=$fail_short_range";;
+        medium_range) echo "medium_range: successes=$success_medium_range, failures=$fail_medium_range";;
+        analysis_assim_extend) echo "analysis_assim_extend: successes=$success_analysis_assim_extend, failures=$fail_analysis_assim_extend";;
+    esac
+done
+echo ""
+echo "--- Total ---"
+echo "Successes: $success_total"
+echo "Failures: $fail_total"
+echo ""
 
-    echo "--- VPUs ---"
-    for vpu in $(printf "%s\n" $VPU_LIST | sort -V); do
-        total_s=${SUCCESS["vpu_${vpu}"]:-0}
-        total_f=${FAIL["vpu_${vpu}"]:-0}
-
-        s_short=${SUCCESS_VPU_TYPE["${vpu}_short_range"]:-0}
-        s_medium=${SUCCESS_VPU_TYPE["${vpu}_medium_range"]:-0}
-        s_assim=${SUCCESS_VPU_TYPE["${vpu}_analysis_assim_extend"]:-0}
-
-        f_short=${FAIL_VPU_TYPE["${vpu}_short_range"]:-0}
-        f_medium=${FAIL_VPU_TYPE["${vpu}_medium_range"]:-0}
-        f_assim=${FAIL_VPU_TYPE["${vpu}_analysis_assim_extend"]:-0}
-
-        echo "${vpu}: successes=${total_s}(${s_short},${s_medium},${s_assim}), failures=${total_f}(${f_short},${f_medium},${f_assim})"
-    done
-    echo
-
-    if [[ " ${TYPES[*]} " =~ " medium_range " ]]; then
-        echo "--- Ensembles ---"
-        for ens in $(echo $ENSEMBLE_LIST | tr ' ' '\n' | sort -n); do
-            key="ensemble_${ens}"
-            s=${SUCCESS[$key]:-0}
-            f=${FAIL[$key]:-0}
-            echo "${ens}: successes=$s, failures=$f"
-        done
-        echo
-    fi
-}
-
-# --- Print single summary only ---
-print_summary
+if [ "$fail_total" -gt 0 ]; then
+    exit 1
+else
+    exit 0
+fi
