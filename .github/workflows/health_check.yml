@@ -3,12 +3,8 @@ name: NRDS Health Check and Auto-Rerun
 on:
   workflow_dispatch:
     inputs:
-      start_date:
-        description: 'Start date (YYYYMMDD)'
-        required: false
-        default: ''
-      end_date:
-        description: 'End date (YYYYMMDD)'
+      date:
+        description: 'Date to check (YYYYMMDD, defaults to yesterday)'
         required: false
         default: ''
       vpus:
@@ -22,20 +18,34 @@ on:
       auto_rerun:
         description: 'Automatically trigger reruns for failures'
         type: boolean
-        default: false
+        default: true
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: '0 12 * * *'  # Daily at 12:00 UTC (after morning runs complete)
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: 1.10.0
+  TF_BACKEND: healthcheck
+  TF_VAR_FILE: variables-healthcheck.tfvars
+  # Maximum number of failures to auto-rerun. If exceeded, skip rerun and alert only.
+  # This prevents runaway costs when systemic issues cause many failures.
+  MAX_RERUN_FAILURES: 20
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   health-check:
+    name: Check Previous Day Outputs
     runs-on: ubuntu-latest
     outputs:
       has_failures: ${{ steps.health_check.outputs.has_failures }}
       failure_count: ${{ steps.health_check.outputs.failure_count }}
       failures: ${{ steps.health_check.outputs.failures }}
+      auto_rerun: ${{ steps.params.outputs.auto_rerun }}
+      check_date: ${{ steps.params.outputs.check_date }}
+      threshold_exceeded: ${{ steps.health_check.outputs.threshold_exceeded }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,79 +56,518 @@ jobs:
       - name: Set Parameters
         id: params
         run: |
-          # Default: check last 7 days for manual runs, yesterday for scheduled
+          # Get yesterday's date (works on Ubuntu/Linux)
+          YESTERDAY=$(date -d 'yesterday' +%Y%m%d)
+
+          # Use input date or default to yesterday
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "${{ github.event.inputs.start_date }}" ]; then
-              START_DATE="${{ github.event.inputs.start_date }}"
+            if [ -n "${{ github.event.inputs.date }}" ]; then
+              CHECK_DATE="${{ github.event.inputs.date }}"
             else
-              START_DATE=$(date -d '7 days ago' +%Y%m%d)
+              CHECK_DATE="$YESTERDAY"
             fi
-            
-            if [ -n "${{ github.event.inputs.end_date }}" ]; then
-              END_DATE="${{ github.event.inputs.end_date }}"
-            else
-              END_DATE=$(date -d 'yesterday' +%Y%m%d)
-            fi
-            
             VPUS="${{ github.event.inputs.vpus }}"
             RUN_TYPES="${{ github.event.inputs.run_types }}"
             AUTO_RERUN="${{ github.event.inputs.auto_rerun }}"
           else
-            # Scheduled run - check yesterday only
-            START_DATE=$(date -d 'yesterday' +%Y%m%d)
-            END_DATE=$(date -d 'yesterday' +%Y%m%d)
+            # Scheduled run - check yesterday
+            CHECK_DATE="$YESTERDAY"
             VPUS="all"
             RUN_TYPES="all"
             AUTO_RERUN="true"
           fi
-          
-          echo "start_date=$START_DATE" >> $GITHUB_OUTPUT
-          echo "end_date=$END_DATE" >> $GITHUB_OUTPUT
+
+          echo "check_date=$CHECK_DATE" >> $GITHUB_OUTPUT
           echo "vpus=$VPUS" >> $GITHUB_OUTPUT
           echo "run_types=$RUN_TYPES" >> $GITHUB_OUTPUT
           echo "auto_rerun=$AUTO_RERUN" >> $GITHUB_OUTPUT
-          
+
           echo "Health check parameters:"
-          echo "  Date range: $START_DATE to $END_DATE"
+          echo "  Check date: $CHECK_DATE"
           echo "  VPUs: $VPUS"
           echo "  Run types: $RUN_TYPES"
           echo "  Auto rerun: $AUTO_RERUN"
 
-      - name: Run Health Check and Capture Failures
+      - name: Check tar files and capture failures
         id: health_check
         run: |
-          ./check_datastream_outputs.sh \
-            --start ${{ steps.params.outputs.start_date }} \
-            --end ${{ steps.params.outputs.end_date }} \
-            --vpus ${{ steps.params.outputs.vpus }} \
-            --run_types ${{ steps.params.outputs.run_types }} 2>&1 | tee health_output.txt
-          
-          # Parse failures into JSON array
-          failures=$(grep "missing" health_output.txt | awk '{print $1}' | while read url; do
-            date=$(echo "$url" | sed -n 's/.*ngen\.\([0-9]\{8\}\).*/\1/p')
-            type=$(echo "$url" | sed -n 's/.*ngen\.[0-9]\{8\}\/\([^\/]*\).*/\1/p')
-            cycle=$(echo "$url" | sed -n "s/.*\/$type\/\([0-9]\{2\}\).*/\1/p")
-            vpu=$(echo "$url" | sed -n 's/.*VPU_\([^\/]*\).*/\1/p')
-            
-            if [[ "$type" == "medium_range" ]]; then
-              ens=$(echo "$url" | sed -n 's/.*\/[0-9]\{2\}\/\([0-9]\)\/VPU.*/\1/p')
-              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"ensemble\":\"$ens\",\"vpu\":\"$vpu\"}"
-            else
-              echo "{\"date\":\"$date\",\"type\":\"$type\",\"cycle\":\"$cycle\",\"vpu\":\"$vpu\"}"
-            fi
-          done | jq -s '.')
-          
+          CHECK_DATE="${{ steps.params.outputs.check_date }}"
+          VPUS="${{ steps.params.outputs.vpus }}"
+          RUN_TYPES="${{ steps.params.outputs.run_types }}"
+
+          # S3 base URL for outputs
+          BASE_URL="https://ciroh-community-ngen-datastream.s3.amazonaws.com/outputs/cfe_nom/v2.2_hydrofabric"
+
+          # VPU list
+          if [ "$VPUS" = "all" ]; then
+            VPU_LIST="01 02 03N 03S 03W 04 05 06 07 08 09 10U 10L 11 12 13 14 15 16 17 18"
+          else
+            VPU_LIST=$(echo "$VPUS" | sed 's/,/ /g')
+          fi
+
+          # Run types and their init cycles
+          if [ "$RUN_TYPES" = "all" ]; then
+            TYPES="short_range medium_range analysis_assim_extend"
+          else
+            TYPES=$(echo "$RUN_TYPES" | sed 's/,/ /g')
+          fi
+
+          # Tracking
+          FAILURES="[]"
+          success_count=0
+          fail_count=0
+
+          echo "Checking outputs for date: $CHECK_DATE"
+          echo "Base URL: $BASE_URL"
+          echo ""
+
+          for type in $TYPES; do
+            # Get init cycles for this type
+            case "$type" in
+              short_range) CYCLES="00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23";;
+              medium_range) CYCLES="00 06 12 18";;
+              analysis_assim_extend) CYCLES="16";;
+            esac
+
+            for cycle in $CYCLES; do
+              for vpu in $VPU_LIST; do
+                if [ "$type" = "medium_range" ]; then
+                  # Medium range only produces ensemble member 1 in production
+                  # (members 2-7 are not currently generated)
+                  ens=1
+                  url="${BASE_URL}/ngen.${CHECK_DATE}/${type}/${cycle}/${ens}/VPU_${vpu}/ngen-run.tar.gz"
+                  status=$(curl -I -s -o /dev/null -w "%{http_code}" "$url" --connect-timeout 5 --max-time 10)
+
+                  if [ "$status" = "200" ]; then
+                    success_count=$((success_count + 1))
+                  else
+                    echo "MISSING: ${type}/${cycle}/${ens}/VPU_${vpu} (status: $status)"
+                    fail_count=$((fail_count + 1))
+                    FAILURES=$(echo "$FAILURES" | jq --arg date "$CHECK_DATE" --arg type "$type" --arg cycle "$cycle" --arg ens "$ens" --arg vpu "$vpu" \
+                      '. + [{"date": $date, "type": $type, "cycle": $cycle, "ensemble": $ens, "vpu": $vpu}]')
+                  fi
+                else
+                  url="${BASE_URL}/ngen.${CHECK_DATE}/${type}/${cycle}/VPU_${vpu}/ngen-run.tar.gz"
+                  status=$(curl -I -s -o /dev/null -w "%{http_code}" "$url" --connect-timeout 5 --max-time 10)
+
+                  if [ "$status" = "200" ]; then
+                    success_count=$((success_count + 1))
+                  else
+                    echo "MISSING: ${type}/${cycle}/VPU_${vpu} (status: $status)"
+                    fail_count=$((fail_count + 1))
+                    FAILURES=$(echo "$FAILURES" | jq --arg date "$CHECK_DATE" --arg type "$type" --arg cycle "$cycle" --arg vpu "$vpu" \
+                      '. + [{"date": $date, "type": $type, "cycle": $cycle, "vpu": $vpu}]')
+                  fi
+                fi
+              done
+            done
+          done
+
           # Set outputs
           echo "failures<<EOF" >> $GITHUB_OUTPUT
-          echo "$failures" >> $GITHUB_OUTPUT
+          echo "$FAILURES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
-          count=$(echo "$failures" | jq 'length')
-          echo "has_failures=$([ $count -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "failure_count=$count" >> $GITHUB_OUTPUT
-          
+
+          echo "has_failures=$([ "$fail_count" -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "failure_count=$fail_count" >> $GITHUB_OUTPUT
+
+          # Check if failure count exceeds threshold
+          MAX_FAILURES="${{ env.MAX_RERUN_FAILURES }}"
+          if [ "$fail_count" -gt "$MAX_FAILURES" ]; then
+            echo "threshold_exceeded=true" >> $GITHUB_OUTPUT
+            echo ""
+            echo "::warning::Failure count ($fail_count) exceeds threshold ($MAX_FAILURES). Auto-rerun will be SKIPPED."
+            echo "::warning::This likely indicates a systemic issue. Please investigate manually."
+          else
+            echo "threshold_exceeded=false" >> $GITHUB_OUTPUT
+          fi
+
           echo ""
-          echo "Total failures found: $count"
-          if [ $count -gt 0 ]; then
-            echo "$failures" | jq '.'
+          echo "===== SUMMARY ====="
+          echo "Date checked: $CHECK_DATE"
+          echo "Successes: $success_count"
+          echo "Failures: $fail_count"
+          echo "Max rerun threshold: $MAX_FAILURES"
+
+          if [ "$fail_count" -gt 0 ]; then
+            echo ""
+            echo "Failed runs:"
+            echo "$FAILURES" | jq '.'
+          fi
+
+      - name: Create Summary
+        run: |
+          echo "## Health Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date checked:** ${{ steps.params.outputs.check_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Failures found:** ${{ steps.health_check.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Max rerun threshold:** ${{ env.MAX_RERUN_FAILURES }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Auto-rerun enabled:** ${{ steps.params.outputs.auto_rerun }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.health_check.outputs.threshold_exceeded }}" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### :warning: Threshold Exceeded - Auto-Rerun SKIPPED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The number of failures (${{ steps.health_check.outputs.failure_count }}) exceeds the maximum threshold (${{ env.MAX_RERUN_FAILURES }})." >> $GITHUB_STEP_SUMMARY
+            echo "This likely indicates a **systemic issue** rather than individual run failures." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Recommended actions:**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check AWS infrastructure (Step Functions, EC2, S3)" >> $GITHUB_STEP_SUMMARY
+            echo "2. Review CloudWatch logs for patterns" >> $GITHUB_STEP_SUMMARY
+            echo "3. Manually rerun specific VPUs once issue is resolved" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.health_check.outputs.has_failures }}" = "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Missing Outputs" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            echo '${{ steps.health_check.outputs.failures }}' | jq '.' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  deploy-infrastructure:
+    name: Deploy Rerun Infrastructure
+    needs: health-check
+    if: |
+      needs.health-check.outputs.has_failures == 'true' &&
+      needs.health-check.outputs.auto_rerun == 'true' &&
+      needs.health-check.outputs.threshold_exceeded != 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      state_machine_arn: ${{ steps.get_sm_arn.outputs.arn }}
+    defaults:
+      run:
+        working-directory: infra/aws/terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install --upgrade pip boto3 pandas
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-HealthCheckDeploy
+
+      - name: Generate execution files
+        working-directory: infra/aws
+        run: |
+          echo "Generating VPU execution files..."
+          python python/src/research_datastream/gen_vpu_execs.py \
+            --arch arm \
+            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+            --ami_file terraform/modules/schedules/config/community_ami.txt \
+            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+            --out_dir terraform/modules/schedules/executions
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -backend-config=backend-${TF_BACKEND}.hcl
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -var-file="${TF_VAR_FILE}" -auto-approve
+          echo "Infrastructure deployed successfully"
+
+      - name: Get State Machine ARN
+        id: get_sm_arn
+        run: |
+          ARN=$(aws stepfunctions describe-state-machine \
+            --state-machine-arn "arn:aws:states:${{ env.AWS_REGION }}:$(aws sts get-caller-identity --query Account --output text):stateMachine:nrds_healthcheck_sm" \
+            --query 'stateMachineArn' \
+            --output text)
+          echo "arn=$ARN" >> $GITHUB_OUTPUT
+          echo "State Machine ARN: $ARN"
+
+      - name: Wait for IAM propagation
+        run: |
+          echo "Waiting for IAM permissions to propagate..."
+          sleep 60
+
+  run-failed-executions:
+    name: Rerun Failed Executions
+    needs: [health-check, deploy-infrastructure]
+    if: |
+      needs.health-check.outputs.has_failures == 'true' &&
+      needs.health-check.outputs.auto_rerun == 'true' &&
+      needs.health-check.outputs.threshold_exceeded != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        failure_index: ${{ fromJson(needs.health-check.outputs.failures) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install --upgrade pip boto3 pandas
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Rerun-${{ matrix.failure_index.vpu }}
+          role-duration-seconds: 7200
+
+      - name: Generate execution files
+        working-directory: infra/aws
+        run: |
+          python python/src/research_datastream/gen_vpu_execs.py \
+            --arch arm \
+            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+            --ami_file terraform/modules/schedules/config/community_ami.txt \
+            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+            --out_dir rerun_executions
+
+      - name: Prepare execution file
+        id: prepare
+        working-directory: infra/aws
+        run: |
+          DATE="${{ matrix.failure_index.date }}"
+          TYPE="${{ matrix.failure_index.type }}"
+          CYCLE="${{ matrix.failure_index.cycle }}"
+          VPU="${{ matrix.failure_index.vpu }}"
+          ENSEMBLE="${{ matrix.failure_index.ensemble }}"
+
+          echo "Processing: $TYPE/$CYCLE${ENSEMBLE:+/$ENSEMBLE}/VPU_$VPU for date $DATE"
+
+          # Determine execution file path
+          if [ "$TYPE" = "medium_range" ] && [ -n "$ENSEMBLE" ]; then
+            EXEC_FILE="rerun_executions/${TYPE}/${CYCLE}/${ENSEMBLE}/execution_datastream_${VPU}.json"
+          else
+            EXEC_FILE="rerun_executions/${TYPE}/${CYCLE}/execution_datastream_${VPU}.json"
+          fi
+
+          if [ ! -f "$EXEC_FILE" ]; then
+            echo "::error::Execution file not found: $EXEC_FILE"
+            exit 1
+          fi
+
+          echo "Original execution file:"
+          cat "$EXEC_FILE"
+
+          # End date format: {DATE}0100 (date at 01:00 AM)
+          # This matches what modify_execution.py uses for testing
+          # The -s DAILY is kept as-is; adding -e tells datastream when to end
+          END_DATE="${DATE}0100"
+          echo "End date for datastream: $END_DATE"
+
+          # Modify execution file for rerun:
+          # For reruns, we need to:
+          # 1. Keep -s DAILY but add -e {date}0100 (datastream handles DAILY internally)
+          # 2. Replace DAILY in S3 paths with the actual date (so correct forcings are used)
+          # 3. Keep production S3 prefix (outputs go to correct location)
+          jq --arg end "$END_DATE" --arg date "$DATE" --arg run_id "${{ github.run_id }}" '
+            .commands = [.commands[] |
+              # Keep -s DAILY but add -e end_date (datastream handles DAILY for start)
+              gsub("-s DAILY "; "-s DAILY -e \($end) ") |
+              # Replace DAILY in S3 paths with actual date (for forcing file paths)
+              gsub("ngen\\.DAILY"; "ngen.\($date)")
+            ] |
+            # Add GitHubRunId tag for safe cleanup
+            .instance_parameters.TagSpecifications[0].Tags += [{"Key": "GitHubRunId", "Value": $run_id}]
+          ' "$EXEC_FILE" > modified_exec.json
+
+          echo ""
+          echo "Modified execution file:"
+          cat modified_exec.json
+
+          echo "exec_file=modified_exec.json" >> $GITHUB_OUTPUT
+
+      - name: Check and create AWS key pair
+        run: |
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text
+          fi
+
+      - name: Start Step Functions execution
+        id: stepfunction
+        working-directory: infra/aws
+        run: |
+          DATE="${{ matrix.failure_index.date }}"
+          TYPE="${{ matrix.failure_index.type }}"
+          CYCLE="${{ matrix.failure_index.cycle }}"
+          VPU="${{ matrix.failure_index.vpu }}"
+          ENSEMBLE="${{ matrix.failure_index.ensemble }}"
+
+          SM_ARN="${{ needs.deploy-infrastructure.outputs.state_machine_arn }}"
+
+          # Create unique execution name
+          TS=$(date +%Y%m%d%H%M%S%3N)
+          case "$TYPE" in
+            short_range) PREFIX="sr";;
+            medium_range) PREFIX="mr";;
+            analysis_assim_extend) PREFIX="aae";;
+          esac
+
+          NAME="rerun-${PREFIX}-${VPU}-${CYCLE}${ENSEMBLE:+-$ENSEMBLE}-${DATE}-${TS}"
+
+          echo "Starting execution: $NAME"
+
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "$SM_ARN" \
+            --name "$NAME" \
+            --input "file://${{ steps.prepare.outputs.exec_file }}" \
+            --query 'executionArn' \
+            --output text)
+
+          echo "Execution ARN: $EXEC_ARN"
+          echo "exec_arn=$EXEC_ARN" >> $GITHUB_OUTPUT
+
+          # Monitor execution
+          status="RUNNING"
+          while [ "$status" = "RUNNING" ]; do
+            sleep 30
+            status=$(aws stepfunctions describe-execution --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "Status: $status"
+          done
+
+          if [ "$status" = "SUCCEEDED" ]; then
+            echo "Execution succeeded!"
+          else
+            echo "Execution failed with status: $status"
+            aws stepfunctions describe-execution --execution-arn "$EXEC_ARN"
+            exit 1
+          fi
+
+      - name: Verify output
+        run: |
+          DATE="${{ matrix.failure_index.date }}"
+          TYPE="${{ matrix.failure_index.type }}"
+          CYCLE="${{ matrix.failure_index.cycle }}"
+          VPU="${{ matrix.failure_index.vpu }}"
+          ENSEMBLE="${{ matrix.failure_index.ensemble }}"
+
+          # Check if tar file exists in production location
+          if [ "$TYPE" = "medium_range" ] && [ -n "$ENSEMBLE" ]; then
+            URL="https://ciroh-community-ngen-datastream.s3.amazonaws.com/outputs/cfe_nom/v2.2_hydrofabric/ngen.${DATE}/${TYPE}/${CYCLE}/${ENSEMBLE}/VPU_${VPU}/ngen-run.tar.gz"
+          else
+            URL="https://ciroh-community-ngen-datastream.s3.amazonaws.com/outputs/cfe_nom/v2.2_hydrofabric/ngen.${DATE}/${TYPE}/${CYCLE}/VPU_${VPU}/ngen-run.tar.gz"
+          fi
+
+          echo "Verifying output at: $URL"
+
+          status=$(curl -I -s -o /dev/null -w "%{http_code}" "$URL")
+          if [ "$status" = "200" ]; then
+            echo "SUCCESS: Output file created!"
+          else
+            echo "WARNING: Output file not found (status: $status)"
+            # Don't fail - the step function may have succeeded but file location differs
+          fi
+
+  cleanup:
+    name: Cleanup Infrastructure
+    needs: [health-check, deploy-infrastructure, run-failed-executions]
+    if: always() && needs.deploy-infrastructure.result == 'success'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/aws/terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          pip install --upgrade pip boto3 pandas
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-HealthCheckCleanup
+
+      - name: Generate execution files
+        working-directory: infra/aws
+        run: |
+          python python/src/research_datastream/gen_vpu_execs.py \
+            --arch arm \
+            --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
+            --ami_file terraform/modules/schedules/config/community_ami.txt \
+            --exec_template_vpu terraform/modules/schedules/executions/templates/execution_datastream_VPU_template.json \
+            --exec_template_fp terraform/modules/schedules/executions/templates/execution_datastream_fp_template.json \
+            --out_dir terraform/modules/schedules/executions
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -backend-config=backend-${TF_BACKEND}.hcl
+        continue-on-error: true
+
+      - name: Terminate orphaned EC2 instances
+        run: |
+          echo "Checking for orphaned EC2 instances from this workflow run..."
+
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --filters \
+              "Name=tag:GitHubRunId,Values=${{ github.run_id }}" \
+              "Name=instance-state-name,Values=running,pending" \
+            --query 'Reservations[*].Instances[*].InstanceId' \
+            --output text)
+
+          if [ -n "$INSTANCE_IDS" ]; then
+            echo "Terminating instances: $INSTANCE_IDS"
+            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS || true
+          else
+            echo "No orphaned instances found"
+          fi
+        continue-on-error: true
+
+      - name: Terraform Destroy
+        run: |
+          terraform destroy -var-file="${TF_VAR_FILE}" -auto-approve
+        continue-on-error: true
+
+      - name: Summary
+        run: |
+          echo "## Auto-Rerun Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date checked:** ${{ needs.health-check.outputs.check_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Failures detected:** ${{ needs.health-check.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Threshold exceeded:** ${{ needs.health-check.outputs.threshold_exceeded }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.health-check.outputs.threshold_exceeded }}" = "true" ]; then
+            echo "- **Auto-rerun:** SKIPPED (too many failures)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Infrastructure deployed and cleaned up**" >> $GITHUB_STEP_SUMMARY
           fi
