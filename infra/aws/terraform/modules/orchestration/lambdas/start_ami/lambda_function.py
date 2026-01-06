@@ -1,9 +1,19 @@
 import boto3
 import botocore
+from botocore.config import Config
 import time, os, json
 
+# Configure retry for EC2 API throttling (RequestLimitExceeded)
+# https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html
+retry_config = Config(
+    retries={
+        'total_max_attempts': 15,
+        'mode': 'standard'
+    }
+)
+
 global client_ec2
-client_ec2 = boto3.client('ec2',region_name=os.environ['AWS_REGION'])
+client_ec2 = boto3.client('ec2', region_name=os.environ['AWS_REGION'], config=retry_config)
 
 REGION_NAME_MAP = {
     "us-east-1": "US East (N. Virginia)",
@@ -109,7 +119,12 @@ def lambda_handler(event, context):
 
     event['instance_parameters']['MaxCount'] = 1
     event['instance_parameters']['MinCount'] = 1
-    params             = event['instance_parameters']
+
+    # Remove InstanceId if present (can happen on retries after a previous successful run)
+    # run_instances() does not accept InstanceId as a parameter - it's only for tracking
+    params = event['instance_parameters'].copy()
+    params.pop('InstanceId', None)
+
     try:
         response = client_ec2.run_instances(**params)
         instance_id = response['Instances'][0]['InstanceId']
