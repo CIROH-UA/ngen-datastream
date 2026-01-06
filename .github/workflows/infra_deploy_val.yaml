@@ -439,6 +439,7 @@ jobs:
           # Get state machine ARN from SSM parameter (set by Terraform)
           ARN=$(aws ssm get-parameter \
             --name "/datastream/state-machine-arn" \
+            --with-decryption \
             --query 'Parameter.Value' \
             --output text \
             --region ${{ env.AWS_REGION }})
