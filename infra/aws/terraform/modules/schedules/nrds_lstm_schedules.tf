@@ -30,6 +30,7 @@ locals {
           member_suffix = ""
           member_path   = ""
           nprocs        = 3
+          timeout_s     = 3600
         }
       ]
     ]) : pair.key => pair
@@ -65,7 +66,8 @@ locals {
             member        = member
             member_suffix = "_${member}"
             member_path   = "/${member}"
-            nprocs        = 3
+            nprocs        = 7
+            timeout_s     = 7200
           }
         ]
       ]
@@ -112,11 +114,12 @@ locals {
           volume_size   = local.init_cycles_config_lstm.analysis_assim_extend.volume_size
           run_type_l    = "analysis_assim_extend"
           run_type_h    = "ANALYSIS_ASSIM_EXTEND"
-          fcst          = "f001_f028"
+          fcst          = "tm27_tm00"
           member        = ""
           member_suffix = ""
           member_path   = ""
           nprocs        = 3
+          timeout_s     = 3600
         }
       ]
     ]) : pair.key => pair
@@ -161,6 +164,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_lstm" {
       member_suffix      = each.value.member_suffix
       member_path        = each.value.member_path
       nprocs             = each.value.nprocs
+      timeout_s          = each.value.timeout_s
       ami_id             = local.lstm_ami_id
       instance_type      = each.value.instance_type
       key_name           = local.lstm_key_name
@@ -198,6 +202,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_lstm" {
       member_suffix      = each.value.member_suffix
       member_path        = each.value.member_path
       nprocs             = each.value.nprocs
+      timeout_s          = each.value.timeout_s
       ami_id             = local.lstm_ami_id
       instance_type      = each.value.instance_type
       key_name           = local.lstm_key_name
@@ -235,6 +240,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_lstm" {
       member_suffix      = each.value.member_suffix
       member_path        = each.value.member_path
       nprocs             = each.value.nprocs
+      timeout_s          = each.value.timeout_s
       ami_id             = local.lstm_ami_id
       instance_type      = each.value.instance_type
       key_name           = local.lstm_key_name
