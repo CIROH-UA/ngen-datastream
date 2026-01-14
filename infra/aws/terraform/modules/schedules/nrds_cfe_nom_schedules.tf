@@ -28,6 +28,7 @@ locals {
           fcst          = "f001_f018"
           member        = ""
           member_suffix = ""
+          member_path   = ""
           nprocs        = 3
         }
       ]
@@ -63,6 +64,7 @@ locals {
             fcst          = "f001_f240"
             member        = member
             member_suffix = "_${member}"
+            member_path   = "/${member}"
             nprocs        = 3
           }
         ]
@@ -113,6 +115,7 @@ locals {
           fcst          = "f001_f028"
           member        = ""
           member_suffix = ""
+          member_path   = ""
           nprocs        = 3
         }
       ]
@@ -156,6 +159,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
       fcst               = each.value.fcst
       member             = each.value.member
       member_suffix      = each.value.member_suffix
+      member_path        = each.value.member_path
       nprocs             = each.value.nprocs
       ami_id             = local.cfe_nom_ami_id
       instance_type      = each.value.instance_type
@@ -192,6 +196,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
       fcst               = each.value.fcst
       member             = each.value.member
       member_suffix      = each.value.member_suffix
+      member_path        = each.value.member_path
       nprocs             = each.value.nprocs
       ami_id             = local.cfe_nom_ami_id
       instance_type      = each.value.instance_type
@@ -228,6 +233,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
       fcst               = each.value.fcst
       member             = each.value.member
       member_suffix      = each.value.member_suffix
+      member_path        = each.value.member_path
       nprocs             = each.value.nprocs
       ami_id             = local.cfe_nom_ami_id
       instance_type      = each.value.instance_type
