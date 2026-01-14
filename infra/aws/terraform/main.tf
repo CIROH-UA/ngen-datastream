@@ -20,10 +20,6 @@ variable "profile_name" {}
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
 
-variable "state_machine_arn" {
-  type = string
-}
-
 module "nrds_orchestration" {
     source = "./modules/orchestration"
 
