@@ -138,7 +138,7 @@ locals {
 resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
   for_each = local.short_range_cfe_nom_config
 
-  name       = "short_range_fcst${each.value.init}_vpu${each.value.vpu}_schedule_cfe_nom"
+  name       = "short_range_fcst${each.value.init}_vpu${each.value.vpu}_schedule_cfe_nom_test"
   group_name = "default"
 
   flexible_time_window {
@@ -151,27 +151,29 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input = jsonencode({
-      StateMachineArn = var.state_machine_arn
-      Name            = "cfe_nom_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>"
-      Input = templatefile(local.cfe_nom_template_path, {
-        vpu                = each.value.vpu
-        init               = each.value.init
-        run_type_l         = each.value.run_type_l
-        run_type_h         = each.value.run_type_h
-        fcst               = each.value.fcst
-        member             = each.value.member
-        member_suffix      = each.value.member_suffix
-        member_path        = each.value.member_path
-        nprocs             = each.value.nprocs
-        ami_id             = local.cfe_nom_ami_id
-        instance_type      = each.value.instance_type
-        key_name           = local.cfe_nom_key_name
-        security_group_ids = local.cfe_nom_security_groups
-        instance_profile   = local.cfe_nom_instance_profile
-        volume_size        = each.value.volume_size
-      })
-    })
+    input    = <<-EOT
+{
+  "StateMachineArn": "${var.state_machine_arn}",
+  "Name": "cfe_nom_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
+  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+    vpu                = each.value.vpu
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    fcst               = each.value.fcst
+    member             = each.value.member
+    member_suffix      = each.value.member_suffix
+    member_path        = each.value.member_path
+    nprocs             = each.value.nprocs
+    ami_id             = local.cfe_nom_ami_id
+    instance_type      = each.value.instance_type
+    key_name           = local.cfe_nom_key_name
+    security_group_ids = local.cfe_nom_security_groups
+    instance_profile   = local.cfe_nom_instance_profile
+    volume_size        = each.value.volume_size
+  }))}
+}
+EOT
   }
 }
 
@@ -179,7 +181,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
 resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
   for_each = local.medium_range_cfe_nom_config
 
-  name       = "medium_range_fcst${each.value.init}_mem${each.value.member}_vpu${each.value.vpu}_schedule_cfe_nom"
+  name       = "medium_range_fcst${each.value.init}_mem${each.value.member}_vpu${each.value.vpu}_schedule_cfe_nom_test"
   group_name = "default"
 
   flexible_time_window {
@@ -192,27 +194,29 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input = jsonencode({
-      StateMachineArn = var.state_machine_arn
-      Name            = "cfe_nom_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>"
-      Input = templatefile(local.cfe_nom_template_path, {
-        vpu                = each.value.vpu
-        init               = each.value.init
-        run_type_l         = each.value.run_type_l
-        run_type_h         = each.value.run_type_h
-        fcst               = each.value.fcst
-        member             = each.value.member
-        member_suffix      = each.value.member_suffix
-        member_path        = each.value.member_path
-        nprocs             = each.value.nprocs
-        ami_id             = local.cfe_nom_ami_id
-        instance_type      = each.value.instance_type
-        key_name           = local.cfe_nom_key_name
-        security_group_ids = local.cfe_nom_security_groups
-        instance_profile   = local.cfe_nom_instance_profile
-        volume_size        = each.value.volume_size
-      })
-    })
+    input    = <<-EOT
+{
+  "StateMachineArn": "${var.state_machine_arn}",
+  "Name": "cfe_nom_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>",
+  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+    vpu                = each.value.vpu
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    fcst               = each.value.fcst
+    member             = each.value.member
+    member_suffix      = each.value.member_suffix
+    member_path        = each.value.member_path
+    nprocs             = each.value.nprocs
+    ami_id             = local.cfe_nom_ami_id
+    instance_type      = each.value.instance_type
+    key_name           = local.cfe_nom_key_name
+    security_group_ids = local.cfe_nom_security_groups
+    instance_profile   = local.cfe_nom_instance_profile
+    volume_size        = each.value.volume_size
+  }))}
+}
+EOT
   }
 }
 
@@ -220,7 +224,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
 resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
   for_each = local.analysis_assim_extend_cfe_nom_config
 
-  name       = "analysis_assim_extend_fcst${each.value.init}_vpu${each.value.vpu}_schedule_cfe_nom"
+  name       = "analysis_assim_extend_fcst${each.value.init}_vpu${each.value.vpu}_schedule_cfe_nom_test"
   group_name = "default"
 
   flexible_time_window {
@@ -233,26 +237,28 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input = jsonencode({
-      StateMachineArn = var.state_machine_arn
-      Name            = "cfe_nom_analysis_assim_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>"
-      Input = templatefile(local.cfe_nom_template_path, {
-        vpu                = each.value.vpu
-        init               = each.value.init
-        run_type_l         = each.value.run_type_l
-        run_type_h         = each.value.run_type_h
-        fcst               = each.value.fcst
-        member             = each.value.member
-        member_suffix      = each.value.member_suffix
-        member_path        = each.value.member_path
-        nprocs             = each.value.nprocs
-        ami_id             = local.cfe_nom_ami_id
-        instance_type      = each.value.instance_type
-        key_name           = local.cfe_nom_key_name
-        security_group_ids = local.cfe_nom_security_groups
-        instance_profile   = local.cfe_nom_instance_profile
-        volume_size        = each.value.volume_size
-      })
-    })
+    input    = <<-EOT
+{
+  "StateMachineArn": "${var.state_machine_arn}",
+  "Name": "cfe_nom_analysis_assim_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
+  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+    vpu                = each.value.vpu
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    fcst               = each.value.fcst
+    member             = each.value.member
+    member_suffix      = each.value.member_suffix
+    member_path        = each.value.member_path
+    nprocs             = each.value.nprocs
+    ami_id             = local.cfe_nom_ami_id
+    instance_type      = each.value.instance_type
+    key_name           = local.cfe_nom_key_name
+    security_group_ids = local.cfe_nom_security_groups
+    instance_profile   = local.cfe_nom_instance_profile
+    volume_size        = each.value.volume_size
+  }))}
+}
+EOT
   }
 }
