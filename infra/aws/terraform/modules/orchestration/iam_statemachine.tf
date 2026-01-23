@@ -19,10 +19,10 @@ resource "aws_iam_policy" "lambda_invoke_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect    = "Allow",
-      Action    = "lambda:InvokeFunction",
-      Resource  = [ "*"
-        ]
+      Effect = "Allow",
+      Action = "lambda:InvokeFunction",
+      Resource = ["*"
+      ]
     }]
   })
 }

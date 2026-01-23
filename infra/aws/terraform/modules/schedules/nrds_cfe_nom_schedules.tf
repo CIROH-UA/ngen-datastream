@@ -51,9 +51,9 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : [
         for vpu in local.vpus : [
-          for member in (
+          for member in(
             vpu == "fp" ? ["1"] : local.init_cycles_config_cfe_nom.medium_range.ensemble_members
-          ) : {
+            ) : {
             key           = "${init}_${member}_${vpu}"
             init          = init
             vpu           = vpu
@@ -76,9 +76,9 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : [
         for vpu in local.vpus : [
-          for member in (
+          for member in(
             vpu == "fp" ? ["1"] : local.init_cycles_config_cfe_nom.medium_range.ensemble_members
-          ) : {
+            ) : {
             key   = "${init}_${member}_${vpu}"
             value = vpu == "fp" ? (tonumber(init) + 2) % 24 : (tonumber(init) + 3) % 24
           }
@@ -93,7 +93,7 @@ locals {
         for member in local.init_cycles_config_cfe_nom.medium_range.ensemble_members : [
           for vpu in local.vpus : {
             key   = "${init}_${member}_${vpu}"
-            value = floor(((tonumber(member) - 1) * (1.0/7.0) * 60) % 60)
+            value = floor(((tonumber(member) - 1) * (1.0 / 7.0) * 60) % 60)
           }
         ]
       ]
@@ -149,24 +149,28 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
   schedule_expression_timezone = "America/New_York"
 
   target {
-    arn      = var.state_machine_arn
+    arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = templatefile(local.cfe_nom_template_path, {
-      vpu                = each.value.vpu
-      init               = each.value.init
-      run_type_l         = each.value.run_type_l
-      run_type_h         = each.value.run_type_h
-      fcst               = each.value.fcst
-      member             = each.value.member
-      member_suffix      = each.value.member_suffix
-      member_path        = each.value.member_path
-      nprocs             = each.value.nprocs
-      ami_id             = local.cfe_nom_ami_id
-      instance_type      = each.value.instance_type
-      key_name           = local.cfe_nom_key_name
-      security_group_ids = local.cfe_nom_security_groups
-      instance_profile   = local.cfe_nom_instance_profile
-      volume_size        = each.value.volume_size
+    input = jsonencode({
+      StateMachineArn = var.state_machine_arn
+      Name            = "cfe_nom_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>"
+      Input = templatefile(local.cfe_nom_template_path, {
+        vpu                = each.value.vpu
+        init               = each.value.init
+        run_type_l         = each.value.run_type_l
+        run_type_h         = each.value.run_type_h
+        fcst               = each.value.fcst
+        member             = each.value.member
+        member_suffix      = each.value.member_suffix
+        member_path        = each.value.member_path
+        nprocs             = each.value.nprocs
+        ami_id             = local.cfe_nom_ami_id
+        instance_type      = each.value.instance_type
+        key_name           = local.cfe_nom_key_name
+        security_group_ids = local.cfe_nom_security_groups
+        instance_profile   = local.cfe_nom_instance_profile
+        volume_size        = each.value.volume_size
+      })
     })
   }
 }
@@ -186,24 +190,28 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
   schedule_expression_timezone = "America/New_York"
 
   target {
-    arn      = var.state_machine_arn
+    arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = templatefile(local.cfe_nom_template_path, {
-      vpu                = each.value.vpu
-      init               = each.value.init
-      run_type_l         = each.value.run_type_l
-      run_type_h         = each.value.run_type_h
-      fcst               = each.value.fcst
-      member             = each.value.member
-      member_suffix      = each.value.member_suffix
-      member_path        = each.value.member_path
-      nprocs             = each.value.nprocs
-      ami_id             = local.cfe_nom_ami_id
-      instance_type      = each.value.instance_type
-      key_name           = local.cfe_nom_key_name
-      security_group_ids = local.cfe_nom_security_groups
-      instance_profile   = local.cfe_nom_instance_profile
-      volume_size        = each.value.volume_size
+    input = jsonencode({
+      StateMachineArn = var.state_machine_arn
+      Name            = "cfe_nom_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>"
+      Input = templatefile(local.cfe_nom_template_path, {
+        vpu                = each.value.vpu
+        init               = each.value.init
+        run_type_l         = each.value.run_type_l
+        run_type_h         = each.value.run_type_h
+        fcst               = each.value.fcst
+        member             = each.value.member
+        member_suffix      = each.value.member_suffix
+        member_path        = each.value.member_path
+        nprocs             = each.value.nprocs
+        ami_id             = local.cfe_nom_ami_id
+        instance_type      = each.value.instance_type
+        key_name           = local.cfe_nom_key_name
+        security_group_ids = local.cfe_nom_security_groups
+        instance_profile   = local.cfe_nom_instance_profile
+        volume_size        = each.value.volume_size
+      })
     })
   }
 }
@@ -223,24 +231,28 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
   schedule_expression_timezone = "America/New_York"
 
   target {
-    arn      = var.state_machine_arn
+    arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = templatefile(local.cfe_nom_template_path, {
-      vpu                = each.value.vpu
-      init               = each.value.init
-      run_type_l         = each.value.run_type_l
-      run_type_h         = each.value.run_type_h
-      fcst               = each.value.fcst
-      member             = each.value.member
-      member_suffix      = each.value.member_suffix
-      member_path        = each.value.member_path
-      nprocs             = each.value.nprocs
-      ami_id             = local.cfe_nom_ami_id
-      instance_type      = each.value.instance_type
-      key_name           = local.cfe_nom_key_name
-      security_group_ids = local.cfe_nom_security_groups
-      instance_profile   = local.cfe_nom_instance_profile
-      volume_size        = each.value.volume_size
+    input = jsonencode({
+      StateMachineArn = var.state_machine_arn
+      Name            = "cfe_nom_analysis_assim_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>"
+      Input = templatefile(local.cfe_nom_template_path, {
+        vpu                = each.value.vpu
+        init               = each.value.init
+        run_type_l         = each.value.run_type_l
+        run_type_h         = each.value.run_type_h
+        fcst               = each.value.fcst
+        member             = each.value.member
+        member_suffix      = each.value.member_suffix
+        member_path        = each.value.member_path
+        nprocs             = each.value.nprocs
+        ami_id             = local.cfe_nom_ami_id
+        instance_type      = each.value.instance_type
+        key_name           = local.cfe_nom_key_name
+        security_group_ids = local.cfe_nom_security_groups
+        instance_profile   = local.cfe_nom_instance_profile
+        volume_size        = each.value.volume_size
+      })
     })
   }
 }
