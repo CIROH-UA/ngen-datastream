@@ -20,15 +20,20 @@ variable "profile_name" {}
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
 
+# VPC Configuration - fetch default VPC automatically
+data "aws_vpc" "default" {
+  default = true
+}
+
+variable "resource_prefix" {
+  type        = string
+  description = "Prefix for resource naming (e.g., 'nrds_test', 'nrds_prod')"
+}
+
 # EC2 Configuration
 variable "ec2_key_name" {
   type        = string
   description = "EC2 key pair name for SSH access"
-}
-
-variable "ec2_security_groups" {
-  type        = list(string)
-  description = "Security group IDs for EC2 instances"
 }
 
 variable "ec2_instance_profile" {
@@ -84,6 +89,8 @@ module "nrds_orchestration" {
   ec2_role                  = var.ec2_role
   ec2_policy_name           = var.ec2_policy_name
   profile_name              = var.profile_name
+  resource_prefix           = var.resource_prefix
+  vpc_id                    = data.aws_vpc.default.id
 }
 
 module "nrds_schedules" {
@@ -96,7 +103,7 @@ module "nrds_schedules" {
 
   # EC2 config
   ec2_key_name         = var.ec2_key_name
-  ec2_security_groups  = var.ec2_security_groups
+  ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
   ec2_instance_profile = var.ec2_instance_profile
 
   # Model AMIs

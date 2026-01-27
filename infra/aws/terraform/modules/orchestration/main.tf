@@ -20,3 +20,11 @@ variable "sm_role_name" {}
 variable "ec2_role" {}
 variable "ec2_policy_name" {}
 variable "profile_name" {}
+variable "resource_prefix" {
+  type        = string
+  description = "Prefix for resource naming"
+}
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID for security group"
+}

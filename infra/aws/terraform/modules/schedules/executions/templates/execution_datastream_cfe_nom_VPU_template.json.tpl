@@ -23,8 +23,21 @@
         "ResourceType": "instance",
         "Tags": [
           {
+            "Key": "Name",
+            "Value": "${environment_suffix}_CFE_NOM_${run_type_l}_VPU${vpu}_init${init}${member_suffix}"
+          },
+          {
             "Key": "Project",
             "Value": "datastream_FULLCONUS_v1.2_${run_type_l}_${vpu}"
+          }
+        ]
+      },
+      {
+        "ResourceType": "volume",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "${environment_suffix}_CFE_NOM_${run_type_l}_VPU${vpu}_init${init}${member_suffix}_vol"
           }
         ]
       }

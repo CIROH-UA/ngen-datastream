@@ -168,9 +168,10 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
     key_name           = local.cfe_nom_key_name
-    security_group_ids = local.cfe_nom_security_groups
-    instance_profile   = local.cfe_nom_instance_profile
-    volume_size        = each.value.volume_size
+    security_group_ids  = local.cfe_nom_security_groups
+    instance_profile    = local.cfe_nom_instance_profile
+    volume_size         = each.value.volume_size
+    environment_suffix  = var.environment_suffix
 }))}
 }
 EOT
@@ -211,9 +212,10 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
     key_name           = local.cfe_nom_key_name
-    security_group_ids = local.cfe_nom_security_groups
-    instance_profile   = local.cfe_nom_instance_profile
-    volume_size        = each.value.volume_size
+    security_group_ids  = local.cfe_nom_security_groups
+    instance_profile    = local.cfe_nom_instance_profile
+    volume_size         = each.value.volume_size
+    environment_suffix  = var.environment_suffix
 }))}
 }
 EOT
@@ -254,9 +256,10 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
     key_name           = local.cfe_nom_key_name
-    security_group_ids = local.cfe_nom_security_groups
-    instance_profile   = local.cfe_nom_instance_profile
-    volume_size        = each.value.volume_size
+    security_group_ids  = local.cfe_nom_security_groups
+    instance_profile    = local.cfe_nom_instance_profile
+    volume_size         = each.value.volume_size
+    environment_suffix  = var.environment_suffix
 }))}
 }
 EOT
