@@ -8,10 +8,10 @@ locals {
   lstm_template_path = "${path.module}/executions/templates/execution_datastream_lstm_VPU_template.json.tpl"
 
   # Common LSTM configuration
-  lstm_ami_id           = "ami-0bba768785947ef54"
-  lstm_key_name         = "jlaser_community_east1"
-  lstm_security_groups  = jsonencode(["sg-0fcbe0c6d6faa0117"])
-  lstm_instance_profile = "datastream_community_ec2_profile"
+  lstm_ami_id           = var.lstm_ami_id
+  lstm_key_name         = var.ec2_key_name
+  lstm_security_groups  = jsonencode(var.ec2_security_groups)
+  lstm_instance_profile = var.ec2_instance_profile
 
   # Short range forecast config mapping
   short_range_lstm_config = {
@@ -141,20 +141,20 @@ locals {
 resource "aws_scheduler_schedule" "datastream_schedule_short_range_lstm" {
   for_each = local.short_range_lstm_config
 
-  name       = "short_range_fcst${each.value.init}_vpu${each.value.vpu}_schedule_lstm_test"
-  group_name = "default"
+  name       = "short_range_fcst${each.value.init}_vpu${each.value.vpu}_schedule_lstm_${var.environment_suffix}"
+  group_name = var.schedule_group_name
 
   flexible_time_window {
     mode = "OFF"
   }
 
   schedule_expression          = "cron(0 ${local.short_range_times_lstm[each.key]} * * ? *)"
-  schedule_expression_timezone = "America/New_York"
+  schedule_expression_timezone = var.schedule_timezone
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = <<-EOT
+    input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "lstm_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
@@ -175,30 +175,30 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_lstm" {
     security_group_ids = local.lstm_security_groups
     instance_profile   = local.lstm_instance_profile
     volume_size        = each.value.volume_size
-  }))}
+}))}
 }
 EOT
-  }
+}
 }
 
 # Medium Range LSTM Schedules
 resource "aws_scheduler_schedule" "datastream_schedule_medium_range_lstm" {
   for_each = local.medium_range_lstm_config
 
-  name       = "medium_range_fcst${each.value.init}_mem${each.value.member}_vpu${each.value.vpu}_schedule_lstm_test"
-  group_name = "default"
+  name       = "medium_range_fcst${each.value.init}_mem${each.value.member}_vpu${each.value.vpu}_schedule_lstm_${var.environment_suffix}"
+  group_name = var.schedule_group_name
 
   flexible_time_window {
     mode = "OFF"
   }
 
   schedule_expression          = "cron(${local.medium_range_member_offsets_lstm[each.key]} ${local.medium_range_times_lstm[each.key]} * * ? *)"
-  schedule_expression_timezone = "America/New_York"
+  schedule_expression_timezone = var.schedule_timezone
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = <<-EOT
+    input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "lstm_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>",
@@ -219,30 +219,30 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_lstm" {
     security_group_ids = local.lstm_security_groups
     instance_profile   = local.lstm_instance_profile
     volume_size        = each.value.volume_size
-  }))}
+}))}
 }
 EOT
-  }
+}
 }
 
 # Analysis/Assimilation LSTM Schedules
 resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_lstm" {
   for_each = local.analysis_assim_extend_lstm_config
 
-  name       = "analysis_assim_extend_fcst${each.value.init}_vpu${each.value.vpu}_schedule_lstm_test"
-  group_name = "default"
+  name       = "analysis_assim_extend_fcst${each.value.init}_vpu${each.value.vpu}_schedule_lstm_${var.environment_suffix}"
+  group_name = var.schedule_group_name
 
   flexible_time_window {
     mode = "OFF"
   }
 
   schedule_expression          = "cron(0 ${local.analysis_assim_extend_times_lstm[each.key]} * * ? *)"
-  schedule_expression_timezone = "America/New_York"
+  schedule_expression_timezone = var.schedule_timezone
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = aws_iam_role.scheduler_role.arn
-    input    = <<-EOT
+    input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "lstm_analysis_assim_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
@@ -263,8 +263,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_lstm" {
     security_group_ids = local.lstm_security_groups
     instance_profile   = local.lstm_instance_profile
     volume_size        = each.value.volume_size
-  }))}
+}))}
 }
 EOT
-  }
+}
 }

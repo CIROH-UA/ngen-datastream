@@ -20,6 +20,53 @@ variable "profile_name" {}
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
 
+# EC2 Configuration
+variable "ec2_key_name" {
+  type        = string
+  description = "EC2 key pair name for SSH access"
+}
+
+variable "ec2_security_groups" {
+  type        = list(string)
+  description = "Security group IDs for EC2 instances"
+}
+
+variable "ec2_instance_profile" {
+  type        = string
+  description = "IAM instance profile name for EC2"
+}
+
+# Model-specific AMIs
+variable "cfe_nom_ami_id" {
+  type        = string
+  description = "AMI ID for CFE_NOM model EC2 instances"
+  default     = "ami-0ef008a1e6d9aa12d"
+}
+
+variable "lstm_ami_id" {
+  type        = string
+  description = "AMI ID for LSTM model EC2 instances"
+  default     = "ami-0bba768785947ef54"
+}
+
+# Schedule Settings
+variable "schedule_timezone" {
+  type        = string
+  description = "Timezone for EventBridge schedules"
+  default     = "America/New_York"
+}
+
+variable "schedule_group_name" {
+  type        = string
+  description = "EventBridge scheduler group name"
+  default     = "default"
+}
+
+variable "environment_suffix" {
+  type        = string
+  description = "Environment suffix for schedule names (e.g., 'dev', 'prod', 'test')"
+}
+
 module "nrds_orchestration" {
   source = "./modules/orchestration"
 
@@ -47,4 +94,17 @@ module "nrds_schedules" {
   scheduler_role_name   = var.scheduler_role_name
   state_machine_arn     = module.nrds_orchestration.datastream_arn
 
+  # EC2 config
+  ec2_key_name         = var.ec2_key_name
+  ec2_security_groups  = var.ec2_security_groups
+  ec2_instance_profile = var.ec2_instance_profile
+
+  # Model AMIs
+  cfe_nom_ami_id = var.cfe_nom_ami_id
+  lstm_ami_id    = var.lstm_ami_id
+
+  # Schedule settings
+  schedule_timezone   = var.schedule_timezone
+  schedule_group_name = var.schedule_group_name
+  environment_suffix  = var.environment_suffix
 }
