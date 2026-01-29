@@ -1,8 +1,24 @@
 name: Build, Test, and Push Datastream AMI
 on:
-  workflow_dispatch:   
+  workflow_dispatch:
+    inputs:
+      ds_tag:
+        description: 'Datastream Docker image tag'
+        required: false
+        type: string
+        default: ''
+      fp_tag:
+        description: 'Forcing Processor Docker image tag'
+        required: false
+        type: string
+        default: ''
+      ngiab_tag:
+        description: 'NGIAB Docker image tag'
+        required: false
+        type: string
+        default: ''
   push:
-    branches: 
+    branches:
       - main
     paths:
       - 'ami_version.yml'
@@ -36,24 +52,48 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-      
-          # Current versions
+
+          # Current versions from ami_version.yml
           CURRENT_DS_AMI=$(yq -r e '."datastream-ami-version"' ami_version.yml)
-          DS_TAG=$(yq -r e '.DS_TAG' ami_version.yml)
-          FP_TAG=$(yq -r e '.FP_TAG' ami_version.yml)
-          NGIAB_TAG=$(yq -r e '.NGIAB_TAG' ami_version.yml)
-      
+          DS_TAG_FILE=$(yq -r e '.DS_TAG' ami_version.yml)
+          FP_TAG_FILE=$(yq -r e '.FP_TAG' ami_version.yml)
+          NGIAB_TAG_FILE=$(yq -r e '.NGIAB_TAG' ami_version.yml)
+
+          # Use workflow inputs if provided, otherwise use values from file
+          DS_TAG="${{ github.event.inputs.ds_tag }}"
+          FP_TAG="${{ github.event.inputs.fp_tag }}"
+          NGIAB_TAG="${{ github.event.inputs.ngiab_tag }}"
+
+          # Fallback to file values if inputs are empty
+          if [ -z "$DS_TAG" ]; then
+            DS_TAG="$DS_TAG_FILE"
+          fi
+          if [ -z "$FP_TAG" ]; then
+            FP_TAG="$FP_TAG_FILE"
+          fi
+          if [ -z "$NGIAB_TAG" ]; then
+            NGIAB_TAG="$NGIAB_TAG_FILE"
+          fi
+
+          echo "Using DS_TAG: $DS_TAG"
+          echo "Using FP_TAG: $FP_TAG"
+          echo "Using NGIAB_TAG: $NGIAB_TAG"
+
           # Ensure previous commit and file exist
           if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_version.yml 2>/dev/null; then
             git show HEAD~1:ami_version.yml > previous_versions.yml
           else
             printf "datastream-ami-version: '0.0.0'\n" > previous_versions.yml
           fi
-      
+
           PREVIOUS_DS_AMI=$(yq -r e '."datastream-ami-version"' previous_versions.yml)
-      
+
           # Outputs for AMI change detection
-          if [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
+          # If workflow_dispatch with custom tags, force build
+          if [ -n "${{ github.event.inputs.ds_tag }}" ] || [ -n "${{ github.event.inputs.fp_tag }}" ] || [ -n "${{ github.event.inputs.ngiab_tag }}" ]; then
+            echo "Custom image tags provided via workflow_dispatch - forcing AMI build"
+            echo "build_ds_ami=true" >> "$GITHUB_OUTPUT"
+          elif [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
             echo "datastream-ami-version changed: $PREVIOUS_DS_AMI -> $CURRENT_DS_AMI"
             echo "build_ds_ami=true" >> "$GITHUB_OUTPUT"
           else
