@@ -1,5 +1,6 @@
 output "datastream_arn" {
-  value = aws_sfn_state_machine.datastream_state_machine.arn
+  value       = aws_sfn_state_machine.datastream_state_machine.arn
+  description = "State machine ARN for the datastream workflow"
 }
 
 output "ec2_security_group_id" {

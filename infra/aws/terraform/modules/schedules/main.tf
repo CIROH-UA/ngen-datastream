@@ -51,12 +51,6 @@ variable "cfe_nom_ami_id" {
   default     = "ami-0ef008a1e6d9aa12d"
 }
 
-variable "lstm_ami_id" {
-  type        = string
-  description = "AMI ID for LSTM model EC2 instances"
-  default     = "ami-0bba768785947ef54"
-}
-
 # Schedule Settings
 variable "schedule_timezone" {
   type        = string

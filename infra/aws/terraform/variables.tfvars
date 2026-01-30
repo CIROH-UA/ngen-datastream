@@ -20,9 +20,8 @@ scheduler_role_name       = "nrds_test_scheduler_role"
 ec2_key_name         = "jlaser_community_east1"
 ec2_instance_profile = "datastream_community_ec2_profile"
 
-# Model AMIs
+# Model AMI
 cfe_nom_ami_id = "ami-0ef008a1e6d9aa12d"
-lstm_ami_id    = "ami-0bba768785947ef54"
 
 # Schedule Settings
 schedule_timezone   = "America/New_York"
