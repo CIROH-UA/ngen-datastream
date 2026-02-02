@@ -33,14 +33,44 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Convert Markdown to HTML
+    - name: Convert Markdown to styled HTML
       run: |
         sudo apt-get update && sudo apt-get install -y pandoc
-        pandoc docs/bucket/README.md \
-          -o README.html \
-          --standalone \
-          --metadata title="S3 Bucket: ciroh-community-ngen-datastream" \
-          --css=https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css
+
+        # Create HTML header with custom CSS
+        cat << 'HEADER' > README.html
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>S3 Bucket: ciroh-community-ngen-datastream</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 1000px; margin: 0 auto; padding: 20px; color: #333; }
+                h1 { border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
+                h2 { color: #1a73e8; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+                table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background: #f5f5f5; }
+                tr:hover { background: #f9f9f9; }
+                code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; }
+                pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+                pre code { background: transparent; padding: 0; }
+                ul { margin: 10px 0; }
+                li { margin: 5px 0; }
+                hr { border: none; border-top: 1px solid #eee; margin: 30px 0; }
+                a { color: #1a73e8; text-decoration: none; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+        HEADER
+
+        # Convert markdown to HTML body and append
+        pandoc docs/bucket/README.md --to html >> README.html
+
+        # Close HTML
+        echo "</body></html>" >> README.html
 
     - name: Upload README.html to S3
       run: |
