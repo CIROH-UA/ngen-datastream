@@ -5,8 +5,10 @@ on:
   push:
     branches:
       - main
+      - feature/bucket-readme-deployment
     paths:
       - 'docs/bucket/README.html'
+      - '.github/workflows/upload_bucket_readme.yaml'
 
 env:
   AWS_REGION: us-east-1
