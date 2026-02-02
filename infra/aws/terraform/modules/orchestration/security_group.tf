@@ -5,14 +5,6 @@ resource "aws_security_group" "datastream_ec2_sg" {
   description = "Security group for NRDS datastream EC2 instances"
   vpc_id      = var.vpc_id
 
-  ingress {
-    description = "SSH access"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
     description = "Allow all outbound"
     from_port   = 0
