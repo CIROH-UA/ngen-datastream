@@ -3,9 +3,9 @@ Last Updated: 02/2026
 
 Changes
 * All datastream forcings and output data from the original `v2.1`, `v2.2` prefixes have been moved to `forcings/v2.2_hydrofabric` and `outputs/cfe_nom/v2.2_hydrofabric`, respectively. Prefixes `v2.1`, `v2.2` no longer exist.
-* BMI configuration files have been fixed and remade with the new tooling in datastreamcli PR https://github.com/CIROH-UA/datastreamcli/pull/34 .
 
 Status LSTM DataStream (DEV)
+No changes from last update
 * Output data exists at `outputs/lstm/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * VPU 09 only
@@ -14,7 +14,7 @@ Status LSTM DataStream (DEV)
 * v2.2 hydrofabric
 
 Status CFE NOM DataStream
-* UPDATED BMI CONFIGS (https://github.com/CIROH-UA/datastreamcli/pull/34)
+No changes from last update
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs
