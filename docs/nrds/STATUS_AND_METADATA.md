@@ -2,7 +2,15 @@
 Last Updated: 02/2026
 
 Changes
+* A Routing-only datastream has been added! This datastream inputs National Water Model v3 pre-reouting outputs (`q_lateral`), remaps them to the NextGen v2.2 hydrofabric, and then fed into t-route. 
 * All datastream forcings and output data from the original `v2.1`, `v2.2` prefixes have been moved to `forcings/v2.2_hydrofabric` and `outputs/cfe_nom/v2.2_hydrofabric`, respectively. Prefixes `v2.1`, `v2.2` no longer exist.
+
+Status Routing-Only DataStream (DEV)
+* Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
+* Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
+* VPU 03W only
+* Run Types - short_range (hourly, every hour)
+* v2.2 hydrofabric
 
 Status LSTM DataStream (DEV)
 No changes from last update
