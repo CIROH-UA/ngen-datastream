@@ -9,7 +9,7 @@ No changes from last update
 * Output data exists at `outputs/lstm/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * VPU 09 only
-* Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
 * Cold start
 * v2.2 hydrofabric
 
@@ -18,7 +18,7 @@ No changes from last update
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs
-* Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
 * Cold start
 * v2.2 hydrofabric
 
