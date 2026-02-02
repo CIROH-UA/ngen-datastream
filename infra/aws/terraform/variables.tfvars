@@ -17,7 +17,6 @@ scheduler_policy_name     = "nrds_test_scheduler_policy"
 scheduler_role_name       = "nrds_test_scheduler_role"
 
 # EC2 Configuration
-ec2_key_name         = "jlaser_community_east1"
 ec2_instance_profile = "datastream_community_ec2_profile"
 
 # Model AMI

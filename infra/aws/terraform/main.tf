@@ -31,11 +31,6 @@ variable "resource_prefix" {
 }
 
 # EC2 Configuration
-variable "ec2_key_name" {
-  type        = string
-  description = "EC2 key pair name for SSH access"
-}
-
 variable "ec2_instance_profile" {
   type        = string
   description = "IAM instance profile name for EC2"
@@ -96,7 +91,6 @@ module "nrds_schedules" {
   state_machine_arn     = module.nrds_orchestration.datastream_arn
 
   # EC2 config
-  ec2_key_name         = var.ec2_key_name
   ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
   ec2_instance_profile = var.ec2_instance_profile
 

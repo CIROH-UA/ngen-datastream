@@ -29,11 +29,6 @@ variable "state_machine_arn" {
 }
 
 # EC2 Configuration
-variable "ec2_key_name" {
-  type        = string
-  description = "EC2 key pair name for SSH access"
-}
-
 variable "ec2_security_groups" {
   type        = list(string)
   description = "Security group IDs for EC2 instances"

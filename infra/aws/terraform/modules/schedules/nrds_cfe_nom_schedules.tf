@@ -9,7 +9,6 @@ locals {
 
   # Common CFE_NOM configuration
   cfe_nom_ami_id           = var.cfe_nom_ami_id
-  cfe_nom_key_name         = var.ec2_key_name
   cfe_nom_security_groups  = jsonencode(var.ec2_security_groups)
   cfe_nom_instance_profile = var.ec2_instance_profile
 
@@ -167,7 +166,6 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     nprocs             = each.value.nprocs
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
-    key_name           = local.cfe_nom_key_name
     security_group_ids  = local.cfe_nom_security_groups
     instance_profile    = local.cfe_nom_instance_profile
     volume_size         = each.value.volume_size
@@ -211,7 +209,6 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     nprocs             = each.value.nprocs
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
-    key_name           = local.cfe_nom_key_name
     security_group_ids  = local.cfe_nom_security_groups
     instance_profile    = local.cfe_nom_instance_profile
     volume_size         = each.value.volume_size
@@ -255,7 +252,6 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     nprocs             = each.value.nprocs
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
-    key_name           = local.cfe_nom_key_name
     security_group_ids  = local.cfe_nom_security_groups
     instance_profile    = local.cfe_nom_instance_profile
     volume_size         = each.value.volume_size
