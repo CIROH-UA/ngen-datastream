@@ -1,0 +1,39 @@
+name: Upload Bucket README to S3
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/bucket/README.html'
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: ciroh-community-ngen-datastream
+
+jobs:
+  upload-readme:
+    name: Upload README to S3
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Upload README.html to S3
+      run: |
+        aws s3 cp docs/bucket/README.html s3://${{ env.S3_BUCKET }}/README.html \
+          --content-type "text/html" \
+          --cache-control "max-age=3600"
+        echo "Successfully uploaded README.html to s3://${{ env.S3_BUCKET }}/README.html"

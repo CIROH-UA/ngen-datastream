@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 Bucket: ciroh-community-ngen-datastream</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 1000px; margin: 0 auto; padding: 20px; color: #333; }
+        h1 { border-bottom: 2px solid #1a73e8; padding-bottom: 10px; }
+        h2 { color: #1a73e8; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f5f5f5; }
+        tr:hover { background: #f9f9f9; }
+        code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        .folder-tree { background: #f8f8f8; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre; }
+        ul { margin: 10px 0; }
+        li { margin: 5px 0; }
+        hr { border: none; border-top: 1px solid #eee; margin: 30px 0; }
+    </style>
+</head>
+<body>
+
+<h1>S3 Bucket: ciroh-community-ngen-datastream</h1>
+
+<p>This bucket contains outputs from the <strong>NextGen Research DataStream (NRDS)</strong>, an automated hydrologic simulation system that runs the NextGen Water Resources Modeling Framework operationally across CONUS. It provides daily forcing data, model simulation results, hydrofabric geopackages, and configuration files organized by 21 Vector Processing Units (VPUs). Data is updated continuously with short-range (18hr) and medium-range (10-day) forecasts.</p>
+
+<h2>Root Folders</h2>
+<table>
+    <tr><th>Folder</th><th>Description</th><th>Usage</th></tr>
+    <tr><td><code>outputs/</code></td><td>NextGen model simulation results</td><td>Download ngen-run.tar.gz and troute NetCDF for streamflow data</td></tr>
+    <tr><td><code>v2.2/</code></td><td>Daily forcing files (current)</td><td>Download forcing NetCDF files as input for NextGen runs</td></tr>
+    <tr><td><code>v2.1/</code></td><td>Daily forcing files (legacy)</td><td>Legacy data from Oct 2024, use v2.2 for current runs</td></tr>
+    <tr><td><code>v2.2_resources/</code></td><td>Static resources per VPU</td><td>Download gpkg, BMI configs, and weights for simulation setup</td></tr>
+    <tr><td><code>realizations/</code></td><td>Model config JSONs</td><td>Use as templates for custom NextGen simulation configs</td></tr>
+    <tr><td><code>parameters/</code></td><td>Community parameters</td><td>Apply calibrated params to improve regional accuracy</td></tr>
+    <tr><td><code>mappings/</code></td><td>ID mapping files</td><td>Translate between NWM COMIDs and NextGen catchment IDs</td></tr>
+    <tr><td><code>status/</code></td><td>Dashboards</td><td>Check pipeline status and data availability</td></tr>
+    <tr><td><code>submissions/</code></td><td>Contributions</td><td>Reference example for submitting calibrated parameters</td></tr>
+    <tr><td><code>forcingprocessor/</code></td><td>FP test metadata</td><td>Internal testing for forcing processor validation</td></tr>
+</table>
+
+<hr>
+
+<h2>outputs/</h2>
+<p>Contains NextGen model simulation results from operational runs. Organized by model type (CFE, LSTM, or routing_only), date, forecast type (short_range, medium_range, or analysis_assim_extend), and VPU. Each run produces a complete ngen-run.tar.gz archive with catchment outputs and routed streamflow.</p>
+<div class="folder-tree">outputs/
++-- cfe_nom/v2.2_hydrofabric/ngen.{DATE}/
+|   +-- short_range/{00-23}/VPU_{XX}/
+|   +-- medium_range/{00,06,12,18}/1/VPU_{XX}/
+|   +-- analysis_assim_extend/16/VPU_{XX}/
++-- lstm/v2.2_hydrofabric/ngen.{DATE}/
+|   +-- short_range/{00-23}/VPU_{XX}/
+|   +-- medium_range/{00,06,12,18}/1/VPU_{XX}/
+|   +-- analysis_assim_extend/16/VPU_{XX}/
++-- routing_only/v2.2_hydrofabric/ngen.{DATE}/</div>
+
+<p><strong>Each VPU folder contains:</strong></p>
+<table>
+    <tr><th>File</th><th>Size</th><th>Description</th></tr>
+    <tr><td><code>ngen-run.tar.gz</code></td><td>12-500MB</td><td>Complete simulation archive</td></tr>
+    <tr><td><code>merkdir.file</code></td><td>~12MB</td><td>Integrity hash</td></tr>
+    <tr><td><code>datastream-metadata/</code></td><td>~15KB</td><td>Execution configs and timing</td></tr>
+    <tr><td><code>ngen-run/outputs/troute/*.nc</code></td><td>~4MB</td><td>Routed streamflow NetCDF</td></tr>
+</table>
+
+<p><strong>ngen-run.tar.gz contents:</strong></p>
+<p>Complete NextGen simulation archive containing all inputs, configs, and outputs. Extract with <code>tar -xzf ngen-run.tar.gz</code></p>
+<div class="folder-tree">ngen-run/
++-- config/
+|   +-- nextgen_VPU_{XX}.gpkg           # 63MB hydrofabric geopackage
+|   +-- realization.json                # 3.5KB NextGen realization config
+|   +-- troute.yaml                     # 2KB T-Route routing config
+|   +-- noah-owp-modular-init.*.pkl     # 4.4MB NOAH-OWP init pickle
+|   +-- cat_config/                     # Per-catchment BMI configs
+|       +-- CFE/                        # CFE config per catchment
+|       +-- NOAH-OWP-M/                 # NOAH-OWP config per catchment
+|       +-- PET/                        # PET config per catchment
++-- forcings/
+|   +-- ngen.t{HH}z.*.forcing.*.nc      # 17-127MB forcing NetCDF
++-- outputs/
+|   +-- ngen/
+|   |   +-- cat-{ID}.csv                # ~17,600 per-catchment CSVs
+|   +-- parquet/
+|   |   +-- {YYYYMMDDHHMM}NEXOUT.parquet # 18 hourly nexus outputs (~85KB each)
+|   +-- troute/                         # Empty in tar (see note below)
++-- lakeout/                            # Lake routing outputs (if applicable)
++-- restart/
+|   +-- channel_restart_*               # ~314KB channel restart file
++-- partitions_3.json                   # 546KB MPI partition (3 proc)
++-- partitions_4.json                   # 274KB MPI partition (4 proc)</div>
+<p><strong>Note:</strong> The <code>troute_output_*.nc</code> file (~4MB routed streamflow) is stored separately in the VPU folder at <code>ngen-run/outputs/troute/</code>, not inside the tar.gz archive.</p>
+
+<p><strong>datastream-metadata/ contents:</strong></p>
+<ul>
+    <li><code>execution.json</code> - Full run parameters</li>
+    <li><code>profile.txt</code> - Timing breakdown</li>
+    <li><code>docker_hashes.txt</code> - Image SHAs</li>
+    <li><code>conf_datastream.json</code> - Datastream config</li>
+    <li><code>conf_fp.json</code> - Forcing processor config</li>
+    <li><code>conf_nwmurl.json</code> - NWM URL config</li>
+    <li><code>datastream.env</code> - Environment variables</li>
+    <li><code>datastream_steps.txt</code> - Execution steps log</li>
+    <li><code>realization_user.json</code> - User realization</li>
+    <li><code>realization_datastream.json</code> - Final realization</li>
+</ul>
+
+<hr>
+
+<h2>v2.2/</h2>
+<p>Daily pre-processed meteorological forcing files converted from NWM format to NextGen-compatible NetCDF. Updated every hour for short_range (18hr forecasts) and every 6 hours for medium_range (10-day forecasts). Files are partitioned by VPU for efficient regional access.</p>
+<div class="folder-tree">v2.2/ngen.{YYYYMMDD}/
++-- forcing_short_range/{00-23}/
+|   +-- metadata/
+|   |   +-- execution.json
+|   |   +-- forcings_metadata/
+|   |       +-- conf_fp.json, conf_nwmurl.json
+|   |       +-- filenamelist.txt, profile_fp.txt
+|   |       +-- weights.parquet (~149MB)
+|   +-- ngen.t{HH}z.short_range.forcing.f001_f018.VPU_{XX}.nc
++-- forcing_medium_range/{00,06,12,18}/
+|   +-- metadata/
+|   +-- ngen.t{HH}z.medium_range.forcing.f001_f240.VPU_{XX}.nc
++-- forcing_analysis_assim_extend/16/
+    +-- metadata/
+    +-- ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_{XX}.nc</div>
+
+<p><strong>File sizes:</strong></p>
+<table>
+    <tr><th>Type</th><th>Size per VPU</th><th>Forecast Hours</th></tr>
+    <tr><td>short_range</td><td>17-127MB</td><td>f001-f018 (18hr)</td></tr>
+    <tr><td>medium_range</td><td>216MB-1.6GB</td><td>f001-f240 (10 day)</td></tr>
+    <tr><td>analysis_assim_extend</td><td>26-194MB</td><td>tm27-tm00 (28hr lookback)</td></tr>
+</table>
+
+<hr>
+
+<h2>v2.2_resources/</h2>
+<p>Static resources required for running NextGen simulations, including hydrofabric geopackages, BMI module configurations, and forcing weight files. These files are pre-computed per VPU and rarely change. Download once and reuse across multiple simulation runs.</p>
+<div class="folder-tree">v2.2_resources/
++-- VPU_{XX}/config/
+|   +-- nextgen_VPU_{XX}.gpkg      # 63-490MB hydrofabric
+|   +-- ngen-bmi-configs.tar.gz    # 2.5MB BMI configs
+|   +-- partitions_4.json          # ~274KB MPI partition file
++-- weights/
+|   +-- nextgen_VPU_{XX}_weights.json  # 9-47MB forcing weights
++-- conus_weights.parquet          # 154MB full CONUS weights
++-- lstm_conus_cat_config.tar.gz   # 78MB LSTM configs
++-- validator.tar.gz               # 32MB validation data
++-- datastream_ngen-run_pytest.tar.gz  # 172MB test data
++-- obj.json                       # 1.7KB object metadata</div>
+
+<hr>
+
+<h2>realizations/</h2>
+<p>NextGen realization JSON files that define the model chain and parameters for each simulation. These configs specify which BMI modules to run (e.g., SLOTH, NOAH-OWP, CFE, LSTM) and how they connect. Use these as templates for custom runs.</p>
+<table>
+    <tr><th>File</th><th>Size</th><th>Model Chain</th></tr>
+    <tr><td><code>realization_VPU_{XX}.json</code></td><td>3.5KB</td><td>SLOTH &gt; NOAH-OWP &gt; PET &gt; CFE &gt; T-Route</td></tr>
+    <tr><td><code>realization_VPU_16.json</code></td><td>390KB</td><td>Extended params for VPU 16</td></tr>
+    <tr><td><code>realization_rust_lstm_troute.json</code></td><td>1.7KB</td><td>LSTM &gt; T-Route</td></tr>
+    <tr><td><code>realization_lstm_python.json</code></td><td>1.7KB</td><td>Python LSTM</td></tr>
+    <tr><td><code>realization_lstm_rust.json</code></td><td>1.7KB</td><td>Rust LSTM</td></tr>
+    <tr><td><code>lumped_realization_example.json</code></td><td>6KB</td><td>Example lumped config</td></tr>
+</table>
+
+<hr>
+
+<h2>mappings/</h2>
+<p>Crosswalk files that map between National Water Model COMIDs and NextGen catchment/nexus IDs. Essential for translating NWM outputs to NextGen format or comparing results between the two modeling frameworks.</p>
+<table>
+    <tr><th>File</th><th>Size</th><th>Description</th></tr>
+    <tr><td><code>nwm_to_ngen_map.json</code></td><td>70MB</td><td>NWM COMID to NextGen catchment ID</td></tr>
+    <tr><td><code>hf2.2_ref_hf_nexus_map.json</code></td><td>70MB</td><td>Hydrofabric nexus reference map</td></tr>
+</table>
+
+<hr>
+
+<h2>parameters/</h2>
+<p>Community-contributed calibrated model parameters that improve simulation accuracy for specific regions. These override default parameters and are submitted by researchers who have calibrated models against observed streamflow data.</p>
+<table>
+    <tr><th>File</th><th>Size</th><th>Description</th></tr>
+    <tr><td><code>parameters_16.parquet</code></td><td>4KB</td><td>Custom params for VPU 16</td></tr>
+</table>
+
+<hr>
+
+<h2>status/</h2>
+<p>Operational monitoring dashboards showing the current state of the datastream pipeline. View run completion status, timing metrics, and AWS CloudWatch monitoring links. Check here first to verify if today's data is available.</p>
+<table>
+    <tr><th>File</th><th>Size</th><th>Description</th></tr>
+    <tr><td><code>dashboard.html</code></td><td>176KB</td><td>Main status dashboard</td></tr>
+    <tr><td><code>cloudwatch_dashboard.html</code></td><td>646B</td><td>CloudWatch metrics link</td></tr>
+</table>
+
+<hr>
+
+<h2>submissions/</h2>
+<p>Community-contributed parameter files and model configurations. Researchers can submit calibrated parameters or custom configurations to be included in operational runs after review.</p>
+<table>
+    <tr><th>File</th><th>Size</th><th>Description</th></tr>
+    <tr><td><code>example_community_contribution.tar.gz</code></td><td>110KB</td><td>Example submission template</td></tr>
+</table>
+
+<hr>
+
+<h2>forcingprocessor/</h2>
+<p>Test metadata and outputs from the forcing processor component that converts NWM data to NextGen format. Used for validating forcing processor changes.</p>
+<div class="folder-tree">forcingprocessor/
++-- test/
+    +-- metadata/
+        +-- execution.json    # ~2.7KB test execution metadata</div>
+
+<hr>
+
+<h2>Download Examples</h2>
+<pre># Output (model results)
+aws s3 cp s3://ciroh-community-ngen-datastream/outputs/cfe_nom/v2.2_hydrofabric/ngen.20260116/short_range/12/VPU_09/ngen-run.tar.gz . --no-sign-request
+
+# Forcing (input data)
+aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.20260116/forcing_short_range/12/ngen.t12z.short_range.forcing.f001_f018.VPU_09.nc . --no-sign-request
+
+# Hydrofabric (geopackage)
+aws s3 cp s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_09/config/nextgen_VPU_09.gpkg . --no-sign-request
+
+# Realization (model config)
+curl -O https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_VPU_09.json
+
+# Weights (forcing weights)
+aws s3 cp s3://ciroh-community-ngen-datastream/v2.2_resources/weights/nextgen_VPU_09_weights.json . --no-sign-request</pre>
+
+<hr>
+
+<h2>VPUs</h2>
+<table>
+    <tr><th>VPU</th><th>Region</th><th>gpkg Size</th><th>Download</th></tr>
+    <tr><td>01</td><td>New England</td><td>102MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_01/config/nextgen_VPU_01.gpkg">nextgen_VPU_01.gpkg</a></td></tr>
+    <tr><td>02</td><td>Mid-Atlantic</td><td>168MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_02/config/nextgen_VPU_02.gpkg">nextgen_VPU_02.gpkg</a></td></tr>
+    <tr><td>03N</td><td>South Atlantic North</td><td>157MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_03N/config/nextgen_VPU_03N.gpkg">nextgen_VPU_03N.gpkg</a></td></tr>
+    <tr><td>03S</td><td>South Atlantic South</td><td>70MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_03S/config/nextgen_VPU_03S.gpkg">nextgen_VPU_03S.gpkg</a></td></tr>
+    <tr><td>03W</td><td>South Atlantic West</td><td>162MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_03W/config/nextgen_VPU_03W.gpkg">nextgen_VPU_03W.gpkg</a></td></tr>
+    <tr><td>04</td><td>Great Lakes</td><td>185MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_04/config/nextgen_VPU_04.gpkg">nextgen_VPU_04.gpkg</a></td></tr>
+    <tr><td>05</td><td>Ohio</td><td>253MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_05/config/nextgen_VPU_05.gpkg">nextgen_VPU_05.gpkg</a></td></tr>
+    <tr><td>06</td><td>Tennessee</td><td>71MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_06/config/nextgen_VPU_06.gpkg">nextgen_VPU_06.gpkg</a></td></tr>
+    <tr><td>07</td><td>Upper Mississippi</td><td>307MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_07/config/nextgen_VPU_07.gpkg">nextgen_VPU_07.gpkg</a></td></tr>
+    <tr><td>08</td><td>Lower Mississippi</td><td>186MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_08/config/nextgen_VPU_08.gpkg">nextgen_VPU_08.gpkg</a></td></tr>
+    <tr><td>09</td><td>Souris-Red-Rainy</td><td>63MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_09/config/nextgen_VPU_09.gpkg">nextgen_VPU_09.gpkg</a></td></tr>
+    <tr><td>10L</td><td>Missouri Lower</td><td>320MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_10L/config/nextgen_VPU_10L.gpkg">nextgen_VPU_10L.gpkg</a></td></tr>
+    <tr><td>10U</td><td>Missouri Upper</td><td>490MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_10U/config/nextgen_VPU_10U.gpkg">nextgen_VPU_10U.gpkg</a></td></tr>
+    <tr><td>11</td><td>Arkansas-Red-White</td><td>355MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_11/config/nextgen_VPU_11.gpkg">nextgen_VPU_11.gpkg</a></td></tr>
+    <tr><td>12</td><td>Texas-Gulf</td><td>191MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_12/config/nextgen_VPU_12.gpkg">nextgen_VPU_12.gpkg</a></td></tr>
+    <tr><td>13</td><td>Rio Grande</td><td>134MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_13/config/nextgen_VPU_13.gpkg">nextgen_VPU_13.gpkg</a></td></tr>
+    <tr><td>14</td><td>Colorado Upper</td><td>172MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_14/config/nextgen_VPU_14.gpkg">nextgen_VPU_14.gpkg</a></td></tr>
+    <tr><td>15</td><td>Colorado Lower</td><td>212MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_15/config/nextgen_VPU_15.gpkg">nextgen_VPU_15.gpkg</a></td></tr>
+    <tr><td>16</td><td>Great Basin</td><td>179MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_16/config/nextgen_VPU_16.gpkg">nextgen_VPU_16.gpkg</a></td></tr>
+    <tr><td>17</td><td>Pacific Northwest</td><td>387MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_17/config/nextgen_VPU_17.gpkg">nextgen_VPU_17.gpkg</a></td></tr>
+    <tr><td>18</td><td>California</td><td>213MB</td><td><a href="https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2_resources/VPU_18/config/nextgen_VPU_18.gpkg">nextgen_VPU_18.gpkg</a></td></tr>
+</table>
+
+</body>
+</html>
