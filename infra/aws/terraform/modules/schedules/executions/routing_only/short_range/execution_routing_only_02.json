@@ -1,6 +1,6 @@
 {
   "commands": [
-    "su - ec2-user -c 'rm -rf /home/ec2-user/outputs && docker pull awiciroh/datastream:routing-only && docker pull awiciroh/forcingprocessor:routing-only && export DS_TAG=routing-only FP_TAG=routing-only && /home/ec2-user/datastreamcli/scripts/routing_only_datastream -s DAILY -n 4 --FORCING_SOURCE NWM_V3_CHRTOUT_SHORT_RANGE_02 -d /home/ec2-user/outputs -r s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_03W -R https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_VPU_03W.json --S3_BUCKET ciroh-community-ngen-datastream-test --S3_PREFIX outputs/routing_only/v2.2_hydrofabric/ngen.DAILY/SHORT_RANGE/02/VPU_03W'"
+    "su - ec2-user -c 'rm -rf /home/ec2-user/outputs && docker pull awiciroh/datastream:routing-only && docker pull awiciroh/forcingprocessor:routing-only && export DS_TAG=routing-only FP_TAG=routing-only && /home/ec2-user/datastreamcli/scripts/routing_only_datastream -s DAILY -n 4 --FORCING_SOURCE NWM_V3_CHRTOUT_SHORT_RANGE_02 -d /home/ec2-user/outputs -r s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_03W -R https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_VPU_03W.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX outputs/routing_only/v2.2_hydrofabric/ngen.DAILY/short_range/02/VPU_03W'"
   ],
   "run_options": {
     "ii_terminate_instance": true,
@@ -26,7 +26,7 @@
         "Tags": [
           {
             "Key": "Project",
-            "Value": "routing_only_SHORT_RANGE_VPU_03W"
+            "Value": "routing_only_short_range_VPU_03W"
           }
         ]
       }
