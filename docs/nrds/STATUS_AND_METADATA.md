@@ -1,5 +1,37 @@
 # Status
-Last Updated: 20251126
+Last Updated: 02/2026
+
+Changes
+* A Routing-only datastream has been added! This datastream inputs National Water Model v3 pre-reouting outputs (`q_lateral`), remaps them to the NextGen v2.2 hydrofabric, and then fed into t-route. 
+* All datastream forcings and output data from the original `v2.1`, `v2.2` prefixes have been moved to `forcings/v2.2_hydrofabric` and `outputs/cfe_nom/v2.2_hydrofabric`, respectively. Prefixes `v2.1`, `v2.2` no longer exist.
+
+Status Routing-Only DataStream (DEV)
+* Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
+* Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
+* VPU 03W only
+* Run Types - short_range (hourly, every hour)
+* v2.2 hydrofabric
+
+Status LSTM DataStream (DEV)
+No changes from last update
+* Output data exists at `outputs/lstm/v2.2_hydrofabric/...`
+* Forcings from `forcings/v2.2_hydrofabric`
+* VPU 09 only
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
+* Cold start
+* v2.2 hydrofabric
+
+Status CFE NOM DataStream
+No changes from last update
+* Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
+* Forcings from `forcings/v2.2_hydrofabric`
+* All VPUs
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
+* Cold start
+* v2.2 hydrofabric
+
+---
+Updated: 11/2025
 
 Changes
 * All datastream output data is now being written to the prefix `outputs/<DATASTREAM_NAME>/v2.2_hydrofabric/ngen.<DATE>/<RUN_TYPE>/<INIT>/<VPU>`
@@ -20,8 +52,8 @@ Status CFE NOM DataStream
 * Cold start
 * v2.2 hydrofabric
   
-# Status
-Last Updated: 20251014
+---
+Updated: 10/2025
 
 Changes
 * On October 14th, the NRDS scaled back by turning off all medium range members besides the first.
@@ -32,8 +64,8 @@ Status
 * Cold start
 * v2.2 hydrofabric
 
-# Status
-Last Updated: 20250929
+---
+Updated: 09/2025
 
 Changes
 * On September 1st, the NRDS scaled out to full conus simulation with a NextGen configuration of NOM, CFE, and troute.
@@ -45,8 +77,8 @@ Status
 * Cold start
 * v2.2 hydrofabric
 
-# Status
-Last updated: 08/2025
+---
+Updated: 08/2025
 
 Changes
 * Processing has scaled back to only regions with community contributed parameters (VPU16 as of now)
@@ -64,8 +96,8 @@ Future Updates
 * Implement warm state
 * Update to latest hydrofabric when released.
 
-# Status
-Last updated: 05/2025
+---
+Updated: 05/2025
 
 Status
 * Spatial distribution of processing - split by VPU and subsetted manually from v2.2 [CONUS](https://lynker-spatial.s3-us-west-2.amazonaws.com/hydrofabric/v2.2/conus/conus_nextgen.gpkg). 
@@ -89,9 +121,7 @@ Planned Updates
 * Codify a workflow by which community members may propose edits to the [official parameters set](https://datastream.ciroh.org/index.html#parameters/)
 * Evaluate predictive performance on a national scale 
 
----------
-## Previous Updates
-
+---
 Updated: 02/2025
 
 Status
