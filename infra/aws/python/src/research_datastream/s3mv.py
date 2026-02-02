@@ -5,7 +5,6 @@ Moves objects from one S3 prefix to another with pattern filtering and parallel 
 
 Author: Jordan Laser
 jlaser@lynker.com
-
 """
 
 import argparse
@@ -30,16 +29,19 @@ class MoveStats:
         self.last_print = 0
         self.start_time = None
         self.sample_moves = []  # Store sample moves for dry-run display
+        self.pattern_sample_moves = []  # Store samples that match the replacement pattern
     
     def start(self):
         """Mark the start time"""
         import time
         self.start_time = time.time()
     
-    def add_sample_move(self, source_bucket: str, source_key: str, dest_bucket: str, dest_key: str):
+    def add_sample_move(self, source_bucket: str, source_key: str, dest_bucket: str, dest_key: str, has_pattern: bool = False):
         """Add a sample move for dry-run display"""
         with self.lock:
             self.sample_moves.append((source_bucket, source_key, dest_bucket, dest_key))
+            if has_pattern:
+                self.pattern_sample_moves.append((source_bucket, source_key, dest_bucket, dest_key))
     
     def get_sample_moves(self, first_n: int = 2, last_n: int = 2):
         """Get first N and last N sample moves"""
@@ -48,6 +50,11 @@ class MoveStats:
             if total <= first_n + last_n:
                 return self.sample_moves, []
             return self.sample_moves[:first_n], self.sample_moves[-last_n:]
+    
+    def get_pattern_samples(self, n: int = 2):
+        """Get up to N samples that match the pattern"""
+        with self.lock:
+            return self.pattern_sample_moves[:n]
     
     def increment_total(self):
         with self.lock:
@@ -125,7 +132,8 @@ def move_object(
     source_key: str,
     dest_key: str,
     dry_run: bool,
-    stats: Optional[MoveStats] = None
+    stats: Optional[MoveStats] = None,
+    replace_pattern: Optional[str] = None
 ) -> Tuple[bool, Optional[str]]:
     """
     Move a single S3 object using copy + delete (same as 'aws s3 mv').
@@ -138,7 +146,8 @@ def move_object(
     if dry_run:
         # Record sample move for display
         if stats:
-            stats.add_sample_move(source_bucket, source_key, dest_bucket, dest_key)
+            has_pattern = replace_pattern and replace_pattern in source_key
+            stats.add_sample_move(source_bucket, source_key, dest_bucket, dest_key, has_pattern)
         return True, None
     
     import time
@@ -209,14 +218,16 @@ def process_object(
     relative_path = object_key[len(prefix_old):].lstrip('/')
     
     # Apply pattern replacement if specified
-    if replace_pattern and with_pattern:
-        relative_path = relative_path.replace(replace_pattern, with_pattern)
+    if replace_pattern is not None:
+        # Allow empty string for with_pattern (to delete the pattern)
+        replacement = with_pattern if with_pattern is not None else ""
+        relative_path = relative_path.replace(replace_pattern, replacement)
     
     new_key = f"{prefix_new}/{relative_path}"
     
     # Move the object
     success, error = move_object(
-        s3_client, source_bucket, dest_bucket, object_key, new_key, dry_run, stats
+        s3_client, source_bucket, dest_bucket, object_key, new_key, dry_run, stats, replace_pattern
     )
     
     if success:
@@ -287,6 +298,11 @@ Examples:
     --replace_pattern SHORT_RANGE --with_pattern short_range \\
     --threads 20
   
+  # Delete a pattern from file paths (remove unwanted directory)
+  %(prog)s --source_bucket my-bucket --prefix_old v2.2 --prefix_new v2.2 \\
+    --delete_pattern metadata.csv/ \\
+    --threads 30
+  
   # Move only files containing 'forcing', replace pattern in path
   %(prog)s --source_bucket my-bucket --prefix_old v2.2 --prefix_new v2.2_new \\
     --contains_pattern forcing --replace_pattern UPPER --with_pattern lower \\
@@ -309,7 +325,9 @@ Examples:
     parser.add_argument('--replace_pattern', default=None,
                         help='Pattern to find and replace in the file path (case-sensitive)')
     parser.add_argument('--with_pattern', default=None,
-                        help='Replacement pattern (used with --replace_pattern)')
+                        help='Replacement pattern (used with --replace_pattern). Use empty string "" to delete.')
+    parser.add_argument('--delete_pattern', default=None,
+                        help='Pattern to delete from the file path (shorthand for --replace_pattern X --with_pattern "")')
     parser.add_argument('--threads', type=int, default=10,
                         help='Number of parallel threads (default: 10)')
     parser.add_argument('--dry-run', action='store_true',
@@ -325,10 +343,19 @@ Examples:
     
     args = parser.parse_args()
     
-    # Validate pattern replacement args
-    if (args.replace_pattern and not args.with_pattern) or (args.with_pattern and not args.replace_pattern):
-        print("Error: --replace_pattern and --with_pattern must be used together")
+    # Validate pattern replacement/deletion args
+    if args.delete_pattern and (args.replace_pattern or args.with_pattern):
+        print("Error: --delete_pattern cannot be used with --replace_pattern or --with_pattern")
         sys.exit(1)
+    
+    if args.with_pattern and not args.replace_pattern:
+        print("Error: --with_pattern requires --replace_pattern to be specified")
+        sys.exit(1)
+    
+    # Convert delete_pattern to replace_pattern with empty replacement
+    if args.delete_pattern:
+        args.replace_pattern = args.delete_pattern
+        args.with_pattern = ""
     
     # Set destination bucket to source bucket if not specified
     dest_bucket = args.dest_bucket if args.dest_bucket else args.source_bucket
@@ -347,8 +374,11 @@ Examples:
     print(f"New Prefix:       {prefix_new}")
     print(f"Ignore Pattern:   {args.ignore_pattern or '(none)'}")
     print(f"Contains Pattern: {args.contains_pattern or '(none)'}")
-    if args.replace_pattern and args.with_pattern:
-        print(f"Replace Pattern:  '{args.replace_pattern}' -> '{args.with_pattern}'")
+    if args.replace_pattern:
+        if args.with_pattern:
+            print(f"Replace Pattern:  '{args.replace_pattern}' -> '{args.with_pattern}'")
+        else:
+            print(f"Delete Pattern:   '{args.replace_pattern}' (remove from path)")
     print(f"Threads:          {args.threads}")
     print(f"Progress Every:   {args.progress_interval:,} files")
     print(f"Dry Run:          {args.dry_run}")
@@ -440,8 +470,31 @@ Examples:
             print("Sample File Moves (Dry-Run Preview)")
             print("=" * 60)
             
+            # If pattern replacement is active, show samples with the pattern
+            if args.replace_pattern:
+                pattern_affected = len(stats.pattern_sample_moves)
+                total_samples = len(stats.sample_moves)
+                print(f"\nPattern '{args.replace_pattern}' found in {pattern_affected:,} of {total_samples:,} files")
+                
+                if pattern_affected == 0:
+                    print(f"⚠️  WARNING: No files contain the pattern '{args.replace_pattern}'")
+                    print(f"   The pattern will have no effect. Check your pattern spelling.")
+                else:
+                    # Show samples that actually have the pattern
+                    pattern_samples = stats.get_pattern_samples(n=2)
+                    if pattern_samples:
+                        print(f"\nExample files WITH pattern '{args.replace_pattern}':")
+                        for i, (src_bucket, src_key, dst_bucket, dst_key) in enumerate(pattern_samples, 1):
+                            print(f"\n  {i}. Source:")
+                            print(f"     s3://{src_bucket}/{src_key}")
+                            print(f"     Destination:")
+                            print(f"     s3://{dst_bucket}/{dst_key}")
+                            if src_key != dst_key:
+                                print(f"     ✓ Pattern removed from path")
+            
             if first_samples:
-                print("\nFirst 2 files:")
+                print("\n" + "-" * 60)
+                print("First 2 files overall:")
                 for i, (src_bucket, src_key, dst_bucket, dst_key) in enumerate(first_samples, 1):
                     print(f"\n  {i}. Source:")
                     print(f"     s3://{src_bucket}/{src_key}")
@@ -450,7 +503,7 @@ Examples:
             
             if last_samples and len(first_samples) + len(last_samples) > len(first_samples):
                 print(f"\n  ... ({moved - len(first_samples) - len(last_samples):,} files in between) ...")
-                print(f"\nLast 2 files:")
+                print(f"\nLast 2 files overall:")
                 for i, (src_bucket, src_key, dst_bucket, dst_key) in enumerate(last_samples, moved - len(last_samples) + 1):
                     print(f"\n  {i}. Source:")
                     print(f"     s3://{src_bucket}/{src_key}")
