@@ -7,7 +7,7 @@ on:
       - main
       - feature/bucket-readme-deployment
     paths:
-      - 'docs/bucket/README.html'
+      - 'docs/bucket/README.md'
       - '.github/workflows/upload_bucket_readme.yaml'
 
 env:
@@ -33,9 +33,18 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Convert Markdown to HTML
+      run: |
+        sudo apt-get update && sudo apt-get install -y pandoc
+        pandoc docs/bucket/README.md \
+          -o README.html \
+          --standalone \
+          --metadata title="S3 Bucket: ciroh-community-ngen-datastream" \
+          --css=https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css
+
     - name: Upload README.html to S3
       run: |
-        aws s3 cp docs/bucket/README.html s3://${{ env.S3_BUCKET }}/README.html \
+        aws s3 cp README.html s3://${{ env.S3_BUCKET }}/README.html \
           --content-type "text/html" \
           --cache-control "max-age=3600"
         echo "Successfully uploaded README.html to s3://${{ env.S3_BUCKET }}/README.html"
