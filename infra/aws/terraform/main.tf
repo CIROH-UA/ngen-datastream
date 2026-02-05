@@ -19,6 +19,12 @@ variable "profile_name" {}
 
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
+variable "s3_bucket" {}
+variable "ec2_profile_name" {}
+variable "security_group_id" {}
+variable "key_name" {}
+variable "ami_id_fp" {}
+variable "ami_id_vpu" {}
 
 module "nrds_orchestration" {
     source = "./modules/orchestration"
@@ -45,4 +51,11 @@ module "nrds_schedules" {
     region = var.region
     scheduler_policy_name = var.scheduler_policy_name
     scheduler_role_name = var.scheduler_role_name
+    s3_bucket = var.s3_bucket
+    ec2_profile_name = var.ec2_profile_name
+    security_group_id = var.security_group_id
+    key_name = var.key_name
+    ami_id_fp = var.ami_id_fp
+    ami_id_vpu = var.ami_id_vpu
+    state_machine_arn = module.nrds_orchestration.datastream_arns
 }

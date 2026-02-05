@@ -1,7 +1,7 @@
 # Terraform configuration for AWS Scheduler to trigger Step Functions executions for NRDS CFE NOM
 
 locals {
-  init_cycles_config = jsondecode(file("${path.module}/executions/execution_forecast_inputs.json"))
+  init_cycles_config = jsondecode(file("${path.module}/config/execution_forecast_inputs.json"))
 
   vpus = [
     "fp","01","02","03N","03S","03W","04",
@@ -116,7 +116,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range" {
   schedule_expression_timezone = "America/New_York"
 
   target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
+    arn      = var.state_machine_arn
     role_arn = aws_iam_role.scheduler_role.arn
     input    = file(each.value)
   }
@@ -139,7 +139,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range" {
   schedule_expression_timezone = "America/New_York"
 
   target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
+    arn      = var.state_machine_arn
     role_arn = aws_iam_role.scheduler_role.arn
     input    = file(each.value)
   }
@@ -162,7 +162,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range" {
   schedule_expression_timezone = "America/New_York"
 
   target {
-    arn      = aws_sfn_state_machine.datastream_state_machine.arn
+    arn      = var.state_machine_arn
     role_arn = aws_iam_role.scheduler_role.arn
     input    = file(each.value)
   }
