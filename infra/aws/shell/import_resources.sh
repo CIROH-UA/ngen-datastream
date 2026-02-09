@@ -23,7 +23,7 @@ declare -A resource_map=(
   ["ec2_role"]="iam|aws_iam_role.ec2_role|get-role --role-name"
   ["lambda_policy_name"]="iam|aws_iam_policy.datastreamlambda_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
   ["lambda_invoke_policy_name"]="iam|aws_iam_policy.lambda_invoke_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
-  ["ec2_policy_name"]="iam|aws_iam_policy.ec2_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\].Arn'"
+  ["ec2_policy_name"]="iam|aws_iam_policy.ec2_policy|list-policies --query 'Policies[?PolicyName==\`FullAccess\`].Arn'"
   ["profile_name"]="iam|aws_iam_instance_profile.instance_profile|get-instance-profile --instance-profile-name"
 )
 
@@ -49,8 +49,7 @@ import_resource() {
             terraform import -var-file=$VAR_FILE "$resource_name" "$import_id"
         else
             echo "Resource $import_id does not exist, skipping."
-        fi        
-        echo "Resource $import_id does not exist, skipping."
+        fi
     fi
 }
 
