@@ -16,9 +16,6 @@ profile_name              = "nrds_test_ec2_profile"
 scheduler_policy_name     = "nrds_test_scheduler_policy"
 scheduler_role_name       = "nrds_test_scheduler_role"
 
-# EC2 Configuration
-ec2_instance_profile = "datastream_community_ec2_profile"
-
 # Model AMI
 cfe_nom_ami_id = "ami-0ef008a1e6d9aa12d"
 

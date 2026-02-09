@@ -24,6 +24,11 @@ output "lambda_arns" {
   description = "ARNs of all Lambda functions in the orchestration workflow"
 }
 
+output "ec2_instance_profile_name" {
+  value       = aws_iam_instance_profile.instance_profile.name
+  description = "IAM instance profile name for EC2 instances"
+}
+
 output "lambda_function_names" {
   value = [
     aws_lambda_function.starter_lambda.function_name,

@@ -44,12 +44,6 @@ variable "resource_prefix" {
   description = "Prefix for resource naming (e.g., 'nrds_test', 'nrds_prod')"
 }
 
-# EC2 Configuration
-variable "ec2_instance_profile" {
-  type        = string
-  description = "IAM instance profile name for EC2"
-}
-
 # Model-specific AMIs
 variable "cfe_nom_ami_id" {
   type        = string
@@ -106,7 +100,7 @@ module "nrds_schedules" {
 
   # EC2 config
   ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
-  ec2_instance_profile = var.ec2_instance_profile
+  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
 
   # Model AMI
   cfe_nom_ami_id = var.cfe_nom_ami_id
