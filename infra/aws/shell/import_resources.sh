@@ -1,6 +1,15 @@
 #!/bin/bash
 VAR_FILE="$1"
-source $VAR_FILE
+
+# Parse HCL-style .tfvars (handles spaces around =, comments, and quoted values)
+while IFS= read -r line; do
+  # Skip blank lines and comments
+  [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+  # Match key = "value" with flexible whitespace
+  if [[ "$line" =~ ^[[:space:]]*([a-zA-Z_][a-zA-Z0-9_]*)[[:space:]]*=[[:space:]]*\"([^\"]*)\" ]]; then
+    declare "${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"
+  fi
+done < "$VAR_FILE"
 
 declare -A resource_map=(
   ["sm_name"]="stepfunctions|aws_sfn_state_machine.sm|list-state-machines --state-machine-name"
