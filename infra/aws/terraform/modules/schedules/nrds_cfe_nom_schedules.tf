@@ -239,7 +239,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
-  "Name": "cfe_nom_analysis_assim_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
+  "Name": "cfe_nom_analysis_assim_extend_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
   "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
