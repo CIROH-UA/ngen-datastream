@@ -33,12 +33,6 @@ variable "profile_name" {}
 
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
-
-# VPC Configuration - fetch default VPC automatically
-data "aws_vpc" "default" {
-  default = true
-}
-
 variable "resource_prefix" {
   type        = string
   description = "Prefix for resource naming (e.g., 'nrds_test', 'nrds_prod')"
@@ -87,7 +81,6 @@ module "nrds_orchestration" {
   ec2_policy_name           = var.ec2_policy_name
   profile_name              = var.profile_name
   resource_prefix           = var.resource_prefix
-  vpc_id                    = data.aws_vpc.default.id
 }
 
 module "nrds_schedules" {

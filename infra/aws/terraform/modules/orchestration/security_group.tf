@@ -3,7 +3,7 @@
 resource "aws_security_group" "datastream_ec2_sg" {
   name_prefix = "${var.resource_prefix}_ec2_sg_"
   description = "Security group for NRDS datastream EC2 instances"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.aws_vpc.default.id
 
   egress {
     description = "Allow all outbound"
