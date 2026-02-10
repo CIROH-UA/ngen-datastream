@@ -3,7 +3,21 @@ provider "aws" {
 }
 
 terraform {
-  required_version = ">= 0.12"
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }
+  }
 }
 
 variable "region" {}
@@ -20,3 +34,11 @@ variable "sm_role_name" {}
 variable "ec2_role" {}
 variable "ec2_policy_name" {}
 variable "profile_name" {}
+variable "resource_prefix" {
+  type        = string
+  description = "Prefix for resource naming"
+}
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID for security group"
+}
