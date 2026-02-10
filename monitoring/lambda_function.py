@@ -120,7 +120,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         .progress-fill {{ height: 100%; transition: width 0.3s; }}
         .progress-fill.complete {{ background: #4caf50; }}
         .progress-fill.partial {{ background: #ff9800; }}
-        .progress-fill.low {{ background: #f44336; }}
+        .progress-fill.low {{ background: #d4a017; }}
         .forecast-section {{
             background: #fafafa; border-radius: 6px; padding: 15px;
             margin-bottom: 10px; border: 1px solid #eee;
@@ -148,7 +148,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         .missing-title {{ font-weight: 600; color: #e65100; margin-bottom: 8px; font-size: 13px; }}
         .missing-section.all-complete .missing-title {{ color: #2e7d32; }}
         .missing-item {{
-            display: inline-block; background: #ffcdd2; color: #c62828;
+            display: inline-block; background: #fff3cd; color: #856404;
             padding: 3px 6px; border-radius: 3px; margin: 2px; font-size: 11px;
             font-family: monospace;
         }}
@@ -157,8 +157,9 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         }}
         .legend-item {{ display: flex; align-items: center; gap: 5px; }}
         .legend-box {{ width: 16px; height: 16px; border-radius: 3px; }}
-        .legend-box.ok {{ background: #c8e6c9; }}
-        .legend-box.missing {{ background: #ffcdd2; }}
+        .legend-box.green {{ background: #4caf50; }}
+        .legend-box.orange {{ background: #ff9800; }}
+        .legend-box.gold {{ background: #d4a017; }}
     </style>
 </head>
 <body>
@@ -167,8 +168,9 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         <p class="updated">Last updated: {updated_at} UTC (auto-refreshes every hour) | Data fetched in {execution_time:.1f}s</p>
 
         <div class="legend">
-            <div class="legend-item"><div class="legend-box ok"></div> Complete</div>
-            <div class="legend-item"><div class="legend-box missing"></div> Missing</div>
+            <div class="legend-item"><div class="legend-box green"></div> 95%+ Complete</div>
+            <div class="legend-item"><div class="legend-box orange"></div> 50-95% Complete</div>
+            <div class="legend-item"><div class="legend-box gold"></div> Below 50%</div>
         </div>
 """
 
