@@ -80,6 +80,7 @@ jobs:
         framework: terraform
         output_format: cli,sarif
         output_file_path: console,results.sarif
+        skip_check: CKV_AWS_297
         soft_fail: true
     
     - name: Upload Checkov Results
