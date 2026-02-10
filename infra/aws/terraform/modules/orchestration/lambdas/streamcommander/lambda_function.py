@@ -101,6 +101,9 @@ def lambda_handler(event, context):
                     new_str = re.sub(prefix_daily_pattern, replacement, jcmd)
                     event["commands"][j] = re.sub(prefix_daily_pattern, replacement, jcmd)
 
+        if not isinstance(today, str):
+            today = today.strftime('%Y%m%d')
+
         if forcing_file is not None:
             # Shifting forcing file times based on ensemble member
             escaped = re.escape(forcing_file)
