@@ -120,7 +120,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         .progress-fill {{ height: 100%; transition: width 0.3s; }}
         .progress-fill.complete {{ background: #4caf50; }}
         .progress-fill.partial {{ background: #ff9800; }}
-        .progress-fill.low {{ background: #d4a017; }}
+        .progress-fill.low {{ background: #ff9800; }}
         .forecast-section {{
             background: #fafafa; border-radius: 6px; padding: 15px;
             margin-bottom: 10px; border: 1px solid #eee;
@@ -159,7 +159,6 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         .legend-box {{ width: 16px; height: 16px; border-radius: 3px; }}
         .legend-box.green {{ background: #4caf50; }}
         .legend-box.orange {{ background: #ff9800; }}
-        .legend-box.gold {{ background: #d4a017; }}
     </style>
 </head>
 <body>
@@ -169,8 +168,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
 
         <div class="legend">
             <div class="legend-item"><div class="legend-box green"></div> 95%+ Complete</div>
-            <div class="legend-item"><div class="legend-box orange"></div> 50-95% Complete</div>
-            <div class="legend-item"><div class="legend-box gold"></div> Below 50%</div>
+            <div class="legend-item"><div class="legend-box orange"></div> Below 95%</div>
         </div>
 """
 
