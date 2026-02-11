@@ -66,7 +66,7 @@ def lambda_handler(event, context):
 def store_failed_execution(execution,bucket):
     print(f'Execution failed, storing execution in {bucket}')
     timestamp = datetime.datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
-    key = f"tests/failed_executions/{timestamp}.json"
+    key = f"test/cicd/nrds/failed_executions/{timestamp}.json"
     client_s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(execution))
     print(f'Execution stored in {bucket} at {key}')
 
