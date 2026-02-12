@@ -1,4 +1,5 @@
 region                    = "us-east-1"
+resource_prefix           = "nrds_dev"
 sm_name                   = "nrds_dev_sm"
 sm_role_name              = "nrds_dev_sm_role"
 starter_lambda_name       = "nrds_dev_start_ec2"
@@ -14,6 +15,5 @@ ec2_policy_name           = "nrds_dev_ec2_policy"
 profile_name              = "nrds_dev_ec2_profile"
 scheduler_policy_name     = "nrds_dev_scheduler_policy"
 scheduler_role_name       = "nrds_dev_scheduler_role"
-ec2_security_groups       = ["sg-0fcbe0c6d6faa0117"]
 environment_suffix        = "dev"
 routing_only_ami_id       = "ami-0e6cb37ae70ddb282"

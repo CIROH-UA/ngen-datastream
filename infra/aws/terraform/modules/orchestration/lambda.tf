@@ -29,46 +29,51 @@ data "archive_file" "python_lambda_stopper" {
 }
 
 resource "aws_lambda_function" "starter_lambda" {
-  function_name = var.starter_lambda_name
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  filename      = "${path.module}/lambdas/starter_lambda.zip"
-  timeout       = 900
+  function_name    = var.starter_lambda_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/starter_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_starter.output_base64sha256
+  timeout          = 900
 }
 
 resource "aws_lambda_function" "commander_lambda" {
-  function_name = var.commander_lambda_name
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  filename      = "${path.module}/lambdas/commander_lambda.zip"
-  timeout       = 600
+  function_name    = var.commander_lambda_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/commander_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_commander.output_base64sha256
+  timeout          = 600
 }
 
 resource "aws_lambda_function" "poller_lambda" {
-  function_name = var.poller_lambda_name
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  filename      = "${path.module}/lambdas/poller_lambda.zip"
-  timeout       = 900
+  function_name    = var.poller_lambda_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/poller_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_poller.output_base64sha256
+  timeout          = 900
 }
 
 resource "aws_lambda_function" "checker_lambda" {
-  function_name = var.checker_lambda_name
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  filename      = "${path.module}/lambdas/checker_lambda.zip"
-  timeout       = 60
+  function_name    = var.checker_lambda_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/checker_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_checker.output_base64sha256
+  timeout          = 60
 }
 
 resource "aws_lambda_function" "stopper_lambda" {
-  function_name = var.stopper_lambda_name
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.12"
-  filename      = "${path.module}/lambdas/stopper_lambda.zip"
-  timeout       = 180
+  function_name    = var.stopper_lambda_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/stopper_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_stopper.output_base64sha256
+  timeout          = 180
 }

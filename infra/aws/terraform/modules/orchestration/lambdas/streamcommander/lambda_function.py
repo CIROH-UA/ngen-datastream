@@ -36,6 +36,8 @@ def lambda_handler(event, context):
 
     instance_id = event['instance_parameters']['InstanceId']
 
+    bucket = None
+    prefix = None
 
     if "datastream_command_options" in event:
         ds_options = event["datastream_command_options"]
@@ -202,8 +204,10 @@ def lambda_handler(event, context):
                 InstanceIds=[instance_id],
                 DocumentName='AWS-RunShellScript',
                 Parameters={'commands': event['commands'],
-                            "executionTimeout": [f"{3600*24}"]
-                            }
+                            'executionTimeout': [f"{3600*24}"]
+                            },
+                OutputS3BucketName='ciroh-community-ngen-datastream',
+                OutputS3KeyPrefix=f"ssm-logs/{event.get('execution_name', today)}"
                 )
             ii_send_command = False
         except client_ssm.exceptions.ClientError as e:

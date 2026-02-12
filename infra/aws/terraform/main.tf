@@ -55,16 +55,11 @@ variable "lambda_invoke_policy_name" {
 
 # Step Functions State Machine Configuration
 variable "sm_name" {
-  description = "Name of the Step Functions state machine that orchestrates the datastream workflow (Starter → Commander → Poller → Checker → Stopper)"
+  description = "Name of the Step Functions state machine that orchestrates the datastream workflow (Starter -> Commander -> Poller -> Checker -> Stopper)"
 }
 
 variable "sm_role_name" {
   description = "Name of the IAM role assumed by the Step Functions state machine to invoke Lambda functions"
-}
-
-variable "sm_parameter_name" {
-  description = "SSM Parameter Store path where the state machine ARN is stored for reference by other services"
-  default     = "/datastream/state-machine-arn"
 }
 
 # EC2 Instance IAM Configuration
@@ -80,6 +75,11 @@ variable "profile_name" {
   description = "Name of the IAM instance profile that wraps the EC2 role, attached to EC2 instances at launch"
 }
 
+variable "resource_prefix" {
+  type        = string
+  description = "Prefix for resource naming (e.g., 'nrds_dev', 'nrds_prod')"
+}
+
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
 
@@ -87,11 +87,6 @@ variable "scheduler_role_name" {}
 variable "routing_only_ami_id" {
   description = "AMI ID for Routing-Only model EC2 instances"
   default     = "ami-0e6cb37ae70ddb282"
-}
-
-variable "ec2_security_groups" {
-  type        = list(string)
-  description = "Security group IDs for EC2 instances launched by schedules"
 }
 
 variable "environment_suffix" {
@@ -125,10 +120,10 @@ module "nrds_orchestration" {
   lambda_invoke_policy_name = var.lambda_invoke_policy_name
   sm_name                   = var.sm_name
   sm_role_name              = var.sm_role_name
-  sm_parameter_name         = var.sm_parameter_name
   ec2_role                  = var.ec2_role
   ec2_policy_name           = var.ec2_policy_name
   profile_name              = var.profile_name
+  resource_prefix           = var.resource_prefix
 }
 
 module "nrds_schedules" {
@@ -139,15 +134,15 @@ module "nrds_schedules" {
   scheduler_role_name   = var.scheduler_role_name
 
   # Orchestration outputs
-  state_machine_arn    = module.nrds_orchestration.datastream_arns
+  state_machine_arn    = module.nrds_orchestration.datastream_arn
   ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
-  ec2_security_groups  = var.ec2_security_groups
+  ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
 
   # Schedule configuration
-  routing_only_ami_id  = var.routing_only_ami_id
-  environment_suffix   = var.environment_suffix
-  schedule_timezone    = var.schedule_timezone
-  schedule_group_name  = var.schedule_group_name
+  routing_only_ami_id = var.routing_only_ami_id
+  environment_suffix  = var.environment_suffix
+  schedule_timezone   = var.schedule_timezone
+  schedule_group_name = var.schedule_group_name
 
   depends_on = [module.nrds_orchestration]
 }
