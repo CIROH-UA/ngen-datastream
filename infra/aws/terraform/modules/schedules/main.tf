@@ -14,10 +14,7 @@ terraform {
 
 locals {
   vpus = [
-    "fp","01","02","03N","03S","03W","04",
-    "05","06","07","08","09","10L",
-    "10U","11","12","13","14","15",
-    "16","17","18"
+    "03W"
   ]
 }
 variable "region" {}
@@ -43,7 +40,7 @@ variable "ec2_instance_profile" {
 variable "routing_only_ami_id" {
   type        = string
   description = "AMI ID for Routing-Only model EC2 instances"
-  default     = "ami-0e6cb37ae70ddb282"
+  default     = "ami-0f8e27ecfe91ffd4f"
 }
 
 # Schedule Settings

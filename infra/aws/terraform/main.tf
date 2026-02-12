@@ -3,6 +3,8 @@ provider "aws" {
 }
 
 terraform {
+  backend "s3" {}
+
   required_version = ">= 1.0"
 
   required_providers {
@@ -43,7 +45,7 @@ variable "resource_prefix" {
 variable "routing_only_ami_id" {
   type        = string
   description = "AMI ID for Routing-Only model EC2 instances"
-  default     = "ami-0e6cb37ae70ddb282"
+  default     = "ami-0f8e27ecfe91ffd4f"
 }
 
 # Schedule Settings
