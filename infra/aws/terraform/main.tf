@@ -83,6 +83,34 @@ variable "profile_name" {
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
 
+# Schedules Configuration
+variable "routing_only_ami_id" {
+  description = "AMI ID for Routing-Only model EC2 instances"
+  default     = "ami-0e6cb37ae70ddb282"
+}
+
+variable "ec2_security_groups" {
+  type        = list(string)
+  description = "Security group IDs for EC2 instances launched by schedules"
+}
+
+variable "environment_suffix" {
+  type        = string
+  description = "Environment suffix for schedule names (e.g., 'dev', 'prod', 'test')"
+}
+
+variable "schedule_timezone" {
+  type        = string
+  description = "Timezone for EventBridge schedules"
+  default     = "America/New_York"
+}
+
+variable "schedule_group_name" {
+  type        = string
+  description = "EventBridge scheduler group name"
+  default     = "default"
+}
+
 module "nrds_orchestration" {
   source = "./modules/orchestration"
 
@@ -109,6 +137,17 @@ module "nrds_schedules" {
   region                = var.region
   scheduler_policy_name = var.scheduler_policy_name
   scheduler_role_name   = var.scheduler_role_name
+
+  # Orchestration outputs
+  state_machine_arn    = module.nrds_orchestration.datastream_arns
+  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
+  ec2_security_groups  = var.ec2_security_groups
+
+  # Schedule configuration
+  routing_only_ami_id  = var.routing_only_ami_id
+  environment_suffix   = var.environment_suffix
+  schedule_timezone    = var.schedule_timezone
+  schedule_group_name  = var.schedule_group_name
 
   depends_on = [module.nrds_orchestration]
 }
