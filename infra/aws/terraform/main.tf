@@ -1,99 +1,54 @@
+provider "aws" {
+  region = var.region
+}
+
 terraform {
   backend "s3" {}
 
-  required_version = ">= 1.10.0"
+  required_version = ">= 1.0"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }
   }
 }
 
-provider "aws" {
-  region = var.region
-}
-
-variable "region" {
-  description = "AWS region where all resources will be deployed"
-}
-
-# Lambda Functions - Orchestration Components
-variable "starter_lambda_name" {
-  description = "Name of the Lambda function that launches EC2 instances from AMI to run datastream workloads"
-}
-
-variable "commander_lambda_name" {
-  description = "Name of the Lambda function that sends shell commands to EC2 instances via SSM to execute datastream scripts"
-}
-
-variable "poller_lambda_name" {
-  description = "Name of the Lambda function that polls EC2 instance status and monitors command execution progress"
-}
-
-variable "checker_lambda_name" {
-  description = "Name of the Lambda function that validates datastream output exists in S3 after execution completes"
-}
-
-variable "stopper_lambda_name" {
-  description = "Name of the Lambda function that terminates EC2 instances after datastream execution"
-}
-
-# Lambda IAM Configuration
-variable "lambda_policy_name" {
-  description = "Name of the IAM policy granting Lambda functions permissions for EC2, SSM, and S3 operations"
-}
-
-variable "lambda_role_name" {
-  description = "Name of the IAM role assumed by all orchestration Lambda functions"
-}
-
-variable "lambda_invoke_policy_name" {
-  description = "Name of the IAM policy allowing Step Functions state machine to invoke Lambda functions"
-}
-
-# Step Functions State Machine Configuration
-variable "sm_name" {
-  description = "Name of the Step Functions state machine that orchestrates the datastream workflow (Starter -> Commander -> Poller -> Checker -> Stopper)"
-}
-
-variable "sm_role_name" {
-  description = "Name of the IAM role assumed by the Step Functions state machine to invoke Lambda functions"
-}
-
-# EC2 Instance IAM Configuration
-variable "ec2_role" {
-  description = "Name of the IAM role assumed by EC2 instances running datastream workloads, enabling SSM connectivity and S3 access"
-}
-
-variable "ec2_policy_name" {
-  description = "Name of the IAM policy attached to EC2 role granting SSM, S3, and EC2 describe permissions"
-}
-
-variable "profile_name" {
-  description = "Name of the IAM instance profile that wraps the EC2 role, attached to EC2 instances at launch"
-}
-
-variable "resource_prefix" {
-  type        = string
-  description = "Prefix for resource naming (e.g., 'nrds_dev', 'nrds_prod')"
-}
+variable "region" {}
+variable "starter_lambda_name" {}
+variable "commander_lambda_name" {}
+variable "poller_lambda_name" {}
+variable "checker_lambda_name" {}
+variable "stopper_lambda_name" {}
+variable "lambda_policy_name" {}
+variable "lambda_role_name" {}
+variable "lambda_invoke_policy_name" {}
+variable "sm_name" {}
+variable "sm_role_name" {}
+variable "ec2_role" {}
+variable "ec2_policy_name" {}
+variable "profile_name" {}
 
 variable "scheduler_policy_name" {}
 variable "scheduler_role_name" {}
+variable "resource_prefix" {
+  type        = string
+  description = "Prefix for resource naming (e.g., 'nrds_test', 'nrds_prod')"
+}
 
-# Schedules Configuration
+# Model-specific AMIs
 variable "routing_only_ami_id" {
+  type        = string
   description = "AMI ID for Routing-Only model EC2 instances"
   default     = "ami-0e6cb37ae70ddb282"
 }
 
-variable "environment_suffix" {
-  type        = string
-  description = "Environment suffix for schedule names (e.g., 'dev', 'prod', 'test')"
-}
-
+# Schedule Settings
 variable "schedule_timezone" {
   type        = string
   description = "Timezone for EventBridge schedules"
@@ -104,6 +59,11 @@ variable "schedule_group_name" {
   type        = string
   description = "EventBridge scheduler group name"
   default     = "default"
+}
+
+variable "environment_suffix" {
+  type        = string
+  description = "Environment suffix for schedule names (e.g., 'dev', 'prod', 'test')"
 }
 
 module "nrds_orchestration" {
@@ -132,17 +92,17 @@ module "nrds_schedules" {
   region                = var.region
   scheduler_policy_name = var.scheduler_policy_name
   scheduler_role_name   = var.scheduler_role_name
+  state_machine_arn     = module.nrds_orchestration.datastream_arn
 
-  # Orchestration outputs
-  state_machine_arn    = module.nrds_orchestration.datastream_arn
-  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
+  # EC2 config
   ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
+  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
 
-  # Schedule configuration
+  # Model AMI
   routing_only_ami_id = var.routing_only_ami_id
-  environment_suffix  = var.environment_suffix
+
+  # Schedule settings
   schedule_timezone   = var.schedule_timezone
   schedule_group_name = var.schedule_group_name
-
-  depends_on = [module.nrds_orchestration]
+  environment_suffix  = var.environment_suffix
 }
