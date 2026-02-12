@@ -5,7 +5,7 @@
   "run_options": {
     "ii_terminate_instance": true,
     "ii_delete_volume": true,
-    "ii_check_s3": false,
+    "ii_check_s3": true,
     "ii_cheapo": true,
     "timeout_s": 3600,
     "n_retries_allowed": 2
