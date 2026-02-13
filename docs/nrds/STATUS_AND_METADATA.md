@@ -1,4 +1,40 @@
 # Status
+Last Updated: 02/2026 
+
+Changes
+* The LSTM datastream has been expanded from just VPU 09 to 20 out of 21 VPUs. 
+* The CFE NOM datastream has been updated to use corrected CFE BMI configuration files located at `resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed`.
+* Both LSTM and CFE NOM datastreams now get static inputs from `resources/v2.2_hydrofabric`. The prefix `v2.2_resources` is deprecated and will be removed soon.
+* Both LSTM and CFE NOM datastreams now convert the troute netcdf to parquet. This file is available separate the ngen-run.tar.gz file at `.../ngen-run/outputs/troute/*.parquet`.
+
+Status LSTM DataStream 
+* Output data exists at `outputs/lstm_0/v2.2_hydrofabric/...`
+* Forcings from `forcings/v2.2_hydrofabric`
+* All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
+* Ensemble members (weight files)
+  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_25yr_seq999_seed103_2701_171540/config.yml",
+  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_slope_elev_precip_temp_seq999_seed101_2801_191806/config.yml"
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
+* Cold start
+* v2.2 hydrofabric
+
+Status CFE NOM DataStream
+* Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
+* Forcings from `forcings/v2.2_hydrofabric`
+* All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
+* Updated BMI config files at `resources/v2.2_hydrofabric/bmi_configs/lstm_0`
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
+* Cold start
+* v2.2 hydrofabric
+
+Status Routing-Only DataStream (DEV)
+* Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
+* Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
+* VPU 03W only
+* Run Types - short_range (hourly, every hour)
+* v2.2 hydrofabric
+
+---
 Last Updated: 02/2026
 
 Changes
