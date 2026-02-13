@@ -5,7 +5,7 @@ locals {
   init_cycles_config_cfe_nom = jsondecode(file("${path.module}/config/execution_forecast_inputs_cfe_nom.json"))
 
   # CFE_NOM template path
-  cfe_nom_template_path = "${path.module}/executions/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
+  cfe_nom_template_path = "${path.module}/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
 
   # Common CFE_NOM configuration
   cfe_nom_ami_id           = var.cfe_nom_ami_id
@@ -173,7 +173,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
 }))}
 }
 EOT
-}
+  }
 }
 
 # Medium Range CFE_NOM Schedules
@@ -216,7 +216,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
 }))}
 }
 EOT
-}
+  }
 }
 
 # Analysis/Assimilation CFE_NOM Schedules
@@ -259,5 +259,5 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
 }))}
 }
 EOT
-}
+  }
 }

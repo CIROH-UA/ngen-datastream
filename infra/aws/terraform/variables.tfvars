@@ -13,13 +13,3 @@ lambda_invoke_policy_name = "nrds_test_lambda_invoke_policy"
 ec2_role                  = "nrds_test_ec2_role"
 ec2_policy_name           = "nrds_test_ec2_policy"
 profile_name              = "nrds_test_ec2_profile"
-scheduler_policy_name     = "nrds_test_scheduler_policy"
-scheduler_role_name       = "nrds_test_scheduler_role"
-
-# Model AMI
-cfe_nom_ami_id = "ami-0ef008a1e6d9aa12d"
-
-# Schedule Settings
-schedule_timezone   = "America/New_York"
-schedule_group_name = "default"
-environment_suffix  = "test"
