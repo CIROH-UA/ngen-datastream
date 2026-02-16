@@ -8,6 +8,7 @@ on:
       - templatize_cfe_nom_routing_only
     paths:
       - 'infra/aws/terraform/**'
+  workflow_dispatch:
 
 # CRITICAL: Never cancel a terraform apply mid-run — it can leave state locked
 # or resources half-created. Queue new runs instead.

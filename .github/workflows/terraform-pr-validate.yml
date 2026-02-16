@@ -9,6 +9,7 @@ on:
     paths:
       - 'infra/aws/terraform/**'
       - '.github/workflows/terraform-*.yml'
+  workflow_dispatch:
 
 env:
   TF_VERSION: "1.10.0"
@@ -148,7 +149,7 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -var-file=${{ matrix.service.tfvars }} -no-color -input=false -out=tfplan
+        run: terraform plan -var-file=${{ matrix.service.tfvars }} -no-color -input=false -lock-timeout=5m -out=tfplan
         continue-on-error: true
 
       - name: Generate plan text output
