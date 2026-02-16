@@ -201,12 +201,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
             const serviceName = '${{ matrix.service.name }}';
             const planOutcome = '${{ steps.plan.outcome }}';
-            const planOutput = `${{ steps.plan.outputs.stdout }}`.substring(0, 60000);
-            const planError  = `${{ steps.plan.outputs.stderr }}`.substring(0, 5000);
 
-            const body = `### Terraform Plan: \`${serviceName}\` ${planOutcome === 'success' ? '✅' : '❌'}
+            // Read from file to avoid "Argument list too long" with large plans
+            let planOutput = '';
+            try {
+              planOutput = fs.readFileSync('plan_output.txt', 'utf8').substring(0, 60000);
+            } catch (e) {
+              planOutput = 'Plan output not available';
+            }
+
+            const body = `### Terraform Plan: \`${serviceName}\` ${planOutcome === 'success' ? '\u2705' : '\u274C'}
 
             <details><summary>Show Plan Output</summary>
 
@@ -215,8 +222,6 @@ jobs:
             \`\`\`
 
             </details>
-
-            ${planError ? `<details><summary>Errors / Warnings</summary>\n\n\`\`\`\n${planError}\n\`\`\`\n\n</details>` : ''}
 
             *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
 
