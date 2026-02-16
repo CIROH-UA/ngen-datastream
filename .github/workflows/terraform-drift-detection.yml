@@ -33,8 +33,8 @@ jobs:
           # SERVICE REGISTRY — add new services here
           # =====================================================================
           SERVICE_REGISTRY='[
-            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/test.tfvars"},
-            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/test.tfvars"}
+            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/test.tfvars","backend_config":"envs/test.backend.hcl"},
+            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/test.tfvars","backend_config":""}
           ]'
 
           echo "services=$(echo "$SERVICE_REGISTRY" | jq -c '.')" >> "$GITHUB_OUTPUT"
@@ -71,7 +71,12 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          if [[ -n "${{ matrix.service.backend_config }}" ]]; then
+            terraform init -backend-config=${{ matrix.service.backend_config }}
+          else
+            terraform init
+          fi
 
       - name: Terraform Plan (detect drift)
         id: plan
