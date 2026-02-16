@@ -97,6 +97,7 @@ jobs:
     environment: test
     permissions:
       contents: read
+      id-token: write
     strategy:
       # Deploy one service at a time for safety
       max-parallel: 1
@@ -114,8 +115,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -127,11 +127,11 @@ jobs:
       - name: Terraform Init
         run: |
           if [[ -n "${{ matrix.service.backend_config }}" ]]; then
-            terraform init -backend-config=${{ matrix.service.backend_config }}
+            terraform init -backend-config="${{ matrix.service.backend_config }}"
           else
             terraform init
           fi
 
       - name: Terraform Apply
         # -lock-timeout: wait for stale locks from failed runs instead of failing immediately
-        run: terraform apply -var-file=${{ matrix.service.tfvars }} -auto-approve -input=false -lock-timeout=5m
+        run: terraform apply -var-file="${{ matrix.service.tfvars }}" -auto-approve -input=false -lock-timeout=5m

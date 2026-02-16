@@ -138,6 +138,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -152,8 +153,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -167,7 +167,7 @@ jobs:
         id: init
         run: |
           if [[ -n "${{ matrix.service.backend_config }}" ]]; then
-            terraform init -backend-config=${{ matrix.service.backend_config }}
+            terraform init -backend-config="${{ matrix.service.backend_config }}"
           else
             terraform init
           fi
@@ -178,7 +178,7 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -var-file=${{ matrix.service.tfvars }} -no-color -input=false -lock-timeout=5m -out=tfplan
+        run: terraform plan -var-file="${{ matrix.service.tfvars }}" -no-color -input=false -lock-timeout=5m -out=tfplan
         continue-on-error: true
 
       - name: Generate plan text output
