@@ -6,7 +6,7 @@ locals {
   init_cycles_config_routing_only = jsondecode(file("${path.module}/config/execution_forecast_inputs_routing_only.json"))
 
   # Routing-Only template path
-  routing_only_template_path = "${path.module}/executions/templates/execution_datastream_routing_only_VPU_template.json.tpl"
+  routing_only_template_path = "${path.module}/templates/execution_datastream_routing_only_VPU_template.json.tpl"
 
   # Routing-Only VPUs (currently only 03W)
   routing_only_vpus = keys(local.init_cycles_config_routing_only.short_range.instance_types)

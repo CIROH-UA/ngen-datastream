@@ -1,39 +1,28 @@
-provider "aws" {
-  region = var.region
-}
-
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-locals {
-  vpus = [
-    "03W"
-  ]
-}
-variable "region" {}
-variable "scheduler_policy_name" {}
-variable "scheduler_role_name" {}
-
-variable "state_machine_arn" {
-  type = string
-}
-
-# EC2 Configuration
-variable "ec2_security_groups" {
-  type        = list(string)
-  description = "Security group IDs for EC2 instances"
-}
-
-variable "ec2_instance_profile" {
+variable "region" {
   type        = string
-  description = "IAM instance profile name for EC2"
+  description = "AWS region"
+}
+
+# Remote state configuration
+variable "state_bucket" {
+  type        = string
+  description = "S3 bucket containing the shared orchestration state file"
+}
+
+variable "orchestration_state_key" {
+  type        = string
+  description = "S3 key for the shared orchestration state file"
+}
+
+# Scheduler IAM
+variable "scheduler_policy_name" {
+  type        = string
+  description = "Name of the scheduler IAM policy"
+}
+
+variable "scheduler_role_name" {
+  type        = string
+  description = "Name of the scheduler IAM role"
 }
 
 # Model-specific AMIs

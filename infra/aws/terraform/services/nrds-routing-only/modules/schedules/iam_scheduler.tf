@@ -34,8 +34,8 @@ resource "aws_iam_role" "scheduler_role" {
   })
 }
 
-resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
-  name       = "datastream_scheduler_attachment"
+resource "aws_iam_policy_attachment" "routing_only_scheduler_attachment" {
+  name       = "routing_only_scheduler_attachment"
   roles      = [aws_iam_role.scheduler_role.name]
   policy_arn = aws_iam_policy.scheduler_policy.arn
 }
