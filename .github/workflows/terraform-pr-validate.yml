@@ -206,9 +206,11 @@ jobs:
             const planOutcome = '${{ steps.plan.outcome }}';
 
             // Read from file to avoid "Argument list too long" with large plans
+            // Note: actions/github-script runs from repo root, not working-directory
+            const planFile = '${{ matrix.service.path }}/plan_output.txt';
             let planOutput = '';
             try {
-              planOutput = fs.readFileSync('plan_output.txt', 'utf8').substring(0, 60000);
+              planOutput = fs.readFileSync(planFile, 'utf8').substring(0, 60000);
             } catch (e) {
               planOutput = 'Plan output not available';
             }
