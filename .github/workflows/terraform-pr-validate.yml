@@ -32,6 +32,7 @@ jobs:
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
       has_changes: ${{ steps.build-matrix.outputs.has_changes }}
+      orchestration_changed: ${{ steps.filter.outputs.orchestration }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -97,6 +98,34 @@ jobs:
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
         working-directory: infra/aws/terraform
+
+  # ---------------------------------------------------------------------------
+  # Validate the shared orchestration module (no backend, no plan)
+  # ---------------------------------------------------------------------------
+  validate-orchestration:
+    name: "Validate: orchestration module"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.orchestration_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/aws/terraform/modules/orchestration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
 
   # ---------------------------------------------------------------------------
   # Validate & plan each changed service (matrix job)
