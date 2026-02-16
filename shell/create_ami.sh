@@ -97,6 +97,7 @@ echo "Pulling Docker images..."
 docker pull awiciroh/datastream:$DS_TAG
 docker pull awiciroh/forcingprocessor:$FP_TAG
 docker pull awiciroh/ciroh-ngen-image:$NGIAB_TAG
+docker pull zwills/merkdir
 
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
