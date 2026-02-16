@@ -1,0 +1,131 @@
+name: Terraform Deploy
+
+on:
+  push:
+    branches:
+      - main
+      # TODO: Remove this branch after merging to main — avoids double-deploys
+      - templatize_cfe_nom_routing_only
+    paths:
+      - 'infra/aws/terraform/**'
+
+# CRITICAL: Never cancel a terraform apply mid-run — it can leave state locked
+# or resources half-created. Queue new runs instead.
+concurrency:
+  group: terraform-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.9.0"
+  AWS_REGION: us-east-1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Detect which services changed and build a dynamic matrix.
+  #
+  # TO ADD A NEW SERVICE:
+  #   1. Add a filter entry under "Detect changed paths" (step id: filter)
+  #   2. Add a JSON object to SERVICE_REGISTRY in "Build service matrix"
+  #      Place it in deploy order (lowest risk first).
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      services: ${{ steps.build-matrix.outputs.services }}
+      has_changes: ${{ steps.build-matrix.outputs.has_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Filter names MUST match the "name" field in SERVICE_REGISTRY below
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            orchestration:
+              - 'infra/aws/terraform/modules/orchestration/**'
+            nrds-routing-only:
+              - 'infra/aws/terraform/services/nrds-routing-only/**'
+            nrds-cfe-nom:
+              - 'infra/aws/terraform/services/nrds-cfe-nom/**'
+
+      - name: Build service matrix
+        id: build-matrix
+        run: |
+          # =====================================================================
+          # SERVICE REGISTRY — to add a new service, just append a JSON object.
+          # Filter names above MUST match the "name" field here.
+          # ORDER MATTERS: services deploy sequentially (max-parallel: 1).
+          # Put lower-risk / smaller services first as a canary.
+          # =====================================================================
+          SERVICE_REGISTRY='[
+            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/test.tfvars"},
+            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/test.tfvars"}
+          ]'
+
+          # paths-filter "changes" output is a JSON array of matched filter names
+          CHANGED='${{ steps.filter.outputs.changes }}'
+
+          if echo "$CHANGED" | jq -e 'any(. == "orchestration")' > /dev/null 2>&1; then
+            # Shared module changed — every service needs deployment
+            MATRIX="$SERVICE_REGISTRY"
+          else
+            # Keep only services whose filter matched (name == filter name)
+            MATRIX=$(echo "$SERVICE_REGISTRY" | jq -c --argjson changed "$CHANGED" \
+              '[.[] | select(.name as $n | $changed | any(. == $n))]')
+          fi
+
+          echo "services=$(echo "$MATRIX" | jq -c '.')" >> "$GITHUB_OUTPUT"
+          echo "has_changes=$(echo "$MATRIX" | jq -r 'if length > 0 then "true" else "false" end')" >> "$GITHUB_OUTPUT"
+          echo "Matrix: $MATRIX"
+
+  # ---------------------------------------------------------------------------
+  # Deploy each changed service sequentially (one at a time, fail-fast)
+  # ---------------------------------------------------------------------------
+  deploy-service:
+    name: "Deploy: ${{ matrix.service.name }}"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    environment: test
+    permissions:
+      contents: read
+    strategy:
+      # Deploy one service at a time for safety
+      max-parallel: 1
+      # Stop deploying remaining services if one fails
+      fail-fast: true
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.service.path }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        # -lock-timeout: wait for stale locks from failed runs instead of failing immediately
+        run: terraform apply -var-file=${{ matrix.service.tfvars }} -auto-approve -input=false -lock-timeout=5m

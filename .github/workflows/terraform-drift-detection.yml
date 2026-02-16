@@ -1,0 +1,224 @@
+name: Terraform Drift Detection
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC (1 AM EST)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+env:
+  TF_VERSION: "1.9.0"
+  AWS_REGION: us-east-1
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build the full service matrix (always check all services for drift).
+  #
+  # TO ADD A NEW SERVICE:
+  #   Add a JSON object to SERVICE_REGISTRY below.
+  # ---------------------------------------------------------------------------
+  build-matrix:
+    name: Build Service Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.config.outputs.services }}
+    steps:
+      - name: Define service registry
+        id: config
+        run: |
+          # =====================================================================
+          # SERVICE REGISTRY — add new services here
+          # =====================================================================
+          SERVICE_REGISTRY='[
+            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/test.tfvars"},
+            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/test.tfvars"}
+          ]'
+
+          echo "services=$(echo "$SERVICE_REGISTRY" | jq -c '.')" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Run terraform plan for each service and flag drift
+  # ---------------------------------------------------------------------------
+  detect-drift:
+    name: "Drift Check: ${{ matrix.service.name }}"
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.build-matrix.outputs.services) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.service.path }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan (detect drift)
+        id: plan
+        run: |
+          set +eo pipefail
+          terraform plan -var-file=${{ matrix.service.tfvars }} -detailed-exitcode -input=false -lock-timeout=5m -no-color 2>&1 | tee plan_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -eo pipefail
+
+          # Exit codes: 0 = no changes, 1 = error, 2 = changes detected (drift)
+          if [[ $EXIT_CODE -eq 2 ]]; then
+            echo "drift_detected=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Drift detected in ${{ matrix.service.name }}"
+
+            # Extract summary line
+            SUMMARY=$(grep -E "Plan:|No changes" plan_output.txt | tail -1)
+            echo "drift_summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+          elif [[ $EXIT_CODE -eq 0 ]]; then
+            echo "drift_detected=false" >> "$GITHUB_OUTPUT"
+            echo "No drift detected in ${{ matrix.service.name }}"
+          else
+            echo "drift_detected=error" >> "$GITHUB_OUTPUT"
+            echo "::error::Terraform plan failed for ${{ matrix.service.name }}"
+            exit 1
+          fi
+
+      - name: Save drift report
+        if: always()
+        run: |
+          mkdir -p /tmp/drift-reports
+          jq -n \
+            --arg service "${{ matrix.service.name }}" \
+            --arg drift "${{ steps.plan.outputs.drift_detected }}" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{service: $service, drift_detected: $drift, timestamp: $ts, run_url: $url}' \
+            > "/tmp/drift-reports/${{ matrix.service.name }}.json"
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report-${{ matrix.service.name }}
+          path: /tmp/drift-reports/
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Aggregate results and create a GitHub Issue if drift is found
+  # ---------------------------------------------------------------------------
+  notify:
+    name: Drift Summary
+    needs: [build-matrix, detect-drift]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Download all drift reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: drift-report-*
+          path: /tmp/drift-reports
+          merge-multiple: true
+
+      - name: Aggregate and alert
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const reportsDir = '/tmp/drift-reports';
+            const files = fs.readdirSync(reportsDir).filter(f => f.endsWith('.json'));
+
+            const drifted = [];
+            const errors = [];
+
+            for (const file of files) {
+              const report = JSON.parse(fs.readFileSync(path.join(reportsDir, file), 'utf8'));
+              if (report.drift_detected === 'true') drifted.push(report);
+              if (report.drift_detected === 'error') errors.push(report);
+            }
+
+            if (drifted.length === 0 && errors.length === 0) {
+              console.log('No drift detected across any service.');
+              return;
+            }
+
+            // Build issue body
+            const lines = ['## Terraform Drift Detected', ''];
+
+            if (drifted.length > 0) {
+              lines.push(`**${drifted.length} service(s) have drifted from code:**`);
+              lines.push('');
+              for (const r of drifted) {
+                lines.push(`- \`${r.service}\` — [View run](${r.run_url})`);
+              }
+              lines.push('');
+            }
+
+            if (errors.length > 0) {
+              lines.push(`**${errors.length} service(s) failed plan:**`);
+              lines.push('');
+              for (const r of errors) {
+                lines.push(`- \`${r.service}\` — [View run](${r.run_url})`);
+              }
+              lines.push('');
+            }
+
+            lines.push('### Next Steps');
+            lines.push('1. Review the plan output in the linked workflow run');
+            lines.push('2. If the drift is intentional, run `terraform apply` to update state');
+            lines.push('3. If the drift is unintended, investigate who/what modified the resource');
+            lines.push('');
+            lines.push(`*Detected at ${new Date().toISOString()} by drift detection workflow*`);
+
+            const body = lines.join('\n');
+            const title = `Terraform Drift: ${drifted.map(r => r.service).join(', ') || 'plan errors'}`;
+
+            // Check if an open drift issue already exists to avoid duplicates
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'terraform-drift',
+              per_page: 1,
+            });
+
+            if (issues.length > 0) {
+              // Update existing issue with a new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body,
+              });
+              console.log(`Updated existing drift issue #${issues[0].number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['terraform-drift'],
+              });
+              console.log('Created new drift issue');
+            }

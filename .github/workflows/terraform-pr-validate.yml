@@ -1,0 +1,246 @@
+name: Terraform PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      # TODO: Remove this branch after merging to main
+      - templatize_cfe_nom_routing_only
+    paths:
+      - 'infra/aws/terraform/**'
+      - '.github/workflows/terraform-*.yml'
+
+env:
+  TF_VERSION: "1.9.0"
+  AWS_REGION: us-east-1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Detect which services changed and build a dynamic matrix.
+  #
+  # TO ADD A NEW SERVICE:
+  #   1. Add a filter entry under "Detect changed paths" (step id: filter)
+  #   2. Add a JSON object to SERVICE_REGISTRY in "Build service matrix"
+  # ---------------------------------------------------------------------------
+  detect-changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      services: ${{ steps.build-matrix.outputs.services }}
+      has_changes: ${{ steps.build-matrix.outputs.has_changes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Filter names MUST match the "name" field in SERVICE_REGISTRY below
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            orchestration:
+              - 'infra/aws/terraform/modules/orchestration/**'
+            nrds-routing-only:
+              - 'infra/aws/terraform/services/nrds-routing-only/**'
+            nrds-cfe-nom:
+              - 'infra/aws/terraform/services/nrds-cfe-nom/**'
+
+      - name: Build service matrix
+        id: build-matrix
+        run: |
+          # =====================================================================
+          # SERVICE REGISTRY — to add a new service, just append a JSON object.
+          # Filter names above MUST match the "name" field here.
+          # =====================================================================
+          SERVICE_REGISTRY='[
+            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/test.tfvars"},
+            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/test.tfvars"}
+          ]'
+
+          # paths-filter "changes" output is a JSON array of matched filter names
+          CHANGED='${{ steps.filter.outputs.changes }}'
+
+          if echo "$CHANGED" | jq -e 'any(. == "orchestration")' > /dev/null 2>&1; then
+            # Shared module changed — every service needs validation
+            MATRIX="$SERVICE_REGISTRY"
+          else
+            # Keep only services whose filter matched (name == filter name)
+            MATRIX=$(echo "$SERVICE_REGISTRY" | jq -c --argjson changed "$CHANGED" \
+              '[.[] | select(.name as $n | $changed | any(. == $n))]')
+          fi
+
+          echo "services=$(echo "$MATRIX" | jq -c '.')" >> "$GITHUB_OUTPUT"
+          echo "has_changes=$(echo "$MATRIX" | jq -r 'if length > 0 then "true" else "false" end')" >> "$GITHUB_OUTPUT"
+          echo "Matrix: $MATRIX"
+
+  # ---------------------------------------------------------------------------
+  # Format check across the entire Terraform directory
+  # ---------------------------------------------------------------------------
+  validate-format:
+    name: Terraform Format Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: infra/aws/terraform
+
+  # ---------------------------------------------------------------------------
+  # Validate & plan each changed service (matrix job)
+  # ---------------------------------------------------------------------------
+  validate-service:
+    name: "Validate & Plan: ${{ matrix.service.name }}"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.service.path }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          # Wrapper must be enabled to capture plan output for PR comments
+          terraform_wrapper: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -var-file=${{ matrix.service.tfvars }} -no-color -input=false -out=tfplan
+        continue-on-error: true
+
+      - name: Generate plan text output
+        if: always() && steps.plan.outcome != 'skipped'
+        run: terraform show -no-color tfplan > plan_output.txt 2>&1 || true
+
+      - name: Upload plan artifact
+        if: always() && steps.plan.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.service.name }}-${{ github.event.pull_request.number }}
+          path: |
+            ${{ matrix.service.path }}/tfplan
+            ${{ matrix.service.path }}/plan_output.txt
+          retention-days: 30
+
+      - name: Post Plan as PR Comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const serviceName = '${{ matrix.service.name }}';
+            const planOutcome = '${{ steps.plan.outcome }}';
+            const planOutput = `${{ steps.plan.outputs.stdout }}`.substring(0, 60000);
+            const planError  = `${{ steps.plan.outputs.stderr }}`.substring(0, 5000);
+
+            const body = `### Terraform Plan: \`${serviceName}\` ${planOutcome === 'success' ? '✅' : '❌'}
+
+            <details><summary>Show Plan Output</summary>
+
+            \`\`\`terraform
+            ${planOutput}
+            \`\`\`
+
+            </details>
+
+            ${planError ? `<details><summary>Errors / Warnings</summary>\n\n\`\`\`\n${planError}\n\`\`\`\n\n</details>` : ''}
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+
+            // Find and update existing comment for this service, or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = `Terraform Plan: \`${serviceName}\``;
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ---------------------------------------------------------------------------
+  # Security scanning with tfsec and checkov
+  # ---------------------------------------------------------------------------
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        continue-on-error: true
+        with:
+          working_directory: infra/aws/terraform
+          soft_fail: true
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
+        with:
+          directory: infra/aws/terraform
+          framework: terraform
+          soft_fail: true
+          output_format: cli

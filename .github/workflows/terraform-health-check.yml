@@ -1,0 +1,98 @@
+name: Terraform Infrastructure Health Check
+
+on:
+  # Run after the deploy workflow completes (success or failure)
+  workflow_run:
+    workflows: ["Terraform Deploy"]
+    types:
+      - completed
+  # Also run on a schedule every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build the service matrix for health checks.
+  #
+  # TO ADD A NEW SERVICE:
+  #   Add a JSON object to SERVICE_REGISTRY (sm_name must match your tfvars).
+  # ---------------------------------------------------------------------------
+  build-matrix:
+    name: Build Service Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.config.outputs.services }}
+    steps:
+      - name: Define service registry
+        id: config
+        run: |
+          # =====================================================================
+          # SERVICE REGISTRY — add new services here
+          # =====================================================================
+          SERVICE_REGISTRY='[
+            {"name":"nrds-routing-only","sm_name":"nrds_routing_only_test_sm"},
+            {"name":"nrds-cfe-nom","sm_name":"nrds_cfe_nom_test_sm"}
+          ]'
+
+          echo "services=$(echo "$SERVICE_REGISTRY" | jq -c '.')" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Verify that each Step Functions state machine exists and is ACTIVE
+  # ---------------------------------------------------------------------------
+  check-state-machine:
+    name: "Health Check: ${{ matrix.service.name }}"
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.build-matrix.outputs.services) }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check state machine is ACTIVE
+        id: check
+        run: |
+          SM_NAME="${{ matrix.service.sm_name }}"
+          echo "Checking state machine: $SM_NAME"
+
+          # Find the state machine ARN by name
+          SM_ARN=$(aws stepfunctions list-state-machines \
+            --query "stateMachines[?name=='${SM_NAME}'].stateMachineArn | [0]" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          if [[ "$SM_ARN" == "None" || -z "$SM_ARN" ]]; then
+            echo "::error::State machine '${SM_NAME}' not found"
+            echo "status=NOT_FOUND" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          STATUS=$(aws stepfunctions describe-state-machine \
+            --state-machine-arn "$SM_ARN" \
+            --query "status" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "State machine ARN: $SM_ARN"
+          echo "Status: $STATUS"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+          if [[ "$STATUS" != "ACTIVE" ]]; then
+            echo "::error::State machine '${SM_NAME}' is $STATUS, expected ACTIVE"
+            exit 1
+          fi
+
+          echo "${{ matrix.service.name }} state machine is ACTIVE"
