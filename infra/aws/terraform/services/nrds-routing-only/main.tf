@@ -6,8 +6,8 @@ terraform {
   required_version = ">= 1.10"
 
   backend "s3" {
-    bucket       = "ciroh-nrds-terraform-state"
-    key          = "nrds-routing-only/test/terraform.tfstate"
+    bucket       = "ciroh-terraform-state"
+    key          = "routing-only-test-datastream/terraform.tfstate"
     region       = "us-east-1"
     use_lockfile = true
   }
