@@ -207,15 +207,25 @@ jobs:
             // Note: actions/github-script runs from repo root, not working-directory
             const planFile = '${{ matrix.service.path }}/plan_output.txt';
             let planOutput = '';
+            let summary = '';
             try {
-              planOutput = fs.readFileSync(planFile, 'utf8').substring(0, 60000);
+              planOutput = fs.readFileSync(planFile, 'utf8');
+              // Extract the summary line (e.g. "Plan: 22 to add, 0 to change, 0 to destroy.")
+              const summaryMatch = planOutput.match(/Plan: .+|No changes\. .+/);
+              summary = summaryMatch ? summaryMatch[0] : 'Summary not available';
+              // Keep last 200 lines for the collapsible details
+              const lines = planOutput.split('\n');
+              planOutput = lines.slice(Math.max(0, lines.length - 200)).join('\n');
             } catch (e) {
               planOutput = 'Plan output not available';
+              summary = 'Plan output not available';
             }
 
             const body = `### Terraform Plan: \`${serviceName}\` ${planOutcome === 'success' ? '\u2705' : '\u274C'}
 
-            <details><summary>Show Plan Output</summary>
+            **${summary}**
+
+            <details><summary>Show Plan Details</summary>
 
             \`\`\`terraform
             ${planOutput}
