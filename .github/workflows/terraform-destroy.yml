@@ -1,0 +1,72 @@
+name: Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to destroy"
+        required: true
+        type: choice
+        options:
+          - nrds-routing-only
+          - nrds-cfe-nom
+      confirm:
+        description: "Type the service name again to confirm destruction"
+        required: true
+        type: string
+
+concurrency:
+  group: terraform-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.10.0"
+  AWS_REGION: us-east-1
+
+jobs:
+  validate-confirmation:
+    name: Validate Confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation matches service
+        run: |
+          if [[ "${{ inputs.confirm }}" != "${{ inputs.service }}" ]]; then
+            echo "::error::Confirmation '${{ inputs.confirm }}' does not match service '${{ inputs.service }}'. Aborting."
+            exit 1
+          fi
+
+  destroy-service:
+    name: "Destroy: ${{ inputs.service }}"
+    needs: validate-confirmation
+    runs-on: ubuntu-latest
+    environment: test
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/aws/terraform/services/${{ inputs.service }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -backend-config="envs/test.backend.hcl"
+
+      - name: Terraform Plan Destroy
+        run: terraform plan -destroy -var-file="envs/test.tfvars" -input=false -out=destroy.tfplan
+
+      - name: Terraform Destroy
+        run: terraform apply -auto-approve -input=false -lock-timeout=5m destroy.tfplan
