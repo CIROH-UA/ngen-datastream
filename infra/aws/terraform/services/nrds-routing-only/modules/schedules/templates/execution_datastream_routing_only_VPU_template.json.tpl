@@ -12,7 +12,7 @@
         -r s3://${s3_bucket}/v2.2_resources/VPU_${vpu} \
         -R https://${s3_bucket}.s3.amazonaws.com/realizations/realization_VPU_${vpu}.json \
         --S3_BUCKET ${s3_bucket} \
-        --S3_PREFIX outputs/routing_only/v2.2_hydrofabric/ngen.DAILY/test/${run_type_l}/${init}/VPU_${vpu}'"
+        --S3_PREFIX outputs/routing_only/v2.2_hydrofabric/ngen.DAILY/${run_type_l}/${init}/VPU_${vpu}'"
   ],
   "run_options": {
     "ii_terminate_instance": true,
