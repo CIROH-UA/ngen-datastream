@@ -27,6 +27,7 @@ jobs:
   validate-confirmation:
     name: Validate Confirmation
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Check confirmation matches service
         run: |
