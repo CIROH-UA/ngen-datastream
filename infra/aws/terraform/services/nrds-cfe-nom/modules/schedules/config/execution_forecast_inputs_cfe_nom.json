@@ -34,7 +34,7 @@
   },
   "medium_range": {
     "init_cycles": ["00", "06", "12", "18"],
-    "ensemble_members": ["1","2","3","4","5","6","7"],
+    "ensemble_members": ["1"],
     "instance_types": {
       "01":"m8g.2xlarge",
       "02":"m8g.2xlarge",
