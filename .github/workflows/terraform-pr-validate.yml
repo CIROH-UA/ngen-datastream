@@ -4,8 +4,6 @@ on:
   pull_request:
     branches:
       - main
-      # TODO: Remove this branch after merging to main
-      - templatize_cfe_nom_routing_only
     paths:
       - 'infra/aws/terraform/**'
       - '.github/workflows/terraform-*.yml'

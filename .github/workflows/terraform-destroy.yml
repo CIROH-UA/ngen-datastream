@@ -39,7 +39,6 @@ jobs:
     name: "Destroy: ${{ inputs.service }}"
     needs: validate-confirmation
     runs-on: ubuntu-latest
-    environment: test
     permissions:
       contents: read
       id-token: write

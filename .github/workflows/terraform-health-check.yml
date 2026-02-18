@@ -37,8 +37,8 @@ jobs:
           # SERVICE REGISTRY — add new services here
           # =====================================================================
           SERVICE_REGISTRY='[
-            {"name":"nrds-routing-only","sm_name":"nrds_routing_only_test_sm"},
-            {"name":"nrds-cfe-nom","sm_name":"nrds_cfe_nom_test_sm"}
+            {"name":"nrds-routing-only","sm_name":"nrds_routing_only_prod_sm"},
+            {"name":"nrds-cfe-nom","sm_name":"nrds_cfe_nom_prod_sm"}
           ]'
 
           echo "services=$(echo "$SERVICE_REGISTRY" | jq -c '.')" >> "$GITHUB_OUTPUT"
