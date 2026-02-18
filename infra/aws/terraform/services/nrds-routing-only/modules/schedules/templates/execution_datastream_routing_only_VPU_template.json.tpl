@@ -9,9 +9,9 @@
         -n ${nprocs} \
         --FORCING_SOURCE NWM_V3_CHRTOUT_${run_type_h}_${init} \
         -d /home/ec2-user/outputs \
-        -r s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_${vpu} \
-        -R https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_VPU_${vpu}.json \
-        --S3_BUCKET ciroh-community-ngen-datastream \
+        -r s3://${s3_bucket}/v2.2_resources/VPU_${vpu} \
+        -R https://${s3_bucket}.s3.amazonaws.com/realizations/realization_VPU_${vpu}.json \
+        --S3_BUCKET ${s3_bucket} \
         --S3_PREFIX outputs/routing_only/v2.2_hydrofabric/ngen.DAILY/${run_type_l}/${init}/VPU_${vpu}'"
   ],
   "run_options": {

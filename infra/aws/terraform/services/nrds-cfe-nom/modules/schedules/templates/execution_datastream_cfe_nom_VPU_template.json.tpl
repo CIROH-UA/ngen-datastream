@@ -4,12 +4,12 @@
       && /home/ec2-user/ngen-datastream/scripts/datastream \
         -s DAILY \
         -n ${nprocs} \
-        -F s3://ciroh-community-ngen-datastream/forcings/v2.2_hydrofabric/ngen.DAILY/forcing_${run_type_l}/${init}/ngen.t${init}z.${run_type_l}.forcing.${fcst}.VPU_${vpu}.nc \
+        -F s3://${s3_bucket}/forcings/v2.2_hydrofabric/ngen.DAILY/forcing_${run_type_l}/${init}/ngen.t${init}z.${run_type_l}.forcing.${fcst}.VPU_${vpu}.nc \
         --FORCING_SOURCE NWM_V3_${run_type_h}_${init}${member_suffix} \
         -d /home/ec2-user/outputs \
-        -r s3://ciroh-community-ngen-datastream/v2.2_resources/VPU_${vpu} \
-        -R https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_VPU_${vpu}.json \
-        --S3_BUCKET ciroh-community-ngen-datastream \
+        -r s3://${s3_bucket}/v2.2_resources/VPU_${vpu} \
+        -R https://${s3_bucket}.s3.amazonaws.com/realizations/realization_VPU_${vpu}.json \
+        --S3_BUCKET ${s3_bucket} \
         --S3_PREFIX test/ngen.DAILY/${run_type_l}/${init}${member_path}/VPU_${vpu}'"
   ],
   "run_options": {

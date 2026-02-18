@@ -27,3 +27,6 @@ routing_only_ami_id = "ami-0f8e27ecfe91ffd4f"
 schedule_timezone   = "America/New_York"
 schedule_group_name = "default"
 environment_suffix  = "test"
+
+# S3
+s3_bucket = "ciroh-community-ngen-datastream"

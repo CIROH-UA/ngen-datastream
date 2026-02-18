@@ -170,6 +170,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     instance_profile   = local.cfe_nom_instance_profile
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT
@@ -213,6 +214,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     instance_profile   = local.cfe_nom_instance_profile
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT
@@ -256,6 +258,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     instance_profile   = local.cfe_nom_instance_profile
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT

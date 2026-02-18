@@ -27,3 +27,6 @@ cfe_nom_ami_id = "ami-0ef008a1e6d9aa12d"
 schedule_timezone   = "America/New_York"
 schedule_group_name = "default"
 environment_suffix  = "test"
+
+# S3
+s3_bucket = "ciroh-community-ngen-datastream"

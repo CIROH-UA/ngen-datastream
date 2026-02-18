@@ -79,6 +79,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_routing_only"
     instance_profile   = local.routing_only_instance_profile
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT

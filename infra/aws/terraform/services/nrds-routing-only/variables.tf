@@ -57,3 +57,9 @@ variable "environment_suffix" {
   type        = string
   description = "Environment suffix for schedule names (e.g., 'dev', 'prod', 'test')"
 }
+
+variable "s3_bucket" {
+  type        = string
+  description = "S3 bucket name for datastream resources and outputs"
+  default     = "ciroh-community-ngen-datastream"
+}

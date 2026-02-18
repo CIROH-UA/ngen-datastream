@@ -59,4 +59,7 @@ module "schedules" {
   schedule_timezone   = var.schedule_timezone
   schedule_group_name = var.schedule_group_name
   environment_suffix  = var.environment_suffix
+
+  # S3
+  s3_bucket = var.s3_bucket
 }
