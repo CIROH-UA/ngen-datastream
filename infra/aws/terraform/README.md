@@ -9,16 +9,16 @@ infra/aws/terraform/
   services/
     nrds-routing-only/    # Routing-Only model service
       envs/
-        test.tfvars       # Variable values for the test environment
-        test.backend.hcl  # S3 backend config for the test environment
+        prod.tfvars       # Variable values for the prod environment
+        prod.backend.hcl  # S3 backend config for the prod environment
       modules/
         schedules/        # EventBridge schedules for this service
       main.tf
       variables.tf
     nrds-cfe-nom/         # CFE-NOM model service
       envs/
-        test.tfvars
-        test.backend.hcl
+        prod.tfvars
+        prod.backend.hcl
       modules/
         schedules/
       main.tf
@@ -42,8 +42,8 @@ Each service stores its Terraform state in the `ciroh-terraform-state` S3 bucket
 
 | Service | State Key | Backend Config |
 |---------|-----------|----------------|
-| nrds-routing-only | `routing-only-test-datastream/terraform.tfstate` | `envs/test.backend.hcl` |
-| nrds-cfe-nom | `cfe-nom-test-datastream/terraform.tfstate` | `envs/test.backend.hcl` |
+| nrds-routing-only | `routing-only-prod-datastream/terraform.tfstate` | `envs/prod.backend.hcl` |
+| nrds-cfe-nom | `cfe-nom-prod-datastream/terraform.tfstate` | `envs/prod.backend.hcl` |
 
 # AWS
 In order to go from cloning this repository to executing NextGen simulations in AWS cloud, see this [document](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/GETTING_STARTED.md).
@@ -66,15 +66,15 @@ cd infra/aws/terraform/services/nrds-cfe-nom
 ```
 3) Initialize Terraform with the backend config for your environment:
 ```bash
-terraform init -backend-config=envs/test.backend.hcl
+terraform init -backend-config=envs/prod.backend.hcl
 ```
 4) Review the plan:
 ```bash
-terraform plan -var-file=envs/test.tfvars
+terraform plan -var-file=envs/prod.tfvars
 ```
 5) Apply:
 ```bash
-terraform apply -var-file=envs/test.tfvars
+terraform apply -var-file=envs/prod.tfvars
 ```
 
 ## Execute AWS State Machine
@@ -90,14 +90,14 @@ aws stepfunctions start-execution \
 ## Tear Down AWS Infrastructure
 ```bash
 cd infra/aws/terraform/services/<service-name>
-terraform init -backend-config=envs/test.backend.hcl
-terraform destroy -var-file=envs/test.tfvars
+terraform init -backend-config=envs/prod.backend.hcl
+terraform destroy -var-file=envs/prod.tfvars
 ```
 
 ## Partial Success (`terraform apply failure`)
-`terraform apply` will fail if some of the resources already exist with the names defined in `envs/test.tfvars`. These resources must be either manually destroyed or imported. A script exists [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/shell/import_resources.sh) to automate importing any existing resources. Remove all spaces from variable file if using this script.
+`terraform apply` will fail if some of the resources already exist with the names defined in `envs/prod.tfvars`. These resources must be either manually destroyed or imported. A script exists [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/shell/import_resources.sh) to automate importing any existing resources. Remove all spaces from variable file if using this script.
 ```bash
-import_resources.sh <path-to-envs/test.tfvars>
+import_resources.sh <path-to-envs/prod.tfvars>
 ```
 
 ## CI/CD Workflows

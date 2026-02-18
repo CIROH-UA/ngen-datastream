@@ -63,10 +63,10 @@ jobs:
           terraform_wrapper: false
 
       - name: Terraform Init
-        run: terraform init -backend-config="envs/test.backend.hcl"
+        run: terraform init -backend-config="envs/prod.backend.hcl"
 
       - name: Terraform Plan Destroy
-        run: terraform plan -destroy -var-file="envs/test.tfvars" -input=false -out=destroy.tfplan
+        run: terraform plan -destroy -var-file="envs/prod.tfvars" -input=false -out=destroy.tfplan
 
       - name: Terraform Destroy
         run: terraform apply -auto-approve -input=false -lock-timeout=5m destroy.tfplan

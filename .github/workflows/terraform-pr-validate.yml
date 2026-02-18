@@ -58,8 +58,8 @@ jobs:
           # Filter names above MUST match the "name" field here.
           # =====================================================================
           SERVICE_REGISTRY='[
-            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/test.tfvars","backend_config":"envs/test.backend.hcl"},
-            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/test.tfvars","backend_config":"envs/test.backend.hcl"}
+            {"name":"nrds-routing-only","path":"infra/aws/terraform/services/nrds-routing-only","tfvars":"envs/prod.tfvars","backend_config":"envs/prod.backend.hcl"},
+            {"name":"nrds-cfe-nom","path":"infra/aws/terraform/services/nrds-cfe-nom","tfvars":"envs/prod.tfvars","backend_config":"envs/prod.backend.hcl"}
           ]'
 
           # paths-filter "changes" output is a JSON array of matched filter names
