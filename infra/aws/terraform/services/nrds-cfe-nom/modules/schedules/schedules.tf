@@ -110,7 +110,7 @@ locals {
           volume_size   = local.init_cycles_config_cfe_nom.analysis_assim_extend.volume_size
           run_type_l    = "analysis_assim_extend"
           run_type_h    = "ANALYSIS_ASSIM_EXTEND"
-          fcst          = "f001_f028"
+          fcst          = "tm27_tm00"
           member        = ""
           member_suffix = ""
           member_path   = ""
