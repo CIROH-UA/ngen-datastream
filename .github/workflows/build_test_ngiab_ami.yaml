@@ -257,7 +257,7 @@ jobs:
           echo "AMI replacement completed for VPU ${{ env.VPU }}"
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
           
-          jq --arg DATE "${{ env.DATE }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "tests/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
+          jq --arg DATE "${{ env.DATE }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "test/cicd/nrds/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
 
 
       - name: Check and create AWS key pair
@@ -289,37 +289,37 @@ jobs:
 
       - name: Verify output files
         run: |
-          curl -fSs -o test_01.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_01.nc || { echo "Error: VPU_01 not found"; exit 1; }
-          curl -fSs -o test_02.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_02.nc || { echo "Error: VPU_02 not found"; exit 1; }
-          curl -fSs -o test_03W.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03W.nc || { echo "Error: VPU_03W not found"; exit 1; }
-          curl -fSs -o test_03S.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03S.nc || { echo "Error: VPU_03S not found"; exit 1; }
-          curl -fSs -o test_03N.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03N.nc || { echo "Error: VPU_03N not found"; exit 1; }
-          curl -fSs -o test_04.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_04.nc || { echo "Error: VPU_04 not found"; exit 1; }
-          curl -fSs -o test_05.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_05.nc || { echo "Error: VPU_05 not found"; exit 1; }
-          curl -fSs -o test_06.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_06.nc || { echo "Error: VPU_06 not found"; exit 1; }
-          curl -fSs -o test_07.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_07.nc || { echo "Error: VPU_07 not found"; exit 1; }
-          curl -fSs -o test_08.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_08.nc || { echo "Error: VPU_08 not found"; exit 1; }
-          curl -fSs -o test_09.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_09.nc || { echo "Error: VPU_09 not found"; exit 1; }
-          curl -fSs -o test_10L.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc || { echo "Error: VPU_10L not found"; exit 1; }
-          curl -fSs -o test_10U.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10U.nc || { echo "Error: VPU_10U not found"; exit 1; }
-          curl -fSs -o test_11.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_11.nc || { echo "Error: VPU_11 not found"; exit 1; }
-          curl -fSs -o test_12.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_12.nc || { echo "Error: VPU_12 not found"; exit 1; }
-          curl -fSs -o test_13.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_13.nc || { echo "Error: VPU_13 not found"; exit 1; }
-          curl -fSs -o test_14.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_14.nc || { echo "Error: VPU_14 not found"; exit 1; }
-          curl -fSs -o test_15.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_15.nc || { echo "Error: VPU_15 not found"; exit 1; }
-          curl -fSs -o test_16.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_16.nc || { echo "Error: VPU_16 not found"; exit 1; }
-          curl -fSs -o test_17.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_17.nc || { echo "Error: VPU_17 not found"; exit 1; }
-          curl -fSs -o test_18.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_18.nc || { echo "Error: VPU_18 not found"; exit 1; }
+          curl -fSs -o test_01.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_01.nc || { echo "Error: VPU_01 not found"; exit 1; }
+          curl -fSs -o test_02.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_02.nc || { echo "Error: VPU_02 not found"; exit 1; }
+          curl -fSs -o test_03W.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03W.nc || { echo "Error: VPU_03W not found"; exit 1; }
+          curl -fSs -o test_03S.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03S.nc || { echo "Error: VPU_03S not found"; exit 1; }
+          curl -fSs -o test_03N.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_03N.nc || { echo "Error: VPU_03N not found"; exit 1; }
+          curl -fSs -o test_04.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_04.nc || { echo "Error: VPU_04 not found"; exit 1; }
+          curl -fSs -o test_05.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_05.nc || { echo "Error: VPU_05 not found"; exit 1; }
+          curl -fSs -o test_06.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_06.nc || { echo "Error: VPU_06 not found"; exit 1; }
+          curl -fSs -o test_07.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_07.nc || { echo "Error: VPU_07 not found"; exit 1; }
+          curl -fSs -o test_08.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_08.nc || { echo "Error: VPU_08 not found"; exit 1; }
+          curl -fSs -o test_09.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_09.nc || { echo "Error: VPU_09 not found"; exit 1; }
+          curl -fSs -o test_10L.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10L.nc || { echo "Error: VPU_10L not found"; exit 1; }
+          curl -fSs -o test_10U.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_10U.nc || { echo "Error: VPU_10U not found"; exit 1; }
+          curl -fSs -o test_11.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_11.nc || { echo "Error: VPU_11 not found"; exit 1; }
+          curl -fSs -o test_12.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_12.nc || { echo "Error: VPU_12 not found"; exit 1; }
+          curl -fSs -o test_13.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_13.nc || { echo "Error: VPU_13 not found"; exit 1; }
+          curl -fSs -o test_14.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_14.nc || { echo "Error: VPU_14 not found"; exit 1; }
+          curl -fSs -o test_15.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_15.nc || { echo "Error: VPU_15 not found"; exit 1; }
+          curl -fSs -o test_16.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_16.nc || { echo "Error: VPU_16 not found"; exit 1; }
+          curl -fSs -o test_17.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_17.nc || { echo "Error: VPU_17 not found"; exit 1; }
+          curl -fSs -o test_18.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/fp/ngen.t00z.short_range.forcing.f001_f018.VPU_18.nc || { echo "Error: VPU_18 not found"; exit 1; }
 
       - name: Debug - Check what files were created
         run: |
           echo "Checking what files were actually created..."
-          aws s3 ls s3://ciroh-community-ngen-datastream/tests/ --recursive
+          aws s3 ls s3://ciroh-community-ngen-datastream/test/cicd/nrds/ --recursive
 
       - name: Verify output files
         run: |
           echo "Checking if processing created any output files for FP..."
-          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/fp/ --recursive 2>/dev/null || echo "")
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/test/cicd/nrds/short_range/fp/ --recursive 2>/dev/null || echo "")
           
           if [ -n "$file_list" ]; then
             echo "SUCCESS: FP processing completed successfully!"
@@ -333,7 +333,7 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/fp || echo "No file to delete"
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/test/cicd/nrds/short_range/fp || echo "No file to delete"
 
 
   test-all-vpus:
@@ -405,7 +405,7 @@ jobs:
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
           
           # Apply jq transformations for this specific VPU
-          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, {"Key": "AMI_Version", "Value": "datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "tests/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
+          jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, {"Key": "AMI_Version", "Value": "datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "test/cicd/nrds/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
 
 
       - name: Check and create AWS key pair
@@ -443,7 +443,7 @@ jobs:
           echo "Checking if processing created any output files for VPU ${{ env.VPU }}..."
           
           # Check if the directory exists and has files
-          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
+          file_list=$(aws s3 ls s3://ciroh-community-ngen-datastream/test/cicd/nrds/short_range/VPU_${{ env.VPU }}/ --recursive 2>/dev/null || echo "")
           
           if [ -n "$file_list" ]; then
             echo "SUCCESS: VPU ${{ env.VPU }} datastream processing completed successfully!"
@@ -468,12 +468,12 @@ jobs:
       - name: Verify output files
         if: matrix.vpu != '10U' && matrix.vpu != '17'
         run: |
-          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/tests/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
+          curl -fSs -o test.txt https://ciroh-community-ngen-datastream.s3.amazonaws.com/test/cicd/nrds/short_range/VPU_${{ env.VPU }}/merkdir.file || { echo "Error: File not found or request failed"; exit 1; }
 
       - name: Clean up
         if: always()
         run: |
-          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/tests/short_range/VPU_${{ env.VPU }} || echo "No files to delete for VPU ${{ env.VPU }}"
+          aws s3 rm --recursive s3://ciroh-community-ngen-datastream/test/cicd/nrds/short_range/VPU_${{ env.VPU }} || echo "No files to delete for VPU ${{ env.VPU }}"
 
 
 

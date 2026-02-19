@@ -85,10 +85,15 @@ cd /home/ec2-user
 sudo -u ec2-user git clone https://github.com/CIROH-UA/ngen-datastream.git
 chown -R ec2-user:ec2-user /home/ec2-user/ngen-datastream
 
+echo "Cloning datastreamcli repository..."
+sudo -u ec2-user git clone https://github.com/CIROH-UA/datastreamcli.git
+chown -R ec2-user:ec2-user /home/ec2-user/datastreamcli
+
 echo "Pulling Docker images..."
 docker pull awiciroh/datastream:$DS_TAG
 docker pull awiciroh/forcingprocessor:$FP_TAG
 docker pull awiciroh/ciroh-ngen-image:$NGIAB_TAG
+docker pull zwills/merkdir
 
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
