@@ -89,10 +89,6 @@ echo "Cloning datastreamcli repository..."
 sudo -u ec2-user git clone https://github.com/CIROH-UA/datastreamcli.git
 chown -R ec2-user:ec2-user /home/ec2-user/datastreamcli
 
-echo "Creating symlink for backward compatibility..."
-mkdir -p /home/ec2-user/ngen-datastream/scripts
-ln -sf /home/ec2-user/datastreamcli/scripts/datastream /home/ec2-user/ngen-datastream/scripts/datastream
-
 echo "Pulling Docker images..."
 docker pull awiciroh/datastream:$DS_TAG
 docker pull awiciroh/forcingprocessor:$FP_TAG
