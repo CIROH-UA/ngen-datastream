@@ -11,7 +11,7 @@
         -g s3://${s3_bucket}/resources/v2.2_hydrofabric/geopackages/VPU_${vpu}/nextgen_VPU_${vpu}.gpkg \
         -R https://${s3_bucket}.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_${vpu}.json \
         --S3_BUCKET ${s3_bucket} \
-        --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/${run_type_l}/${init}${member_path}/VPU_${vpu}'"
+        --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/test/${run_type_l}/${init}${member_path}/VPU_${vpu}'"
   ],
   "run_options": {
     "ii_terminate_instance": true,

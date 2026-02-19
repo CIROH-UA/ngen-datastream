@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - templatize_cfe_nom_routing_only
+      # - templatize_cfe_nom_routing_only
     paths:
       - 'infra/aws/terraform/**'
   workflow_dispatch:
