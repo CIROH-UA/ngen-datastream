@@ -13,7 +13,6 @@ locals {
 
   # Common Routing-Only configuration
   routing_only_ami_id           = var.routing_only_ami_id
-  routing_only_security_groups  = jsonencode(var.ec2_security_groups)
   routing_only_instance_profile = var.ec2_instance_profile
 
   # Short range forecast config mapping
@@ -75,7 +74,6 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_routing_only"
     nprocs             = each.value.nprocs
     ami_id             = local.routing_only_ami_id
     instance_type      = each.value.instance_type
-    security_group_ids = local.routing_only_security_groups
     instance_profile   = local.routing_only_instance_profile
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix

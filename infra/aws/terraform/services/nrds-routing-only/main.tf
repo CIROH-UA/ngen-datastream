@@ -49,7 +49,6 @@ module "schedules" {
   state_machine_arn     = module.nrds_orchestration.datastream_arn
 
   # EC2 config from orchestration
-  ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
   ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
 
   # Model AMI

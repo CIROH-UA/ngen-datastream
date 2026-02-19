@@ -13,7 +13,6 @@
   "instance_parameters": {
     "ImageId": "${ami_id}",
     "InstanceType": "${instance_type}",
-    "SecurityGroupIds": ${security_group_ids},
     "IamInstanceProfile": {
       "Name": "${instance_profile}"
     },

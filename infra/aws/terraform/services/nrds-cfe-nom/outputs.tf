@@ -4,11 +4,6 @@ output "datastream_arn" {
   description = "State machine ARN for the datastream workflow"
 }
 
-output "ec2_security_group_id" {
-  value       = module.nrds_orchestration.ec2_security_group_id
-  description = "Security group ID for EC2 instances"
-}
-
 output "lambda_role_arn" {
   value       = module.nrds_orchestration.lambda_role_arn
   description = "IAM role ARN used by Lambda functions"

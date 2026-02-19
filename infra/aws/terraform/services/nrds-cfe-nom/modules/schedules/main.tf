@@ -26,11 +26,6 @@ variable "state_machine_arn" {
 }
 
 # EC2 Configuration
-variable "ec2_security_groups" {
-  type        = list(string)
-  description = "Security group IDs for EC2 instances"
-}
-
 variable "ec2_instance_profile" {
   type        = string
   description = "IAM instance profile name for EC2"
