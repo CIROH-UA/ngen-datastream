@@ -173,7 +173,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
     vpu_list           = local.fp_vpu_list
-  })) : jsonencode(templatefile(local.cfe_nom_template_path, {
+    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -189,7 +189,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-  }))}
+}))}
 }
 EOT
 }
@@ -229,7 +229,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
     vpu_list           = local.fp_vpu_list
-  })) : jsonencode(templatefile(local.cfe_nom_template_path, {
+    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -245,7 +245,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-  }))}
+}))}
 }
 EOT
 }
@@ -285,7 +285,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
     vpu_list           = local.fp_vpu_list
-  })) : jsonencode(templatefile(local.cfe_nom_template_path, {
+    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -301,7 +301,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-  }))}
+}))}
 }
 EOT
 }
