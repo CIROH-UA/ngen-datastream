@@ -51,8 +51,9 @@ module "schedules" {
   # EC2 config from orchestration
   ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
 
-  # Model AMI
+  # Model AMIs
   cfe_nom_ami_id = var.cfe_nom_ami_id
+  fp_ami_id      = var.fp_ami_id
 
   # Schedule settings
   schedule_timezone   = var.schedule_timezone
