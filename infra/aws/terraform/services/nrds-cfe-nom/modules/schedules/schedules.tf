@@ -15,7 +15,7 @@ locals {
   fp_template_path    = "${path.module}/templates/execution_datastream_cfe_nom_fp_template.json.tpl"
   fp_ami_id           = var.fp_ami_id
   fp_instance_profile = var.ec2_instance_profile
-  fp_vpu_list         = join(",", local.vpus)
+  fp_vpu_list         = join(",", [for v in local.vpus : v if v != "fp"])
 
   # Short range forecast config mapping
   short_range_cfe_nom_config = {
@@ -67,7 +67,7 @@ locals {
             run_type_h    = "MEDIUM_RANGE"
             fcst          = "f001_f240"
             member        = member
-            member_suffix = "_${member}"
+            member_suffix = vpu == "fp" ? "_0" : "_${member}"
             member_path   = "/${member}"
             nprocs        = 3
           }
@@ -137,60 +137,6 @@ locals {
     ]) : pair.key => pair.value
   }
 
-  # ========================================
-  # FP (Forcing Processor) config mappings
-  # ========================================
-
-  # Short range FP config
-  short_range_fp_config = {
-    for init in local.init_cycles_config_cfe_nom.short_range.init_cycles : init => {
-      init          = init
-      instance_type = local.init_cycles_config_cfe_nom.short_range.instance_types["fp"]
-      volume_size   = local.init_cycles_config_cfe_nom.short_range.volume_size
-      run_type_l    = "short_range"
-      run_type_h    = "SHORT_RANGE"
-      member_suffix = ""
-      timeout_s     = 3600
-    }
-  }
-
-  short_range_fp_times = {
-    for init in local.init_cycles_config_cfe_nom.short_range.init_cycles : init => (tonumber(init)) % 24
-  }
-
-  # Medium range FP config
-  medium_range_fp_config = {
-    for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : init => {
-      init          = init
-      instance_type = local.init_cycles_config_cfe_nom.medium_range.instance_types["fp"]
-      volume_size   = local.init_cycles_config_cfe_nom.medium_range.volume_size
-      run_type_l    = "medium_range"
-      run_type_h    = "MEDIUM_RANGE"
-      member_suffix = "_0"
-      timeout_s     = 7200
-    }
-  }
-
-  medium_range_fp_times = {
-    for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : init => (tonumber(init) + 2) % 24
-  }
-
-  # Analysis/Assimilation FP config
-  analysis_assim_extend_fp_config = {
-    for init in local.init_cycles_config_cfe_nom.analysis_assim_extend.init_cycles : init => {
-      init          = init
-      instance_type = local.init_cycles_config_cfe_nom.analysis_assim_extend.instance_types["fp"]
-      volume_size   = local.init_cycles_config_cfe_nom.analysis_assim_extend.volume_size
-      run_type_l    = "analysis_assim_extend"
-      run_type_h    = "ANALYSIS_ASSIM_EXTEND"
-      member_suffix = ""
-      timeout_s     = 3600
-    }
-  }
-
-  analysis_assim_extend_fp_times = {
-    for init in local.init_cycles_config_cfe_nom.analysis_assim_extend.init_cycles : init => 15
-  }
 }
 
 # Short Range CFE_NOM Schedules
@@ -214,7 +160,20 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    member_suffix      = each.value.member_suffix
+    ami_id             = local.fp_ami_id
+    instance_type      = each.value.instance_type
+    instance_profile   = local.fp_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 3600
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
+    vpu_list           = local.fp_vpu_list
+  })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -230,7 +189,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-}))}
+  }))}
 }
 EOT
 }
@@ -257,7 +216,20 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    member_suffix      = each.value.member_suffix
+    ami_id             = local.fp_ami_id
+    instance_type      = each.value.instance_type
+    instance_profile   = local.fp_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 7200
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
+    vpu_list           = local.fp_vpu_list
+  })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -273,7 +245,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-}))}
+  }))}
 }
 EOT
 }
@@ -300,7 +272,20 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_analysis_assim_extend_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    member_suffix      = each.value.member_suffix
+    ami_id             = local.fp_ami_id
+    instance_type      = each.value.instance_type
+    instance_profile   = local.fp_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 3600
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
+    vpu_list           = local.fp_vpu_list
+  })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -316,131 +301,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-}))}
-}
-EOT
-}
-}
-
-# ========================================
-# FP (Forcing Processor) Schedules
-# ========================================
-
-# Short Range FP Schedules
-resource "aws_scheduler_schedule" "datastream_schedule_short_range_fp_cfe_nom" {
-  for_each = local.short_range_fp_config
-
-  name       = "short_range_fcst${each.value.init}_vpufp_schedule_cfe_nom_${var.environment_suffix}"
-  group_name = var.schedule_group_name
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression          = "cron(0 ${local.short_range_fp_times[each.key]} * * ? *)"
-  schedule_expression_timezone = var.schedule_timezone
-
-  target {
-    arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
-    role_arn = aws_iam_role.scheduler_role.arn
-    input = <<-EOT
-{
-  "StateMachineArn": "${var.state_machine_arn}",
-  "Name": "cfe_nom_short_range_vpufp_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.fp_template_path, {
-    init               = each.value.init
-    run_type_l         = each.value.run_type_l
-    run_type_h         = each.value.run_type_h
-    member_suffix      = each.value.member_suffix
-    ami_id             = local.fp_ami_id
-    instance_type      = each.value.instance_type
-    instance_profile   = local.fp_instance_profile
-    volume_size        = each.value.volume_size
-    timeout_s          = each.value.timeout_s
-    environment_suffix = var.environment_suffix
-    s3_bucket          = var.s3_bucket
-    vpu_list           = local.fp_vpu_list
-}))}
-}
-EOT
-}
-}
-
-# Medium Range FP Schedules
-resource "aws_scheduler_schedule" "datastream_schedule_medium_range_fp_cfe_nom" {
-  for_each = local.medium_range_fp_config
-
-  name       = "medium_range_fcst${each.value.init}_mem1_vpufp_schedule_cfe_nom_${var.environment_suffix}"
-  group_name = var.schedule_group_name
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression          = "cron(0 ${local.medium_range_fp_times[each.key]} * * ? *)"
-  schedule_expression_timezone = var.schedule_timezone
-
-  target {
-    arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
-    role_arn = aws_iam_role.scheduler_role.arn
-    input = <<-EOT
-{
-  "StateMachineArn": "${var.state_machine_arn}",
-  "Name": "cfe_nom_medium_range_vpufp_init${each.value.init}_mem1_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.fp_template_path, {
-    init               = each.value.init
-    run_type_l         = each.value.run_type_l
-    run_type_h         = each.value.run_type_h
-    member_suffix      = each.value.member_suffix
-    ami_id             = local.fp_ami_id
-    instance_type      = each.value.instance_type
-    instance_profile   = local.fp_instance_profile
-    volume_size        = each.value.volume_size
-    timeout_s          = each.value.timeout_s
-    environment_suffix = var.environment_suffix
-    s3_bucket          = var.s3_bucket
-    vpu_list           = local.fp_vpu_list
-}))}
-}
-EOT
-}
-}
-
-# Analysis/Assimilation FP Schedules
-resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_fp_cfe_nom" {
-  for_each = local.analysis_assim_extend_fp_config
-
-  name       = "analysis_assim_extend_fcst${each.value.init}_vpufp_schedule_cfe_nom_${var.environment_suffix}"
-  group_name = var.schedule_group_name
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression          = "cron(0 ${local.analysis_assim_extend_fp_times[each.key]} * * ? *)"
-  schedule_expression_timezone = var.schedule_timezone
-
-  target {
-    arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
-    role_arn = aws_iam_role.scheduler_role.arn
-    input = <<-EOT
-{
-  "StateMachineArn": "${var.state_machine_arn}",
-  "Name": "cfe_nom_analysis_assim_extend_vpufp_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.fp_template_path, {
-    init               = each.value.init
-    run_type_l         = each.value.run_type_l
-    run_type_h         = each.value.run_type_h
-    member_suffix      = each.value.member_suffix
-    ami_id             = local.fp_ami_id
-    instance_type      = each.value.instance_type
-    instance_profile   = local.fp_instance_profile
-    volume_size        = each.value.volume_size
-    timeout_s          = each.value.timeout_s
-    environment_suffix = var.environment_suffix
-    s3_bucket          = var.s3_bucket
-    vpu_list           = local.fp_vpu_list
-}))}
+  }))}
 }
 EOT
 }
