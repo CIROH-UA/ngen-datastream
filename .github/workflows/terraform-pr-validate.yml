@@ -1,0 +1,203 @@
+name: Terraform PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'infra/aws/terraform/**'
+      - '.github/workflows/terraform-*.yml'
+  workflow_dispatch:
+
+env:
+  TF_VERSION: "1.10.0"
+  AWS_REGION: us-east-1
+  WORKING_DIR: infra/aws/terraform/services/nrds
+
+jobs:
+  validate-format:
+    name: Terraform Format Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: infra/aws/terraform
+
+  validate-orchestration:
+    name: Validate orchestration module
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: infra/aws/terraform/modules/orchestration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+  validate-and-plan:
+    name: Validate & Plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="envs/prod.backend.hcl"
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -var-file="envs/prod.tfvars" -no-color -input=false -lock-timeout=5m -out=tfplan
+        continue-on-error: true
+
+      - name: Generate plan text output
+        if: always() && steps.plan.outcome != 'skipped'
+        run: terraform show -no-color tfplan > plan_output.txt 2>&1 || true
+
+      - name: Upload plan artifact
+        if: always() && steps.plan.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-nrds-${{ github.event.pull_request.number }}
+          path: |
+            ${{ env.WORKING_DIR }}/tfplan
+            ${{ env.WORKING_DIR }}/plan_output.txt
+          retention-days: 30
+
+      - name: Post Plan as PR Comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const planOutcome = '${{ steps.plan.outcome }}';
+
+            const planFile = '${{ env.WORKING_DIR }}/plan_output.txt';
+            let planOutput = '';
+            let summary = '';
+            try {
+              planOutput = fs.readFileSync(planFile, 'utf8');
+              const summaryMatch = planOutput.match(/Plan: .+|No changes\. .+/);
+              summary = summaryMatch ? summaryMatch[0] : 'Summary not available';
+              const lines = planOutput.split('\n');
+              planOutput = lines.slice(Math.max(0, lines.length - 200)).join('\n');
+            } catch (e) {
+              planOutput = 'Plan output not available';
+              summary = 'Plan output not available';
+            }
+
+            const body = `### Terraform Plan: \`nrds\` ${planOutcome === 'success' ? '\u2705' : '\u274C'}
+
+            **${summary}**
+
+            <details><summary>Show Plan Details</summary>
+
+            \`\`\`terraform
+            ${planOutput}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Workflow: \`${{ github.workflow }}\`*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = `Terraform Plan: \`nrds\``;
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        continue-on-error: true
+        with:
+          working_directory: infra/aws/terraform
+          soft_fail: true
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
+        with:
+          directory: infra/aws/terraform
+          framework: terraform
+          soft_fail: true
+          output_format: cli

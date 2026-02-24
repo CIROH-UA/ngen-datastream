@@ -1,0 +1,61 @@
+name: Terraform Infrastructure Health Check
+
+on:
+  workflow_run:
+    workflows: ["Terraform Deploy"]
+    types:
+      - completed
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+permissions:
+  contents: read
+
+jobs:
+  check-state-machine:
+    name: Health Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check state machine is ACTIVE
+        run: |
+          SM_NAME="nrds_prod_sm"
+          echo "Checking state machine: $SM_NAME"
+
+          SM_ARN=$(aws stepfunctions list-state-machines \
+            --query "stateMachines[?name=='${SM_NAME}'].stateMachineArn | [0]" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          if [[ "$SM_ARN" == "None" || -z "$SM_ARN" ]]; then
+            echo "::error::State machine '${SM_NAME}' not found"
+            exit 1
+          fi
+
+          STATUS=$(aws stepfunctions describe-state-machine \
+            --state-machine-arn "$SM_ARN" \
+            --query "status" \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          echo "State machine ARN: $SM_ARN"
+          echo "Status: $STATUS"
+
+          if [[ "$STATUS" != "ACTIVE" ]]; then
+            echo "::error::State machine '${SM_NAME}' is $STATUS, expected ACTIVE"
+            exit 1
+          fi
+
+          echo "State machine is ACTIVE"
