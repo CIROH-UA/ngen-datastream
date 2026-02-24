@@ -1,16 +1,9 @@
-# State Machine
+# Orchestration
 output "datastream_arn" {
   value       = module.nrds_orchestration.datastream_arn
   description = "State machine ARN for the datastream workflow"
 }
 
-# Security
-output "ec2_security_group_id" {
-  value       = module.nrds_orchestration.ec2_security_group_id
-  description = "Security group ID for EC2 instances"
-}
-
-# Lambda Functions
 output "lambda_role_arn" {
   value       = module.nrds_orchestration.lambda_role_arn
   description = "IAM role ARN used by Lambda functions"
@@ -26,8 +19,18 @@ output "lambda_function_names" {
   description = "Names of all Lambda functions in the orchestration workflow"
 }
 
-# Write ARN to file for external reference
-resource "local_file" "write_arn" {
-  content  = module.nrds_orchestration.datastream_arn
-  filename = "${path.module}/sm_ARN.txt"
+# Schedules
+output "short_range_schedule_count" {
+  value       = length(module.schedules.short_range_schedule_ids)
+  description = "Number of short range CFE_NOM schedules created"
+}
+
+output "medium_range_schedule_count" {
+  value       = length(module.schedules.medium_range_schedule_ids)
+  description = "Number of medium range CFE_NOM schedules created"
+}
+
+output "analysis_assim_schedule_count" {
+  value       = length(module.schedules.analysis_assim_schedule_ids)
+  description = "Number of analysis/assimilation CFE_NOM schedules created"
 }

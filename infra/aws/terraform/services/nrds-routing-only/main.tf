@@ -3,7 +3,11 @@ provider "aws" {
 }
 
 terraform {
-  required_version = ">= 1.0"
+  required_version = ">= 1.10"
+
+  # Config loaded from envs/*.backend.hcl via -backend-config flag
+  backend "s3" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -16,55 +20,8 @@ terraform {
   }
 }
 
-variable "region" {}
-variable "starter_lambda_name" {}
-variable "commander_lambda_name" {}
-variable "poller_lambda_name" {}
-variable "checker_lambda_name" {}
-variable "stopper_lambda_name" {}
-variable "lambda_policy_name" {}
-variable "lambda_role_name" {}
-variable "lambda_invoke_policy_name" {}
-variable "sm_name" {}
-variable "sm_role_name" {}
-variable "ec2_role" {}
-variable "ec2_policy_name" {}
-variable "profile_name" {}
-
-variable "scheduler_policy_name" {}
-variable "scheduler_role_name" {}
-variable "resource_prefix" {
-  type        = string
-  description = "Prefix for resource naming (e.g., 'nrds_test', 'nrds_prod')"
-}
-
-# Model-specific AMIs
-variable "cfe_nom_ami_id" {
-  type        = string
-  description = "AMI ID for CFE_NOM model EC2 instances"
-  default     = "ami-0ef008a1e6d9aa12d"
-}
-
-# Schedule Settings
-variable "schedule_timezone" {
-  type        = string
-  description = "Timezone for EventBridge schedules"
-  default     = "America/New_York"
-}
-
-variable "schedule_group_name" {
-  type        = string
-  description = "EventBridge scheduler group name"
-  default     = "default"
-}
-
-variable "environment_suffix" {
-  type        = string
-  description = "Environment suffix for schedule names (e.g., 'dev', 'prod', 'test')"
-}
-
 module "nrds_orchestration" {
-  source = "./modules/orchestration"
+  source = "../../modules/orchestration"
 
   region                    = var.region
   starter_lambda_name       = var.starter_lambda_name
@@ -83,7 +40,7 @@ module "nrds_orchestration" {
   resource_prefix           = var.resource_prefix
 }
 
-module "nrds_schedules" {
+module "schedules" {
   source = "./modules/schedules"
 
   region                = var.region
@@ -91,15 +48,17 @@ module "nrds_schedules" {
   scheduler_role_name   = var.scheduler_role_name
   state_machine_arn     = module.nrds_orchestration.datastream_arn
 
-  # EC2 config
-  ec2_security_groups  = [module.nrds_orchestration.ec2_security_group_id]
+  # EC2 config from orchestration
   ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
 
   # Model AMI
-  cfe_nom_ami_id = var.cfe_nom_ami_id
+  routing_only_ami_id = var.routing_only_ami_id
 
   # Schedule settings
   schedule_timezone   = var.schedule_timezone
   schedule_group_name = var.schedule_group_name
   environment_suffix  = var.environment_suffix
+
+  # S3
+  s3_bucket = var.s3_bucket
 }

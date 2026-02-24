@@ -3,11 +3,6 @@ output "datastream_arn" {
   description = "State machine ARN for the datastream workflow"
 }
 
-output "ec2_security_group_id" {
-  value       = aws_security_group.datastream_ec2_sg.id
-  description = "Security group ID for EC2 instances"
-}
-
 output "lambda_role_arn" {
   value       = aws_iam_role.lambda_role.arn
   description = "IAM role ARN used by Lambda functions"
