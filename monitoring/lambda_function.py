@@ -45,11 +45,15 @@ def get_schedule_details(name):
                 forecast_type = part
                 break
 
+        ngiab_tag_match = re.search(r'NGIAB_TAG=([^\s&\'\"]+)', input_str)
+        ngiab_tag = ngiab_tag_match.group(1) if ngiab_tag_match else None
+
         return {
             'name': name,
             'prefix': prefix,
             'model': model,
-            'forecast_type': forecast_type
+            'forecast_type': forecast_type,
+            'ngiab_tag': ngiab_tag
         }
     except Exception as e:
         return None
@@ -181,7 +185,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
             model = r.get('model', 'unknown')
             key = f"{model}_{ftype}"
             if key not in by_type:
-                by_type[key] = {'exists': [], 'missing': [], 'model': model, 'forecast_type': ftype}
+                by_type[key] = {'exists': [], 'missing': [], 'model': model, 'forecast_type': ftype, 'ngiab_tag': r.get('ngiab_tag')}
             if r['exists']:
                 by_type[key]['exists'].append(r)
             else:
@@ -213,7 +217,10 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
             total_count = exists_count + missing_count
             pct = (exists_count / total_count * 100) if total_count > 0 else 0
 
+            ngiab_tag = data.get('ngiab_tag')
             display_name = f"{data['model'].upper()} - {data['forecast_type'].replace('_', ' ').title()}"
+            if ngiab_tag:
+                display_name += f" (NGIAB - {ngiab_tag})"
             section_id = f"{date}_{key}"
             pct_class = 'complete' if pct >= 95 else 'partial' if pct >= 50 else 'low'
 
@@ -269,7 +276,7 @@ def lambda_handler(event, context):
 
     # Fetch all schedules
     print("Fetching all schedules...")
-    schedule_names = get_all_schedules()
+    schedule_names = [name for name in get_all_schedules() if 'test' not in name.lower()]
     print(f"Found {len(schedule_names)} schedules")
 
     # Get schedule details
@@ -307,6 +314,7 @@ def lambda_handler(event, context):
                 'exists': exists,
                 'forecast_type': sched['forecast_type'],
                 'model': sched['model'],
+                'ngiab_tag': sched.get('ngiab_tag'),
                 'date': date
             })
 
