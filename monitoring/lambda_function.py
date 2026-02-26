@@ -101,6 +101,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="3600">
     <title>NRDS Output Status Dashboard</title>
     <style>
         * {{ box-sizing: border-box; }}
