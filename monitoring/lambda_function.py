@@ -229,7 +229,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
             if missing_count == 0:
                 html += '                    <div class="missing-title">All outputs complete!</div>\n'
             else:
-                html += f'                    <div class="missing-title">Missing ({missing_count}):</div>\n'
+                html += f'                    <div class="missing-title">In Progress ({missing_count}):</div>\n'
                 for m in sorted(data['missing'], key=lambda x: x['name']):
                     html += f'                    <span class="missing-item">{m["name"]}</span>\n'
 
