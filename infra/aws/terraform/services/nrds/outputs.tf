@@ -29,3 +29,7 @@ output "cfe_nom_medium_range_schedule_count" {
 output "cfe_nom_analysis_assim_schedule_count" {
   value = module.cfe_nom_schedules.analysis_assim_schedule_count
 }
+
+output "routing_only_short_range_schedule_count" {
+  value = module.routing_only_schedules.short_range_schedule_count
+}
