@@ -162,7 +162,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
 <body>
     <div class="container">
         <h1>NRDS Status Dashboard</h1>
-        <p class="updated">Last updated: {updated_at} UTC (auto-refreshes every hour) | Data fetched in {execution_time:.1f}s</p>
+        <p class="updated">Last updated: {updated_at} UTC</p>
 
 """
 
