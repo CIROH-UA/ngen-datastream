@@ -1,4 +1,10 @@
 locals {
+  instance_vcpus = {
+    "m8g.xlarge"  = 4
+    "m8g.2xlarge" = 8
+    "m8g.4xlarge" = 16
+  }
+
   init_cycles_config_cfe_nom = jsondecode(file("${path.module}/config/execution_forecast_inputs_cfe_nom.json"))
 
   cfe_nom_template_path = "${path.module}/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
@@ -26,7 +32,7 @@ locals {
           member        = ""
           member_suffix = ""
           member_path   = ""
-          nprocs        = 3
+          nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.short_range.instance_types[vpu]] - 1
         }
       ]
     ]) : pair.key => pair
@@ -61,7 +67,7 @@ locals {
             member        = member
             member_suffix = vpu == "fp" ? "_0" : "_${member}"
             member_path   = "/${member}"
-            nprocs        = 3
+            nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.medium_range.instance_types[vpu]] - 1
           }
         ]
       ]
@@ -111,7 +117,7 @@ locals {
           member        = ""
           member_suffix = ""
           member_path   = ""
-          nprocs        = 3
+          nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.analysis_assim_extend.instance_types[vpu]] - 1
         }
       ]
     ]) : pair.key => pair
@@ -177,6 +183,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     instance_type      = each.value.instance_type
     instance_profile   = local.cfe_nom_instance_profile
     volume_size        = each.value.volume_size
+    timeout_s          = 3600
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
 }))}
@@ -233,6 +240,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     instance_type      = each.value.instance_type
     instance_profile   = local.cfe_nom_instance_profile
     volume_size        = each.value.volume_size
+    timeout_s          = 7200
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
 }))}
@@ -289,6 +297,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     instance_type      = each.value.instance_type
     instance_profile   = local.cfe_nom_instance_profile
     volume_size        = each.value.volume_size
+    timeout_s          = 3600
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
 }))}

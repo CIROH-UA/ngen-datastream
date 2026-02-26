@@ -7,7 +7,7 @@
     "ii_delete_volume": true,
     "ii_check_s3": true,
     "ii_cheapo": true,
-    "timeout_s": 3600,
+    "timeout_s": ${timeout_s},
     "n_retries_allowed": 2
   },
   "instance_parameters": {
