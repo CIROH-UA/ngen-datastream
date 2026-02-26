@@ -16,6 +16,10 @@ infra/aws/terraform/
       prod.backend.hcl            # S3 backend config
       prod.tfvars                 # Production variable values
     datastreams/
+      cfe-nom/                    # CFE NOM schedule module
+        schedules.tf              # Short range, medium range, AnA schedules
+        config/                   # Forecast input configuration
+        templates/                # Execution JSON templates
       routing-only/               # Routing-Only schedule module
         schedules.tf              # Short range schedules
         config/

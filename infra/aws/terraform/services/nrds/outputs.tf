@@ -18,6 +18,18 @@ output "ec2_instance_profile_name" {
   value = module.nrds_orchestration.ec2_instance_profile_name
 }
 
+output "cfe_nom_short_range_schedule_count" {
+  value = module.cfe_nom_schedules.short_range_schedule_count
+}
+
+output "cfe_nom_medium_range_schedule_count" {
+  value = module.cfe_nom_schedules.medium_range_schedule_count
+}
+
+output "cfe_nom_analysis_assim_schedule_count" {
+  value = module.cfe_nom_schedules.analysis_assim_schedule_count
+}
+
 output "routing_only_short_range_schedule_count" {
   value = module.routing_only_schedules.short_range_schedule_count
 }

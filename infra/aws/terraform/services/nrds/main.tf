@@ -47,6 +47,24 @@ module "nrds_orchestration" {
 # To add a new datastream: add a module block here and a directory under datastreams/
 # =============================================================================
 
+module "cfe_nom_schedules" {
+  source = "./datastreams/cfe-nom"
+
+  region               = var.region
+  state_machine_arn    = module.nrds_orchestration.datastream_arn
+  scheduler_role_arn   = aws_iam_role.scheduler_role.arn
+  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
+
+  cfe_nom_ami_id = var.cfe_nom_ami_id
+  fp_ami_id      = var.fp_ami_id
+
+  schedule_timezone   = var.schedule_timezone
+  schedule_group_name = var.schedule_group_name
+  environment_suffix  = var.environment_suffix
+
+  s3_bucket = var.s3_bucket
+}
+
 module "routing_only_schedules" {
   source = "./datastreams/routing-only"
 

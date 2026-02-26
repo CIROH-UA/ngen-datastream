@@ -34,6 +34,18 @@ variable "scheduler_role_name" {
 }
 
 # Per-datastream AMIs
+variable "cfe_nom_ami_id" {
+  type        = string
+  description = "AMI ID for CFE_NOM model EC2 instances"
+  default     = "ami-038132f534157b5c3"
+}
+
+variable "fp_ami_id" {
+  type        = string
+  description = "AMI ID for forcing processor EC2 instances"
+  default     = "ami-062245e1c9604128d"
+}
+
 variable "routing_only_ami_id" {
   type        = string
   description = "AMI ID for Routing-Only model EC2 instances"
