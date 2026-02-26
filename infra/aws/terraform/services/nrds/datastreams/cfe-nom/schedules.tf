@@ -1,18 +1,22 @@
-# Terraform configuration for AWS Scheduler to trigger Step Functions executions for NRDS CFE_NOM
-# Uses templatefile() for dynamic execution JSON generation - no pre-generated files needed
-
 locals {
+  instance_vcpus = {
+    "m8g.xlarge"  = 4
+    "m8g.2xlarge" = 8
+    "m8g.4xlarge" = 16
+  }
+
   init_cycles_config_cfe_nom = jsondecode(file("${path.module}/config/execution_forecast_inputs_cfe_nom.json"))
 
-  # CFE_NOM template path
-  cfe_nom_template_path = "${path.module}/executions/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
+  cfe_nom_template_path = "${path.module}/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
 
-  # Common CFE_NOM configuration
   cfe_nom_ami_id           = var.cfe_nom_ami_id
-  cfe_nom_security_groups  = jsonencode(var.ec2_security_groups)
   cfe_nom_instance_profile = var.ec2_instance_profile
 
-  # Short range forecast config mapping
+  fp_template_path    = "${path.module}/templates/execution_datastream_cfe_nom_fp_template.json.tpl"
+  fp_ami_id           = var.fp_ami_id
+  fp_instance_profile = var.ec2_instance_profile
+  fp_vpu_list         = join(",", [for v in local.vpus : v if v != "fp"])
+
   short_range_cfe_nom_config = {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.short_range.init_cycles : [
@@ -28,7 +32,7 @@ locals {
           member        = ""
           member_suffix = ""
           member_path   = ""
-          nprocs        = 3
+          nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.short_range.instance_types[vpu]] - 1
         }
       ]
     ]) : pair.key => pair
@@ -45,7 +49,6 @@ locals {
     ]) : pair.key => pair.value
   }
 
-  # Medium range forecast config mapping
   medium_range_cfe_nom_config = {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : [
@@ -62,9 +65,9 @@ locals {
             run_type_h    = "MEDIUM_RANGE"
             fcst          = "f001_f240"
             member        = member
-            member_suffix = "_${member}"
+            member_suffix = vpu == "fp" ? "_0" : "_${member}"
             member_path   = "/${member}"
-            nprocs        = 3
+            nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.medium_range.instance_types[vpu]] - 1
           }
         ]
       ]
@@ -99,7 +102,6 @@ locals {
     ]) : pair.key => pair.value
   }
 
-  # Analysis/Assimilation forecast config mapping
   analysis_assim_extend_cfe_nom_config = {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.analysis_assim_extend.init_cycles : [
@@ -111,11 +113,11 @@ locals {
           volume_size   = local.init_cycles_config_cfe_nom.analysis_assim_extend.volume_size
           run_type_l    = "analysis_assim_extend"
           run_type_h    = "ANALYSIS_ASSIM_EXTEND"
-          fcst          = "f001_f028"
+          fcst          = "tm27_tm00"
           member        = ""
           member_suffix = ""
           member_path   = ""
-          nprocs        = 3
+          nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.analysis_assim_extend.instance_types[vpu]] - 1
         }
       ]
     ]) : pair.key => pair
@@ -149,12 +151,25 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
-    role_arn = aws_iam_role.scheduler_role.arn
+    role_arn = var.scheduler_role_arn
     input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    member_suffix      = each.value.member_suffix
+    ami_id             = local.fp_ami_id
+    instance_type      = each.value.instance_type
+    instance_profile   = local.fp_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 3600
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
+    vpu_list           = local.fp_vpu_list
+    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -166,10 +181,11 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     nprocs             = each.value.nprocs
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
-    security_group_ids  = local.cfe_nom_security_groups
-    instance_profile    = local.cfe_nom_instance_profile
-    volume_size         = each.value.volume_size
-    environment_suffix  = var.environment_suffix
+    instance_profile   = local.cfe_nom_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 3600
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT
@@ -192,12 +208,25 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
-    role_arn = aws_iam_role.scheduler_role.arn
+    role_arn = var.scheduler_role_arn
     input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    member_suffix      = each.value.member_suffix
+    ami_id             = local.fp_ami_id
+    instance_type      = each.value.instance_type
+    instance_profile   = local.fp_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 7200
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
+    vpu_list           = local.fp_vpu_list
+    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -209,10 +238,11 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     nprocs             = each.value.nprocs
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
-    security_group_ids  = local.cfe_nom_security_groups
-    instance_profile    = local.cfe_nom_instance_profile
-    volume_size         = each.value.volume_size
-    environment_suffix  = var.environment_suffix
+    instance_profile   = local.cfe_nom_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 7200
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT
@@ -235,12 +265,25 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
 
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
-    role_arn = aws_iam_role.scheduler_role.arn
+    role_arn = var.scheduler_role_arn
     input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_analysis_assim_extend_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
+    init               = each.value.init
+    run_type_l         = each.value.run_type_l
+    run_type_h         = each.value.run_type_h
+    member_suffix      = each.value.member_suffix
+    ami_id             = local.fp_ami_id
+    instance_type      = each.value.instance_type
+    instance_profile   = local.fp_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 3600
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
+    vpu_list           = local.fp_vpu_list
+    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -252,10 +295,11 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     nprocs             = each.value.nprocs
     ami_id             = local.cfe_nom_ami_id
     instance_type      = each.value.instance_type
-    security_group_ids  = local.cfe_nom_security_groups
-    instance_profile    = local.cfe_nom_instance_profile
-    volume_size         = each.value.volume_size
-    environment_suffix  = var.environment_suffix
+    instance_profile   = local.cfe_nom_instance_profile
+    volume_size        = each.value.volume_size
+    timeout_s          = 3600
+    environment_suffix = var.environment_suffix
+    s3_bucket          = var.s3_bucket
 }))}
 }
 EOT
