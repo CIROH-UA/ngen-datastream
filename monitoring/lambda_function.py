@@ -48,12 +48,16 @@ def get_schedule_details(name):
         ngiab_tag_match = re.search(r'NGIAB_TAG=([^\s&\'\"]+)', input_str)
         ngiab_tag = ngiab_tag_match.group(1) if ngiab_tag_match else None
 
+        created_date = response.get('CreationDate')
+        created_str = created_date.strftime('%Y%m%d') if created_date else None
+
         return {
             'name': name,
             'prefix': prefix,
             'model': model,
             'forecast_type': forecast_type,
-            'ngiab_tag': ngiab_tag
+            'ngiab_tag': ngiab_tag,
+            'created_date': created_str
         }
     except Exception as e:
         return None
@@ -305,6 +309,9 @@ def lambda_handler(event, context):
 
         results = []
         for sched in schedule_details:
+            # Skip schedules created after this date
+            if sched.get('created_date') and date < sched['created_date']:
+                continue
             updated_prefix = sched['prefix'].replace('DAILY', date)
             exists = updated_prefix in existing_files
 
