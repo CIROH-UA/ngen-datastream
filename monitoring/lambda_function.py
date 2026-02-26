@@ -125,10 +125,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
             width: 100%; height: 25px; background: #e0e0e0; border-radius: 12px;
             overflow: hidden; margin: 10px 0;
         }}
-        .progress-fill {{ height: 100%; transition: width 0.3s; }}
-        .progress-fill.complete {{ background: #4caf50; }}
-        .progress-fill.partial {{ background: #ff9800; }}
-        .progress-fill.low {{ background: #ff9800; }}
+        .progress-fill {{ height: 100%; transition: width 0.3s; background: #4caf50; }}
         .forecast-section {{
             background: #fafafa; border-radius: 6px; padding: 15px;
             margin-bottom: 10px; border: 1px solid #eee;
@@ -160,13 +157,6 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
             padding: 3px 6px; border-radius: 3px; margin: 2px; font-size: 11px;
             font-family: monospace;
         }}
-        .legend {{
-            display: flex; gap: 20px; margin-bottom: 20px; font-size: 14px;
-        }}
-        .legend-item {{ display: flex; align-items: center; gap: 5px; }}
-        .legend-box {{ width: 16px; height: 16px; border-radius: 3px; }}
-        .legend-box.green {{ background: #4caf50; }}
-        .legend-box.orange {{ background: #ff9800; }}
     </style>
 </head>
 <body>
@@ -174,10 +164,6 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         <h1>NRDS Status Dashboard</h1>
         <p class="updated">Last updated: {updated_at} UTC (auto-refreshes every hour) | Data fetched in {execution_time:.1f}s</p>
 
-        <div class="legend">
-            <div class="legend-item"><div class="legend-box green"></div> 95%+ Complete</div>
-            <div class="legend-item"><div class="legend-box orange"></div> Below 95%</div>
-        </div>
 """
 
     for date in dates:
@@ -201,7 +187,6 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
         overall_pct = (total_exists / total * 100) if total > 0 else 0
 
         formatted_date = f"{date[:4]}-{date[4:6]}-{date[6:]}"
-        pct_class = 'complete' if overall_pct >= 95 else 'partial' if overall_pct >= 50 else 'low'
 
         html += f"""
         <div class="date-section">
@@ -210,7 +195,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
                 <span class="date-summary">{total_exists} / {total} ({overall_pct:.1f}%)</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill {pct_class}" style="width: {overall_pct}%"></div>
+                <div class="progress-fill" style="width: {overall_pct}%"></div>
             </div>
 """
 
@@ -226,7 +211,6 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
             if ngiab_tag:
                 display_name += f" (NGIAB - {ngiab_tag})"
             section_id = f"{date}_{key}"
-            pct_class = 'complete' if pct >= 95 else 'partial' if pct >= 50 else 'low'
 
             html += f"""
             <div class="forecast-section">
@@ -234,7 +218,7 @@ def generate_html_multi_day(all_results, dates, updated_at, execution_time):
                     <span class="forecast-name">{display_name}</span>
                     <div class="forecast-stats">
                         <div class="mini-progress">
-                            <div class="progress-fill {pct_class}" style="width: {pct}%"></div>
+                            <div class="progress-fill" style="width: {pct}%"></div>
                         </div>
                         <span class="count">{exists_count} / {total_count} ({pct:.1f}%)</span>
                     </div>
