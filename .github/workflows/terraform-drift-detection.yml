@@ -113,6 +113,22 @@ jobs:
             const report = JSON.parse(fs.readFileSync('/tmp/drift-reports/nrds.json', 'utf8'));
 
             if (report.drift_detected === 'false') {
+              const { data: openIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'terraform-drift',
+              });
+              for (const issue of openIssues) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+                console.log(`Closed resolved drift issue #${issue.number}`);
+              }
               console.log('No drift detected.');
               return;
             }
