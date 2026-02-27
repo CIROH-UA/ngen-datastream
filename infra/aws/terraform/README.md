@@ -20,6 +20,10 @@ infra/aws/terraform/
         schedules.tf              # Short range, medium range, AnA schedules
         config/                   # Forecast input configuration
         templates/                # Execution JSON templates
+      forcing/                    # Forcing generation schedule module
+        schedules.tf              # Short range, medium range, AnA schedules
+        config/                   # Forecast input configuration
+        templates/                # Execution JSON templates
 ```
 
 ## Architecture
@@ -69,7 +73,6 @@ aws stepfunctions start-execution \
 | `terraform-deploy.yml` | Push to main | Plan + apply with manual approval |
 | `terraform-pr-validate.yml` | Pull request | Format check, validate, plan with PR comment |
 | `terraform-drift-detection.yml` | Daily at 6 AM UTC | Detect infrastructure drift |
-| `terraform-health-check.yml` | Every 6 hours + post-deploy | Verify state machine is ACTIVE |
 
 ## Documentation
 
