@@ -1,5 +1,3 @@
-# IAM Role and Policy for AWS Scheduler to start Step Functions executions
-
 resource "aws_iam_policy" "scheduler_policy" {
   name        = var.scheduler_policy_name
   description = "Policy with permissions for statemachine execution"
@@ -34,8 +32,8 @@ resource "aws_iam_role" "scheduler_role" {
   })
 }
 
-resource "aws_iam_policy_attachment" "datastream_scheduler_attachment" {
-  name       = "datastream_scheduler_attachment"
+resource "aws_iam_policy_attachment" "scheduler_attachment" {
+  name       = "${var.resource_prefix}_scheduler_attachment"
   roles      = [aws_iam_role.scheduler_role.name]
   policy_arn = aws_iam_policy.scheduler_policy.arn
 }

@@ -1,0 +1,85 @@
+name: Terraform Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/aws/terraform/**'
+  workflow_dispatch:
+
+# CRITICAL: Never cancel a terraform apply mid-run — it can leave state locked
+# or resources half-created. Queue new runs instead.
+concurrency:
+  group: terraform-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.10.0"
+  AWS_REGION: us-east-1
+  WORKING_DIR: infra/aws/terraform/services/nrds
+
+jobs:
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -backend-config="envs/prod.backend.hcl"
+
+      - name: Terraform Plan
+        run: terraform plan -var-file="envs/prod.tfvars" -no-color -input=false -lock-timeout=5m
+
+  deploy:
+    name: Terraform Apply
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init -backend-config="envs/prod.backend.hcl"
+
+      - name: Terraform Apply
+        run: terraform apply -var-file="envs/prod.tfvars" -auto-approve -input=false -lock-timeout=5m
