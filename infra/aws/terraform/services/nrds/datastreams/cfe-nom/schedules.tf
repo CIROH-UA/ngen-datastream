@@ -7,15 +7,9 @@ locals {
 
   init_cycles_config_cfe_nom = jsondecode(file("${path.module}/config/execution_forecast_inputs_cfe_nom.json"))
 
-  cfe_nom_template_path = "${path.module}/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
-
+  cfe_nom_template_path    = "${path.module}/templates/execution_datastream_cfe_nom_VPU_template.json.tpl"
   cfe_nom_ami_id           = var.cfe_nom_ami_id
   cfe_nom_instance_profile = var.ec2_instance_profile
-
-  fp_template_path    = "${path.module}/templates/execution_datastream_cfe_nom_fp_template.json.tpl"
-  fp_ami_id           = var.fp_ami_id
-  fp_instance_profile = var.ec2_instance_profile
-  fp_vpu_list         = join(",", [for v in local.vpus : v if v != "fp"])
 
   short_range_cfe_nom_config = {
     for pair in flatten([
@@ -43,7 +37,7 @@ locals {
       for init in local.init_cycles_config_cfe_nom.short_range.init_cycles : [
         for vpu in local.vpus : {
           key   = "${init}_${vpu}"
-          value = vpu == "fp" ? (tonumber(init)) % 24 : (tonumber(init) + 1) % 24
+          value = (tonumber(init) + 1) % 24
         }
       ]
     ]) : pair.key => pair.value
@@ -53,9 +47,7 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : [
         for vpu in local.vpus : [
-          for member in(
-            vpu == "fp" ? ["1"] : local.init_cycles_config_cfe_nom.medium_range.ensemble_members
-            ) : {
+          for member in local.init_cycles_config_cfe_nom.medium_range.ensemble_members : {
             key           = "${init}_${member}_${vpu}"
             init          = init
             vpu           = vpu
@@ -65,7 +57,7 @@ locals {
             run_type_h    = "MEDIUM_RANGE"
             fcst          = "f001_f240"
             member        = member
-            member_suffix = vpu == "fp" ? "_0" : "_${member}"
+            member_suffix = "_${member}"
             member_path   = "/${member}"
             nprocs        = local.instance_vcpus[local.init_cycles_config_cfe_nom.medium_range.instance_types[vpu]] - 1
           }
@@ -78,11 +70,9 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.medium_range.init_cycles : [
         for vpu in local.vpus : [
-          for member in(
-            vpu == "fp" ? ["1"] : local.init_cycles_config_cfe_nom.medium_range.ensemble_members
-            ) : {
+          for member in local.init_cycles_config_cfe_nom.medium_range.ensemble_members : {
             key   = "${init}_${member}_${vpu}"
-            value = vpu == "fp" ? (tonumber(init) + 2) % 24 : (tonumber(init) + 3) % 24
+            value = (tonumber(init) + 3) % 24
           }
         ]
       ]
@@ -128,7 +118,7 @@ locals {
       for init in local.init_cycles_config_cfe_nom.analysis_assim_extend.init_cycles : [
         for vpu in local.vpus : {
           key   = "${init}_${vpu}"
-          value = vpu == "fp" ? 15 : 16
+          value = 16
         }
       ]
     ]) : pair.key => pair.value
@@ -156,20 +146,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
-    init               = each.value.init
-    run_type_l         = each.value.run_type_l
-    run_type_h         = each.value.run_type_h
-    member_suffix      = each.value.member_suffix
-    ami_id             = local.fp_ami_id
-    instance_type      = each.value.instance_type
-    instance_profile   = local.fp_instance_profile
-    volume_size        = each.value.volume_size
-    timeout_s          = 3600
-    environment_suffix = var.environment_suffix
-    s3_bucket          = var.s3_bucket
-    vpu_list           = local.fp_vpu_list
-    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -213,20 +190,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_medium_range_vpu${each.value.vpu}_init${each.value.init}_mem${each.value.member}_<aws.scheduler.execution-id>",
-  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
-    init               = each.value.init
-    run_type_l         = each.value.run_type_l
-    run_type_h         = each.value.run_type_h
-    member_suffix      = each.value.member_suffix
-    ami_id             = local.fp_ami_id
-    instance_type      = each.value.instance_type
-    instance_profile   = local.fp_instance_profile
-    volume_size        = each.value.volume_size
-    timeout_s          = 7200
-    environment_suffix = var.environment_suffix
-    s3_bucket          = var.s3_bucket
-    vpu_list           = local.fp_vpu_list
-    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
@@ -270,20 +234,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "cfe_nom_analysis_assim_extend_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
-  "Input": ${each.value.vpu == "fp" ? jsonencode(templatefile(local.fp_template_path, {
-    init               = each.value.init
-    run_type_l         = each.value.run_type_l
-    run_type_h         = each.value.run_type_h
-    member_suffix      = each.value.member_suffix
-    ami_id             = local.fp_ami_id
-    instance_type      = each.value.instance_type
-    instance_profile   = local.fp_instance_profile
-    volume_size        = each.value.volume_size
-    timeout_s          = 3600
-    environment_suffix = var.environment_suffix
-    s3_bucket          = var.s3_bucket
-    vpu_list           = local.fp_vpu_list
-    })) : jsonencode(templatefile(local.cfe_nom_template_path, {
+  "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
     run_type_l         = each.value.run_type_l
