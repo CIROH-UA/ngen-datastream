@@ -45,7 +45,7 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
       "Resource": "arn:aws:states:::lambda:invoke",
       "OutputPath": "$.Payload",
       "Parameters": {
-        "Payload.$": "$",
+        "Payload.$": "States.JsonMerge($, States.StringToJson(States.Format('\\{\"execution_name\":\"{}\"\\}', $$.Execution.Name)), false)",
         "FunctionName": "${aws_lambda_function.commander_lambda.arn}:$LATEST"
       },      
       "Retry": [
