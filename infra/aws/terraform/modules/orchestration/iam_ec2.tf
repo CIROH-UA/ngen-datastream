@@ -56,6 +56,13 @@ resource "aws_iam_policy" "ec2_policy" {
           "ec2:DescribeTags"
         ],
         Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ],
+        Resource = "arn:aws:secretsmanager:us-east-1:879381264451:secret:docker_awiciroh_creds-*"
       }
     ]
   })
