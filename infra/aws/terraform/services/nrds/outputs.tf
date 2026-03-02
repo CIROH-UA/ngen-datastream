@@ -41,3 +41,7 @@ output "forcing_medium_range_schedule_count" {
 output "forcing_analysis_assim_schedule_count" {
   value = module.forcing_schedules.analysis_assim_schedule_count
 }
+
+output "routing_only_short_range_schedule_count" {
+  value = module.routing_only_schedules.short_range_schedule_count
+}
