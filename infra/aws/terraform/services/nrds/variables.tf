@@ -49,7 +49,7 @@ variable "fp_ami_id" {
 variable "routing_only_ami_id" {
   type        = string
   description = "AMI ID for Routing-Only model EC2 instances"
-  default     = "ami-0f8e27ecfe91ffd4f"
+  default     = "ami-038132f534157b5c3"
 }
 
 # Schedule settings

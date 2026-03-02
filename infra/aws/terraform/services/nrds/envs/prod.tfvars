@@ -23,7 +23,7 @@ scheduler_role_name   = "nrds_prod_scheduler_role"
 # Per-datastream AMIs
 cfe_nom_ami_id      = "ami-038132f534157b5c3"
 fp_ami_id           = "ami-062245e1c9604128d"
-routing_only_ami_id = "ami-0f8e27ecfe91ffd4f"
+routing_only_ami_id = "ami-038132f534157b5c3"
 
 # Schedule settings
 schedule_timezone   = "America/New_York"

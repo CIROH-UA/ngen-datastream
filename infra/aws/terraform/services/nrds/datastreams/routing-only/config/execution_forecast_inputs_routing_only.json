@@ -9,6 +9,6 @@
     "instance_types": {
       "03W": "m8g.xlarge"
     },
-    "volume_size": 50
+    "volume_size": 64
   }
 }
