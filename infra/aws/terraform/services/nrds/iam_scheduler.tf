@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_policy" "scheduler_policy" {
   name        = var.scheduler_policy_name
   description = "Policy with permissions for statemachine execution"
@@ -7,12 +9,18 @@ resource "aws_iam_policy" "scheduler_policy" {
       {
         "Effect" : "Allow",
         Action = [
-          "states:StartExecution",
+          "states:StartExecution"
+        ],
+        "Resource" : [module.nrds_orchestration.datastream_arn]
+      },
+      {
+        "Effect" : "Allow",
+        Action = [
           "events:PutTargets",
           "events:PutRule",
           "events:PutPermission"
         ],
-        "Resource" : ["*"]
+        "Resource" : ["arn:aws:events:${var.region}:${data.aws_caller_identity.current.account_id}:rule/*"]
       }
     ]
   })

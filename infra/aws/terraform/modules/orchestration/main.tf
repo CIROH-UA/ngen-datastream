@@ -38,6 +38,14 @@ variable "resource_prefix" {
   type        = string
   description = "Prefix for resource naming"
 }
+variable "s3_bucket" {
+  type        = string
+  description = "S3 bucket name for IAM policy scoping"
+}
+
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
 data "aws_vpc" "default" {
   default = true
 }

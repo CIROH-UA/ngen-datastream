@@ -40,6 +40,7 @@ module "nrds_orchestration" {
   ec2_policy_name           = var.ec2_policy_name
   profile_name              = var.profile_name
   resource_prefix           = var.resource_prefix
+  s3_bucket                 = var.s3_bucket
 }
 
 # =============================================================================
