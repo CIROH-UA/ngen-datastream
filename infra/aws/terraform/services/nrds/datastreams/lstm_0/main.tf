@@ -33,9 +33,9 @@ variable "ec2_instance_profile" {
   description = "IAM instance profile name for EC2"
 }
 
-variable "cfe_nom_ami_id" {
+variable "lstm_0_ami_id" {
   type        = string
-  description = "AMI ID for CFE_NOM model EC2 instances"
+  description = "AMI ID for LSTM_0 model EC2 instances"
 }
 
 variable "schedule_timezone" {
