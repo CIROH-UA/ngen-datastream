@@ -29,11 +29,11 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "${environment_suffix}_CFE_NOM_${run_type_l}_fp_init${init}${member_suffix}"
+            "Value": "${environment_suffix}_forcing_${run_type_l}_init${init}${member_suffix}"
           },
           {
             "Key": "Project",
-            "Value": "datastream_FULLCONUS_v1.2_${run_type_l}_fp"
+            "Value": "forcing_FULLCONUS_v1.2_${run_type_l}"
           }
         ]
       },
@@ -42,7 +42,7 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "${environment_suffix}_CFE_NOM_${run_type_l}_fp_init${init}${member_suffix}_vol"
+            "Value": "${environment_suffix}_forcing_${run_type_l}_init${init}${member_suffix}_vol"
           }
         ]
       }
