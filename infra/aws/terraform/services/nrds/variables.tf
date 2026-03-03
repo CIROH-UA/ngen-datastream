@@ -52,6 +52,12 @@ variable "routing_only_ami_id" {
   default     = "ami-038132f534157b5c3"
 }
 
+variable "lstm_0_ami_id" {
+  type        = string
+  description = "AMI ID for LSTM_0 model EC2 instances"
+  default     = "ami-038132f534157b5c3"
+}
+
 # Schedule settings
 variable "schedule_timezone" {
   type        = string
