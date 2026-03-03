@@ -45,3 +45,15 @@ output "forcing_analysis_assim_schedule_count" {
 output "routing_only_short_range_schedule_count" {
   value = module.routing_only_schedules.short_range_schedule_count
 }
+
+output "lstm_0_short_range_schedule_count" {
+  value = module.lstm_0_schedules.short_range_schedule_count
+}
+
+output "lstm_0_medium_range_schedule_count" {
+  value = module.lstm_0_schedules.medium_range_schedule_count
+}
+
+output "lstm_0_analysis_assim_schedule_count" {
+  value = module.lstm_0_schedules.analysis_assim_schedule_count
+}

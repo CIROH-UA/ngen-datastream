@@ -26,8 +26,12 @@ infra/aws/terraform/
         templates/                # Execution JSON templates
       routing-only/               # Routing-Only schedule module
         schedules.tf              # Short range schedules
-        config/
-        templates/
+        config/                   # Forecast input configuration
+        templates/                # Execution JSON templates
+      lstm_0/                     # LSTM_0 schedule module
+        schedules.tf              # Short range, medium range, AnA schedules
+        config/                   # Forecast input configuration
+        templates/                # Execution JSON templates
 ```
 
 ## Architecture
