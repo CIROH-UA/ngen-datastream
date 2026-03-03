@@ -64,9 +64,12 @@ def lambda_handler(event, context):
     return event
 
 def store_failed_execution(execution,bucket):
-    print(f'Execution failed, storing execution in {bucket}')
+    retry_attempt = execution.get('retry_attempt', 0)
+    n_retries_allowed = execution.get('run_options', {}).get('n_retries_allowed', 0)
+    category = "retried" if retry_attempt < n_retries_allowed else "failed"
+    print(f'Execution failed (attempt {retry_attempt}/{n_retries_allowed}, category={category}), storing in {bucket}')
     timestamp = datetime.datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
-    key = f"test/cicd/nrds/failed_executions/{timestamp}.json"
+    key = f"monitoring/failed_executions/{category}/{timestamp}.json"
     client_s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(execution))
     print(f'Execution stored in {bucket} at {key}')
 
