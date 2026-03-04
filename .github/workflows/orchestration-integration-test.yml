@@ -113,20 +113,24 @@ jobs:
             fi
           done
 
+          # Capture execution history regardless of outcome
+          aws stepfunctions get-execution-history \
+            --execution-arn "$EXEC_ARN" \
+            --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed' || type=='LambdaFunctionFailed' || type=='LambdaFunctionScheduleFailed' || type=='ExecutionFailed']" \
+            --output json | tee /tmp/history.json
+
+          echo "history<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/history.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
           if [ "$STATUS" = "SUCCEEDED" ]; then
             echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
-            aws stepfunctions get-execution-history \
-              --execution-arn "$EXEC_ARN" \
-              --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed'].[type,timestamp,stateEnteredEventDetails.name]" \
-              --output text | tee /tmp/history.txt
-            echo "history<<EOF" >> "$GITHUB_OUTPUT"
-            cat /tmp/history.txt >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
           elif [ "$STATUS" = "RUNNING" ]; then
             echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
             exit 1
           else
             echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            echo "::error::SM execution $STATUS. See history above."
             exit 1
           fi
 
