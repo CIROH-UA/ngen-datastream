@@ -1,0 +1,201 @@
+name: Test Datastream VPU
+
+on:
+  workflow_dispatch:
+    inputs:
+      datastream:
+        description: 'Datastream name (e.g. cfe_nom, lstm_0)'
+        required: true
+        type: string
+      vpus:
+        description: 'Comma-separated VPUs to test (e.g. "16" or "01,09,16") or "all"'
+        required: true
+        default: 'all'
+        type: string
+      date:
+        description: 'Forcing date (YYYYMMDD) with known good data on S3'
+        required: true
+        type: string
+      hour:
+        description: 'Forcing hour (e.g. 15)'
+        required: true
+        default: '15'
+        type: string
+
+concurrency:
+  group: vpu-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: ciroh-community-ngen-datastream
+
+jobs:
+  # ── Build the VPU matrix ──────────────────────────────────────────
+  build-matrix:
+    name: Build VPU matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          ALL='["01","02","03N","03S","03W","04","05","06","07","08","09","10L","10U","11","12","13","14","15","16","17","18"]'
+          INPUT="${{ inputs.vpus }}"
+          if [ "$INPUT" = "all" ]; then
+            echo "matrix={\"vpu\":$ALL}" >> "$GITHUB_OUTPUT"
+          else
+            # Convert comma-separated to JSON array
+            JSON=$(echo "$INPUT" | jq -Rc 'split(",") | map(gsub("\\s+";""))')
+            echo "matrix={\"vpu\":$JSON}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Run each VPU via the prod state machine ───────────────────────
+  test-vpu:
+    name: VPU ${{ matrix.vpu }}
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve datastream config
+        id: config
+        run: |
+          DS="${{ inputs.datastream }}"
+          VPU="${{ matrix.vpu }}"
+          DATE="${{ inputs.date }}"
+          HOUR="${{ inputs.hour }}"
+
+          # Read AMI from prod.tfvars based on datastream
+          PROD_VARS="infra/aws/terraform/services/nrds/envs/prod.tfvars"
+          case "$DS" in
+            cfe_nom)
+              AMI=$(grep cfe_nom_ami_id "$PROD_VARS" | grep -o 'ami-[a-z0-9]*')
+              FORCING="s3://${{ env.S3_BUCKET }}/forcings/v2.2_hydrofabric/ngen.${DATE}/forcing_short_range/${HOUR}/ngen.t${HOUR}z.short_range.forcing.f001_f018.VPU_${VPU}.nc"
+              BMI_CONFIGS="s3://${{ env.S3_BUCKET }}/resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed/VPU_${VPU}/config/ngen-bmi-configs.tar.gz"
+              GEOPACKAGE="s3://${{ env.S3_BUCKET }}/resources/v2.2_hydrofabric/geopackages/VPU_${VPU}/nextgen_VPU_${VPU}.gpkg"
+              REALIZATION="https://${{ env.S3_BUCKET }}.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_${VPU}.json"
+              FORCING_SOURCE="NWM_V3_SHORT_RANGE_${HOUR}"
+              DS_TAG="1.4.0"
+              NGIAB_TAG="v1.7.0"
+              ;;
+            fp)
+              AMI=$(grep fp_ami_id "$PROD_VARS" | grep -o 'ami-[a-z0-9]*')
+              FORCING="s3://${{ env.S3_BUCKET }}/forcings/v2.2_hydrofabric/ngen.${DATE}/forcing_short_range/${HOUR}/ngen.t${HOUR}z.short_range.forcing.f001_f018.VPU_${VPU}.nc"
+              BMI_CONFIGS="s3://${{ env.S3_BUCKET }}/resources/v2.2_hydrofabric/bmi_configs/fp/VPU_${VPU}/config/ngen-bmi-configs.tar.gz"
+              GEOPACKAGE="s3://${{ env.S3_BUCKET }}/resources/v2.2_hydrofabric/geopackages/VPU_${VPU}/nextgen_VPU_${VPU}.gpkg"
+              REALIZATION="https://${{ env.S3_BUCKET }}.s3.amazonaws.com/realizations/fp/realization_VPU_${VPU}.json"
+              FORCING_SOURCE="NWM_V3_SHORT_RANGE_${HOUR}"
+              DS_TAG="1.4.0"
+              NGIAB_TAG="v1.7.0"
+              ;;
+            *)
+              echo "::error::Unknown datastream '$DS'. Add its config to the resolve step."
+              exit 1
+              ;;
+          esac
+
+          echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+          echo "forcing=$FORCING" >> "$GITHUB_OUTPUT"
+          echo "bmi_configs=$BMI_CONFIGS" >> "$GITHUB_OUTPUT"
+          echo "geopackage=$GEOPACKAGE" >> "$GITHUB_OUTPUT"
+          echo "realization=$REALIZATION" >> "$GITHUB_OUTPUT"
+          echo "forcing_source=$FORCING_SOURCE" >> "$GITHUB_OUTPUT"
+          echo "ds_tag=$DS_TAG" >> "$GITHUB_OUTPUT"
+          echo "ngiab_tag=$NGIAB_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build execution payload
+        run: |
+          VPU="${{ matrix.vpu }}"
+          DATE="${{ inputs.date }}"
+          S3_PREFIX="test/cicd/vpu_test/${{ inputs.datastream }}/VPU_${VPU}"
+          PROFILE="nrds_prod_ec2_profile"
+
+          CMD="runuser -l ec2-user -c 'export SKIP_VALIDATION=True DS_TAG=${{ steps.config.outputs.ds_tag }} NGIAB_TAG=${{ steps.config.outputs.ngiab_tag }} && /home/ec2-user/datastreamcli/scripts/datastream -s DAILY -e ${DATE}0000 -n 3 -F ${{ steps.config.outputs.forcing }} --FORCING_SOURCE ${{ steps.config.outputs.forcing_source }} -d /home/ec2-user/outputs -N ${{ steps.config.outputs.bmi_configs }} -g ${{ steps.config.outputs.geopackage }} -R ${{ steps.config.outputs.realization }} --S3_BUCKET ${{ env.S3_BUCKET }} --S3_PREFIX ${S3_PREFIX}'"
+
+          jq -n \
+            --arg CMD "$CMD" \
+            --arg AMI "${{ steps.config.outputs.ami }}" \
+            --arg PROFILE "$PROFILE" \
+            --arg VPU "$VPU" \
+            '{
+              commands: [$CMD],
+              run_options: {
+                ii_terminate_instance: true,
+                ii_delete_volume: true,
+                ii_check_s3: true,
+                ii_cheapo: true,
+                timeout_s: 3600,
+                n_retries_allowed: 2
+              },
+              instance_parameters: {
+                ImageId: $AMI,
+                InstanceType: "m8g.xlarge",
+                IamInstanceProfile: { Name: $PROFILE },
+                TagSpecifications: [
+                  {ResourceType: "instance", Tags: [{Key: "Name", Value: ("ci_vpu_test_" + $VPU)}, {Key: "Project", Value: "ci_vpu_test"}]},
+                  {ResourceType: "volume", Tags: [{Key: "Name", Value: ("ci_vpu_test_" + $VPU)}]}
+                ],
+                BlockDeviceMappings: [
+                  {DeviceName: "/dev/xvda", Ebs: {VolumeSize: 64, VolumeType: "gp3"}}
+                ]
+              }
+            }' > /tmp/exec_input.json
+
+          echo "Payload for VPU_${VPU}:"
+          jq '.commands[0][:200]' /tmp/exec_input.json
+
+      - name: Start and monitor execution
+        run: |
+          SM_ARN="arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm"
+          EXEC_NAME="ci_vpu_${{ matrix.vpu }}_${{ inputs.datastream }}_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "$SM_ARN" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/exec_input.json" \
+            --query 'executionArn' --output text)
+          echo "Started: $EXEC_ARN"
+
+          TIMEOUT=3600
+          ELAPSED=0
+          STATUS="RUNNING"
+
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] VPU_${{ matrix.vpu }}: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              sleep 30
+              ELAPSED=$((ELAPSED + 30))
+            fi
+          done
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "VPU_${{ matrix.vpu }} PASSED"
+          else
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskFailed' || type=='LambdaFunctionFailed' || type=='ExecutionFailed']" \
+              --output json
+            echo "::error::VPU_${{ matrix.vpu }} $STATUS"
+            exit 1
+          fi
+
+      - name: Clean up test S3 output
+        if: always()
+        run: |
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/test/cicd/vpu_test/${{ inputs.datastream }}/VPU_${{ matrix.vpu }}/" --recursive || true
