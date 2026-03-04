@@ -17,8 +17,6 @@ env:
   AWS_REGION: us-east-1
   TF_DIR: infra/aws/terraform/services/nrds
   CI_CONFIG: .github/orchestration-test
-  # Known good date with verified forcing data on S3
-  TEST_DATE: "20260209"
 
 jobs:
   integration-test:
@@ -62,28 +60,23 @@ jobs:
           echo "sm_arn=$(terraform output -raw datastream_arn)" >> "$GITHUB_OUTPUT"
           echo "profile=$(terraform output -raw ec2_instance_profile_name)" >> "$GITHUB_OUTPUT"
 
-      # ── Build payload from static test template ─────────────────────
+      # ── Build payload: swap profile and AMI from prod ────────────────
       - name: Build execution payload
         working-directory: .
         run: |
           PAYLOAD="${{ github.workspace }}/${{ env.CI_CONFIG }}/test-execution-payload.json"
+          PROD_VARS="${{ github.workspace }}/infra/aws/terraform/services/nrds/envs/prod.tfvars"
+          AMI=$(grep cfe_nom_ami_id "$PROD_VARS" | grep -o 'ami-[a-z0-9]*')
 
-          # - Swap instance profile placeholder to CI profile
-          # - Replace DAILY in forcing/prefix paths with known good date
-          #   (prevents Commander lambda from using today's date)
-          # - Pin end_date so forcing data is guaranteed to exist
-          # - Redirect S3 output to test prefix
           jq \
             --arg PROFILE "${{ steps.deploy.outputs.profile }}" \
-            --arg DATE "${{ env.TEST_DATE }}" \
+            --arg AMI "$AMI" \
             '
             .instance_parameters.IamInstanceProfile.Name = $PROFILE |
-            .commands |= map(gsub("ngen\\.DAILY"; "ngen.\($DATE)")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
-            .commands |= map(sub("--S3_PREFIX \\S+"; "--S3_PREFIX test/cicd/orchestration-test'\''"))
+            .instance_parameters.ImageId = $AMI
             ' "$PAYLOAD" > /tmp/exec_input.json
 
-          echo "Payload built:"
+          echo "Payload built (AMI=$AMI):"
           jq '.commands[0][:200]' /tmp/exec_input.json
 
       # ── Execute and monitor ────────────────────────────────────────
