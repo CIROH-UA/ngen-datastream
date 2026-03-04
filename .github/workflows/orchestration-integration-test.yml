@@ -15,7 +15,8 @@ concurrency:
 env:
   TF_VERSION: "1.10.0"
   AWS_REGION: us-east-1
-  WORKING_DIR: infra/aws/terraform/services/nrds
+  TF_DIR: infra/aws/terraform/services/nrds
+  CI_CONFIG: .github/orchestration-test
 
 jobs:
   integration-test:
@@ -27,7 +28,7 @@ jobs:
       id-token: write
     defaults:
       run:
-        working-directory: ${{ env.WORKING_DIR }}
+        working-directory: infra/aws/terraform/services/nrds
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,68 +45,33 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
-      # ── Deploy test orchestration ──────────────────────────────────
-      - name: Terraform Init (test backend)
-        run: terraform init -backend-config="envs/ci.backend.hcl"
+      # ── Deploy orchestration module only (no schedules) ────────────
+      - name: Terraform Init
+        run: |
+          terraform init -backend-config="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.backend.hcl"
 
       - name: Terraform Apply (orchestration only)
         id: deploy
         run: |
           terraform apply \
-            -var-file="envs/ci.tfvars" \
+            -var-file="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.tfvars" \
             -target=module.nrds_orchestration \
             -auto-approve -input=false -lock-timeout=5m
 
-          SM_ARN=$(terraform output -raw datastream_arn)
-          PROFILE=$(terraform output -raw ec2_instance_profile_name)
-          echo "sm_arn=$SM_ARN" >> "$GITHUB_OUTPUT"
-          echo "instance_profile=$PROFILE" >> "$GITHUB_OUTPUT"
-          echo "Deployed test SM: $SM_ARN"
+          echo "sm_arn=$(terraform output -raw datastream_arn)" >> "$GITHUB_OUTPUT"
+          echo "profile=$(terraform output -raw ec2_instance_profile_name)" >> "$GITHUB_OUTPUT"
 
-      # ── Build execution payload from recent prod run ───────────────
-      - name: Build test payload
-        id: payload
-        run: |
-          PROD_SM="arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm"
-
-          # Grab the most recent successful short_range execution
-          EXEC_ARN=$(aws stepfunctions list-executions \
-            --state-machine-arn "$PROD_SM" \
-            --status-filter SUCCEEDED \
-            --max-results 20 \
-            --query "executions[?contains(name,'short_range')].executionArn | [0]" \
-            --output text)
-
-          if [ "$EXEC_ARN" = "None" ] || [ -z "$EXEC_ARN" ]; then
-            echo "No recent successful execution found"
-            exit 1
-          fi
-          echo "Using payload from: $EXEC_ARN"
-
-          # Extract input and swap instance profile to test
-          aws stepfunctions describe-execution \
-            --execution-arn "$EXEC_ARN" \
-            --query 'input' --output text > /tmp/raw_input.json
-
-          python3 -c "
-          import json, sys
-          d = json.load(open('/tmp/raw_input.json'))
-          d['instance_parameters']['IamInstanceProfile']['Name'] = '${{ steps.deploy.outputs.instance_profile }}'
-          for ts in d['instance_parameters'].get('TagSpecifications', []):
-              for tag in ts.get('Tags', []):
-                  if tag['Key'] == 'Name':
-                      tag['Value'] = 'ci_orchestration_test'
-                  if tag['Key'] == 'Project':
-                      tag['Value'] = 'ci_orchestration_test'
-          json.dump(d, open('/tmp/exec_input.json', 'w'))
-          "
-          echo "Payload ready"
-
-      # ── Execute and monitor ────────────────────────────────────────
+      # ── Run execution against the test SM ──────────────────────────
       - name: Start execution
         id: execute
+        working-directory: .
         run: |
-          EXEC_NAME="ci_test_pr${{ github.event.pull_request.number }}_$(date +%s)"
+          PROFILE="${{ steps.deploy.outputs.profile }}"
+          jq --arg p "$PROFILE" \
+            '.instance_parameters.IamInstanceProfile.Name = $p' \
+            "${{ env.CI_CONFIG }}/test-execution-payload.json" > /tmp/exec_input.json
+
+          EXEC_NAME="ci_test_pr${{ github.event.pull_request.number || 'manual' }}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ steps.deploy.outputs.sm_arn }}" \
             --name "$EXEC_NAME" \
@@ -117,66 +83,54 @@ jobs:
 
       - name: Monitor execution
         id: monitor
+        working-directory: .
         run: |
           EXEC_ARN="${{ steps.execute.outputs.exec_arn }}"
-          TIMEOUT=2400  # 40 minutes
+          TIMEOUT=2400
           ELAPSED=0
-          INTERVAL=15
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
             STATUS=$(aws stepfunctions describe-execution \
-              --execution-arn "$EXEC_ARN" \
-              --query 'status' --output text)
-
-            echo "[$ELAPSED s] Status: $STATUS"
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] $STATUS"
 
             if [ "$STATUS" = "SUCCEEDED" ]; then
               echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
-
-              # Collect lambda timings
-              HISTORY=$(aws stepfunctions get-execution-history \
+              aws stepfunctions get-execution-history \
                 --execution-arn "$EXEC_ARN" \
                 --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed'].[type,timestamp,stateEnteredEventDetails.name]" \
-                --output text)
-              echo "Lambda history:"
-              echo "$HISTORY"
-              echo "history<<HIST_EOF" >> "$GITHUB_OUTPUT"
-              echo "$HISTORY" >> "$GITHUB_OUTPUT"
-              echo "HIST_EOF" >> "$GITHUB_OUTPUT"
+                --output text | tee /tmp/history.txt
+              echo "history<<EOF" >> "$GITHUB_OUTPUT"
+              cat /tmp/history.txt >> "$GITHUB_OUTPUT"
+              echo "EOF" >> "$GITHUB_OUTPUT"
               exit 0
             fi
 
             if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "TIMED_OUT" ] || [ "$STATUS" = "ABORTED" ]; then
               echo "result=$STATUS" >> "$GITHUB_OUTPUT"
-              CAUSE=$(aws stepfunctions describe-execution \
-                --execution-arn "$EXEC_ARN" \
-                --query 'cause' --output text 2>/dev/null || echo "Unknown")
-              echo "error=$CAUSE" >> "$GITHUB_OUTPUT"
-              echo "Execution $STATUS: $CAUSE"
+              echo "error=$(aws stepfunctions describe-execution --execution-arn "$EXEC_ARN" --query 'cause' --output text 2>/dev/null || echo 'Unknown')" >> "$GITHUB_OUTPUT"
               exit 1
             fi
 
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
+            sleep 15
+            ELAPSED=$((ELAPSED + 15))
           done
 
           echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
-          echo "Timed out after ${TIMEOUT}s"
           exit 1
 
-      # ── Always destroy ─────────────────────────────────────────────
-      - name: Terraform Destroy (cleanup)
+      # ── Always destroy (orchestration only) ────────────────────────
+      - name: Terraform Destroy
         if: always() && steps.deploy.outcome == 'success'
         run: |
           terraform destroy \
-            -var-file="envs/ci.tfvars" \
+            -var-file="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.tfvars" \
+            -target=module.nrds_orchestration \
             -auto-approve -input=false -lock-timeout=5m
-          echo "Test environment destroyed"
 
-      - name: Clean up CI state
+      - name: Clean up state
         if: always() && steps.deploy.outcome == 'success'
-        run: |
-          aws s3 rm "s3://ciroh-terraform-state/nrds-ci/" --recursive || true
+        run: aws s3 rm "s3://ciroh-terraform-state/nrds-ci/" --recursive || true
 
       # ── Post result to PR ──────────────────────────────────────────
       - name: Post result to PR
@@ -192,15 +146,11 @@ jobs:
 
             let body = `### Orchestration Integration Test ${icon}\n\n`;
             body += `**Result: ${result}**\n\n`;
-
             if (history) {
               body += `<details><summary>Lambda Execution History</summary>\n\n`;
               body += '```\n' + history + '\n```\n\n</details>\n\n';
             }
-            if (error) {
-              body += `**Error:** ${error}\n\n`;
-            }
-
+            if (error) body += `**Error:** ${error}\n\n`;
             body += `*Triggered by PR #${{ github.event.pull_request.number }}*`;
 
             const marker = 'Orchestration Integration Test';
@@ -209,22 +159,10 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            const existing = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes(marker)
-            );
-
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            const params = { owner: context.repo.owner, repo: context.repo.repo, body };
             if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
+              await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
             } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
             }
