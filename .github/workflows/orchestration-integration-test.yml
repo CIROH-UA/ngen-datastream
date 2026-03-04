@@ -17,10 +17,8 @@ env:
   AWS_REGION: us-east-1
   TF_DIR: infra/aws/terraform/services/nrds
   CI_CONFIG: .github/orchestration-test
-  # Known good date with verified forcing data and execution metadata on S3
+  # Known good date with verified forcing data on S3
   TEST_DATE: "20260209"
-  TEST_INIT: "16"
-  TEST_VPU: "09"
 
 jobs:
   integration-test:
@@ -64,46 +62,29 @@ jobs:
           echo "sm_arn=$(terraform output -raw datastream_arn)" >> "$GITHUB_OUTPUT"
           echo "profile=$(terraform output -raw ec2_instance_profile_name)" >> "$GITHUB_OUTPUT"
 
-      # ── Build payload from known good S3 execution (same as build_test_ngiab_ami) ──
-      - name: Download and modify execution JSON
+      # ── Build payload from static test template ─────────────────────
+      - name: Build execution payload
         working-directory: .
         run: |
-          S3_BUCKET="ciroh-community-ngen-datastream"
-          EXEC_PATH="v2.2/ngen.${{ env.TEST_DATE }}/short_range/${{ env.TEST_INIT }}/VPU_${{ env.TEST_VPU }}/datastream-metadata/execution.json"
+          PAYLOAD="${{ github.workspace }}/${{ env.CI_CONFIG }}/test-execution-payload.json"
 
-          aws s3 cp "s3://${S3_BUCKET}/${EXEC_PATH}" execution.json
-          echo "Downloaded execution.json from s3://${S3_BUCKET}/${EXEC_PATH}"
-
-          # Same jq pattern as build_test_ngiab_ami.yaml:
-          # - Strip runtime fields
-          # - Swap instance profile to CI
-          # - Tag as CI test
-          # - Redirect S3 output to test prefix
+          # - Swap instance profile placeholder to CI profile
+          # - Replace DAILY in forcing/prefix paths with known good date
+          #   (prevents Commander lambda from using today's date)
           # - Pin end_date so forcing data is guaranteed to exist
+          # - Redirect S3 output to test prefix
           jq \
             --arg PROFILE "${{ steps.deploy.outputs.profile }}" \
             --arg DATE "${{ env.TEST_DATE }}" \
             '
-            del(.instance_parameters.MaxCount, .instance_parameters.MinCount,
-                .instance_parameters.InstanceId, .instance_parameters.SecurityGroupIds,
-                .instance_parameters.InstanceMarketOptions,
-                .t0, .ii_s3_object_checked, .retry_attempt, .region) |
             .instance_parameters.IamInstanceProfile.Name = $PROFILE |
-            .instance_parameters.TagSpecifications = [
-              {"ResourceType": "instance", "Tags": [
-                {"Key": "Name",    "Value": "ci_orchestration_test"},
-                {"Key": "Project", "Value": "ci_orchestration_test"}
-              ]},
-              {"ResourceType": "volume", "Tags": [
-                {"Key": "Name", "Value": "ci_orchestration_test_vol"}
-              ]}
-            ] |
-            .commands |= map(gsub("--S3_PREFIX \\S+"; "--S3_PREFIX test/cicd/orchestration-test")) |
-            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
-            ' execution.json > /tmp/exec_input.json
+            .commands |= map(gsub("ngen\\.DAILY"; "ngen.\($DATE)")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000")) |
+            .commands |= map(sub("--S3_PREFIX \\S+"; "--S3_PREFIX test/cicd/orchestration-test'\''"))
+            ' "$PAYLOAD" > /tmp/exec_input.json
 
           echo "Payload built:"
-          jq '.instance_parameters.IamInstanceProfile, .commands[0][:120]' /tmp/exec_input.json
+          jq '.commands[0][:200]' /tmp/exec_input.json
 
       # ── Execute and monitor ────────────────────────────────────────
       - name: Start and monitor execution
