@@ -17,6 +17,10 @@ env:
   AWS_REGION: us-east-1
   TF_DIR: infra/aws/terraform/services/nrds
   CI_CONFIG: .github/orchestration-test
+  # Known good date with verified forcing data and execution metadata on S3
+  TEST_DATE: "20260209"
+  TEST_INIT: "16"
+  TEST_VPU: "09"
 
 jobs:
   integration-test:
@@ -47,8 +51,7 @@ jobs:
 
       # ── Deploy orchestration module only (no schedules) ────────────
       - name: Terraform Init
-        run: |
-          terraform init -backend-config="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.backend.hcl"
+        run: terraform init -backend-config="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.backend.hcl"
 
       - name: Terraform Apply (orchestration only)
         id: deploy
@@ -61,63 +64,95 @@ jobs:
           echo "sm_arn=$(terraform output -raw datastream_arn)" >> "$GITHUB_OUTPUT"
           echo "profile=$(terraform output -raw ec2_instance_profile_name)" >> "$GITHUB_OUTPUT"
 
-      # ── Run execution against the test SM ──────────────────────────
-      - name: Start execution
-        id: execute
+      # ── Build payload from known good S3 execution (same as build_test_ngiab_ami) ──
+      - name: Download and modify execution JSON
         working-directory: .
         run: |
-          PROFILE="${{ steps.deploy.outputs.profile }}"
-          jq --arg p "$PROFILE" \
-            '.instance_parameters.IamInstanceProfile.Name = $p' \
-            "${{ env.CI_CONFIG }}/test-execution-payload.json" > /tmp/exec_input.json
+          S3_BUCKET="ciroh-community-ngen-datastream"
+          EXEC_PATH="v2.2/ngen.${{ env.TEST_DATE }}/short_range/${{ env.TEST_INIT }}/VPU_${{ env.TEST_VPU }}/datastream-metadata/execution.json"
 
+          aws s3 cp "s3://${S3_BUCKET}/${EXEC_PATH}" execution.json
+          echo "Downloaded execution.json from s3://${S3_BUCKET}/${EXEC_PATH}"
+
+          # Same jq pattern as build_test_ngiab_ami.yaml:
+          # - Strip runtime fields
+          # - Swap instance profile to CI
+          # - Tag as CI test
+          # - Redirect S3 output to test prefix
+          # - Pin end_date so forcing data is guaranteed to exist
+          jq \
+            --arg PROFILE "${{ steps.deploy.outputs.profile }}" \
+            --arg DATE "${{ env.TEST_DATE }}" \
+            '
+            del(.instance_parameters.MaxCount, .instance_parameters.MinCount,
+                .instance_parameters.InstanceId, .instance_parameters.SecurityGroupIds,
+                .instance_parameters.InstanceMarketOptions,
+                .t0, .ii_s3_object_checked, .retry_attempt, .region) |
+            .instance_parameters.IamInstanceProfile.Name = $PROFILE |
+            .instance_parameters.TagSpecifications = [
+              {"ResourceType": "instance", "Tags": [
+                {"Key": "Name",    "Value": "ci_orchestration_test"},
+                {"Key": "Project", "Value": "ci_orchestration_test"}
+              ]},
+              {"ResourceType": "volume", "Tags": [
+                {"Key": "Name", "Value": "ci_orchestration_test_vol"}
+              ]}
+            ] |
+            .commands |= map(gsub("--S3_PREFIX \\S+"; "--S3_PREFIX test/cicd/orchestration-test")) |
+            .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))
+            ' execution.json > /tmp/exec_input.json
+
+          echo "Payload built:"
+          jq '.instance_parameters.IamInstanceProfile, .commands[0][:120]' /tmp/exec_input.json
+
+      # ── Execute and monitor ────────────────────────────────────────
+      - name: Start and monitor execution
+        id: monitor
+        working-directory: .
+        run: |
           EXEC_NAME="ci_test_pr${{ github.event.pull_request.number || 'manual' }}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ steps.deploy.outputs.sm_arn }}" \
             --name "$EXEC_NAME" \
             --input "file:///tmp/exec_input.json" \
             --query 'executionArn' --output text)
-
-          echo "exec_arn=$EXEC_ARN" >> "$GITHUB_OUTPUT"
           echo "Started: $EXEC_ARN"
 
-      - name: Monitor execution
-        id: monitor
-        working-directory: .
-        run: |
-          EXEC_ARN="${{ steps.execute.outputs.exec_arn }}"
           TIMEOUT=2400
           ELAPSED=0
+          STATUS="RUNNING"
 
-          while [ $ELAPSED -lt $TIMEOUT ]; do
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
             STATUS=$(aws stepfunctions describe-execution \
               --execution-arn "$EXEC_ARN" --query 'status' --output text)
             echo "[$ELAPSED s] $STATUS"
-
-            if [ "$STATUS" = "SUCCEEDED" ]; then
-              echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
-              aws stepfunctions get-execution-history \
-                --execution-arn "$EXEC_ARN" \
-                --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed'].[type,timestamp,stateEnteredEventDetails.name]" \
-                --output text | tee /tmp/history.txt
-              echo "history<<EOF" >> "$GITHUB_OUTPUT"
-              cat /tmp/history.txt >> "$GITHUB_OUTPUT"
-              echo "EOF" >> "$GITHUB_OUTPUT"
-              exit 0
+            if [ "$STATUS" = "RUNNING" ]; then
+              sleep 15
+              ELAPSED=$((ELAPSED + 15))
             fi
-
-            if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "TIMED_OUT" ] || [ "$STATUS" = "ABORTED" ]; then
-              echo "result=$STATUS" >> "$GITHUB_OUTPUT"
-              echo "error=$(aws stepfunctions describe-execution --execution-arn "$EXEC_ARN" --query 'cause' --output text 2>/dev/null || echo 'Unknown')" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-
-            sleep 15
-            ELAPSED=$((ELAPSED + 15))
           done
 
-          echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
-          exit 1
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed'].[type,timestamp,stateEnteredEventDetails.name]" \
+              --output text | tee /tmp/history.txt
+            echo "history<<EOF" >> "$GITHUB_OUTPUT"
+            cat /tmp/history.txt >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      # ── Clean up test output on S3 ────────────────────────────────
+      - name: Clean up test S3 output
+        if: always()
+        run: aws s3 rm "s3://ciroh-community-ngen-datastream/test/cicd/orchestration-test/" --recursive || true
 
       # ── Always destroy (orchestration only) ────────────────────────
       - name: Terraform Destroy
@@ -141,7 +176,6 @@ jobs:
           script: |
             const result = '${{ steps.monitor.outputs.result }}' || 'DID_NOT_RUN';
             const icon = result === 'SUCCEEDED' ? '\u2705' : '\u274C';
-            const error = '${{ steps.monitor.outputs.error }}' || '';
             const history = `${{ steps.monitor.outputs.history }}` || '';
 
             let body = `### Orchestration Integration Test ${icon}\n\n`;
@@ -150,7 +184,6 @@ jobs:
               body += `<details><summary>Lambda Execution History</summary>\n\n`;
               body += '```\n' + history + '\n```\n\n</details>\n\n';
             }
-            if (error) body += `**Error:** ${error}\n\n`;
             body += `*Triggered by PR #${{ github.event.pull_request.number }}*`;
 
             const marker = 'Orchestration Integration Test';
