@@ -1,0 +1,174 @@
+name: Test Datastream Forcing
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/forcing/**'
+
+concurrency:
+  group: forcing-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  SM_ARN: arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm
+  S3_BUCKET: ciroh-community-ngen-datastream
+  INSTANCE_PROFILE: nrds_prod_ec2_profile
+  PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
+  CONFIG: .github/vpu-test/forcing.json
+
+jobs:
+  test-forcing:
+    name: Run Forcing Processor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build execution payload
+        id: payload
+        run: |
+          AMI_VAR=$(jq -r '.ami_var' "${{ env.CONFIG }}")
+          AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
+          INSTANCE_TYPE=$(jq -r '.instance_type' "${{ env.CONFIG }}")
+          VOLUME_SIZE=$(jq -r '.volume_size' "${{ env.CONFIG }}")
+          TIMEOUT_S=$(jq -r '.timeout_s' "${{ env.CONFIG }}")
+          INIT=$(jq -r '.init' "${{ env.CONFIG }}")
+          VPU_LIST=$(jq -r '.vpu_list' "${{ env.CONFIG }}")
+
+          # Build commands array with substitutions
+          jq --arg init "$INIT" \
+             --arg vpu_list "$VPU_LIST" \
+             --arg s3_bucket "${{ env.S3_BUCKET }}" \
+             '.commands | map(
+               gsub("\\{init\\}"; $init) |
+               gsub("\\{vpu_list\\}"; $vpu_list) |
+               gsub("\\{s3_bucket\\}"; $s3_bucket)
+             )' "${{ env.CONFIG }}" > /tmp/commands.json
+
+          # Build full payload
+          jq -n \
+            --slurpfile cmds /tmp/commands.json \
+            --arg ami "$AMI" \
+            --arg itype "$INSTANCE_TYPE" \
+            --arg profile "${{ env.INSTANCE_PROFILE }}" \
+            --argjson volsize "$VOLUME_SIZE" \
+            --argjson timeout "$TIMEOUT_S" \
+            '{
+              commands: $cmds[0],
+              run_options: {
+                ii_terminate_instance: true,
+                ii_delete_volume: true,
+                ii_check_s3: true,
+                ii_cheapo: true,
+                timeout_s: $timeout,
+                n_retries_allowed: 2
+              },
+              instance_parameters: {
+                ImageId: $ami,
+                InstanceType: $itype,
+                IamInstanceProfile: { Name: $profile },
+                TagSpecifications: [
+                  {
+                    ResourceType: "instance",
+                    Tags: [
+                      { Key: "Name", Value: "ci_forcing_test" },
+                      { Key: "Project", Value: "ci_forcing_test" }
+                    ]
+                  },
+                  {
+                    ResourceType: "volume",
+                    Tags: [
+                      { Key: "Name", Value: "ci_forcing_test_vol" }
+                    ]
+                  }
+                ],
+                BlockDeviceMappings: [
+                  {
+                    DeviceName: "/dev/xvda",
+                    Ebs: { VolumeSize: $volsize, VolumeType: "gp3" }
+                  }
+                ]
+              }
+            }' > /tmp/payload.json
+
+          echo "Payload commands count: $(jq '.commands | length' /tmp/payload.json)"
+          jq '.instance_parameters.InstanceType' /tmp/payload.json
+
+      - name: Start and monitor execution
+        id: monitor
+        run: |
+          EXEC_NAME="ci_forcing_test_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ env.SM_ARN }}" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/payload.json" \
+            --query 'executionArn' --output text)
+          echo "Started: $EXEC_ARN"
+
+          TIMEOUT=2400
+          ELAPSED=0
+          STATUS="RUNNING"
+
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              sleep 15
+              ELAPSED=$((ELAPSED + 15))
+            fi
+          done
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskFailed' || type=='ExecutionFailed' || type=='LambdaFunctionFailed']" \
+              --output json
+            exit 1
+          fi
+
+      - name: Post result to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const result = '${{ steps.monitor.outputs.result }}' || 'DID_NOT_RUN';
+            const icon = result === 'SUCCEEDED' ? '\u2705' : '\u274C';
+
+            let body = `### Forcing Processor Test ${icon}\n\n`;
+            body += `**Result: ${result}**\n\n`;
+            body += `*Triggered by PR #${{ github.event.pull_request.number }}*`;
+
+            const marker = 'Forcing Processor Test';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            const params = { owner: context.repo.owner, repo: context.repo.repo, body };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
+            }
