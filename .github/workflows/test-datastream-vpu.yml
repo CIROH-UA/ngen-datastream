@@ -115,12 +115,14 @@ jobs:
           AMI="${{ needs.setup.outputs.ami }}"
           CONFIG=".github/vpu-test/${DS}.json"
 
-          INSTANCE_TYPE=$(jq -r '.instance_type' "$CONFIG")
+          # Check for per-VPU instance type override, fallback to default
+          OVERRIDE=$(jq -r --arg vpu "$VPU" '.instance_type_overrides[$vpu] // empty' "$CONFIG")
+          INSTANCE_TYPE=${OVERRIDE:-$(jq -r '.instance_type' "$CONFIG")}
           VOLUME_SIZE=$(jq -r '.volume_size' "$CONFIG")
           TIMEOUT_S=$(jq -r '.timeout_s' "$CONFIG")
           INIT=$(jq -r '.init' "$CONFIG")
 
-          # Calculate nprocs from instance type
+          # Calculate nprocs from instance type (vCPUs - 1)
           case "$INSTANCE_TYPE" in
             m8g.xlarge)  NPROCS=3 ;;
             m8g.2xlarge) NPROCS=7 ;;
