@@ -4,6 +4,7 @@
   "run_type": "short_range",
   "init": "15",
   "instance_type": "m8g.xlarge",
+  "nprocs": 4,
   "volume_size": 64,
   "timeout_s": 3600,
   "command": "su - ec2-user -c 'rm -rf /home/ec2-user/outputs && export SKIP_VALIDATION=True DS_TAG=1.4.0 NGIAB_TAG=v1.7.0 && /home/ec2-user/datastreamcli/scripts/datastream -s DAILY -n {nprocs} --FORCING_SOURCE NWM_V3_CHRTOUT_SHORT_RANGE_{init} -d /home/ec2-user/outputs -g s3://{s3_bucket}/resources/v2.2_hydrofabric/geopackages/VPU_{vpu}/nextgen_VPU_{vpu}.gpkg -R https://{s3_bucket}.s3.amazonaws.com/realizations/routing_only/realization_sloth_troute.json --S3_BUCKET {s3_bucket} --S3_PREFIX {s3_test_prefix}/{datastream}/VPU_{vpu}'"
