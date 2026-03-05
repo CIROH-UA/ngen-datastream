@@ -134,7 +134,9 @@ jobs:
 
       # ── Always destroy (orchestration only) ────────────────────────
       - name: Terraform Destroy
+        id: destroy
         if: always() && steps.deploy.outcome == 'success'
+        continue-on-error: true
         timeout-minutes: 10
         run: |
           for attempt in 1 2; do
@@ -149,11 +151,12 @@ jobs:
             echo "Destroy attempt $attempt failed, retrying in 15s..."
             sleep 15
           done
-          echo "::warning::Terraform destroy failed after 2 attempts"
+          echo "::error::Terraform destroy failed after 2 attempts, falling back to force cleanup"
           exit 1
 
       - name: Force cleanup on destroy failure
-        if: always() && steps.deploy.outcome == 'success'
+        id: force-cleanup
+        if: always() && steps.deploy.outcome == 'success' && steps.destroy.outcome == 'failure'
         timeout-minutes: 5
         run: |
           echo "Force-deleting any remaining nrds_ci_ resources..."
@@ -183,6 +186,11 @@ jobs:
             aws iam delete-policy --policy-arn "$ARN" 2>/dev/null || true
           done
           echo "Force cleanup complete"
+
+      - name: Alert on cleanup failure
+        if: always() && steps.force-cleanup.outcome == 'failure'
+        run: |
+          echo "::error::Force cleanup failed! Orphaned nrds_ci_ resources may remain in AWS. Manual cleanup required."
 
       - name: Clean up state
         if: always() && steps.deploy.outcome == 'success'
