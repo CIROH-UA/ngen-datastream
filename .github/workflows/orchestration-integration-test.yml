@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
       id-token: write
     defaults:
       run:
@@ -189,8 +190,21 @@ jobs:
 
       - name: Alert on cleanup failure
         if: always() && steps.force-cleanup.outcome == 'failure'
-        run: |
-          echo "::error::Force cleanup failed! Orphaned nrds_ci_ resources may remain in AWS. Manual cleanup required."
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'CI cleanup failed: orphaned nrds_ci_ resources in AWS',
+              body: `The orchestration integration test destroy step and force cleanup both failed.\n\n` +
+                    `**Orphaned resources** with prefix \`nrds_ci_\` may remain in AWS and need manual deletion.\n\n` +
+                    `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n` +
+                    `Resources to check: lambdas, IAM roles/policies, instance profile, state machine, S3 state.`,
+              labels: ['bug', 'CI/CD']
+            });
+            core.error('Force cleanup failed! Orphaned nrds_ci_ resources may remain in AWS. Created issue for tracking.');
 
       - name: Clean up state
         if: always() && steps.deploy.outcome == 'success'
