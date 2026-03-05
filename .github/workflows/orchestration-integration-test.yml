@@ -135,11 +135,54 @@ jobs:
       # ── Always destroy (orchestration only) ────────────────────────
       - name: Terraform Destroy
         if: always() && steps.deploy.outcome == 'success'
+        timeout-minutes: 10
         run: |
-          terraform destroy \
-            -var-file="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.tfvars" \
-            -target=module.nrds_orchestration \
-            -auto-approve -input=false -lock-timeout=5m
+          for attempt in 1 2; do
+            echo "Destroy attempt $attempt..."
+            if terraform destroy \
+              -var-file="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.tfvars" \
+              -target=module.nrds_orchestration \
+              -auto-approve -input=false -lock-timeout=5m; then
+              echo "Destroy succeeded"
+              exit 0
+            fi
+            echo "Destroy attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "::warning::Terraform destroy failed after 2 attempts"
+          exit 1
+
+      - name: Force cleanup on destroy failure
+        if: always() && steps.deploy.outcome == 'success'
+        timeout-minutes: 5
+        run: |
+          echo "Force-deleting any remaining nrds_ci_ resources..."
+          # Lambdas
+          for FN in nrds_ci_start_ec2 nrds_ci_ec2_commander nrds_ci_ec2_command_poller nrds_ci_s3_object_checker nrds_ci_ec2_stopper; do
+            aws lambda delete-function --function-name "$FN" 2>/dev/null && echo "  deleted $FN" || true
+          done
+          # State machine
+          aws stepfunctions delete-state-machine \
+            --state-machine-arn "arn:aws:states:us-east-1:879381264451:stateMachine:nrds_ci_sm" 2>/dev/null || true
+          # IAM - detach policies, remove profile, delete roles and policies
+          for ROLE in nrds_ci_ec2_role nrds_ci_lambda_role nrds_ci_sm_role; do
+            for P in $(aws iam list-attached-role-policies --role-name "$ROLE" --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null); do
+              aws iam detach-role-policy --role-name "$ROLE" --policy-arn "$P" 2>/dev/null || true
+            done
+          done
+          aws iam remove-role-from-instance-profile --instance-profile-name nrds_ci_ec2_profile --role-name nrds_ci_ec2_role 2>/dev/null || true
+          aws iam delete-instance-profile --instance-profile-name nrds_ci_ec2_profile 2>/dev/null || true
+          for ROLE in nrds_ci_ec2_role nrds_ci_lambda_role nrds_ci_sm_role; do
+            aws iam delete-role --role-name "$ROLE" 2>/dev/null || true
+          done
+          for POL in nrds_ci_ec2_policy nrds_ci_lambda_policy nrds_ci_lambda_invoke_policy; do
+            ARN="arn:aws:iam::879381264451:policy/$POL"
+            for V in $(aws iam list-policy-versions --policy-arn "$ARN" --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text 2>/dev/null); do
+              aws iam delete-policy-version --policy-arn "$ARN" --version-id "$V" 2>/dev/null || true
+            done
+            aws iam delete-policy --policy-arn "$ARN" 2>/dev/null || true
+          done
+          echo "Force cleanup complete"
 
       - name: Clean up state
         if: always() && steps.deploy.outcome == 'success'
