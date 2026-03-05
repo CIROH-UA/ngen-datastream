@@ -122,18 +122,13 @@ jobs:
           TIMEOUT_S=$(jq -r '.timeout_s' "$CONFIG")
           INIT=$(jq -r '.init' "$CONFIG")
 
-          # Use config nprocs if set, otherwise calculate from instance type
-          CONFIG_NPROCS=$(jq -r '.nprocs // empty' "$CONFIG")
-          if [ -n "$CONFIG_NPROCS" ]; then
-            NPROCS=$CONFIG_NPROCS
-          else
-            case "$INSTANCE_TYPE" in
-              m8g.xlarge)  NPROCS=3 ;;
-              m8g.2xlarge) NPROCS=7 ;;
-              m8g.4xlarge) NPROCS=15 ;;
-              *)           NPROCS=3 ;;
-            esac
-          fi
+          # Calculate nprocs from instance type (vCPUs - 1)
+          case "$INSTANCE_TYPE" in
+            m8g.xlarge)  NPROCS=3 ;;
+            m8g.2xlarge) NPROCS=7 ;;
+            m8g.4xlarge) NPROCS=15 ;;
+            *)           NPROCS=3 ;;
+          esac
 
           # Build command from template
           CMD=$(jq -r '.command' "$CONFIG" | \
