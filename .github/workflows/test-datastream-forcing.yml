@@ -47,15 +47,21 @@ jobs:
           TIMEOUT_S=$(jq -r '.timeout_s' "${{ env.CONFIG }}")
           INIT=$(jq -r '.init' "${{ env.CONFIG }}")
           VPU_LIST=$(jq -r '.vpu_list' "${{ env.CONFIG }}")
+          S3_TEST_PREFIX=$(jq -r '.s3_test_prefix' "${{ env.CONFIG }}")
+
+          echo "init=$INIT" >> "$GITHUB_OUTPUT"
+          echo "s3_test_prefix=$S3_TEST_PREFIX" >> "$GITHUB_OUTPUT"
 
           # Build commands array with substitutions
           jq --arg init "$INIT" \
              --arg vpu_list "$VPU_LIST" \
              --arg s3_bucket "${{ env.S3_BUCKET }}" \
+             --arg s3_test_prefix "$S3_TEST_PREFIX" \
              '.commands | map(
                gsub("\\{init\\}"; $init) |
                gsub("\\{vpu_list\\}"; $vpu_list) |
-               gsub("\\{s3_bucket\\}"; $s3_bucket)
+               gsub("\\{s3_bucket\\}"; $s3_bucket) |
+               gsub("\\{s3_test_prefix\\}"; $s3_test_prefix)
              )' "${{ env.CONFIG }}" > /tmp/commands.json
 
           # Build full payload
@@ -145,6 +151,34 @@ jobs:
               --output json
             exit 1
           fi
+
+      # ── Verify output files per VPU ──────────────────────────────────
+      - name: Verify output files
+        if: steps.monitor.outputs.result == 'SUCCEEDED'
+        run: |
+          INIT="${{ steps.payload.outputs.init }}"
+          PREFIX="${{ steps.payload.outputs.s3_test_prefix }}"
+          FAILED=0
+          for VPU in 01 02 03N 03S 03W 04 05 06 07 08 09 10L 10U 11 12 13 14 15 16 18; do
+            FILE="s3://${{ env.S3_BUCKET }}/${PREFIX}/${INIT}/ngen.t${INIT}z.short_range.forcing.f001_f018.VPU_${VPU}.nc"
+            if aws s3 ls "$FILE" > /dev/null 2>&1; then
+              echo "OK: VPU_${VPU}"
+            else
+              echo "MISSING: VPU_${VPU} - $FILE"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -eq 1 ]; then
+            echo "::error::Some VPU forcing files are missing"
+            exit 1
+          fi
+          echo "All 20 VPU forcing files verified"
+
+      # ── Clean up test output ─────────────────────────────────────────
+      - name: Clean up test S3 output
+        if: always()
+        run: |
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/${{ steps.payload.outputs.s3_test_prefix }}/" --recursive || true
 
       - name: Post result to PR
         if: always() && github.event_name == 'pull_request'
