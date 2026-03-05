@@ -158,6 +158,7 @@ jobs:
       - name: Force cleanup on destroy failure
         id: force-cleanup
         if: always() && steps.deploy.outcome == 'success' && steps.destroy.outcome == 'failure'
+        continue-on-error: true
         timeout-minutes: 5
         run: |
           echo "Force-deleting any remaining nrds_ci_ resources..."
@@ -189,7 +190,7 @@ jobs:
           echo "Force cleanup complete"
 
       - name: Alert on cleanup failure
-        if: always() && steps.force-cleanup.outcome == 'failure'
+        if: always() && steps.destroy.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
