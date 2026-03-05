@@ -1,0 +1,282 @@
+name: Test Datastream VPUs
+
+on:
+  workflow_dispatch:
+    inputs:
+      datastream:
+        description: "Datastream to test"
+        required: true
+        type: choice
+        options:
+          - cfe-nom
+          - routing-only
+      vpu:
+        description: "VPU to test (leave empty for all)"
+        required: false
+        type: string
+
+concurrency:
+  group: vpu-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  SM_ARN: arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm
+  S3_BUCKET: ciroh-community-ngen-datastream
+  S3_TEST_PREFIX: test/cicd/vpu-test
+  INSTANCE_PROFILE: nrds_prod_ec2_profile
+  PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
+
+jobs:
+  # ── Detect datastream and build VPU matrix ─────────────────────────
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      datastream: ${{ steps.detect.outputs.datastream }}
+      matrix: ${{ steps.matrix.outputs.vpus }}
+      ami: ${{ steps.ami.outputs.ami }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect datastream
+        id: detect
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "datastream=${{ inputs.datastream }}" >> "$GITHUB_OUTPUT"
+          else
+            # Detect from changed files in PR
+            CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep '^infra/aws/terraform/services/nrds/datastreams/' | head -1)
+            DS=$(echo "$CHANGED" | sed 's|infra/aws/terraform/services/nrds/datastreams/||' | cut -d'/' -f1)
+            if [ -z "$DS" ]; then
+              echo "::error::Could not detect datastream from changed files"
+              exit 1
+            fi
+            echo "datastream=$DS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build VPU matrix
+        id: matrix
+        run: |
+          DS="${{ steps.detect.outputs.datastream }}"
+          CONFIG=".github/vpu-test/${DS}.json"
+          if [ ! -f "$CONFIG" ]; then
+            echo "::error::No test config found at $CONFIG"
+            exit 1
+          fi
+
+          if [ -n "${{ inputs.vpu }}" ]; then
+            # Single VPU from workflow_dispatch
+            echo "vpus=[\"${{ inputs.vpu }}\"]" >> "$GITHUB_OUTPUT"
+          else
+            # All VPUs from config
+            VPUS=$(jq -c '.vpus' "$CONFIG")
+            echo "vpus=$VPUS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Look up AMI
+        id: ami
+        run: |
+          DS="${{ steps.detect.outputs.datastream }}"
+          AMI_VAR=$(jq -r '.ami_var' ".github/vpu-test/${DS}.json")
+          AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
+          echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+
+  # ── Test each VPU in parallel ──────────────────────────────────────
+  test-vpu:
+    name: "VPU ${{ matrix.vpu }}"
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        vpu: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build execution payload
+        id: payload
+        run: |
+          DS="${{ needs.setup.outputs.datastream }}"
+          VPU="${{ matrix.vpu }}"
+          AMI="${{ needs.setup.outputs.ami }}"
+          CONFIG=".github/vpu-test/${DS}.json"
+
+          INSTANCE_TYPE=$(jq -r '.instance_type' "$CONFIG")
+          VOLUME_SIZE=$(jq -r '.volume_size' "$CONFIG")
+          TIMEOUT_S=$(jq -r '.timeout_s' "$CONFIG")
+          INIT=$(jq -r '.init' "$CONFIG")
+
+          # Calculate nprocs from instance type
+          case "$INSTANCE_TYPE" in
+            m8g.xlarge)  NPROCS=3 ;;
+            m8g.2xlarge) NPROCS=7 ;;
+            m8g.4xlarge) NPROCS=15 ;;
+            *)           NPROCS=3 ;;
+          esac
+
+          # Build command from template
+          CMD=$(jq -r '.command' "$CONFIG" | \
+            sed "s|{vpu}|${VPU}|g" | \
+            sed "s|{init}|${INIT}|g" | \
+            sed "s|{nprocs}|${NPROCS}|g" | \
+            sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
+            sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g" | \
+            sed "s|{datastream}|${DS}|g")
+
+          # Build full execution payload
+          jq -n \
+            --arg cmd "$CMD" \
+            --arg ami "$AMI" \
+            --arg itype "$INSTANCE_TYPE" \
+            --arg profile "${{ env.INSTANCE_PROFILE }}" \
+            --arg tag_name "ci_vpu_test_${DS}_VPU${VPU}" \
+            --argjson volsize "$VOLUME_SIZE" \
+            --argjson timeout "$TIMEOUT_S" \
+            '{
+              commands: [$cmd],
+              run_options: {
+                ii_terminate_instance: true,
+                ii_delete_volume: true,
+                ii_check_s3: true,
+                ii_cheapo: true,
+                timeout_s: $timeout,
+                n_retries_allowed: 2
+              },
+              instance_parameters: {
+                ImageId: $ami,
+                InstanceType: $itype,
+                IamInstanceProfile: { Name: $profile },
+                TagSpecifications: [
+                  {
+                    ResourceType: "instance",
+                    Tags: [
+                      { Key: "Name", Value: $tag_name },
+                      { Key: "Project", Value: $tag_name }
+                    ]
+                  },
+                  {
+                    ResourceType: "volume",
+                    Tags: [
+                      { Key: "Name", Value: ($tag_name + "_vol") }
+                    ]
+                  }
+                ],
+                BlockDeviceMappings: [
+                  {
+                    DeviceName: "/dev/xvda",
+                    Ebs: { VolumeSize: $volsize, VolumeType: "gp3" }
+                  }
+                ]
+              }
+            }' > /tmp/payload.json
+
+          echo "Payload for VPU $VPU:"
+          jq '.commands[0][:200]' /tmp/payload.json
+
+      - name: Start and monitor execution
+        id: monitor
+        run: |
+          DS="${{ needs.setup.outputs.datastream }}"
+          VPU="${{ matrix.vpu }}"
+
+          EXEC_NAME="ci_vpu_${DS}_${VPU}_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ env.SM_ARN }}" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/payload.json" \
+            --query 'executionArn' --output text)
+          echo "Started: $EXEC_ARN"
+
+          TIMEOUT=2400
+          ELAPSED=0
+          STATUS="RUNNING"
+
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] VPU $VPU: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              sleep 15
+              ELAPSED=$((ELAPSED + 15))
+            fi
+          done
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskFailed' || type=='ExecutionFailed' || type=='LambdaFunctionFailed']" \
+              --output json
+            exit 1
+          fi
+
+  # ── Report results and clean up ────────────────────────────────────
+  report:
+    name: Report & Cleanup
+    needs: [setup, test-vpu]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Clean up test S3 output
+        run: |
+          DS="${{ needs.setup.outputs.datastream }}"
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}/" --recursive || true
+
+      - name: Post result to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const ds = '${{ needs.setup.outputs.datastream }}';
+            const vpus = ${{ needs.setup.outputs.matrix }};
+            const overall = '${{ needs.test-vpu.result }}';
+            const icon = overall === 'success' ? '\u2705' : '\u274C';
+
+            let body = `### VPU Test: ${ds} ${icon}\n\n`;
+            body += `**Overall: ${overall}**\n\n`;
+            body += `Tested ${vpus.length} VPUs: ${vpus.join(', ')}\n\n`;
+            body += `*Triggered by PR #${{ github.event.pull_request.number }}*`;
+
+            const marker = 'VPU Test:';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            const params = { owner: context.repo.owner, repo: context.repo.repo, body };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
+            }
