@@ -13,5 +13,11 @@
   },
   "volume_size": 64,
   "timeout_s": 3600,
-  "command": "runuser -l ec2-user -c 'export SKIP_VALIDATION=True DS_TAG=1.4.0 NGIAB_TAG=v1.7.0 && /home/ec2-user/datastreamcli/scripts/datastream -s DAILY -e 202602090000 -n {nprocs} -F s3://{s3_bucket}/forcings/v2.2_hydrofabric/ngen.20260209/forcing_short_range/{init}/ngen.t{init}z.short_range.forcing.f001_f018.VPU_{vpu}.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_{init} -d /home/ec2-user/outputs -N s3://{s3_bucket}/resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed/VPU_{vpu}/config/ngen-bmi-configs.tar.gz -g s3://{s3_bucket}/resources/v2.2_hydrofabric/geopackages/VPU_{vpu}/nextgen_VPU_{vpu}.gpkg -R https://{s3_bucket}.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_{vpu}.json --S3_BUCKET {s3_bucket} --S3_PREFIX {s3_test_prefix}/{datastream}/VPU_{vpu}'"
+  "command": "runuser -l ec2-user -c 'export SKIP_VALIDATION=True DS_TAG=1.4.0 NGIAB_TAG=v1.7.0 && /home/ec2-user/datastreamcli/scripts/datastream -s DAILY -e 202602090000 -n {nprocs} -F s3://{s3_bucket}/forcings/v2.2_hydrofabric/ngen.20260209/forcing_short_range/{init}/ngen.t{init}z.short_range.forcing.f001_f018.VPU_{vpu}.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_{init} -d /home/ec2-user/outputs -N s3://{s3_bucket}/resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed/VPU_{vpu}/config/ngen-bmi-configs.tar.gz -g s3://{s3_bucket}/resources/v2.2_hydrofabric/geopackages/VPU_{vpu}/nextgen_VPU_{vpu}.gpkg -R https://{s3_bucket}.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_{vpu}.json --S3_BUCKET {s3_bucket} --S3_PREFIX {s3_test_prefix}/{datastream}/VPU_{vpu}'",
+  "medium_range_instance_type": "m8g.2xlarge",
+  "medium_range_instance_type_overrides": {
+    "10L": "m8g.4xlarge",
+    "10U": "m8g.4xlarge"
+  },
+  "medium_range_command": "runuser -l ec2-user -c 'export SKIP_VALIDATION=True DS_TAG=1.4.0 NGIAB_TAG=v1.7.0 && /home/ec2-user/datastreamcli/scripts/datastream -s DAILY -e 202602090000 -n {nprocs} -F s3://{s3_bucket}/forcings/v2.2_hydrofabric/ngen.20260209/forcing_medium_range/{init}/ngen.t{init}z.medium_range.forcing.f001_f240.VPU_{vpu}.nc --FORCING_SOURCE NWM_V3_MEDIUM_RANGE_{init}_1 -d /home/ec2-user/outputs -N s3://{s3_bucket}/resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed/VPU_{vpu}/config/ngen-bmi-configs.tar.gz -g s3://{s3_bucket}/resources/v2.2_hydrofabric/geopackages/VPU_{vpu}/nextgen_VPU_{vpu}.gpkg -R https://{s3_bucket}.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_{vpu}.json --S3_BUCKET {s3_bucket} --S3_PREFIX {s3_test_prefix}/cfe-nom-mr/VPU_{vpu}'"
 }

@@ -1,0 +1,298 @@
+name: Test Datastream VPUs (Short + Medium Range)
+
+on:
+  workflow_dispatch:
+    inputs:
+      vpu:
+        description: "VPU to test (leave empty for all)"
+        required: false
+        type: string
+
+concurrency:
+  group: vpu-full-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  SM_ARN: arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm
+  S3_BUCKET: ciroh-community-ngen-datastream
+  S3_TEST_PREFIX: test/cicd/vpu-full-test
+  INSTANCE_PROFILE: nrds_prod_ec2_profile
+  PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
+  CONFIG: .github/vpu-test/cfe-nom.json
+
+jobs:
+  # ── Build VPU matrix ─────────────────────────────────────────────
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.vpus }}
+      ami: ${{ steps.ami.outputs.ami }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build VPU matrix
+        id: matrix
+        run: |
+          if [ -n "${{ inputs.vpu }}" ]; then
+            echo "vpus=[\"${{ inputs.vpu }}\"]" >> "$GITHUB_OUTPUT"
+          else
+            VPUS=$(jq -c '.vpus' "${{ env.CONFIG }}")
+            echo "vpus=$VPUS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Look up AMI
+        id: ami
+        run: |
+          AMI_VAR=$(jq -r '.ami_var' "${{ env.CONFIG }}")
+          AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
+          echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+
+  # ── Test each VPU (short + medium range) ─────────────────────────
+  test-vpu:
+    name: "VPU ${{ matrix.vpu }}"
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        vpu: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── Short Range ────────────────────────────────────────────────
+      - name: Build short range payload
+        id: sr_payload
+        run: |
+          VPU="${{ matrix.vpu }}"
+          AMI="${{ needs.setup.outputs.ami }}"
+          CONFIG="${{ env.CONFIG }}"
+
+          OVERRIDE=$(jq -r --arg vpu "$VPU" '.instance_type_overrides[$vpu] // empty' "$CONFIG")
+          INSTANCE_TYPE=${OVERRIDE:-$(jq -r '.instance_type' "$CONFIG")}
+          INIT=$(jq -r '.init' "$CONFIG")
+
+          case "$INSTANCE_TYPE" in
+            m8g.xlarge)  NPROCS=3 ;;
+            m8g.2xlarge) NPROCS=7 ;;
+            m8g.4xlarge) NPROCS=15 ;;
+            *)           NPROCS=3 ;;
+          esac
+
+          CMD=$(jq -r '.command' "$CONFIG" | \
+            sed "s|{vpu}|${VPU}|g" | \
+            sed "s|{init}|${INIT}|g" | \
+            sed "s|{nprocs}|${NPROCS}|g" | \
+            sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
+            sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g" | \
+            sed "s|{datastream}|cfe-nom|g")
+
+          jq -n \
+            --arg cmd "$CMD" \
+            --arg ami "$AMI" \
+            --arg itype "$INSTANCE_TYPE" \
+            --arg profile "${{ env.INSTANCE_PROFILE }}" \
+            --arg tag_name "ci_full_sr_VPU${VPU}" \
+            --argjson volsize 64 \
+            --argjson timeout 3600 \
+            '{
+              commands: [$cmd],
+              run_options: {
+                ii_terminate_instance: true,
+                ii_delete_volume: true,
+                ii_check_s3: true,
+                ii_cheapo: true,
+                timeout_s: $timeout,
+                n_retries_allowed: 2
+              },
+              instance_parameters: {
+                ImageId: $ami,
+                InstanceType: $itype,
+                IamInstanceProfile: { Name: $profile },
+                TagSpecifications: [
+                  { ResourceType: "instance", Tags: [{ Key: "Name", Value: $tag_name }, { Key: "Project", Value: $tag_name }] },
+                  { ResourceType: "volume", Tags: [{ Key: "Name", Value: ($tag_name + "_vol") }] }
+                ],
+                BlockDeviceMappings: [{ DeviceName: "/dev/xvda", Ebs: { VolumeSize: $volsize, VolumeType: "gp3" } }]
+              }
+            }' > /tmp/sr_payload.json
+
+          echo "Short range payload for VPU $VPU:"
+          jq '.commands[0][:200]' /tmp/sr_payload.json
+
+      - name: Run short range
+        id: sr_monitor
+        run: |
+          VPU="${{ matrix.vpu }}"
+          EXEC_NAME="ci_full_sr_${VPU}_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ env.SM_ARN }}" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/sr_payload.json" \
+            --query 'executionArn' --output text)
+          echo "Started SR: $EXEC_ARN"
+
+          TIMEOUT=2400
+          ELAPSED=0
+          STATUS="RUNNING"
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] SR VPU $VPU: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then sleep 15; ELAPSED=$((ELAPSED + 15)); fi
+          done
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"; exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"; exit 1
+          fi
+
+      - name: Verify short range output
+        if: steps.sr_monitor.outputs.result == 'SUCCEEDED'
+        run: |
+          VPU="${{ matrix.vpu }}"
+          FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom/VPU_${VPU}/ngen-run.tar.gz"
+          if aws s3 ls "$FILE" > /dev/null 2>&1; then
+            echo "OK: short_range ngen-run.tar.gz found for VPU_${VPU}"
+          else
+            echo "::error::short_range ngen-run.tar.gz missing for VPU_${VPU}"
+            exit 1
+          fi
+
+      # ── Medium Range ───────────────────────────────────────────────
+      - name: Build medium range payload
+        id: mr_payload
+        run: |
+          VPU="${{ matrix.vpu }}"
+          AMI="${{ needs.setup.outputs.ami }}"
+          CONFIG="${{ env.CONFIG }}"
+          INIT=$(jq -r '.init' "$CONFIG")
+
+          MR_OVERRIDE=$(jq -r --arg vpu "$VPU" '.medium_range_instance_type_overrides[$vpu] // empty' "$CONFIG")
+          MR_INSTANCE_TYPE=${MR_OVERRIDE:-$(jq -r '.medium_range_instance_type // "m8g.2xlarge"' "$CONFIG")}
+
+          case "$MR_INSTANCE_TYPE" in
+            m8g.xlarge)  NPROCS=3 ;;
+            m8g.2xlarge) NPROCS=7 ;;
+            m8g.4xlarge) NPROCS=15 ;;
+            *)           NPROCS=7 ;;
+          esac
+
+          CMD=$(jq -r '.medium_range_command' "$CONFIG" | \
+            sed "s|{vpu}|${VPU}|g" | \
+            sed "s|{init}|${INIT}|g" | \
+            sed "s|{nprocs}|${NPROCS}|g" | \
+            sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
+            sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g")
+
+          jq -n \
+            --arg cmd "$CMD" \
+            --arg ami "$AMI" \
+            --arg itype "$MR_INSTANCE_TYPE" \
+            --arg profile "${{ env.INSTANCE_PROFILE }}" \
+            --arg tag_name "ci_full_mr_VPU${VPU}" \
+            --argjson volsize 64 \
+            --argjson timeout 7200 \
+            '{
+              commands: [$cmd],
+              run_options: {
+                ii_terminate_instance: true,
+                ii_delete_volume: true,
+                ii_check_s3: true,
+                ii_cheapo: true,
+                timeout_s: $timeout,
+                n_retries_allowed: 2
+              },
+              instance_parameters: {
+                ImageId: $ami,
+                InstanceType: $itype,
+                IamInstanceProfile: { Name: $profile },
+                TagSpecifications: [
+                  { ResourceType: "instance", Tags: [{ Key: "Name", Value: $tag_name }, { Key: "Project", Value: $tag_name }] },
+                  { ResourceType: "volume", Tags: [{ Key: "Name", Value: ($tag_name + "_vol") }] }
+                ],
+                BlockDeviceMappings: [{ DeviceName: "/dev/xvda", Ebs: { VolumeSize: $volsize, VolumeType: "gp3" } }]
+              }
+            }' > /tmp/mr_payload.json
+
+          echo "Medium range payload for VPU $VPU:"
+          jq '.commands[0][:200]' /tmp/mr_payload.json
+
+      - name: Run medium range
+        id: mr_monitor
+        run: |
+          VPU="${{ matrix.vpu }}"
+          EXEC_NAME="ci_full_mr_${VPU}_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ env.SM_ARN }}" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/mr_payload.json" \
+            --query 'executionArn' --output text)
+          echo "Started MR: $EXEC_ARN"
+
+          TIMEOUT=4800
+          ELAPSED=0
+          STATUS="RUNNING"
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] MR VPU $VPU: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then sleep 15; ELAPSED=$((ELAPSED + 15)); fi
+          done
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"; exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"; exit 1
+          fi
+
+      - name: Verify medium range output
+        if: steps.mr_monitor.outputs.result == 'SUCCEEDED'
+        run: |
+          VPU="${{ matrix.vpu }}"
+          FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom-mr/VPU_${VPU}/ngen-run.tar.gz"
+          if aws s3 ls "$FILE" > /dev/null 2>&1; then
+            echo "OK: medium_range ngen-run.tar.gz found for VPU_${VPU}"
+          else
+            echo "::error::medium_range ngen-run.tar.gz missing for VPU_${VPU}"
+            exit 1
+          fi
+
+  # ── Clean up ─────────────────────────────────────────────────────
+  cleanup:
+    name: Cleanup
+    needs: [setup, test-vpu]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Clean up test S3 output
+        run: |
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/" --recursive || true
