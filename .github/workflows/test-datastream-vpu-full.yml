@@ -7,6 +7,10 @@ on:
         description: "VPU to test (leave empty for all)"
         required: false
         type: string
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/cfe-nom/**'
 
 concurrency:
   group: vpu-full-test-${{ github.ref }}
