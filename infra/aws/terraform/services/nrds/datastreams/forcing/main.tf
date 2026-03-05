@@ -47,3 +47,4 @@ variable "s3_bucket" {
   type    = string
   default = "ciroh-community-ngen-datastream"
 }
+
