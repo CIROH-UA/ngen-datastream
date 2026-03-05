@@ -56,9 +56,9 @@ jobs:
           AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
           echo "ami=$AMI" >> "$GITHUB_OUTPUT"
 
-  # ── Test each VPU (short + medium range) ─────────────────────────
-  test-vpu:
-    name: "VPU ${{ matrix.vpu }}"
+  # ── Short Range ──────────────────────────────────────────────────
+  short-range:
+    name: "SR VPU ${{ matrix.vpu }}"
     needs: setup
     runs-on: ubuntu-latest
     permissions:
@@ -78,9 +78,8 @@ jobs:
           role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: ${{ env.AWS_REGION }}
 
-      # ── Short Range ────────────────────────────────────────────────
-      - name: Build short range payload
-        id: sr_payload
+      - name: Build payload
+        id: payload
         run: |
           VPU="${{ matrix.vpu }}"
           AMI="${{ needs.setup.outputs.ami }}"
@@ -133,20 +132,20 @@ jobs:
                 ],
                 BlockDeviceMappings: [{ DeviceName: "/dev/xvda", Ebs: { VolumeSize: $volsize, VolumeType: "gp3" } }]
               }
-            }' > /tmp/sr_payload.json
+            }' > /tmp/payload.json
 
           echo "Short range payload for VPU $VPU:"
-          jq '.commands[0][:200]' /tmp/sr_payload.json
+          jq '.commands[0][:200]' /tmp/payload.json
 
-      - name: Run short range
-        id: sr_monitor
+      - name: Run and monitor
+        id: monitor
         run: |
           VPU="${{ matrix.vpu }}"
           EXEC_NAME="ci_full_sr_${VPU}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ env.SM_ARN }}" \
             --name "$EXEC_NAME" \
-            --input "file:///tmp/sr_payload.json" \
+            --input "file:///tmp/payload.json" \
             --query 'executionArn' --output text)
           echo "Started SR: $EXEC_ARN"
 
@@ -168,8 +167,8 @@ jobs:
             echo "result=$STATUS" >> "$GITHUB_OUTPUT"; exit 1
           fi
 
-      - name: Verify short range output
-        if: steps.sr_monitor.outputs.result == 'SUCCEEDED'
+      - name: Verify output
+        if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
           VPU="${{ matrix.vpu }}"
           FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom/VPU_${VPU}/ngen-run.tar.gz"
@@ -180,9 +179,30 @@ jobs:
             exit 1
           fi
 
-      # ── Medium Range ───────────────────────────────────────────────
-      - name: Build medium range payload
-        id: mr_payload
+  # ── Medium Range ─────────────────────────────────────────────────
+  medium-range:
+    name: "MR VPU ${{ matrix.vpu }}"
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        vpu: ${{ fromJson(needs.setup.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build payload
+        id: payload
         run: |
           VPU="${{ matrix.vpu }}"
           AMI="${{ needs.setup.outputs.ami }}"
@@ -234,20 +254,20 @@ jobs:
                 ],
                 BlockDeviceMappings: [{ DeviceName: "/dev/xvda", Ebs: { VolumeSize: $volsize, VolumeType: "gp3" } }]
               }
-            }' > /tmp/mr_payload.json
+            }' > /tmp/payload.json
 
           echo "Medium range payload for VPU $VPU:"
-          jq '.commands[0][:200]' /tmp/mr_payload.json
+          jq '.commands[0][:200]' /tmp/payload.json
 
-      - name: Run medium range
-        id: mr_monitor
+      - name: Run and monitor
+        id: monitor
         run: |
           VPU="${{ matrix.vpu }}"
           EXEC_NAME="ci_full_mr_${VPU}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ env.SM_ARN }}" \
             --name "$EXEC_NAME" \
-            --input "file:///tmp/mr_payload.json" \
+            --input "file:///tmp/payload.json" \
             --query 'executionArn' --output text)
           echo "Started MR: $EXEC_ARN"
 
@@ -269,8 +289,8 @@ jobs:
             echo "result=$STATUS" >> "$GITHUB_OUTPUT"; exit 1
           fi
 
-      - name: Verify medium range output
-        if: steps.mr_monitor.outputs.result == 'SUCCEEDED'
+      - name: Verify output
+        if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
           VPU="${{ matrix.vpu }}"
           FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom-mr/VPU_${VPU}/ngen-run.tar.gz"
@@ -284,7 +304,7 @@ jobs:
   # ── Clean up ─────────────────────────────────────────────────────
   cleanup:
     name: Cleanup
-    needs: [setup, test-vpu]
+    needs: [setup, short-range, medium-range]
     if: always()
     runs-on: ubuntu-latest
     permissions:
