@@ -207,7 +207,7 @@ jobs:
           VPU="${{ matrix.vpu }}"
           AMI="${{ needs.setup.outputs.ami }}"
           CONFIG="${{ env.CONFIG }}"
-          INIT=$(jq -r '.init' "$CONFIG")
+          INIT=$(jq -r '.medium_range_init // .init' "$CONFIG")
 
           MR_OVERRIDE=$(jq -r --arg vpu "$VPU" '.medium_range_instance_type_overrides[$vpu] // empty' "$CONFIG")
           MR_INSTANCE_TYPE=${MR_OVERRIDE:-$(jq -r '.medium_range_instance_type // "m8g.2xlarge"' "$CONFIG")}
