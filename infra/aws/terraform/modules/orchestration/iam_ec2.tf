@@ -33,21 +33,32 @@ resource "aws_iam_policy" "ec2_policy" {
           "ssm:PutComplianceItems",
           "ssm:UpdateInstanceInformation"
         ],
-        Resource = "*"
+        Resource = [
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*",
+          "arn:aws:ssm:${data.aws_region.current.name}::document/*"
+        ]
       },
       {
         Effect = "Allow",
         Action = [
           "iam:PassRole"
         ],
-        Resource = "*"
+        Resource = aws_iam_role.ec2_role.arn
       },
       {
         Effect = "Allow",
         Action = [
-          "s3:*"
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:DeleteObject",
+          "s3:GetBucketLocation"
         ],
-        Resource = "*"
+        Resource = [
+          "arn:aws:s3:::${var.s3_bucket}",
+          "arn:aws:s3:::${var.s3_bucket}/*"
+        ]
       },
       {
         Effect = "Allow",
@@ -56,6 +67,13 @@ resource "aws_iam_policy" "ec2_policy" {
           "ec2:DescribeTags"
         ],
         Resource = "*"
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ],
+        Resource = "arn:aws:secretsmanager:us-east-1:879381264451:secret:docker_awiciroh_creds-*"
       }
     ]
   })

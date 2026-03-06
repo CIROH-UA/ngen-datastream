@@ -1,0 +1,245 @@
+name: Orchestration Integration Test
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/aws/terraform/modules/orchestration/**'
+      - 'infra/aws/terraform/services/nrds/iam_*.tf'
+  workflow_dispatch:
+
+concurrency:
+  group: orchestration-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.10.0"
+  AWS_REGION: us-east-1
+  TF_DIR: infra/aws/terraform/services/nrds
+  CI_CONFIG: .github/orchestration-test
+
+jobs:
+  integration-test:
+    name: Deploy Test SM & Run Execution
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    defaults:
+      run:
+        working-directory: infra/aws/terraform/services/nrds
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # ── Deploy orchestration module only (no schedules) ────────────
+      - name: Terraform Init
+        run: terraform init -backend-config="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.backend.hcl"
+
+      - name: Terraform Apply (orchestration only)
+        id: deploy
+        run: |
+          terraform apply \
+            -var-file="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.tfvars" \
+            -target=module.nrds_orchestration \
+            -auto-approve -input=false -lock-timeout=5m
+
+          echo "sm_arn=$(terraform output -raw datastream_arn)" >> "$GITHUB_OUTPUT"
+          echo "profile=$(terraform output -raw ec2_instance_profile_name)" >> "$GITHUB_OUTPUT"
+
+      # ── Build payload: swap profile and AMI from prod ────────────────
+      - name: Build execution payload
+        working-directory: .
+        run: |
+          PAYLOAD="${{ github.workspace }}/${{ env.CI_CONFIG }}/test-execution-payload.json"
+          PROD_VARS="${{ github.workspace }}/infra/aws/terraform/services/nrds/envs/prod.tfvars"
+          AMI=$(grep cfe_nom_ami_id "$PROD_VARS" | grep -o 'ami-[a-z0-9]*')
+
+          jq \
+            --arg PROFILE "${{ steps.deploy.outputs.profile }}" \
+            --arg AMI "$AMI" \
+            '
+            .instance_parameters.IamInstanceProfile.Name = $PROFILE |
+            .instance_parameters.ImageId = $AMI
+            ' "$PAYLOAD" > /tmp/exec_input.json
+
+          echo "Payload built (AMI=$AMI):"
+          jq '.commands[0][:200]' /tmp/exec_input.json
+
+      # ── Execute and monitor ────────────────────────────────────────
+      - name: Start and monitor execution
+        id: monitor
+        working-directory: .
+        run: |
+          EXEC_NAME="ci_test_pr${{ github.event.pull_request.number || 'manual' }}_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ steps.deploy.outputs.sm_arn }}" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/exec_input.json" \
+            --query 'executionArn' --output text)
+          echo "Started: $EXEC_ARN"
+
+          TIMEOUT=2400
+          ELAPSED=0
+          STATUS="RUNNING"
+
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              sleep 15
+              ELAPSED=$((ELAPSED + 15))
+            fi
+          done
+
+          # Capture execution history regardless of outcome
+          aws stepfunctions get-execution-history \
+            --execution-arn "$EXEC_ARN" \
+            --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed' || type=='LambdaFunctionFailed' || type=='LambdaFunctionScheduleFailed' || type=='ExecutionFailed']" \
+            --output json | tee /tmp/history.json
+
+          echo "history<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/history.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            echo "::error::SM execution $STATUS. See history above."
+            exit 1
+          fi
+
+      # ── Clean up test output on S3 ────────────────────────────────
+      - name: Clean up test S3 output
+        if: always()
+        run: aws s3 rm "s3://ciroh-community-ngen-datastream/test/cicd/orchestration-test/" --recursive || true
+
+      # ── Always destroy (orchestration only) ────────────────────────
+      - name: Terraform Destroy
+        id: destroy
+        if: always() && steps.deploy.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          for attempt in 1 2; do
+            echo "Destroy attempt $attempt..."
+            if terraform destroy \
+              -var-file="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.tfvars" \
+              -target=module.nrds_orchestration \
+              -auto-approve -input=false -lock-timeout=5m; then
+              echo "Destroy succeeded"
+              exit 0
+            fi
+            echo "Destroy attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::Terraform destroy failed after 2 attempts, falling back to force cleanup"
+          exit 1
+
+      - name: Force cleanup on destroy failure
+        id: force-cleanup
+        if: always() && steps.deploy.outcome == 'success' && steps.destroy.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          echo "Force-deleting any remaining nrds_ci_ resources..."
+          # Lambdas
+          for FN in nrds_ci_start_ec2 nrds_ci_ec2_commander nrds_ci_ec2_command_poller nrds_ci_s3_object_checker nrds_ci_ec2_stopper; do
+            aws lambda delete-function --function-name "$FN" 2>/dev/null && echo "  deleted $FN" || true
+          done
+          # State machine
+          aws stepfunctions delete-state-machine \
+            --state-machine-arn "arn:aws:states:us-east-1:879381264451:stateMachine:nrds_ci_sm" 2>/dev/null || true
+          # IAM - detach policies, remove profile, delete roles and policies
+          for ROLE in nrds_ci_ec2_role nrds_ci_lambda_role nrds_ci_sm_role; do
+            for P in $(aws iam list-attached-role-policies --role-name "$ROLE" --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null); do
+              aws iam detach-role-policy --role-name "$ROLE" --policy-arn "$P" 2>/dev/null || true
+            done
+          done
+          aws iam remove-role-from-instance-profile --instance-profile-name nrds_ci_ec2_profile --role-name nrds_ci_ec2_role 2>/dev/null || true
+          aws iam delete-instance-profile --instance-profile-name nrds_ci_ec2_profile 2>/dev/null || true
+          for ROLE in nrds_ci_ec2_role nrds_ci_lambda_role nrds_ci_sm_role; do
+            aws iam delete-role --role-name "$ROLE" 2>/dev/null || true
+          done
+          for POL in nrds_ci_ec2_policy nrds_ci_lambda_policy nrds_ci_lambda_invoke_policy; do
+            ARN="arn:aws:iam::879381264451:policy/$POL"
+            for V in $(aws iam list-policy-versions --policy-arn "$ARN" --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text 2>/dev/null); do
+              aws iam delete-policy-version --policy-arn "$ARN" --version-id "$V" 2>/dev/null || true
+            done
+            aws iam delete-policy --policy-arn "$ARN" 2>/dev/null || true
+          done
+          echo "Force cleanup complete"
+
+      - name: Alert on cleanup failure
+        if: always() && steps.destroy.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'CI cleanup failed: orphaned nrds_ci_ resources in AWS',
+              body: `The orchestration integration test destroy step and force cleanup both failed.\n\n` +
+                    `**Orphaned resources** with prefix \`nrds_ci_\` may remain in AWS and need manual deletion.\n\n` +
+                    `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n` +
+                    `Resources to check: lambdas, IAM roles/policies, instance profile, state machine, S3 state.`,
+              labels: ['bug', 'CI/CD']
+            });
+            core.error('Force cleanup failed! Orphaned nrds_ci_ resources may remain in AWS. Created issue for tracking.');
+
+      - name: Clean up state
+        if: always() && steps.deploy.outcome == 'success'
+        run: aws s3 rm "s3://ciroh-terraform-state/nrds-ci/" --recursive || true
+
+      # ── Post result to PR ──────────────────────────────────────────
+      - name: Post result to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const result = '${{ steps.monitor.outputs.result }}' || 'DID_NOT_RUN';
+            const icon = result === 'SUCCEEDED' ? '\u2705' : '\u274C';
+            const history = `${{ steps.monitor.outputs.history }}` || '';
+
+            let body = `### Orchestration Integration Test ${icon}\n\n`;
+            body += `**Result: ${result}**\n\n`;
+            if (history) {
+              body += `<details><summary>Lambda Execution History</summary>\n\n`;
+              body += '```\n' + history + '\n```\n\n</details>\n\n';
+            }
+            body += `*Triggered by PR #${{ github.event.pull_request.number }}*`;
+
+            const marker = 'Orchestration Integration Test';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            const params = { owner: context.repo.owner, repo: context.repo.repo, body };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
+            }

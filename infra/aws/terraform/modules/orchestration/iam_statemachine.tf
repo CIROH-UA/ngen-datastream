@@ -21,7 +21,17 @@ resource "aws_iam_policy" "lambda_invoke_policy" {
     Statement = [{
       Effect = "Allow",
       Action = "lambda:InvokeFunction",
-      Resource = ["*"
+      Resource = [
+        "${aws_lambda_function.starter_lambda.arn}:*",
+        aws_lambda_function.starter_lambda.arn,
+        "${aws_lambda_function.commander_lambda.arn}:*",
+        aws_lambda_function.commander_lambda.arn,
+        "${aws_lambda_function.poller_lambda.arn}:*",
+        aws_lambda_function.poller_lambda.arn,
+        "${aws_lambda_function.checker_lambda.arn}:*",
+        aws_lambda_function.checker_lambda.arn,
+        "${aws_lambda_function.stopper_lambda.arn}:*",
+        aws_lambda_function.stopper_lambda.arn,
       ]
     }]
   })

@@ -24,14 +24,23 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
           "ec2:RunInstances",
           "ec2:StartInstances",
           "ec2:StopInstances",
-          "ec2:DescribeInstances",
           "ec2:TerminateInstances",
-          "ec2:DescribeVolumes",
           "ec2:DeleteVolume",
           "ec2:DetachVolume",
-          "ec2:DescribeTags",
           "ec2:CreateTags"
         ],
+        Resource = [
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:volume/*",
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:network-interface/*",
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:security-group/*",
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:subnet/*",
+          "arn:aws:ec2:${data.aws_region.current.name}::image/*"
+        ]
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["ec2:DescribeInstances", "ec2:DescribeVolumes", "ec2:DescribeTags"],
         Resource = "*"
       },
       {
@@ -41,14 +50,18 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
           "ssm:GetCommandInvocation",
           "ssm:DescribeInstanceInformation"
         ],
-        Resource = "*"
+        Resource = [
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*",
+          "arn:aws:ssm:${data.aws_region.current.name}::document/*"
+        ]
       },
       {
         Effect = "Allow",
         Action = [
           "iam:PassRole"
         ],
-        Resource = "*"
+        Resource = aws_iam_role.ec2_role.arn
       },
       {
         Effect = "Allow",
@@ -60,9 +73,16 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
       {
         Effect = "Allow",
         Action = [
-          "s3:*"
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:DeleteObject",
+          "s3:GetBucketLocation"
         ],
-        Resource = "*"
+        Resource = [
+          "arn:aws:s3:::${var.s3_bucket}",
+          "arn:aws:s3:::${var.s3_bucket}/*"
+        ]
       },
       {
         "Effect" : "Deny",

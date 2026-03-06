@@ -1,0 +1,53 @@
+{
+  "commands": [
+    "runuser -l ec2-user -c 'export SKIP_VALIDATION=True DS_TAG=1.4.0 NGIAB_TAG=v1.7.0 && /home/ec2-user/datastreamcli/scripts/datastream -s DAILY -e 202602090000 -n 3 -F s3://ciroh-community-ngen-datastream/forcings/v2.2_hydrofabric/ngen.20260209/forcing_short_range/15/ngen.t15z.short_range.forcing.f001_f018.VPU_16.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_15 -d /home/ec2-user/outputs -N s3://ciroh-community-ngen-datastream/resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed/VPU_16/config/ngen-bmi-configs.tar.gz -g s3://ciroh-community-ngen-datastream/resources/v2.2_hydrofabric/geopackages/VPU_16/nextgen_VPU_16.gpkg -R https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_16.json --S3_BUCKET ciroh-community-ngen-datastream --S3_PREFIX test/cicd/orchestration-test'"
+  ],
+  "run_options": {
+    "ii_terminate_instance": true,
+    "ii_delete_volume": true,
+    "ii_check_s3": true,
+    "ii_cheapo": true,
+    "timeout_s": 3600,
+    "n_retries_allowed": 2
+  },
+  "instance_parameters": {
+    "ImageId": "ami-038132f534157b5c3",
+    "InstanceType": "m8g.xlarge",
+    "IamInstanceProfile": {
+      "Name": "INSTANCE_PROFILE_PLACEHOLDER"
+    },
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ci_orchestration_test"
+          },
+          {
+            "Key": "Project",
+            "Value": "ci_orchestration_test"
+          }
+        ]
+      },
+      {
+        "ResourceType": "volume",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ci_orchestration_test"
+          }
+        ]
+      }
+    ],
+    "BlockDeviceMappings": [
+      {
+        "DeviceName": "/dev/xvda",
+        "Ebs": {
+          "VolumeSize": 64,
+          "VolumeType": "gp3"
+        }
+      }
+    ]
+  }
+}
