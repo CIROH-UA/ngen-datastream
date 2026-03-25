@@ -1,9 +1,10 @@
 # Status
+
 Last Updated: 03/2026
 Changes
 * None to the actual deployment, though the deployments are now performed via an automated pipeline using GitHub Actions. The only major change here from the last update is we now refer to the forcing processing as an individual datastream as it is deployed as such and we anticipate deploying different forcing processing datastreams in the future.
 
-Status NWM2NextGen Forcing Processing
+## Status NWM2NextGen Forcing Processing
 * Output data exists at `forcings/v2.2_hydrofabric/...`
 * Input NWM forcings from https://noaa-nwm-pds.s3.amazonaws.com/index.html
 * Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours), analysis_assim_extend(once per day at 16z)
@@ -11,18 +12,18 @@ Status NWM2NextGen Forcing Processing
 * Data grouped by VPU
 * v2.2 hydrofabric
 
-Status LSTM DataStream 
+## Status LSTM DataStream 
 * Output data exists at `outputs/lstm_0/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
 * Ensemble members (weight files)
-  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_25yr_seq999_seed103_2701_171540/config.yml",
+  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_25yr_seq999_seed103_2701_171540/config.yml"
   * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_slope_elev_precip_temp_seq999_seed101_2801_191806/config.yml"
 * Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
 * Cold start
 * v2.2 hydrofabric
 
-Status CFE NOM DataStream
+## Status CFE NOM DataStream
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
@@ -31,7 +32,7 @@ Status CFE NOM DataStream
 * Cold start
 * v2.2 hydrofabric
 
-Status Routing-Only DataStream (DEV)
+## Status Routing-Only DataStream (DEV)
 * Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
 * Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
 * VPU 03W only
@@ -48,18 +49,18 @@ Changes
 * Both LSTM and CFE NOM datastreams now get static inputs from `resources/v2.2_hydrofabric`. The prefix `v2.2_resources` is deprecated and will be removed soon.
 * Both LSTM and CFE NOM datastreams now convert the troute netcdf to parquet. This file is available separate the ngen-run.tar.gz file at `.../ngen-run/outputs/troute/*.parquet`.
 
-Status LSTM DataStream 
+## Status LSTM DataStream 
 * Output data exists at `outputs/lstm_0/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
 * Ensemble members (weight files)
-  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_25yr_seq999_seed103_2701_171540/config.yml",
+  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_25yr_seq999_seed103_2701_171540/config.yml"
   * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_slope_elev_precip_temp_seq999_seed101_2801_191806/config.yml"
 * Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
 * Cold start
 * v2.2 hydrofabric
 
-Status CFE NOM DataStream
+## Status CFE NOM DataStream
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
@@ -68,7 +69,7 @@ Status CFE NOM DataStream
 * Cold start
 * v2.2 hydrofabric
 
-Status Routing-Only DataStream (DEV)
+## Status Routing-Only DataStream (DEV)
 * Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
 * Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
 * VPU 03W only
@@ -82,14 +83,14 @@ Changes
 * A Routing-only datastream has been added! This datastream inputs National Water Model v3 pre-reouting outputs (`q_lateral`), remaps them to the NextGen v2.2 hydrofabric, and then fed into t-route. 
 * All datastream forcings and output data from the original `v2.1`, `v2.2` prefixes have been moved to `forcings/v2.2_hydrofabric` and `outputs/cfe_nom/v2.2_hydrofabric`, respectively. Prefixes `v2.1`, `v2.2` no longer exist.
 
-Status Routing-Only DataStream (DEV)
+## Status Routing-Only DataStream (DEV)
 * Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
 * Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
 * VPU 03W only
 * Run Types - short_range (hourly, every hour)
 * v2.2 hydrofabric
 
-Status LSTM DataStream (DEV)
+## Status LSTM DataStream (DEV)
 No changes from last update
 * Output data exists at `outputs/lstm/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
@@ -98,7 +99,7 @@ No changes from last update
 * Cold start
 * v2.2 hydrofabric
 
-Status CFE NOM DataStream
+## Status CFE NOM DataStream
 No changes from last update
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
@@ -115,14 +116,14 @@ Changes
 * The troute file has been separated from the tar file and exists at the additional prefix of `ngen-run/outputs/troute/*.nc`
 * A development lstm datastream has been deployed with this [NextGen Rust-base LSTM realization.](https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/realization_rust_lstm_troute.json) 
 
-Status LSTM DataStream (DEV)
+## Status LSTM DataStream (DEV)
 * Output data exists at `outputs/lstm/v2.2_hydrofabric/...`
 * VPU 09 only
 * Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
 * Cold start
 * v2.2 hydrofabric
 
-Status CFE NOM DataStream
+## Status CFE NOM DataStream
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * All VPUs
 * Run Types - short_range (all init cycles), medium_range (all init cycles, first member), analysis_assim_extend
