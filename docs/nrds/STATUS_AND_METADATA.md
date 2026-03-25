@@ -1,7 +1,7 @@
 # Status
 Last Updated: 03/2026
 Changes
-* None to the actual deployment, though the deployments are now performed via an automated pipeline using GitHub Actions. The only major change here from the last update is we now refer to the forcing processing as an individual datastream as it is deployed as such and we anticapte deploying differnt forcing processing datastreams in the future.
+* None to the actual deployment, though the deployments are now performed via an automated pipeline using GitHub Actions. The only major change here from the last update is we now refer to the forcing processing as an individual datastream as it is deployed as such and we anticipate deploying different forcing processing datastreams in the future.
 
 Status NWM2NextGen Forcing Processing
 * Output data exists at `forcings/v2.2_hydrofabric/...`
