@@ -26,7 +26,7 @@ Status CFE NOM DataStream
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
-* Updated BMI config files at `resources/v2.2_hydrofabric/bmi_configs/lstm_0`
+* Updated BMI config files at `resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed`
 * Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
 * Cold start
 * v2.2 hydrofabric
@@ -63,7 +63,7 @@ Status CFE NOM DataStream
 * Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
 * Forcings from `forcings/v2.2_hydrofabric`
 * All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
-* Updated BMI config files at `resources/v2.2_hydrofabric/bmi_configs/lstm_0`
+* Updated BMI config files at `resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed`
 * Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
 * Cold start
 * v2.2 hydrofabric
