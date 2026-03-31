@@ -61,6 +61,26 @@ usermod -aG docker ec2-user
 echo "Waiting for Docker to be ready..."
 sleep 10
 
+echo "Writing optimized Docker daemon configuration..."
+cat > /etc/docker/daemon.json << 'DOCKER_CONF'
+{
+  "storage-driver": "overlay2",
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "live-restore": true,
+  "default-ulimits": {
+    "nofile": { "Name": "nofile", "Hard": 65536, "Soft": 65536 }
+  }
+}
+DOCKER_CONF
+
+echo "Restarting Docker with optimized config..."
+systemctl restart docker
+sleep 5
+
 echo "Installing Docker Compose..."
 # Install Docker Compose v2 for ARM64
 mkdir -p /usr/local/lib/docker/cli-plugins
@@ -94,6 +114,12 @@ docker pull awiciroh/datastream:$DS_TAG
 docker pull awiciroh/forcingprocessor:$FP_TAG
 docker pull awiciroh/ciroh-ngen-image:$NGIAB_TAG
 docker pull zwills/merkdir
+
+echo "Pre-warming Docker runtime..."
+docker run --rm awiciroh/datastream:$DS_TAG echo "warm"
+docker run --rm awiciroh/forcingprocessor:$FP_TAG echo "warm"
+docker run --rm awiciroh/ciroh-ngen-image:$NGIAB_TAG echo "warm"
+echo "Docker pre-warm complete"
 
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
