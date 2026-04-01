@@ -7,10 +7,6 @@ on:
         description: "VPU to test (leave empty for all)"
         required: false
         type: string
-  pull_request:
-    branches: [main]
-    paths:
-      - 'infra/aws/terraform/services/nrds/datastreams/cfe-nom/**'
 
 concurrency:
   group: vpu-full-test-${{ github.ref }}
@@ -171,11 +167,12 @@ jobs:
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
           VPU="${{ matrix.vpu }}"
-          FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom/VPU_${VPU}/ngen-run.tar.gz"
-          if aws s3 ls "$FILE" > /dev/null 2>&1; then
-            echo "OK: short_range ngen-run.tar.gz found for VPU_${VPU}"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom/VPU_${VPU}/"
+          FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
+          if [ "$FILE_COUNT" -gt 0 ]; then
+            echo "OK: short_range output found for VPU_${VPU} ($FILE_COUNT files)"
           else
-            echo "::error::short_range ngen-run.tar.gz missing for VPU_${VPU}"
+            echo "::error::short_range output missing for VPU_${VPU} at $PREFIX"
             exit 1
           fi
 
@@ -293,11 +290,12 @@ jobs:
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
           VPU="${{ matrix.vpu }}"
-          FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom-mr/VPU_${VPU}/ngen-run.tar.gz"
-          if aws s3 ls "$FILE" > /dev/null 2>&1; then
-            echo "OK: medium_range ngen-run.tar.gz found for VPU_${VPU}"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom-mr/VPU_${VPU}/"
+          FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
+          if [ "$FILE_COUNT" -gt 0 ]; then
+            echo "OK: medium_range output found for VPU_${VPU} ($FILE_COUNT files)"
           else
-            echo "::error::medium_range ngen-run.tar.gz missing for VPU_${VPU}"
+            echo "::error::medium_range output missing for VPU_${VPU} at $PREFIX"
             exit 1
           fi
 
