@@ -165,10 +165,10 @@ jobs:
 
   test-research-datastream-forcingprocessing:
     needs: [build-test-push-ami, get-ami-info]
-    if: needs.build-test-push-ami.outputs.build_ds_ami == 'true' 
+    if: needs.build-test-push-ami.outputs.build_ds_ami == 'true'
     runs-on: ubuntu-latest
     env:
-      DATE: 20250801
+      DATE: 20250805
     
     steps:
       - name: Checkout repository
@@ -210,15 +210,15 @@ jobs:
           echo " Using AMI ID: $ami_id for AMI name: $ami_name"
 
           # Download the proven working execution JSON from S3
-          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/forcing_short_range/00/metadata/execution.json execution.json
+          aws s3 cp s3://ciroh-community-ngen-datastream/forcings/v2.2_hydrofabric/ngen.${{ env.DATE }}/forcing_short_range/00/metadata/execution.json execution.json
 
           # Replace the working AMI with custom one
           jq --arg ami "$ami_id" '.instance_parameters.ImageId = $ami' execution.json > execution_updated.json
           mv execution_updated.json execution.json
           echo $ami_id
-          # Replace Docker image tags with specific versions
-          sed -i "s|DS_TAG=1.0.1|DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
-          sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
+          # Replace Docker image tags with specific versions (use regex to match any existing version)
+          sed -i "s|DS_TAG=[^ '\"]*|DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|NGIAB_TAG=[^ '\"]*|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
           # Show key info (avoid dumping entire JSON to logs)
           echo "AMI replacement completed"
@@ -353,15 +353,15 @@ jobs:
           echo " Using AMI ID: $ami_id for AMI name: $ami_name"
 
           # Download the proven working execution JSON from S3
-          aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
+          aws s3 cp s3://ciroh-community-ngen-datastream/outputs/cfe_nom/v2.2_hydrofabric/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
 
           # Replace the working AMI with custom one
           jq --arg ami "$ami_id" '.instance_parameters.ImageId = $ami' execution.json > execution_updated.json
           mv execution_updated.json execution.json
           echo $ami_id
-          # Replace Docker image tags with specific versions
-          sed -i "s|DS_TAG=1.0.1|DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
-          sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
+          # Replace Docker image tags with specific versions (use regex to match any existing version)
+          sed -i "s|DS_TAG=[^ '\"]*|DS_TAG=${{ needs.build-test-push-ami.outputs.ds_tag }}|g" execution.json
+          sed -i "s|NGIAB_TAG=[^ '\"]*|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
 
           # Show key info (avoid dumping entire JSON to logs)
