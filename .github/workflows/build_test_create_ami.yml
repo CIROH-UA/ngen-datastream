@@ -24,8 +24,11 @@ on:
     paths:
       - 'ami_version.yml'
 
+env:
+  STATE_MACHINE_ARN: arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm
+
 permissions:
-  contents: read   
+  contents: read
 
 jobs:
   build-test-push-ami:
@@ -192,12 +195,10 @@ jobs:
 
       - name: Download and modify execution JSON
         run: |
-          cd research_datastream/terraform_community
-          
           # Use the AMI ID from the get-ami-info job
           ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
           ami_name="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
-          
+
           # Verify AMI ID is valid
           if [ "$ami_id" == "None" ] || [ "$ami_id" == "" ] || [ "$ami_id" == "null" ]; then
             echo " Invalid AMI ID: $ami_id"
@@ -205,12 +206,12 @@ jobs:
             aws ec2 describe-images --owners self --query 'Images[*].[Name,ImageId]' --output table --region us-east-1
             exit 1
           fi
-          
+
           echo " Using AMI ID: $ami_id for AMI name: $ami_name"
-          
+
           # Download the proven working execution JSON from S3
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/forcing_short_range/00/metadata/execution.json execution.json
-          
+
           # Replace the working AMI with custom one
           jq --arg ami "$ami_id" '.instance_parameters.ImageId = $ami' execution.json > execution_updated.json
           mv execution_updated.json execution.json
@@ -220,25 +221,23 @@ jobs:
           sed -i "s|NGIAB_TAG=v0.0.0|NGIAB_TAG=${{ needs.build-test-push-ami.outputs.ngiab_tag }}|g" execution.json
           cat execution.json
           # Show key info (avoid dumping entire JSON to logs)
-          echo "AMI replacement completed for VPU ${{ env.VPU }}"
+          echo "AMI replacement completed"
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
-          
+
           jq --arg DATE "${{ env.DATE }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions"}]}] | .commands |= map(sub("--s3_prefix(?i) \\K[^ ]+"; "test/cicd/nrds/short_range/fp'\''")) | .commands |= map(gsub("--start_date DAILY"; "--start_date DAILY --end_date \($DATE)0000"))' execution.json > temp.json
 
 
       - name: Check and create AWS key pair
         run: |
-          cd research_datastream/terraform_community
-          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
-            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; 
-          else 
-            echo "Key pair 'actions_key' already exists"; 
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS";
+          else
+            echo "Key pair 'actions_key' already exists";
           fi
 
       - name: Start and monitor Step Functions execution
         run: |
-          cd research_datastream/terraform_community
-          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name fp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn "${{ env.STATE_MACHINE_ARN }}" --name fp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
           echo "Execution ARN: $execution_arn"
           status="RUNNING"
           while [ "$status" != "SUCCEEDED" ]; do
@@ -339,12 +338,10 @@ jobs:
 
       - name: Download and modify execution JSON
         run: |
-          cd research_datastream/terraform_community
-          
           # Use the AMI ID from the get-ami-info job
           ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
           ami_name="datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"
-          
+
           # Verify AMI ID is valid
           if [ "$ami_id" == "None" ] || [ "$ami_id" == "" ] || [ "$ami_id" == "null" ]; then
             echo " Invalid AMI ID: $ami_id"
@@ -352,12 +349,12 @@ jobs:
             aws ec2 describe-images --owners self --query 'Images[*].[Name,ImageId]' --output table --region us-east-1
             exit 1
           fi
-          
+
           echo " Using AMI ID: $ami_id for AMI name: $ami_name"
-          
+
           # Download the proven working execution JSON from S3
           aws s3 cp s3://ciroh-community-ngen-datastream/v2.2/ngen.${{ env.DATE }}/short_range/00/VPU_16/datastream-metadata/execution.json execution.json
-          
+
           # Replace the working AMI with custom one
           jq --arg ami "$ami_id" '.instance_parameters.ImageId = $ami' execution.json > execution_updated.json
           mv execution_updated.json execution.json
@@ -370,25 +367,23 @@ jobs:
           # Show key info (avoid dumping entire JSON to logs)
           echo "AMI replacement completed for VPU ${{ env.VPU }}"
           echo "New AMI ID: $(jq -r '.instance_parameters.ImageId' execution.json)"
-          
+
           # Apply jq transformations for this specific VPU
           jq --arg DATE "${{ env.DATE }}" --arg VPU "${{ env.VPU }}" 'del(.instance_parameters.MaxCount, .instance_parameters.MinCount, .instance_parameters.InstanceId, .t0, .ii_s3_object_checked, .retry_attempt, .region) | .instance_parameters.TagSpecifications = [{"ResourceType": "instance", "Tags": [{"Key": "Project", "Value": "fp_test_git_actions_vpu_\($VPU)"}, {"Key": "AMI_Version", "Value": "datastream-${{ needs.build-test-push-ami.outputs.ds_ami_version }}"}]}] | .commands |= map(sub("--S3_PREFIX(?i) \\K[^ ]+"; "test/cicd/nrds/short_range/VPU_\($VPU)'\''")) | .commands |= map(gsub("VPU_16"; "VPU_\($VPU)")) | .commands |= map(gsub("-s DAILY"; "-s DAILY -e \($DATE)0000"))' execution.json > temp.json
 
 
       - name: Check and create AWS key pair
         run: |
-          cd research_datastream/terraform_community
-          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then 
-            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS"; 
-          else 
-            echo "Key pair 'actions_key' already exists"; 
+          if ! aws ec2 describe-key-pairs --key-names "actions_key" --query 'KeyPairs[0].KeyName' --output text 2>/dev/null; then
+            aws ec2 create-key-pair --key-name "actions_key" --query 'KeyName' --output text && echo "Key pair 'actions_key' created in AWS";
+          else
+            echo "Key pair 'actions_key' already exists";
           fi
 
       - name: Start and monitor Step Functions execution
         id: stepfunction
         run: |
-          cd research_datastream/terraform_community
-          execution_arn=$(aws stepfunctions start-execution --state-machine-arn $(cat ./sm_ARN.txt) --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
+          execution_arn=$(aws stepfunctions start-execution --state-machine-arn "${{ env.STATE_MACHINE_ARN }}" --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
           echo "Execution ARN: $execution_arn"
           status="RUNNING"
           while [ "$status" != "SUCCEEDED" ]; do
