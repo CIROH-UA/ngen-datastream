@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# Cleanup on failure — terminate instance if script fails mid-way
+cleanup() {
+    if [[ -n "$INSTANCE_ID" ]]; then
+        echo "Cleaning up... terminating instance $INSTANCE_ID" >&2
+        aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID" 2>/dev/null || true
+    fi
+    rm -f /tmp/user_data_script.sh
+}
+trap cleanup ERR
+
 # Configuration
 REGION="us-east-1"
 INSTANCE_TYPE="t4g.large"
@@ -10,12 +20,63 @@ BASE_AMI=$(aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2
 
 KEY_NAME="actions_key_arm"
 SECURITY_GROUP="sg-0fcbe0c6d6faa0117"
+IAM_ROLE_NAME="AmiBuilderSSMRole"
+IAM_INSTANCE_PROFILE="Name=$IAM_ROLE_NAME"
+
+# Ensure IAM role and instance profile exist for SSM access
+if ! aws iam get-instance-profile --instance-profile-name "$IAM_ROLE_NAME" >/dev/null 2>&1; then
+    echo "Creating IAM role and instance profile: $IAM_ROLE_NAME..." >&2
+
+    # Create the IAM role with EC2 trust policy
+    aws iam create-role \
+        --role-name "$IAM_ROLE_NAME" \
+        --assume-role-policy-document '{
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": {"Service": "ec2.amazonaws.com"},
+                "Action": "sts:AssumeRole"
+            }]
+        }' >/dev/null
+
+    # Attach the SSM managed policy
+    aws iam attach-role-policy \
+        --role-name "$IAM_ROLE_NAME" \
+        --policy-arn "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+
+    # Create instance profile and add the role
+    aws iam create-instance-profile \
+        --instance-profile-name "$IAM_ROLE_NAME" >/dev/null
+    aws iam add-role-to-instance-profile \
+        --instance-profile-name "$IAM_ROLE_NAME" \
+        --role-name "$IAM_ROLE_NAME"
+
+    # Wait for IAM propagation
+    echo "Waiting for IAM instance profile to propagate..." >&2
+    sleep 10
+else
+    echo "IAM instance profile $IAM_ROLE_NAME already exists." >&2
+fi
 
 # Use environment variables passed from workflow (with defaults)
 AMI_NAME="${AMI_NAME:-ami_tag}"
 DS_TAG="${DS_TAG:-latest}"
 FP_TAG="${FP_TAG:-latest}"
 NGIAB_TAG="${NGIAB_TAG:-latest}"
+
+# Check for duplicate AMI name before launching an instance
+EXISTING_AMI=$(aws ec2 describe-images \
+    --region "$REGION" \
+    --owners self \
+    --filters "Name=name,Values=$AMI_NAME" \
+    --query 'Images[0].ImageId' \
+    --output text 2>/dev/null)
+
+if [[ -n "$EXISTING_AMI" && "$EXISTING_AMI" != "None" ]]; then
+    echo "ERROR: AMI name '$AMI_NAME' is already in use by $EXISTING_AMI." >&2
+    echo "Use a different AMI_NAME or deregister the existing AMI first." >&2
+    exit 1
+fi
 
 echo "Creating AMI with key pair: $KEY_NAME and security group: $SECURITY_GROUP" >&2
 echo "Using base AMI: $BASE_AMI" >&2
@@ -48,10 +109,8 @@ cat >> /tmp/user_data_script.sh << 'USER_DATA_SETUP'
 echo "Updating system packages..."
 dnf update -y
 
-echo "Installing git..."
-dnf install -y git
-dnf install -y docker
-dnf install -y python3-pip pigz awscli tar wget
+echo "Installing packages..."
+dnf install -y git docker python3-pip pigz awscli tar wget
 
 echo "Starting Docker service..."
 systemctl start docker
@@ -82,9 +141,10 @@ systemctl restart docker
 sleep 5
 
 echo "Installing Docker Compose..."
-# Install Docker Compose v2 for ARM64
+# Install Docker Compose v2 for ARM64 (pinned version for reproducibility)
+COMPOSE_VERSION="v2.32.4"
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-aarch64" -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # Create symlink for backward compatibility
@@ -125,9 +185,6 @@ echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
 USER_DATA_SETUP
 
-# Read the complete user data script
-USER_DATA=$(cat /tmp/user_data_script.sh)
-
 # Launch instance
 echo "Launching EC2 instance..."
 INSTANCE_ID=$(aws ec2 run-instances \
@@ -136,6 +193,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --instance-type "$INSTANCE_TYPE" \
     --key-name "$KEY_NAME" \
     --security-group-ids "$SECURITY_GROUP" \
+    --iam-instance-profile "$IAM_INSTANCE_PROFILE" \
     --user-data file:///tmp/user_data_script.sh \
     --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":32,"VolumeType":"gp3"}}]' \
     --query 'Instances[0].InstanceId' \
@@ -143,12 +201,51 @@ INSTANCE_ID=$(aws ec2 run-instances \
 
 echo "Instance ID: $INSTANCE_ID"
 
+# Tag instance for identification in the console
+aws ec2 create-tags --region "$REGION" --resources "$INSTANCE_ID" \
+    --tags Key=Name,Value="ami-builder-$AMI_NAME"
+
 # Wait for running and setup
 echo "Waiting for instance to be running..."
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 
-echo "Waiting 20 minutes for setup to complete..."
-sleep 1200  # 10 minutes for setup
+echo "Waiting for setup to complete (polling via SSM, up to 30 minutes)..."
+# Poll for setup-complete marker instead of a fixed sleep
+MAX_ATTEMPTS=60
+POLL_INTERVAL=30
+SETUP_COMPLETE=false
+for i in $(seq 1 "$MAX_ATTEMPTS"); do
+    COMMAND_ID=$(aws ssm send-command \
+        --region "$REGION" \
+        --instance-ids "$INSTANCE_ID" \
+        --document-name "AWS-RunShellScript" \
+        --parameters 'commands=["cat /var/log/setup-complete 2>/dev/null || echo NOT_READY"]' \
+        --query 'Command.CommandId' \
+        --output text 2>/dev/null) || { sleep "$POLL_INTERVAL"; continue; }
+
+    sleep 5  # brief wait for command to execute
+
+    OUTPUT=$(aws ssm get-command-invocation \
+        --region "$REGION" \
+        --command-id "$COMMAND_ID" \
+        --instance-id "$INSTANCE_ID" \
+        --query 'StandardOutputContent' \
+        --output text 2>/dev/null) || { sleep "$POLL_INTERVAL"; continue; }
+
+    if echo "$OUTPUT" | grep -q "Setup completed successfully"; then
+        echo "Setup completed on instance."
+        SETUP_COMPLETE=true
+        break
+    fi
+
+    echo "  Attempt $i/$MAX_ATTEMPTS — setup still in progress..."
+    sleep "$POLL_INTERVAL"
+done
+
+if [[ "$SETUP_COMPLETE" != "true" ]]; then
+    echo "ERROR: Setup did not complete within the timeout period." >&2
+    exit 1
+fi
 
 # Stop instance
 echo "Stopping instance..."
@@ -164,6 +261,11 @@ AMI_ID=$(aws ec2 create-image \
     --description "ngen-datastream AMI with DS_TAG=$DS_TAG, FP_TAG=$FP_TAG, NGIAB_TAG=$NGIAB_TAG" \
     --query 'ImageId' \
     --output text)
+
+if [[ -z "$AMI_ID" ]]; then
+    echo "ERROR: Failed to create AMI — no AMI ID returned." >&2
+    exit 1
+fi
 
 echo "AMI ID: $AMI_ID"
 
