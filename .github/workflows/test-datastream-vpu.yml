@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - cfe-nom
+          - lstm_0
           - routing-only
       vpu:
         description: "VPU to test (leave empty for all)"
@@ -18,6 +19,7 @@ on:
     branches: [main]
     paths:
       - 'infra/aws/terraform/services/nrds/datastreams/cfe-nom/**'
+      - 'infra/aws/terraform/services/nrds/datastreams/lstm_0/**'
       - 'infra/aws/terraform/services/nrds/datastreams/routing-only/**'
 
 concurrency:

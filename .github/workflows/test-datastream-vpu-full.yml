@@ -3,6 +3,14 @@ name: Test Datastream VPUs (Short + Medium Range)
 on:
   workflow_dispatch:
     inputs:
+      datastream:
+        description: "Datastream to test"
+        required: true
+        type: choice
+        options:
+          - cfe-nom
+          - lstm_0
+          - routing-only
       vpu:
         description: "VPU to test (leave empty for all)"
         required: false
@@ -19,7 +27,7 @@ env:
   S3_TEST_PREFIX: test/cicd/vpu-full-test
   INSTANCE_PROFILE: nrds_prod_ec2_profile
   PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
-  CONFIG: .github/vpu-test/cfe-nom.json
+  CONFIG: .github/vpu-test/${{ inputs.datastream }}.json
 
 jobs:
   # ── Build VPU matrix ─────────────────────────────────────────────
@@ -31,6 +39,7 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.vpus }}
       ami: ${{ steps.ami.outputs.ami }}
+      has_mr: ${{ steps.check_mr.outputs.has_mr }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,6 +60,17 @@ jobs:
           AMI_VAR=$(jq -r '.ami_var' "${{ env.CONFIG }}")
           AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
           echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+
+      - name: Check for medium range config
+        id: check_mr
+        run: |
+          MR_CMD=$(jq -r '.medium_range_command // empty' "${{ env.CONFIG }}")
+          if [ -n "$MR_CMD" ]; then
+            echo "has_mr=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_mr=false" >> "$GITHUB_OUTPUT"
+            echo "Datastream ${{ inputs.datastream }} has no medium range config — MR jobs will be skipped"
+          fi
 
   # ── Short Range ──────────────────────────────────────────────────
   short-range:
@@ -98,7 +118,7 @@ jobs:
             sed "s|{nprocs}|${NPROCS}|g" | \
             sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
             sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g" | \
-            sed "s|{datastream}|cfe-nom|g")
+            sed "s|{datastream}|${{ inputs.datastream }}|g")
 
           jq -n \
             --arg cmd "$CMD" \
@@ -167,7 +187,7 @@ jobs:
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
           VPU="${{ matrix.vpu }}"
-          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom/VPU_${VPU}/"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${{ inputs.datastream }}/VPU_${VPU}/"
           FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
           if [ "$FILE_COUNT" -gt 0 ]; then
             echo "OK: short_range output found for VPU_${VPU} ($FILE_COUNT files)"
@@ -176,10 +196,11 @@ jobs:
             exit 1
           fi
 
-  # ── Medium Range ─────────────────────────────────────────────────
+  # ── Medium Range (skipped if datastream has no MR config) ────────
   medium-range:
     name: "MR VPU ${{ matrix.vpu }}"
     needs: setup
+    if: needs.setup.outputs.has_mr == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -290,7 +311,7 @@ jobs:
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
           VPU="${{ matrix.vpu }}"
-          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/cfe-nom-mr/VPU_${VPU}/"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${{ inputs.datastream }}-mr/VPU_${VPU}/"
           FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
           if [ "$FILE_COUNT" -gt 0 ]; then
             echo "OK: medium_range output found for VPU_${VPU} ($FILE_COUNT files)"
