@@ -1,0 +1,248 @@
+name: Test Forcing Processor
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_type:
+        description: "Run type to test"
+        required: true
+        type: choice
+        options:
+          - short_range
+          - medium_range
+      init:
+        description: "Init cycle (e.g. 00, 06, 15)"
+        required: false
+        default: "15"
+        type: string
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/forcing/**'
+
+concurrency:
+  group: forcing-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  SM_ARN: arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm
+  S3_BUCKET: ciroh-community-ngen-datastream
+  S3_TEST_PREFIX: test/cicd/forcing
+  INSTANCE_PROFILE: nrds_prod_ec2_profile
+  PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
+  VPU_LIST: "01,02,03N,03S,03W,04,05,06,07,08,09,10L,10U,11,12,13,14,15,16,18"
+
+jobs:
+  # ── Setup ────────────────────────────────────────────────────────
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      ami: ${{ steps.ami.outputs.ami }}
+      run_type: ${{ steps.params.outputs.run_type }}
+      init: ${{ steps.params.outputs.init }}
+      instance_type: ${{ steps.params.outputs.instance_type }}
+      timeout_s: ${{ steps.params.outputs.timeout_s }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve parameters
+        id: params
+        run: |
+          CONFIG="infra/aws/terraform/services/nrds/datastreams/forcing/config/execution_forecast_inputs_forcing.json"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RUN_TYPE="${{ inputs.run_type }}"
+            INIT="${{ inputs.init }}"
+          else
+            # Default to short_range init 15 for PR triggers
+            RUN_TYPE="short_range"
+            INIT="15"
+          fi
+
+          INSTANCE_TYPE=$(jq -r --arg rt "$RUN_TYPE" '.[$rt].instance_type' "$CONFIG")
+          VOLUME_SIZE=$(jq -r --arg rt "$RUN_TYPE" '.[$rt].volume_size' "$CONFIG")
+          TIMEOUT_S=3600
+
+          echo "run_type=$RUN_TYPE" >> "$GITHUB_OUTPUT"
+          echo "init=$INIT" >> "$GITHUB_OUTPUT"
+          echo "instance_type=$INSTANCE_TYPE" >> "$GITHUB_OUTPUT"
+          echo "volume_size=$VOLUME_SIZE" >> "$GITHUB_OUTPUT"
+          echo "timeout_s=$TIMEOUT_S" >> "$GITHUB_OUTPUT"
+
+      - name: Look up AMI
+        id: ami
+        run: |
+          AMI=$(grep "fp_ami_id" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
+          echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+
+  # ── Run forcing processor ──────────────────────────────────────
+  test-forcing:
+    name: "FP ${{ needs.setup.outputs.run_type }} init${{ needs.setup.outputs.init }}"
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build payload
+        id: payload
+        run: |
+          RUN_TYPE="${{ needs.setup.outputs.run_type }}"
+          INIT="${{ needs.setup.outputs.init }}"
+          AMI="${{ needs.setup.outputs.ami }}"
+          INSTANCE_TYPE="${{ needs.setup.outputs.instance_type }}"
+          TIMEOUT_S="${{ needs.setup.outputs.timeout_s }}"
+
+          # Convert run_type to uppercase for FORCING_SOURCE
+          RUN_TYPE_H=$(echo "$RUN_TYPE" | tr '[:lower:]' '[:upper:]')
+
+          # Medium range needs member suffix
+          MEMBER_SUFFIX=""
+          if [ "$RUN_TYPE" = "medium_range" ]; then
+            MEMBER_SUFFIX="_1"
+          fi
+
+          # Build the multi-command payload matching prod template
+          jq -n \
+            --arg ami "$AMI" \
+            --arg itype "$INSTANCE_TYPE" \
+            --arg profile "${{ env.INSTANCE_PROFILE }}" \
+            --arg tag_name "ci_forcing_${RUN_TYPE}_init${INIT}" \
+            --arg run_type_h "$RUN_TYPE_H" \
+            --arg run_type_l "$RUN_TYPE" \
+            --arg init "$INIT" \
+            --arg member_suffix "$MEMBER_SUFFIX" \
+            --arg vpu_list "${{ env.VPU_LIST }}" \
+            --arg s3_bucket "${{ env.S3_BUCKET }}" \
+            --arg s3_prefix "${{ env.S3_TEST_PREFIX }}/forcing_${RUN_TYPE}/${INIT}" \
+            --argjson volsize 64 \
+            --argjson timeout "$TIMEOUT_S" \
+            '{
+              commands: [
+                "runuser -l ec2-user -c '\''mkdir -p /home/ec2-user/run/datastream-metadata'\''",
+                "runuser -l ec2-user -c '\''mkdir -p /home/ec2-user/run/ngen-run/config'\''",
+                "runuser -l ec2-user -c '\''cp /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json /home/ec2-user/run'\''",
+                ("runuser -l ec2-user -c '\''docker run --rm -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/datastream:1.0.2 python3 /ngen-datastream/python_tools/src/python_tools/configure_datastream.py --docker_mount /mounted_dir --start_date DAILY --data_dir /home/ec2-user/run --forcing_source NWM_V3_" + $run_type_h + "_" + $init + $member_suffix + " --forcing_split_vpu " + $vpu_list + " --hydrofabric_version v2.2 --realization /mounted_dir/realization_sloth_nom_cfe_pet.json --realization_provided /home/ec2-user/run/realization_sloth_nom_cfe_pet.json --s3_bucket " + $s3_bucket + " --s3_prefix " + $s3_prefix + "'\''"),
+                "runuser -l ec2-user -c '\''docker run --rm -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/forcingprocessor:1.0.3 python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/nwm_filenames_generator.py /mounted_dir/datastream-metadata/conf_nwmurl.json'\''",
+                "runuser -l ec2-user -c '\''cp /home/ec2-user/hydrofabric/v2.2/nextgen_*_weights.json /home/ec2-user/run'\''",
+                "runuser -l ec2-user -c '\''docker run --rm -e AWS_ACCESS_KEY_ID=$(echo $AWS_ACCESS_KEY_ID) -e AWS_SECRET_ACCESS_KEY=$(echo $AWS_SECRET_ACCESS_KEY) -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/forcingprocessor:1.0.3 python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/processor.py /mounted_dir/datastream-metadata/conf_fp.json'\''",
+                ("runuser -l ec2-user -c '\''aws s3 cp /home/ec2-user/run/datastream-metadata/conf_nwmurl.json s3://" + $s3_bucket + "/" + $s3_prefix + "/metadata/forcings_metadata/conf_nwmurl.json --no-progress'\''")
+              ],
+              run_options: {
+                ii_terminate_instance: true,
+                ii_delete_volume: true,
+                ii_check_s3: true,
+                ii_cheapo: true,
+                timeout_s: $timeout,
+                n_retries_allowed: 2
+              },
+              instance_parameters: {
+                ImageId: $ami,
+                InstanceType: $itype,
+                IamInstanceProfile: { Name: $profile },
+                TagSpecifications: [
+                  { ResourceType: "instance", Tags: [{ Key: "Name", Value: $tag_name }, { Key: "Project", Value: $tag_name }] },
+                  { ResourceType: "volume", Tags: [{ Key: "Name", Value: ($tag_name + "_vol") }] }
+                ],
+                BlockDeviceMappings: [{ DeviceName: "/dev/xvda", Ebs: { VolumeSize: $volsize, VolumeType: "gp3" } }]
+              }
+            }' > /tmp/payload.json
+
+          echo "FP payload:"
+          jq '.commands | length' /tmp/payload.json
+          echo "commands in payload"
+          jq '.commands[3][:200]' /tmp/payload.json
+
+      - name: Run and monitor
+        id: monitor
+        run: |
+          RUN_TYPE="${{ needs.setup.outputs.run_type }}"
+          INIT="${{ needs.setup.outputs.init }}"
+          EXEC_NAME="ci_forcing_${RUN_TYPE}_init${INIT}_$(date +%s)"
+          EXEC_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ env.SM_ARN }}" \
+            --name "$EXEC_NAME" \
+            --input "file:///tmp/payload.json" \
+            --query 'executionArn' --output text)
+          echo "Started: $EXEC_ARN"
+
+          TIMEOUT=2400
+          ELAPSED=0
+          STATUS="RUNNING"
+
+          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "$EXEC_ARN" --query 'status' --output text)
+            echo "[$ELAPSED s] FP $RUN_TYPE init$INIT: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              sleep 15
+              ELAPSED=$((ELAPSED + 15))
+            fi
+          done
+
+          if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "RUNNING" ]; then
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
+          else
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskFailed' || type=='ExecutionFailed' || type=='LambdaFunctionFailed']" \
+              --output json
+            exit 1
+          fi
+
+      - name: Verify output files
+        if: steps.monitor.outputs.result == 'SUCCEEDED'
+        run: |
+          RUN_TYPE="${{ needs.setup.outputs.run_type }}"
+          INIT="${{ needs.setup.outputs.init }}"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/forcing_${RUN_TYPE}/${INIT}/"
+
+          # Check that forcing NetCDFs were produced
+          FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | grep -c '\.nc$' || true)
+          echo "Found $FILE_COUNT NetCDF files at $PREFIX"
+
+          if [ "$FILE_COUNT" -ge 20 ]; then
+            echo "OK: $FILE_COUNT forcing NetCDFs found (expected >= 20 VPUs)"
+          else
+            echo "::error::Only $FILE_COUNT NetCDF files found at $PREFIX (expected >= 20)"
+            aws s3 ls "$PREFIX" --recursive | head -30
+            exit 1
+          fi
+
+  # ── Clean up ─────────────────────────────────────────────────────
+  cleanup:
+    name: Cleanup
+    needs: [setup, test-forcing]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Clean up test S3 output
+        run: |
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/" --recursive || true
