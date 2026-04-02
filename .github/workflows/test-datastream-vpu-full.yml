@@ -126,6 +126,8 @@ jobs:
 
           OVERRIDE=$(jq -r --arg vpu "$VPU" '.instance_type_overrides[$vpu] // empty' "$CONFIG")
           INSTANCE_TYPE=${OVERRIDE:-$(jq -r '.instance_type' "$CONFIG")}
+          VOLUME_SIZE=$(jq -r '.volume_size' "$CONFIG")
+          TIMEOUT_S=$(jq -r '.timeout_s' "$CONFIG")
           INIT=$(jq -r '.init' "$CONFIG")
 
           case "$INSTANCE_TYPE" in
@@ -149,8 +151,8 @@ jobs:
             --arg itype "$INSTANCE_TYPE" \
             --arg profile "${{ env.INSTANCE_PROFILE }}" \
             --arg tag_name "ci_full_sr_${DS}_VPU${VPU}" \
-            --argjson volsize 64 \
-            --argjson timeout 3600 \
+            --argjson volsize "$VOLUME_SIZE" \
+            --argjson timeout "$TIMEOUT_S" \
             '{
               commands: [$cmd],
               run_options: {
@@ -202,9 +204,15 @@ jobs:
           if [ "$STATUS" = "SUCCEEDED" ]; then
             echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
           elif [ "$STATUS" = "RUNNING" ]; then
-            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"; exit 1
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
           else
-            echo "result=$STATUS" >> "$GITHUB_OUTPUT"; exit 1
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskFailed' || type=='ExecutionFailed' || type=='LambdaFunctionFailed']" \
+              --output json
+            exit 1
           fi
 
       - name: Verify output
@@ -212,12 +220,11 @@ jobs:
         run: |
           DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}/VPU_${VPU}/"
-          FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
-          if [ "$FILE_COUNT" -gt 0 ]; then
-            echo "OK: SR output found for ${DS} VPU_${VPU} ($FILE_COUNT files)"
+          FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}/VPU_${VPU}/ngen-run.tar.gz"
+          if aws s3 ls "$FILE" > /dev/null 2>&1; then
+            echo "OK: ngen-run.tar.gz found for ${DS} VPU_${VPU}"
           else
-            echo "::error::SR output missing for ${DS} VPU_${VPU} at $PREFIX"
+            echo "::error::ngen-run.tar.gz missing for ${DS} VPU_${VPU} - $FILE"
             exit 1
           fi
 
@@ -252,8 +259,10 @@ jobs:
           CONFIG=".github/vpu-test/${DS}.json"
           INIT=$(jq -r '.medium_range_init // .init' "$CONFIG")
 
+          VOLUME_SIZE=$(jq -r '.volume_size' "$CONFIG")
           MR_OVERRIDE=$(jq -r --arg vpu "$VPU" '.medium_range_instance_type_overrides[$vpu] // empty' "$CONFIG")
           MR_INSTANCE_TYPE=${MR_OVERRIDE:-$(jq -r '.medium_range_instance_type // "m8g.2xlarge"' "$CONFIG")}
+          MR_TIMEOUT=$(jq -r '.medium_range_timeout_s // 7200' "$CONFIG")
 
           case "$MR_INSTANCE_TYPE" in
             m8g.xlarge)  NPROCS=3 ;;
@@ -276,8 +285,8 @@ jobs:
             --arg itype "$MR_INSTANCE_TYPE" \
             --arg profile "${{ env.INSTANCE_PROFILE }}" \
             --arg tag_name "ci_full_mr_${DS}_VPU${VPU}" \
-            --argjson volsize 64 \
-            --argjson timeout 7200 \
+            --argjson volsize "$VOLUME_SIZE" \
+            --argjson timeout "$MR_TIMEOUT" \
             '{
               commands: [$cmd],
               run_options: {
@@ -329,9 +338,15 @@ jobs:
           if [ "$STATUS" = "SUCCEEDED" ]; then
             echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
           elif [ "$STATUS" = "RUNNING" ]; then
-            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"; exit 1
+            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
+            exit 1
           else
-            echo "result=$STATUS" >> "$GITHUB_OUTPUT"; exit 1
+            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
+            aws stepfunctions get-execution-history \
+              --execution-arn "$EXEC_ARN" \
+              --query "events[?type=='TaskFailed' || type=='ExecutionFailed' || type=='LambdaFunctionFailed']" \
+              --output json
+            exit 1
           fi
 
       - name: Verify output
@@ -339,12 +354,11 @@ jobs:
         run: |
           DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}-mr/VPU_${VPU}/"
-          FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
-          if [ "$FILE_COUNT" -gt 0 ]; then
-            echo "OK: MR output found for ${DS} VPU_${VPU} ($FILE_COUNT files)"
+          FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}-mr/VPU_${VPU}/ngen-run.tar.gz"
+          if aws s3 ls "$FILE" > /dev/null 2>&1; then
+            echo "OK: MR ngen-run.tar.gz found for ${DS} VPU_${VPU}"
           else
-            echo "::error::MR output missing for ${DS} VPU_${VPU} at $PREFIX"
+            echo "::error::MR ngen-run.tar.gz missing for ${DS} VPU_${VPU} - $FILE"
             exit 1
           fi
 
