@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - all
           - cfe-nom
           - lstm_0
           - routing-only
@@ -54,7 +55,11 @@ jobs:
         run: |
           # Determine which datastreams to test
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            DATASTREAMS="${{ inputs.datastream }}"
+            if [ "${{ inputs.datastream }}" = "all" ]; then
+              DATASTREAMS=$(ls .github/vpu-test/*.json | xargs -I{} basename {} .json)
+            else
+              DATASTREAMS="${{ inputs.datastream }}"
+            fi
           else
             # Detect all changed datastreams from PR
             DATASTREAMS=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} \
