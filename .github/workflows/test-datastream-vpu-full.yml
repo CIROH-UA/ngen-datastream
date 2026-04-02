@@ -242,7 +242,8 @@ jobs:
             sed "s|{init}|${INIT}|g" | \
             sed "s|{nprocs}|${NPROCS}|g" | \
             sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
-            sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g")
+            sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g" | \
+            sed "s|{datastream}|${{ inputs.datastream }}|g")
 
           jq -n \
             --arg cmd "$CMD" \
