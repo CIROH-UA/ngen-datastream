@@ -48,6 +48,7 @@ jobs:
       timeout_s: ${{ steps.params.outputs.timeout_s }}
       volume_size: ${{ steps.params.outputs.volume_size }}
       vpu_list: ${{ steps.params.outputs.vpu_list }}
+      test_date: ${{ steps.params.outputs.test_date }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -74,6 +75,7 @@ jobs:
           fi
 
           VOLUME_SIZE=$(jq -r '.volume_size' "${{ env.CONFIG }}")
+          TEST_DATE=$(jq -r '.test_date' "${{ env.CONFIG }}")
 
           echo "run_type=$RUN_TYPE" >> "$GITHUB_OUTPUT"
           echo "init=$INIT" >> "$GITHUB_OUTPUT"
@@ -81,6 +83,7 @@ jobs:
           echo "timeout_s=$TIMEOUT_S" >> "$GITHUB_OUTPUT"
           echo "volume_size=$VOLUME_SIZE" >> "$GITHUB_OUTPUT"
           echo "vpu_list=$VPU_LIST" >> "$GITHUB_OUTPUT"
+          echo "test_date=$TEST_DATE" >> "$GITHUB_OUTPUT"
 
       - name: Look up AMI
         id: ami
@@ -117,6 +120,7 @@ jobs:
           TIMEOUT_S="${{ needs.setup.outputs.timeout_s }}"
           VOLUME_SIZE="${{ needs.setup.outputs.volume_size }}"
           VPU_LIST="${{ needs.setup.outputs.vpu_list }}"
+          TEST_DATE="${{ needs.setup.outputs.test_date }}"
 
           RUN_TYPE_H=$(echo "$RUN_TYPE" | tr '[:lower:]' '[:upper:]')
 
@@ -133,6 +137,7 @@ jobs:
               sed "s|{init}|${INIT}|g" | \
               sed "s|{member_suffix}|${MEMBER_SUFFIX}|g" | \
               sed "s|{vpu_list}|${VPU_LIST}|g" | \
+              sed "s|{test_date}|${TEST_DATE}|g" | \
               sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
               sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g"
           done | jq -Rs 'split("\n") | map(select(length > 0))' > /tmp/commands.json
