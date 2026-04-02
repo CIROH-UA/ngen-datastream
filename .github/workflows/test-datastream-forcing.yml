@@ -31,7 +31,7 @@ env:
   S3_TEST_PREFIX: test/cicd/forcing
   INSTANCE_PROFILE: nrds_prod_ec2_profile
   PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
-  VPU_LIST: "01,02,03N,03S,03W,04,05,06,07,08,09,10L,10U,11,12,13,14,15,16,18"
+  CONFIG: .github/vpu-test/forcing.json
 
 jobs:
   # ── Setup ────────────────────────────────────────────────────────
@@ -46,6 +46,8 @@ jobs:
       init: ${{ steps.params.outputs.init }}
       instance_type: ${{ steps.params.outputs.instance_type }}
       timeout_s: ${{ steps.params.outputs.timeout_s }}
+      volume_size: ${{ steps.params.outputs.volume_size }}
+      vpu_list: ${{ steps.params.outputs.vpu_list }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,31 +55,38 @@ jobs:
       - name: Resolve parameters
         id: params
         run: |
-          CONFIG="infra/aws/terraform/services/nrds/datastreams/forcing/config/execution_forecast_inputs_forcing.json"
-
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             RUN_TYPE="${{ inputs.run_type }}"
             INIT="${{ inputs.init }}"
           else
-            # Default to short_range init 15 for PR triggers
-            RUN_TYPE="short_range"
-            INIT="15"
+            RUN_TYPE=$(jq -r '.default_run_type' "${{ env.CONFIG }}")
+            INIT=$(jq -r '.default_init' "${{ env.CONFIG }}")
           fi
 
-          INSTANCE_TYPE=$(jq -r --arg rt "$RUN_TYPE" '.[$rt].instance_type' "$CONFIG")
-          VOLUME_SIZE=$(jq -r --arg rt "$RUN_TYPE" '.[$rt].volume_size' "$CONFIG")
-          TIMEOUT_S=3600
+          VPU_LIST=$(jq -r '.vpus | join(",")' "${{ env.CONFIG }}")
+
+          if [ "$RUN_TYPE" = "medium_range" ]; then
+            INSTANCE_TYPE=$(jq -r '.medium_range_instance_type // .instance_type' "${{ env.CONFIG }}")
+            TIMEOUT_S=$(jq -r '.medium_range_timeout_s // .timeout_s' "${{ env.CONFIG }}")
+          else
+            INSTANCE_TYPE=$(jq -r '.instance_type' "${{ env.CONFIG }}")
+            TIMEOUT_S=$(jq -r '.timeout_s' "${{ env.CONFIG }}")
+          fi
+
+          VOLUME_SIZE=$(jq -r '.volume_size' "${{ env.CONFIG }}")
 
           echo "run_type=$RUN_TYPE" >> "$GITHUB_OUTPUT"
           echo "init=$INIT" >> "$GITHUB_OUTPUT"
           echo "instance_type=$INSTANCE_TYPE" >> "$GITHUB_OUTPUT"
-          echo "volume_size=$VOLUME_SIZE" >> "$GITHUB_OUTPUT"
           echo "timeout_s=$TIMEOUT_S" >> "$GITHUB_OUTPUT"
+          echo "volume_size=$VOLUME_SIZE" >> "$GITHUB_OUTPUT"
+          echo "vpu_list=$VPU_LIST" >> "$GITHUB_OUTPUT"
 
       - name: Look up AMI
         id: ami
         run: |
-          AMI=$(grep "fp_ami_id" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
+          AMI_VAR=$(jq -r '.ami_var' "${{ env.CONFIG }}")
+          AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
           echo "ami=$AMI" >> "$GITHUB_OUTPUT"
 
   # ── Run forcing processor ──────────────────────────────────────
@@ -106,42 +115,39 @@ jobs:
           AMI="${{ needs.setup.outputs.ami }}"
           INSTANCE_TYPE="${{ needs.setup.outputs.instance_type }}"
           TIMEOUT_S="${{ needs.setup.outputs.timeout_s }}"
+          VOLUME_SIZE="${{ needs.setup.outputs.volume_size }}"
+          VPU_LIST="${{ needs.setup.outputs.vpu_list }}"
 
-          # Convert run_type to uppercase for FORCING_SOURCE
           RUN_TYPE_H=$(echo "$RUN_TYPE" | tr '[:lower:]' '[:upper:]')
 
-          # Medium range needs member suffix
           MEMBER_SUFFIX=""
           if [ "$RUN_TYPE" = "medium_range" ]; then
             MEMBER_SUFFIX="_1"
           fi
 
-          # Build the multi-command payload matching prod template
+          # Read commands from config and replace placeholders
+          jq -c '.commands[]' "${{ env.CONFIG }}" | while read -r cmd; do
+            echo "$cmd" | jq -r '.' | \
+              sed "s|{run_type_h}|${RUN_TYPE_H}|g" | \
+              sed "s|{run_type_l}|${RUN_TYPE}|g" | \
+              sed "s|{init}|${INIT}|g" | \
+              sed "s|{member_suffix}|${MEMBER_SUFFIX}|g" | \
+              sed "s|{vpu_list}|${VPU_LIST}|g" | \
+              sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
+              sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g"
+          done | jq -Rs 'split("\n") | map(select(length > 0))' > /tmp/commands.json
+
+          # Build full payload
           jq -n \
+            --slurpfile cmds /tmp/commands.json \
             --arg ami "$AMI" \
             --arg itype "$INSTANCE_TYPE" \
             --arg profile "${{ env.INSTANCE_PROFILE }}" \
             --arg tag_name "ci_forcing_${RUN_TYPE}_init${INIT}" \
-            --arg run_type_h "$RUN_TYPE_H" \
-            --arg run_type_l "$RUN_TYPE" \
-            --arg init "$INIT" \
-            --arg member_suffix "$MEMBER_SUFFIX" \
-            --arg vpu_list "${{ env.VPU_LIST }}" \
-            --arg s3_bucket "${{ env.S3_BUCKET }}" \
-            --arg s3_prefix "${{ env.S3_TEST_PREFIX }}/forcing_${RUN_TYPE}/${INIT}" \
-            --argjson volsize 64 \
+            --argjson volsize "$VOLUME_SIZE" \
             --argjson timeout "$TIMEOUT_S" \
             '{
-              commands: [
-                "runuser -l ec2-user -c '\''mkdir -p /home/ec2-user/run/datastream-metadata'\''",
-                "runuser -l ec2-user -c '\''mkdir -p /home/ec2-user/run/ngen-run/config'\''",
-                "runuser -l ec2-user -c '\''cp /home/ec2-user/ngen-datastream/configs/ngen/realization_sloth_nom_cfe_pet.json /home/ec2-user/run'\''",
-                ("runuser -l ec2-user -c '\''docker run --rm -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/datastream:1.0.2 python3 /ngen-datastream/python_tools/src/python_tools/configure_datastream.py --docker_mount /mounted_dir --start_date DAILY --data_dir /home/ec2-user/run --forcing_source NWM_V3_" + $run_type_h + "_" + $init + $member_suffix + " --forcing_split_vpu " + $vpu_list + " --hydrofabric_version v2.2 --realization /mounted_dir/realization_sloth_nom_cfe_pet.json --realization_provided /home/ec2-user/run/realization_sloth_nom_cfe_pet.json --s3_bucket " + $s3_bucket + " --s3_prefix " + $s3_prefix + "'\''"),
-                "runuser -l ec2-user -c '\''docker run --rm -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/forcingprocessor:1.0.3 python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/nwm_filenames_generator.py /mounted_dir/datastream-metadata/conf_nwmurl.json'\''",
-                "runuser -l ec2-user -c '\''cp /home/ec2-user/hydrofabric/v2.2/nextgen_*_weights.json /home/ec2-user/run'\''",
-                "runuser -l ec2-user -c '\''docker run --rm -e AWS_ACCESS_KEY_ID=$(echo $AWS_ACCESS_KEY_ID) -e AWS_SECRET_ACCESS_KEY=$(echo $AWS_SECRET_ACCESS_KEY) -v /home/ec2-user/run:/mounted_dir -u $(id -u):$(id -g) -w /mounted_dir/datastream-metadata awiciroh/forcingprocessor:1.0.3 python3 /ngen-datastream/forcingprocessor/src/forcingprocessor/processor.py /mounted_dir/datastream-metadata/conf_fp.json'\''",
-                ("runuser -l ec2-user -c '\''aws s3 cp /home/ec2-user/run/datastream-metadata/conf_nwmurl.json s3://" + $s3_bucket + "/" + $s3_prefix + "/metadata/forcings_metadata/conf_nwmurl.json --no-progress'\''")
-              ],
+              commands: $cmds[0],
               run_options: {
                 ii_terminate_instance: true,
                 ii_delete_volume: true,
@@ -162,9 +168,7 @@ jobs:
               }
             }' > /tmp/payload.json
 
-          echo "FP payload:"
-          jq '.commands | length' /tmp/payload.json
-          echo "commands in payload"
+          echo "FP payload ($(jq '.commands | length' /tmp/payload.json) commands):"
           jq '.commands[3][:200]' /tmp/payload.json
 
       - name: Run and monitor
@@ -215,7 +219,6 @@ jobs:
           INIT="${{ needs.setup.outputs.init }}"
           PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/forcing_${RUN_TYPE}/${INIT}/"
 
-          # Check that forcing NetCDFs were produced
           FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | grep -c '\.nc$' || true)
           echo "Found $FILE_COUNT NetCDF files at $PREFIX"
 
