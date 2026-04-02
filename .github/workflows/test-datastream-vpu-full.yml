@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       datastream:
-        description: "Datastream to test"
+        description: "Datastream to test (or 'all')"
         required: true
         type: choice
         options:
+          - all
           - cfe-nom
           - lstm_0
           - routing-only
@@ -27,54 +28,76 @@ env:
   S3_TEST_PREFIX: test/cicd/vpu-full-test
   INSTANCE_PROFILE: nrds_prod_ec2_profile
   PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
-  CONFIG: .github/vpu-test/${{ inputs.datastream }}.json
 
 jobs:
-  # ── Build VPU matrix ─────────────────────────────────────────────
+  # ── Build test matrices ────────────────────────────────────────────
   setup:
     name: Setup
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      matrix: ${{ steps.matrix.outputs.vpus }}
-      ami: ${{ steps.ami.outputs.ami }}
-      has_mr: ${{ steps.check_mr.outputs.has_mr }}
+      sr_matrix: ${{ steps.build.outputs.sr_matrix }}
+      mr_matrix: ${{ steps.build.outputs.mr_matrix }}
+      has_mr: ${{ steps.build.outputs.has_mr }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build VPU matrix
-        id: matrix
+      - name: Build test matrices
+        id: build
         run: |
-          if [ -n "${{ inputs.vpu }}" ]; then
-            echo "vpus=[\"${{ inputs.vpu }}\"]" >> "$GITHUB_OUTPUT"
+          # Determine which datastreams to test
+          if [ "${{ inputs.datastream }}" = "all" ]; then
+            DATASTREAMS=$(ls .github/vpu-test/*.json | xargs -I{} basename {} .json)
           else
-            VPUS=$(jq -c '.vpus' "${{ env.CONFIG }}")
-            echo "vpus=$VPUS" >> "$GITHUB_OUTPUT"
+            DATASTREAMS="${{ inputs.datastream }}"
           fi
 
-      - name: Look up AMI
-        id: ami
-        run: |
-          AMI_VAR=$(jq -r '.ami_var' "${{ env.CONFIG }}")
-          AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
-          echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+          SR_MATRIX="[]"
+          MR_MATRIX="[]"
 
-      - name: Check for medium range config
-        id: check_mr
-        run: |
-          MR_CMD=$(jq -r '.medium_range_command // empty' "${{ env.CONFIG }}")
-          if [ -n "$MR_CMD" ]; then
-            echo "has_mr=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_mr=false" >> "$GITHUB_OUTPUT"
-            echo "Datastream ${{ inputs.datastream }} has no medium range config — MR jobs will be skipped"
+          for DS in $DATASTREAMS; do
+            CONFIG=".github/vpu-test/${DS}.json"
+            if [ ! -f "$CONFIG" ]; then
+              echo "::warning::No test config for $DS — skipping"
+              continue
+            fi
+
+            AMI_VAR=$(jq -r '.ami_var' "$CONFIG")
+            AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
+
+            if [ -n "${{ inputs.vpu }}" ]; then
+              VPUS="[\"${{ inputs.vpu }}\"]"
+            else
+              VPUS=$(jq -c '.vpus' "$CONFIG")
+            fi
+
+            # Add SR entries
+            SR_MATRIX=$(echo "$SR_MATRIX" | jq -c --arg ds "$DS" --arg ami "$AMI" --argjson vpus "$VPUS" \
+              '. + [$vpus[] | {datastream: $ds, vpu: ., ami: $ami}]')
+
+            # Add MR entries only if datastream has medium range config
+            MR_CMD=$(jq -r '.medium_range_command // empty' "$CONFIG")
+            if [ -n "$MR_CMD" ]; then
+              MR_MATRIX=$(echo "$MR_MATRIX" | jq -c --arg ds "$DS" --arg ami "$AMI" --argjson vpus "$VPUS" \
+                '. + [$vpus[] | {datastream: $ds, vpu: ., ami: $ami}]')
+            fi
+          done
+
+          HAS_MR="false"
+          if [ "$(echo "$MR_MATRIX" | jq length)" -gt 0 ]; then
+            HAS_MR="true"
           fi
+
+          echo "sr_matrix={\"include\":$SR_MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "mr_matrix={\"include\":$MR_MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "has_mr=$HAS_MR" >> "$GITHUB_OUTPUT"
+          echo "SR: $(echo "$SR_MATRIX" | jq length) combos, MR: $(echo "$MR_MATRIX" | jq length) combos"
 
   # ── Short Range ──────────────────────────────────────────────────
   short-range:
-    name: "SR VPU ${{ matrix.vpu }}"
+    name: "SR ${{ matrix.datastream }} VPU ${{ matrix.vpu }}"
     needs: setup
     runs-on: ubuntu-latest
     permissions:
@@ -82,8 +105,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      matrix:
-        vpu: ${{ fromJson(needs.setup.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.setup.outputs.sr_matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -97,9 +119,10 @@ jobs:
       - name: Build payload
         id: payload
         run: |
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          AMI="${{ needs.setup.outputs.ami }}"
-          CONFIG="${{ env.CONFIG }}"
+          AMI="${{ matrix.ami }}"
+          CONFIG=".github/vpu-test/${DS}.json"
 
           OVERRIDE=$(jq -r --arg vpu "$VPU" '.instance_type_overrides[$vpu] // empty' "$CONFIG")
           INSTANCE_TYPE=${OVERRIDE:-$(jq -r '.instance_type' "$CONFIG")}
@@ -118,14 +141,14 @@ jobs:
             sed "s|{nprocs}|${NPROCS}|g" | \
             sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
             sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g" | \
-            sed "s|{datastream}|${{ inputs.datastream }}|g")
+            sed "s|{datastream}|${DS}|g")
 
           jq -n \
             --arg cmd "$CMD" \
             --arg ami "$AMI" \
             --arg itype "$INSTANCE_TYPE" \
             --arg profile "${{ env.INSTANCE_PROFILE }}" \
-            --arg tag_name "ci_full_sr_VPU${VPU}" \
+            --arg tag_name "ci_full_sr_${DS}_VPU${VPU}" \
             --argjson volsize 64 \
             --argjson timeout 3600 \
             '{
@@ -150,14 +173,15 @@ jobs:
               }
             }' > /tmp/payload.json
 
-          echo "Short range payload for VPU $VPU:"
+          echo "SR payload for $DS VPU $VPU:"
           jq '.commands[0][:200]' /tmp/payload.json
 
       - name: Run and monitor
         id: monitor
         run: |
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          EXEC_NAME="ci_full_sr_${VPU}_$(date +%s)"
+          EXEC_NAME="ci_full_sr_${DS}_${VPU}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ env.SM_ARN }}" \
             --name "$EXEC_NAME" \
@@ -171,7 +195,7 @@ jobs:
           while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
             STATUS=$(aws stepfunctions describe-execution \
               --execution-arn "$EXEC_ARN" --query 'status' --output text)
-            echo "[$ELAPSED s] SR VPU $VPU: $STATUS"
+            echo "[$ELAPSED s] SR $DS VPU $VPU: $STATUS"
             if [ "$STATUS" = "RUNNING" ]; then sleep 15; ELAPSED=$((ELAPSED + 15)); fi
           done
 
@@ -186,19 +210,20 @@ jobs:
       - name: Verify output
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${{ inputs.datastream }}/VPU_${VPU}/"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}/VPU_${VPU}/"
           FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
           if [ "$FILE_COUNT" -gt 0 ]; then
-            echo "OK: short_range output found for VPU_${VPU} ($FILE_COUNT files)"
+            echo "OK: SR output found for ${DS} VPU_${VPU} ($FILE_COUNT files)"
           else
-            echo "::error::short_range output missing for VPU_${VPU} at $PREFIX"
+            echo "::error::SR output missing for ${DS} VPU_${VPU} at $PREFIX"
             exit 1
           fi
 
-  # ── Medium Range (skipped if datastream has no MR config) ────────
+  # ── Medium Range (skipped if no datastreams have MR config) ────────
   medium-range:
-    name: "MR VPU ${{ matrix.vpu }}"
+    name: "MR ${{ matrix.datastream }} VPU ${{ matrix.vpu }}"
     needs: setup
     if: needs.setup.outputs.has_mr == 'true'
     runs-on: ubuntu-latest
@@ -207,8 +232,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      matrix:
-        vpu: ${{ fromJson(needs.setup.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.setup.outputs.mr_matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -222,9 +246,10 @@ jobs:
       - name: Build payload
         id: payload
         run: |
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          AMI="${{ needs.setup.outputs.ami }}"
-          CONFIG="${{ env.CONFIG }}"
+          AMI="${{ matrix.ami }}"
+          CONFIG=".github/vpu-test/${DS}.json"
           INIT=$(jq -r '.medium_range_init // .init' "$CONFIG")
 
           MR_OVERRIDE=$(jq -r --arg vpu "$VPU" '.medium_range_instance_type_overrides[$vpu] // empty' "$CONFIG")
@@ -243,14 +268,14 @@ jobs:
             sed "s|{nprocs}|${NPROCS}|g" | \
             sed "s|{s3_bucket}|${{ env.S3_BUCKET }}|g" | \
             sed "s|{s3_test_prefix}|${{ env.S3_TEST_PREFIX }}|g" | \
-            sed "s|{datastream}|${{ inputs.datastream }}|g")
+            sed "s|{datastream}|${DS}|g")
 
           jq -n \
             --arg cmd "$CMD" \
             --arg ami "$AMI" \
             --arg itype "$MR_INSTANCE_TYPE" \
             --arg profile "${{ env.INSTANCE_PROFILE }}" \
-            --arg tag_name "ci_full_mr_VPU${VPU}" \
+            --arg tag_name "ci_full_mr_${DS}_VPU${VPU}" \
             --argjson volsize 64 \
             --argjson timeout 7200 \
             '{
@@ -275,14 +300,15 @@ jobs:
               }
             }' > /tmp/payload.json
 
-          echo "Medium range payload for VPU $VPU:"
+          echo "MR payload for $DS VPU $VPU:"
           jq '.commands[0][:200]' /tmp/payload.json
 
       - name: Run and monitor
         id: monitor
         run: |
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          EXEC_NAME="ci_full_mr_${VPU}_$(date +%s)"
+          EXEC_NAME="ci_full_mr_${DS}_${VPU}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ env.SM_ARN }}" \
             --name "$EXEC_NAME" \
@@ -296,7 +322,7 @@ jobs:
           while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
             STATUS=$(aws stepfunctions describe-execution \
               --execution-arn "$EXEC_ARN" --query 'status' --output text)
-            echo "[$ELAPSED s] MR VPU $VPU: $STATUS"
+            echo "[$ELAPSED s] MR $DS VPU $VPU: $STATUS"
             if [ "$STATUS" = "RUNNING" ]; then sleep 15; ELAPSED=$((ELAPSED + 15)); fi
           done
 
@@ -311,13 +337,14 @@ jobs:
       - name: Verify output
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${{ inputs.datastream }}-mr/VPU_${VPU}/"
+          PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}-mr/VPU_${VPU}/"
           FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | wc -l)
           if [ "$FILE_COUNT" -gt 0 ]; then
-            echo "OK: medium_range output found for VPU_${VPU} ($FILE_COUNT files)"
+            echo "OK: MR output found for ${DS} VPU_${VPU} ($FILE_COUNT files)"
           else
-            echo "::error::medium_range output missing for VPU_${VPU} at $PREFIX"
+            echo "::error::MR output missing for ${DS} VPU_${VPU} at $PREFIX"
             exit 1
           fi
 
