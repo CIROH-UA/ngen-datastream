@@ -231,7 +231,7 @@ jobs:
   # ── Medium Range (skipped if no datastreams have MR config) ────────
   medium-range:
     name: "MR ${{ matrix.datastream }} VPU ${{ matrix.vpu }}"
-    needs: setup
+    needs: [setup, short-range]
     if: needs.setup.outputs.has_mr == 'true'
     runs-on: ubuntu-latest
     permissions:
