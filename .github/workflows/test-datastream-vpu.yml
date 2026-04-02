@@ -42,61 +42,61 @@ jobs:
     permissions:
       contents: read
     outputs:
-      datastream: ${{ steps.detect.outputs.datastream }}
-      matrix: ${{ steps.matrix.outputs.vpus }}
-      ami: ${{ steps.ami.outputs.ami }}
+      matrix: ${{ steps.build.outputs.matrix }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect datastream
-        id: detect
+      - name: Build test matrix
+        id: build
         run: |
+          # Determine which datastreams to test
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "datastream=${{ inputs.datastream }}" >> "$GITHUB_OUTPUT"
+            DATASTREAMS="${{ inputs.datastream }}"
           else
-            # Detect from changed files in PR
-            CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep '^infra/aws/terraform/services/nrds/datastreams/' | head -1)
-            DS=$(echo "$CHANGED" | sed 's|infra/aws/terraform/services/nrds/datastreams/||' | cut -d'/' -f1)
-            if [ -z "$DS" ]; then
+            # Detect all changed datastreams from PR
+            DATASTREAMS=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} \
+              | grep '^infra/aws/terraform/services/nrds/datastreams/' \
+              | sed 's|infra/aws/terraform/services/nrds/datastreams/||' \
+              | cut -d'/' -f1 \
+              | sort -u)
+            if [ -z "$DATASTREAMS" ]; then
               echo "::error::Could not detect datastream from changed files"
               exit 1
             fi
-            echo "datastream=$DS" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build VPU matrix
-        id: matrix
-        run: |
-          DS="${{ steps.detect.outputs.datastream }}"
-          CONFIG=".github/vpu-test/${DS}.json"
-          if [ ! -f "$CONFIG" ]; then
-            echo "::error::No test config found at $CONFIG"
-            exit 1
-          fi
+          # Build matrix: one entry per datastream+VPU combo
+          MATRIX="[]"
+          for DS in $DATASTREAMS; do
+            CONFIG=".github/vpu-test/${DS}.json"
+            if [ ! -f "$CONFIG" ]; then
+              echo "::warning::No test config for $DS — skipping"
+              continue
+            fi
 
-          if [ -n "${{ inputs.vpu }}" ]; then
-            # Single VPU from workflow_dispatch
-            echo "vpus=[\"${{ inputs.vpu }}\"]" >> "$GITHUB_OUTPUT"
-          else
-            # All VPUs from config
-            VPUS=$(jq -c '.vpus' "$CONFIG")
-            echo "vpus=$VPUS" >> "$GITHUB_OUTPUT"
-          fi
+            AMI_VAR=$(jq -r '.ami_var' "$CONFIG")
+            AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
 
-      - name: Look up AMI
-        id: ami
-        run: |
-          DS="${{ steps.detect.outputs.datastream }}"
-          AMI_VAR=$(jq -r '.ami_var' ".github/vpu-test/${DS}.json")
-          AMI=$(grep "$AMI_VAR" "${{ env.PROD_VARS }}" | grep -o 'ami-[a-z0-9]*')
-          echo "ami=$AMI" >> "$GITHUB_OUTPUT"
+            if [ -n "${{ inputs.vpu }}" ]; then
+              VPUS="[\"${{ inputs.vpu }}\"]"
+            else
+              VPUS=$(jq -c '.vpus' "$CONFIG")
+            fi
+
+            # Append each VPU as a matrix entry
+            MATRIX=$(echo "$MATRIX" | jq -c --arg ds "$DS" --arg ami "$AMI" --argjson vpus "$VPUS" \
+              '. + [$vpus[] | {datastream: $ds, vpu: ., ami: $ami}]')
+          done
+
+          echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "Testing $(echo "$MATRIX" | jq length) combinations"
 
   # ── Test each VPU in parallel ──────────────────────────────────────
   test-vpu:
-    name: "VPU ${{ matrix.vpu }}"
+    name: "${{ matrix.datastream }} VPU ${{ matrix.vpu }}"
     needs: setup
     runs-on: ubuntu-latest
     permissions:
@@ -104,8 +104,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      matrix:
-        vpu: ${{ fromJson(needs.setup.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -119,9 +118,9 @@ jobs:
       - name: Build execution payload
         id: payload
         run: |
-          DS="${{ needs.setup.outputs.datastream }}"
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
-          AMI="${{ needs.setup.outputs.ami }}"
+          AMI="${{ matrix.ami }}"
           CONFIG=".github/vpu-test/${DS}.json"
 
           # Check for per-VPU instance type override, fallback to default
@@ -201,7 +200,7 @@ jobs:
       - name: Start and monitor execution
         id: monitor
         run: |
-          DS="${{ needs.setup.outputs.datastream }}"
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
 
           EXEC_NAME="ci_vpu_${DS}_${VPU}_$(date +%s)"
@@ -243,7 +242,7 @@ jobs:
       - name: Verify output files
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
-          DS="${{ needs.setup.outputs.datastream }}"
+          DS="${{ matrix.datastream }}"
           VPU="${{ matrix.vpu }}"
           FILE="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}/VPU_${VPU}/ngen-run.tar.gz"
           if aws s3 ls "$FILE" > /dev/null 2>&1; then
@@ -272,8 +271,7 @@ jobs:
 
       - name: Clean up test S3 output
         run: |
-          DS="${{ needs.setup.outputs.datastream }}"
-          aws s3 rm "s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/${DS}/" --recursive || true
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/" --recursive || true
 
       - name: Post result to PR
         if: github.event_name == 'pull_request'
@@ -281,17 +279,21 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const ds = '${{ needs.setup.outputs.datastream }}';
-            const vpus = ${{ needs.setup.outputs.matrix }};
+            const matrix = ${{ needs.setup.outputs.matrix }};
+            const entries = matrix.include;
+            const datastreams = [...new Set(entries.map(e => e.datastream))];
             const overall = '${{ needs.test-vpu.result }}';
             const icon = overall === 'success' ? '\u2705' : '\u274C';
 
-            let body = `### VPU Test: ${ds} ${icon}\n\n`;
+            let body = `### VPU Test ${icon}\n\n`;
             body += `**Overall: ${overall}**\n\n`;
-            body += `Tested ${vpus.length} VPUs: ${vpus.join(', ')}\n\n`;
-            body += `*Triggered by PR #${{ github.event.pull_request.number }}*`;
+            for (const ds of datastreams) {
+              const vpus = entries.filter(e => e.datastream === ds).map(e => e.vpu);
+              body += `- **${ds}**: ${vpus.length} VPUs (${vpus.join(', ')})\n`;
+            }
+            body += `\n*Triggered by PR #${{ github.event.pull_request.number }}*`;
 
-            const marker = 'VPU Test:';
+            const marker = 'VPU Test';
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
