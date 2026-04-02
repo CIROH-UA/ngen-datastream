@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   test-ngiab-dev-integration:
@@ -36,13 +37,11 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3      
 
-    - name: Configure AWS
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-1    
-        export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-        export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+        aws-region: us-east-1
 
     - name: Build docker containers
       run : |        
@@ -72,13 +71,11 @@ jobs:
         echo "FP_TAG: ${{ inputs.fp_tag }}"
         echo "NGIAB_TAG: ${{ inputs.ngiab_tag }}"
 
-    - name: Configure AWS
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region us-east-1    
-        export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-        export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+        aws-region: us-east-1
 
     - name: Base test and NWM_RETRO_V3
       run: |        
@@ -151,11 +148,11 @@ jobs:
           echo "NGIAB_TAG=${{ inputs.ngiab_tag }}"
           echo "ds_ami_version=$CURRENT_DS_AMI" >> "$GITHUB_OUTPUT"
 
-      - name: Configure AWS
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region us-east-1        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
 
       - name: Build AMI on AWS (N Virginia)
         run: |
@@ -178,8 +175,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Get AMI ID
@@ -208,8 +204,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Set up Python
@@ -354,8 +349,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Set up Python
@@ -485,8 +479,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Check VPU Test Results and Handle AMI

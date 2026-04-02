@@ -8,7 +8,8 @@ on:
       - 'ami_version.yml'
 
 permissions:
-  contents: read   
+  contents: read
+  id-token: write
 
 jobs:
   build-test-push-ami:
@@ -66,11 +67,11 @@ jobs:
           echo "fp_tag=$FP_TAG" >> "$GITHUB_OUTPUT"
           echo "ngiab_tag=$NGIAB_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Configure AWS
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region us-east-1        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
 
       - name: Build AMI on AWS (N Virginia)
         if: steps.changes.outputs.build_ds_ami == 'true'
@@ -102,8 +103,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Get AMI ID
@@ -133,8 +133,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Set up Python
@@ -280,8 +279,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Set up Python
@@ -412,8 +410,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Check VPU Test Results and Handle AMI
