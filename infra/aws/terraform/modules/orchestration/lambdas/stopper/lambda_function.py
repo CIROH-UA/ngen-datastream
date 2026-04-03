@@ -34,22 +34,25 @@ def confirm_instance_termination(instance_id):
 
 def lambda_handler(event, context):
     """
-    Generic Poller funcion    
+    Generic Poller funcion
     """
 
-    instance_id = event['instance_parameters']['InstanceId']
+    instance_id = event.get('instance_parameters', {}).get('InstanceId', None)
     if instance_id is None:
-        print('No InstanceId found in event, exiting')
+        print('No InstanceId found in event, nothing to terminate')
         return event
-    response = client_ec2.describe_volumes(
-        Filters=[
-        {
-            'Name': 'volume-id',
-            'Values': [event['volume_id']],
-        },
-    ],)
-    print(response)
-    volume_id=event['volume_id']
+
+    volume_id = event.get('volume_id', None)
+    if volume_id:
+        response = client_ec2.describe_volumes(
+            Filters=[
+            {
+                'Name': 'volume-id',
+                'Values': [volume_id],
+            },
+        ],)
+        print(response)
+
     if event["run_options"]["ii_terminate_instance"]:
         response = client_ec2.terminate_instances(
             InstanceIds=[
@@ -58,7 +61,7 @@ def lambda_handler(event, context):
         )
         confirm_instance_termination(instance_id)
     else:
-        if event["run_options"]["ii_delete_volume"]:
+        if volume_id and event["run_options"]["ii_delete_volume"]:
             print(f'Instance VolumeId {volume_id} located.')
             response = client_ec2.detach_volume(
                 InstanceId=instance_id,
@@ -70,8 +73,8 @@ def lambda_handler(event, context):
             response = client_ec2.delete_volume(
                 VolumeId=volume_id,
                 DryRun=False
-            )   
-            print(f'EBS volume {volume_id} has been successfully deleted.')     
+            )
+            print(f'EBS volume {volume_id} has been successfully deleted.')
         else:
             print(f"Volume {volume_id} remains attached or available and is still incurring costs.")
 

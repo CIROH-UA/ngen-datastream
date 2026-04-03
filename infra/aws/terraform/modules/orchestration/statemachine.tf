@@ -184,7 +184,22 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "BackoffRate": 2
         }
       ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "Catch stopper failures so execution completes instead of leaving orphaned instances",
+          "Next": "Stopper Failed",
+          "ResultPath": "$.stopperError"
+        }
+      ],
       "Next": "Retry Choice"
+    },
+    "Stopper Failed": {
+      "Type": "Fail",
+      "Error": "EC2StopperFailed",
+      "Cause": "EC2Stopper lambda failed - instance may still be running and require manual cleanup"
     }
   }
 }

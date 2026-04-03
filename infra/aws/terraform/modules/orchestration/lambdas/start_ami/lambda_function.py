@@ -116,7 +116,7 @@ def lambda_handler(event, context):
     except botocore.exceptions.ClientError as e:
         error_msg = e.response['Error']['Message']
         print(f"run_instances failed: {error_msg}")
-        
+
         if event['instance_parameters'].get('InstanceMarketOptions', None):
             print("Spot instance request failed, falling back to on-demand instance")
             event['instance_parameters'].pop('InstanceMarketOptions', None)
@@ -129,12 +129,17 @@ def lambda_handler(event, context):
         print(f"Unexpected error: {e}")
         raise
 
-    if not instance_id is None:
-        if not wait_for_instance_running(instance_id):
-            raise Exception(f"EC2 instance {instance_id} did not reach 'Online' state")
-        print(f'{instance_id} has been launched and running')
+    event['instance_parameters']['InstanceId'] = instance_id
 
-    event['instance_parameters']['InstanceId']  = instance_id
+    if instance_id is not None:
+        if not wait_for_instance_running(instance_id):
+            print(f"EC2 instance {instance_id} did not reach 'running' state, terminating")
+            try:
+                client_ec2.terminate_instances(InstanceIds=[instance_id])
+            except Exception as term_err:
+                print(f"Failed to terminate instance {instance_id}: {term_err}")
+            raise Exception(f"EC2 instance {instance_id} did not reach 'Online' state and has been terminated")
+        print(f'{instance_id} has been launched and running')
 
     return event
 
