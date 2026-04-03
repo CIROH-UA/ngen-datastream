@@ -178,3 +178,22 @@ jobs:
               });
               console.log('Created new drift issue');
             }
+
+      - name: Notify Slack
+        if: always()
+        run: |
+          REPORT=$(cat /tmp/drift-reports/nrds.json)
+          DRIFT=$(echo "$REPORT" | jq -r '.drift_detected')
+          RUN_URL=$(echo "$REPORT" | jq -r '.run_url')
+
+          if [ "$DRIFT" = "true" ]; then
+            MSG=":rotating_light: *Terraform drift detected in nrds*\n• <${RUN_URL}|View plan output>\n• Check the GitHub issue labeled \`terraform-drift\`"
+          elif [ "$DRIFT" = "error" ]; then
+            MSG=":x: *Terraform plan failed for nrds*\n• <${RUN_URL}|View run>"
+          else
+            MSG=":white_check_mark: *No terraform drift detected in nrds*"
+          fi
+
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg text "$MSG" '{text: $text}')" || echo "Slack notify failed"
