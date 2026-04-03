@@ -175,12 +175,6 @@ docker pull awiciroh/forcingprocessor:$FP_TAG
 docker pull awiciroh/ciroh-ngen-image:$NGIAB_TAG
 docker pull zwills/merkdir
 
-echo "Pre-warming Docker runtime..."
-docker run --rm awiciroh/datastream:$DS_TAG echo "warm"
-docker run --rm awiciroh/forcingprocessor:$FP_TAG echo "warm"
-docker run --rm awiciroh/ciroh-ngen-image:$NGIAB_TAG echo "warm"
-echo "Docker pre-warm complete"
-
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
 USER_DATA_SETUP
