@@ -179,7 +179,7 @@ jobs:
               console.log('Created new drift issue');
             }
 
-      - name: Notify Slack
+      - name: Notify Slack on drift
         if: always()
         run: |
           REPORT=$(cat /tmp/drift-reports/nrds.json)
@@ -191,7 +191,8 @@ jobs:
           elif [ "$DRIFT" = "error" ]; then
             MSG=":x: *Terraform plan failed for nrds*\n• <${RUN_URL}|View run>"
           else
-            MSG=":white_check_mark: *No terraform drift detected in nrds*"
+            echo "No drift — skipping Slack"
+            exit 0
           fi
 
           curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
