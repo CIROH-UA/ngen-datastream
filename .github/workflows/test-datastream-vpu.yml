@@ -28,11 +28,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_REGION: us-east-1
-  SM_ARN: arn:aws:states:us-east-1:879381264451:stateMachine:nrds_prod_sm
-  S3_BUCKET: ciroh-community-ngen-datastream
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  SM_ARN: ${{ vars.SM_ARN }}
+  S3_BUCKET: ${{ vars.S3_BUCKET }}
   S3_TEST_PREFIX: test/cicd/vpu-test
-  INSTANCE_PROFILE: nrds_prod_ec2_profile
+  INSTANCE_PROFILE: ${{ vars.INSTANCE_PROFILE }}
   PROD_VARS: infra/aws/terraform/services/nrds/envs/prod.tfvars
 
 jobs:
@@ -117,7 +117,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build execution payload
@@ -271,7 +271,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Clean up test S3 output
