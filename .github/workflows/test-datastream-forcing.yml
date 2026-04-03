@@ -126,7 +126,7 @@ jobs:
 
           MEMBER_SUFFIX=""
           if [ "$RUN_TYPE" = "medium_range" ]; then
-            MEMBER_SUFFIX="_1"
+            MEMBER_SUFFIX="_0"
           fi
 
           # Read commands from config and replace placeholders

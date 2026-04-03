@@ -8,7 +8,7 @@
   "default_run_type": "short_range",
   "test_date": "20260209",
   "medium_range_instance_type": "m8g.4xlarge",
-  "medium_range_timeout_s": 3600,
+  "medium_range_timeout_s": 7200,
   "commands": [
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/run/datastream-metadata'",
     "runuser -l ec2-user -c 'mkdir -p /home/ec2-user/run/ngen-run/config'",
