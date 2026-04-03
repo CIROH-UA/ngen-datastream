@@ -129,10 +129,7 @@ cat > /etc/docker/daemon.json << 'DOCKER_CONF'
     "max-size": "10m",
     "max-file": "3"
   },
-  "live-restore": true,
-  "default-ulimits": {
-    "nofile": { "Name": "nofile", "Hard": 65536, "Soft": 65536 }
-  }
+  "live-restore": true
 }
 DOCKER_CONF
 
