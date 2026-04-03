@@ -15,6 +15,7 @@ concurrency:
 env:
   TF_VERSION: "1.10.0"
   AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
   TF_DIR: infra/aws/terraform/services/nrds
   CI_CONFIG: .github/orchestration-test
 
@@ -37,7 +38,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -168,7 +169,7 @@ jobs:
           done
           # State machine
           aws stepfunctions delete-state-machine \
-            --state-machine-arn "arn:aws:states:us-east-1:879381264451:stateMachine:nrds_ci_sm" 2>/dev/null || true
+            --state-machine-arn "arn:aws:states:us-east-1:${AWS_ACCOUNT_ID}:stateMachine:nrds_ci_sm" 2>/dev/null || true
           # IAM - detach policies, remove profile, delete roles and policies
           for ROLE in nrds_ci_ec2_role nrds_ci_lambda_role nrds_ci_sm_role; do
             for P in $(aws iam list-attached-role-policies --role-name "$ROLE" --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null); do
@@ -181,7 +182,7 @@ jobs:
             aws iam delete-role --role-name "$ROLE" 2>/dev/null || true
           done
           for POL in nrds_ci_ec2_policy nrds_ci_lambda_policy nrds_ci_lambda_invoke_policy; do
-            ARN="arn:aws:iam::879381264451:policy/$POL"
+            ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/$POL"
             for V in $(aws iam list-policy-versions --policy-arn "$ARN" --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text 2>/dev/null); do
               aws iam delete-policy-version --policy-arn "$ARN" --version-id "$V" 2>/dev/null || true
             done
