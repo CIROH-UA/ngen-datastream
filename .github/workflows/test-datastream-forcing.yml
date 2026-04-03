@@ -223,15 +223,23 @@ jobs:
           RUN_TYPE="${{ needs.setup.outputs.run_type }}"
           INIT="${{ needs.setup.outputs.init }}"
           PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/forcing_${RUN_TYPE}/${INIT}/"
+          VPU_LIST="${{ needs.setup.outputs.vpu_list }}"
 
-          FILE_COUNT=$(aws s3 ls "$PREFIX" --recursive | grep -c '\.nc$' || true)
-          echo "Found $FILE_COUNT NetCDF files at $PREFIX"
+          MISSING=0
+          FOUND=0
+          for VPU in $(echo "$VPU_LIST" | tr ',' ' '); do
+            FILE=$(aws s3 ls "${PREFIX}" --recursive | grep "VPU_${VPU}.nc" || true)
+            if [ -n "$FILE" ]; then
+              echo "OK: VPU_${VPU} forcing file found"
+              FOUND=$((FOUND + 1))
+            else
+              echo "::error::VPU_${VPU} forcing file missing at ${PREFIX}"
+              MISSING=$((MISSING + 1))
+            fi
+          done
 
-          if [ "$FILE_COUNT" -ge 20 ]; then
-            echo "OK: $FILE_COUNT forcing NetCDFs found (expected >= 20 VPUs)"
-          else
-            echo "::error::Only $FILE_COUNT NetCDF files found at $PREFIX (expected >= 20)"
-            aws s3 ls "$PREFIX" --recursive | head -30
+          echo "Results: $FOUND found, $MISSING missing"
+          if [ "$MISSING" -gt 0 ]; then
             exit 1
           fi
 
