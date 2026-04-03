@@ -26,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
   SM_ARN: ${{ vars.SM_ARN }}
   S3_BUCKET: ${{ vars.S3_BUCKET }}
   S3_TEST_PREFIX: test/cicd/forcing

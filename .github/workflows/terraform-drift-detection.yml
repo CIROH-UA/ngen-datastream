@@ -8,7 +8,7 @@ on:
 
 env:
   TF_VERSION: "1.10.0"
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
   WORKING_DIR: infra/aws/terraform/services/nrds
 
 permissions:
