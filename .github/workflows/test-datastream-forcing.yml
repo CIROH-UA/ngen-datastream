@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - all
           - short_range
           - medium_range
       init:
@@ -41,14 +42,11 @@ jobs:
     permissions:
       contents: read
     outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
       ami: ${{ steps.ami.outputs.ami }}
-      run_type: ${{ steps.params.outputs.run_type }}
-      init: ${{ steps.params.outputs.init }}
-      instance_type: ${{ steps.params.outputs.instance_type }}
-      timeout_s: ${{ steps.params.outputs.timeout_s }}
-      volume_size: ${{ steps.params.outputs.volume_size }}
       vpu_list: ${{ steps.params.outputs.vpu_list }}
       test_date: ${{ steps.params.outputs.test_date }}
+      volume_size: ${{ steps.params.outputs.volume_size }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -56,34 +54,60 @@ jobs:
       - name: Resolve parameters
         id: params
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RUN_TYPE="${{ inputs.run_type }}"
-            INIT="${{ inputs.init }}"
-          else
-            RUN_TYPE=$(jq -r '.default_run_type' "${{ env.CONFIG }}")
-            INIT=$(jq -r '.default_init' "${{ env.CONFIG }}")
-          fi
-
           VPU_LIST=$(jq -r '.vpus | join(",")' "${{ env.CONFIG }}")
-
-          if [ "$RUN_TYPE" = "medium_range" ]; then
-            INSTANCE_TYPE=$(jq -r '.medium_range_instance_type // .instance_type' "${{ env.CONFIG }}")
-            TIMEOUT_S=$(jq -r '.medium_range_timeout_s // .timeout_s' "${{ env.CONFIG }}")
-          else
-            INSTANCE_TYPE=$(jq -r '.instance_type' "${{ env.CONFIG }}")
-            TIMEOUT_S=$(jq -r '.timeout_s' "${{ env.CONFIG }}")
-          fi
-
           VOLUME_SIZE=$(jq -r '.volume_size' "${{ env.CONFIG }}")
           TEST_DATE=$(jq -r '.test_date' "${{ env.CONFIG }}")
 
-          echo "run_type=$RUN_TYPE" >> "$GITHUB_OUTPUT"
-          echo "init=$INIT" >> "$GITHUB_OUTPUT"
-          echo "instance_type=$INSTANCE_TYPE" >> "$GITHUB_OUTPUT"
-          echo "timeout_s=$TIMEOUT_S" >> "$GITHUB_OUTPUT"
-          echo "volume_size=$VOLUME_SIZE" >> "$GITHUB_OUTPUT"
           echo "vpu_list=$VPU_LIST" >> "$GITHUB_OUTPUT"
+          echo "volume_size=$VOLUME_SIZE" >> "$GITHUB_OUTPUT"
           echo "test_date=$TEST_DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Build matrix
+        id: build
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SELECTED="${{ inputs.run_type }}"
+            INIT="${{ inputs.init }}"
+          else
+            SELECTED=$(jq -r '.default_run_type' "${{ env.CONFIG }}")
+            INIT=$(jq -r '.default_init' "${{ env.CONFIG }}")
+          fi
+
+          MATRIX="[]"
+
+          add_entry() {
+            local rt=$1
+            local init=$2
+            local itype timeout_s member_suffix
+
+            if [ "$rt" = "medium_range" ]; then
+              itype=$(jq -r '.medium_range_instance_type // .instance_type' "${{ env.CONFIG }}")
+              timeout_s=$(jq -r '.medium_range_timeout_s // .timeout_s' "${{ env.CONFIG }}")
+              member_suffix="_0"
+            else
+              itype=$(jq -r '.instance_type' "${{ env.CONFIG }}")
+              timeout_s=$(jq -r '.timeout_s' "${{ env.CONFIG }}")
+              member_suffix=""
+            fi
+
+            MATRIX=$(echo "$MATRIX" | jq -c \
+              --arg rt "$rt" \
+              --arg init "$init" \
+              --arg itype "$itype" \
+              --arg timeout_s "$timeout_s" \
+              --arg member_suffix "$member_suffix" \
+              '. + [{ run_type: $rt, init: $init, instance_type: $itype, timeout_s: ($timeout_s | tonumber), member_suffix: $member_suffix }]')
+          }
+
+          if [ "$SELECTED" = "all" ]; then
+            add_entry "short_range" "$INIT"
+            add_entry "medium_range" "06"
+          else
+            add_entry "$SELECTED" "$INIT"
+          fi
+
+          echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "Testing $(echo "$MATRIX" | jq length) run type(s)"
 
       - name: Look up AMI
         id: ami
@@ -94,12 +118,16 @@ jobs:
 
   # ── Run forcing processor ──────────────────────────────────────
   test-forcing:
-    name: "FP ${{ needs.setup.outputs.run_type }} init${{ needs.setup.outputs.init }}"
+    name: "FP ${{ matrix.run_type }} init${{ matrix.init }}"
     needs: setup
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,21 +141,17 @@ jobs:
       - name: Build payload
         id: payload
         run: |
-          RUN_TYPE="${{ needs.setup.outputs.run_type }}"
-          INIT="${{ needs.setup.outputs.init }}"
+          RUN_TYPE="${{ matrix.run_type }}"
+          INIT="${{ matrix.init }}"
           AMI="${{ needs.setup.outputs.ami }}"
-          INSTANCE_TYPE="${{ needs.setup.outputs.instance_type }}"
-          TIMEOUT_S="${{ needs.setup.outputs.timeout_s }}"
+          INSTANCE_TYPE="${{ matrix.instance_type }}"
+          TIMEOUT_S="${{ matrix.timeout_s }}"
           VOLUME_SIZE="${{ needs.setup.outputs.volume_size }}"
           VPU_LIST="${{ needs.setup.outputs.vpu_list }}"
           TEST_DATE="${{ needs.setup.outputs.test_date }}"
+          MEMBER_SUFFIX="${{ matrix.member_suffix }}"
 
           RUN_TYPE_H=$(echo "$RUN_TYPE" | tr '[:lower:]' '[:upper:]')
-
-          MEMBER_SUFFIX=""
-          if [ "$RUN_TYPE" = "medium_range" ]; then
-            MEMBER_SUFFIX="_0"
-          fi
 
           # Read commands from config and replace placeholders
           jq -c '.commands[]' "${{ env.CONFIG }}" | while read -r cmd; do
@@ -179,8 +203,8 @@ jobs:
       - name: Run and monitor
         id: monitor
         run: |
-          RUN_TYPE="${{ needs.setup.outputs.run_type }}"
-          INIT="${{ needs.setup.outputs.init }}"
+          RUN_TYPE="${{ matrix.run_type }}"
+          INIT="${{ matrix.init }}"
           EXEC_NAME="ci_forcing_${RUN_TYPE}_init${INIT}_$(date +%s)"
           EXEC_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "${{ env.SM_ARN }}" \
@@ -189,7 +213,7 @@ jobs:
             --query 'executionArn' --output text)
           echo "Started: $EXEC_ARN"
 
-          TIMEOUT=2400
+          TIMEOUT=${{ matrix.timeout_s }}
           ELAPSED=0
           STATUS="RUNNING"
 
@@ -220,8 +244,8 @@ jobs:
       - name: Verify output files
         if: steps.monitor.outputs.result == 'SUCCEEDED'
         run: |
-          RUN_TYPE="${{ needs.setup.outputs.run_type }}"
-          INIT="${{ needs.setup.outputs.init }}"
+          RUN_TYPE="${{ matrix.run_type }}"
+          INIT="${{ matrix.init }}"
           PREFIX="s3://${{ env.S3_BUCKET }}/${{ env.S3_TEST_PREFIX }}/forcing_${RUN_TYPE}/${INIT}/"
           VPU_LIST="${{ needs.setup.outputs.vpu_list }}"
 
