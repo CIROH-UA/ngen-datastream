@@ -125,7 +125,7 @@ jobs:
       contents: read
       id-token: write
     strategy:
-      fail-fast: false
+      fail-fast: true
       max-parallel: 1
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
