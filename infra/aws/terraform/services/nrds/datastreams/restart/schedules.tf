@@ -2,6 +2,7 @@ locals {
   restart_config = jsondecode(file("${path.module}/config/execution_forecast_inputs_restart.json"))
 
   restart_template_path = "${path.module}/templates/execution_restart_template.json.tpl"
+  restart_vpu_list      = "01,02,03N,03S,03W,04,05,06,07,08,09,10L,10U,11,12,13,14,15,16,18"
 
   restart_schedules = {
     for init in local.restart_config.init_cycles : init => {
@@ -50,6 +51,7 @@ resource "aws_scheduler_schedule" "restart_schedule" {
     s3_bucket          = var.s3_bucket
     ds_tag             = var.ds_tag
     fp_tag             = var.fp_tag
+    vpu_list           = local.restart_vpu_list
   }))}
 }
 EOT

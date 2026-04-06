@@ -6,6 +6,6 @@
     "18", "19", "20", "21", "22", "23"
   ],
   "instance_type": "m8g.xlarge",
-  "volume_size": 32,
+  "volume_size": 64,
   "timeout_s": 1800
 }
