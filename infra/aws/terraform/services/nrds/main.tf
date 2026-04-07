@@ -108,6 +108,8 @@ module "restart_schedules" {
   ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
 
   restart_ami_id = var.restart_ami_id
+  ds_tag         = var.restart_ds_tag
+  fp_tag         = var.restart_fp_tag
 
   schedule_timezone   = var.schedule_timezone
   schedule_group_name = var.schedule_group_name
