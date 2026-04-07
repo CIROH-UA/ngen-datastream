@@ -52,8 +52,8 @@ resource "aws_scheduler_schedule" "restart_schedule" {
     ds_tag             = var.ds_tag
     fp_tag             = var.fp_tag
     vpu_list           = local.restart_vpu_list
-  }))}
+}))}
 }
 EOT
-  }
+}
 }
