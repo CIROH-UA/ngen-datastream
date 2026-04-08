@@ -29,18 +29,6 @@ variable "restart_ami_id" {
   description = "AMI ID for restart generation EC2 instances"
 }
 
-variable "ds_tag" {
-  type        = string
-  default     = "1.7.0"
-  description = "Datastream Docker image tag"
-}
-
-variable "fp_tag" {
-  type        = string
-  default     = "2.2.0"
-  description = "Forcing Processor Docker image tag"
-}
-
 variable "schedule_timezone" {
   type    = string
   default = "America/New_York"

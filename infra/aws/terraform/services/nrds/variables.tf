@@ -64,18 +64,6 @@ variable "restart_ami_id" {
   default     = "ami-038132f534157b5c3"
 }
 
-variable "restart_ds_tag" {
-  type        = string
-  description = "Datastream Docker image tag for restart generation"
-  default     = "1.7.0"
-}
-
-variable "restart_fp_tag" {
-  type        = string
-  description = "Forcing Processor Docker image tag for restart generation"
-  default     = "2.2.0"
-}
-
 # Schedule settings
 variable "schedule_timezone" {
   type        = string

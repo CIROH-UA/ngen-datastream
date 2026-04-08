@@ -49,8 +49,6 @@ resource "aws_scheduler_schedule" "restart_schedule" {
     timeout_s          = each.value.timeout_s
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-    ds_tag             = var.ds_tag
-    fp_tag             = var.fp_tag
     vpu_list           = local.restart_vpu_list
 }))}
 }
