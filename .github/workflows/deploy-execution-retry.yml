@@ -1,0 +1,44 @@
+name: Deploy Execution Retry Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/aws/lambda/maintenance/execution_retry/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  LAMBDA_NAME: nrds_execution_retry
+  LAMBDA_DIR: infra/aws/lambda/maintenance/execution_retry
+
+jobs:
+  deploy:
+    name: Deploy Lambda
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Package and deploy
+        run: |
+          cd ${{ env.LAMBDA_DIR }}
+          zip -j lambda.zip retry_lambda.py
+          aws lambda update-function-code \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --zip-file fileb://lambda.zip \
+            --region ${{ env.AWS_REGION }}
+          aws lambda wait function-updated \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --region ${{ env.AWS_REGION }}
+          echo "Lambda deployed successfully"
