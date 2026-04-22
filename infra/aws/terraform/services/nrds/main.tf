@@ -99,6 +99,23 @@ module "routing_only_schedules" {
   s3_bucket = var.s3_bucket
 }
 
+module "restart_schedules" {
+  source = "./datastreams/restart"
+
+  region               = var.region
+  state_machine_arn    = module.nrds_orchestration.datastream_arn
+  scheduler_role_arn   = aws_iam_role.scheduler_role.arn
+  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
+
+  restart_ami_id = var.restart_ami_id
+
+  schedule_timezone   = var.schedule_timezone
+  schedule_group_name = var.schedule_group_name
+  environment_suffix  = var.environment_suffix
+
+  s3_bucket = var.s3_bucket
+}
+
 module "lstm_0_schedules" {
   source = "./datastreams/lstm_0"
 
