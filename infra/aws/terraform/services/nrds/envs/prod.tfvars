@@ -23,7 +23,7 @@ scheduler_role_name   = "nrds_prod_scheduler_role"
 # Per-datastream AMIs
 cfe_nom_ami_id      = "ami-038132f534157b5c3"
 fp_ami_id           = "ami-062245e1c9604128d"
-routing_only_ami_id = "ami-0e28d2f2d8491620b"
+routing_only_ami_id = "ami-02cb92f166b83470e"
 lstm_0_ami_id       = "ami-038132f534157b5c3"
 restart_ami_id      = "ami-0e28d2f2d8491620b"
 
