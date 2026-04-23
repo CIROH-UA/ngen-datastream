@@ -86,7 +86,9 @@ def lambda_handler(event, context):
             if "SHORT_RANGE" in forcing_source:
                 fcst_cycle = int(forcing_source[-2:])
             elif "MEDIUM_RANGE" in forcing_source:
-                fcst_cycle = int(forcing_source[-4:-2])          
+                fcst_cycle = int(forcing_source[-4:-2])
+            elif "ANALYSIS_ASSIM_RESTART_CHRT" in forcing_source:
+                fcst_cycle = int(forcing_source[-2:])
             if today.hour < fcst_cycle:
                 today = (today - timedelta(days=1))
             today = today.strftime('%Y%m%d')        
