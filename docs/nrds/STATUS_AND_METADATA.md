@@ -1,5 +1,52 @@
 # Status
 
+Last Updated: 04/2026
+Changes
+* A new datastream has been deployed, `restart`, that processes NWM channel routing files onto the NextGen hydrofabric to be used as restart files for troute. The created files are ingested by the `routing-only` datastream to provide initial streamflow conditions. Other datastream deployments have not been updated.
+
+## Status NWM2NextGen Forcing Processing
+* Output data exists at `forcings/v2.2_hydrofabric/...`
+* Input NWM forcings from https://noaa-nwm-pds.s3.amazonaws.com/index.html
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours), analysis_assim_extend(once per day at 16z)
+* Processing by [forcingprocessor](https://github.com/CIROH-UA/forcingprocessor)
+* Data grouped by VPU
+* v2.2 hydrofabric
+
+## Status LSTM DataStream 
+* Output data exists at `outputs/lstm_0/v2.2_hydrofabric/...`
+* Forcings from `forcings/v2.2_hydrofabric`
+* All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
+* Ensemble members (weight files)
+  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_25yr_seq999_seed103_2701_171540/config.yml"
+  * "/ngen/ngen/extern/lstm/trained_neuralhydrology_models/nh_AORC_hourly_slope_elev_precip_temp_seq999_seed101_2801_191806/config.yml"
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
+* Cold start
+* v2.2 hydrofabric
+
+## Status CFE NOM DataStream
+* Output data exists at `outputs/cfe_nom/v2.2_hydrofabric/...`
+* Forcings from `forcings/v2.2_hydrofabric`
+* All VPUs besides VPU 17 https://github.com/CIROH-UA/ngen-datastream/issues/199
+* Updated BMI config files at `resources/v2.2_hydrofabric/bmi_configs/cfe_nom_fixed`
+* Run Types - short_range (hourly, every hour), medium_range (4 times per day, every 6 hours, first member), analysis_assim_extend(once per day at 16z)
+* Cold start
+* v2.2 hydrofabric
+
+## Status Routing-Only DataStream (DEV)
+* Output data exists at `outputs/routing_only/v2.2_hydrofabric/...`
+* Does not input NextGen forcings. Inputs National Water Model v3 pre-routing outputs, `q_lateral`.
+* VPU 03W only
+* Run Types - short_range (hourly, every hour)
+* v2.2 hydrofabric
+
+## Status Restart DataStream
+* Output data exists at `outputs/restarts/v2.2_hydrofabric/...`
+* Input NWM channel routing from https://noaa-nwm-pds.s3.amazonaws.com/index.html
+* Full CONUS
+* Run once every hour
+* v2.2 hydrofabric
+
+---
 Last Updated: 03/2026
 Changes
 * None to the actual deployment, though the deployments are now performed via an automated pipeline using GitHub Actions. The only major change here from the last update is we now refer to the forcing processing as an individual datastream as it is deployed as such and we anticipate deploying different forcing processing datastreams in the future.
