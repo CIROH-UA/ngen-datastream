@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'infra/aws/terraform/**'
+      - '.github/workflows/terraform-deploy.yml'
   workflow_dispatch:
 
 # CRITICAL: Never cancel a terraform apply mid-run — it can leave state locked

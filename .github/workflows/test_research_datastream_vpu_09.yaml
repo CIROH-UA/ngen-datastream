@@ -18,6 +18,7 @@ on:
       - 'research_datastream/terraform_community/main.tf'
       - 'research_datastream/terraform_community/variables.tfvars'
       - 'research_datastream/terraform_community/lambda_functions/**'
+      - '.github/workflows/test_research_datastream_vpu_09.yaml'
      
   pull_request:
     branches:
@@ -36,6 +37,7 @@ on:
       - 'research_datastream/terraform_community/main.tf'
       - 'research_datastream/terraform_community/variables.tfvars'
       - 'research_datastream/terraform_community/lambda_functions/**'
+      - '.github/workflows/test_research_datastream_vpu_09.yaml'
 
 permissions:
   contents: read

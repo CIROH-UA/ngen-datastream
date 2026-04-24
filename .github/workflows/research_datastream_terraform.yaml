@@ -9,6 +9,7 @@ on:
       - 'research_datastream/terraform/variables.tfvars'
       - 'research_datastream/terraform/lambda_functions/**'
       - 'research_datastream/terraform/test/**'
+      - '.github/workflows/research_datastream_terraform.yaml'
 
   pull_request:
     branches:
@@ -18,6 +19,7 @@ on:
       - 'research_datastream/terraform/variables.tfvars'
       - 'research_datastream/terraform/lambda_functions/**'
       - 'research_datastream/terraform/test/**'
+      - '.github/workflows/research_datastream_terraform.yaml'
 
 permissions:
   contents: read

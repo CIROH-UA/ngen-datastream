@@ -7,12 +7,14 @@ on:
     paths:
       - 'forcingprocessor/**'
       - '!forcingprocessor/README.md'      
+      - '.github/workflows/test_research_datastream_fp.yaml'
   pull_request:
     branches:
       - main    
     paths:      
       - 'forcingprocessor/**'
       - '!forcingprocessor/README.md'  
+      - '.github/workflows/test_research_datastream_fp.yaml'
 
 permissions:
   contents: read

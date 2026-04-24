@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'ami_version.yml'
+      - '.github/workflows/build_test_create_ami.yml'
 
 permissions:
   contents: read   
