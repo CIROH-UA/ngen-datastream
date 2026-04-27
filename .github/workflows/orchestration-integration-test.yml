@@ -6,6 +6,7 @@ on:
     paths:
       - 'infra/aws/terraform/modules/orchestration/**'
       - 'infra/aws/terraform/services/nrds/iam_*.tf'
+      - '.github/workflows/orchestration-integration-test.yml'
   workflow_dispatch:
 
 concurrency:

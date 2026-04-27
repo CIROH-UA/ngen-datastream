@@ -7,6 +7,7 @@ on:
     paths:
       - 'infra/aws/terraform/**'
       - '.github/workflows/terraform-*.yml'
+      - '.github/workflows/terraform-pr-validate.yml'
   workflow_dispatch:
 
 env:

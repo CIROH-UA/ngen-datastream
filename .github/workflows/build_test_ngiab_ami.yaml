@@ -87,7 +87,7 @@ jobs:
         export DS_TAG="${{ inputs.ds_tag }}"
         export FP_TAG="${{ inputs.fp_tag }}"
         export NGIAB_TAG="${{ inputs.ngiab_tag }}"        
-        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://ngen-datastream.s3.us-east-2.amazonaws.com/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
+        ./scripts/datastream -s 202006200100 -e 202006200200 -C NWM_RETRO_V3 -d $(pwd)/data/datastream_test -g https://ciroh-community-ngen-datastream.s3.amazonaws.com/resources/v2.1_hydrofabric/geopackages/test_data/palisade.gpkg -R $(pwd)/configs/ngen/realization_sloth_nom_cfe_pet.json
 
 
   bump-version:

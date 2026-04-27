@@ -7,29 +7,32 @@ on:
     paths:
       - 'forcingprocessor/**'
       - '!forcingprocessor/README.md'      
+      - '.github/workflows/test_research_datastream_fp.yaml'
   pull_request:
     branches:
       - main    
     paths:      
       - 'forcingprocessor/**'
       - '!forcingprocessor/README.md'  
+      - '.github/workflows/test_research_datastream_fp.yaml'
 
 permissions:
   contents: read
+  id-token: write
+
 jobs:
   test-research-datastream-forcingprocessing:
     runs-on: ubuntu-latest
     env:
-      DATE: 20250803    
+      DATE: 20250803
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Set up Python
