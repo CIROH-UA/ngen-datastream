@@ -193,7 +193,7 @@ def lambda_handler(event, context):
     client_ssm = boto3.client('ssm')
     print(f'Client established, sending command')
     ii_send_command = True
-    max_wait = 120
+    max_wait = 300
     start_time = time.time()
     while ii_send_command:
         if time.time() - start_time > max_wait:
