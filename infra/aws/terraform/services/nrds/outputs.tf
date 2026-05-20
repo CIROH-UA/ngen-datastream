@@ -57,3 +57,6 @@ output "lstm_0_medium_range_schedule_count" {
 output "lstm_0_analysis_assim_schedule_count" {
   value = module.lstm_0_schedules.analysis_assim_schedule_count
 }
+output "qkrig_daily_schedule_names" {
+  value = module.qkrig_schedules.qkrig_daily_schedule_names
+}

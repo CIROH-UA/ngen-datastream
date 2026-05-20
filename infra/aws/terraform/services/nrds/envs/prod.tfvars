@@ -33,4 +33,5 @@ schedule_group_name = "default"
 environment_suffix  = "prod"
 
 # S3
-s3_bucket = "ciroh-community-ngen-datastream"
+s3_bucket    = "ciroh-community-ngen-datastream"
+qkrig_ami_id = "ami-0dd297f1f6c52facb"
