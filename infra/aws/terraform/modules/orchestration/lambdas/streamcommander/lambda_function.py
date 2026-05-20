@@ -59,6 +59,7 @@ def lambda_handler(event, context):
         event.pop("datastream_command_options")  
 
     forcing_file = None
+    forcing_source = None
     for jcmd in event["commands"]:
         bucket_pattern = r"(?i)--s3_bucket[=\s']+([^\s']+)"
         match = re.search(bucket_pattern, jcmd)
@@ -83,25 +84,30 @@ def lambda_handler(event, context):
             # Create s3 path with DAILY replaced
             prefix_daily = prefix
             fcst_cycle = 16 # for analysis assim extend
-            if "SHORT_RANGE" in forcing_source:
-                fcst_cycle = int(forcing_source[-2:])
-            elif "MEDIUM_RANGE" in forcing_source:
-                fcst_cycle = int(forcing_source[-4:-2])
-            elif "ANALYSIS_ASSIM_RESTART_CHRT" in forcing_source:
-                fcst_cycle = int(forcing_source[-2:])
+            if forcing_source:
+                if "SHORT_RANGE" in forcing_source:
+                    fcst_cycle = int(forcing_source[-2:])
+                elif "MEDIUM_RANGE" in forcing_source:
+                    fcst_cycle = int(forcing_source[-4:-2])
+                elif "ANALYSIS_ASSIM_RESTART_CHRT" in forcing_source:
+                    fcst_cycle = int(forcing_source[-2:])
+            else:
+                fcst_cycle = 24
             if today.hour < fcst_cycle:
                 today = (today - timedelta(days=1))
-            today = today.strftime('%Y%m%d')        
-            prefix = re.sub(r"\DAILY",today,prefix)   
+            today = today.strftime('%Y%m%d')
+            prefix = re.sub(r"\DAILY",today,prefix)
             escaped_path = re.escape(prefix_daily)
             prefix_daily_pattern = escaped_path.replace('DAILY', r'(?P<date>DAILY)')
 
             for j,jcmd in enumerate(event["commands"]):
                 match = re.search(prefix_daily_pattern, jcmd)
                 replacement = prefix_daily.replace('DAILY', today)
-                if match: 
+                if match:
                     new_str = re.sub(prefix_daily_pattern, replacement, jcmd)
                     event["commands"][j] = re.sub(prefix_daily_pattern, replacement, jcmd)
+                if forcing_source is None:
+                    event["commands"][j] = re.sub(r'(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])', today, event["commands"][j])
 
         if forcing_file is not None:
             # Shifting forcing file times based on ensemble member
@@ -112,7 +118,7 @@ def lambda_handler(event, context):
 
             shifted_forcing = forcing_file  # default, if no shift occurs
 
-            if "MEDIUM_RANGE" in forcing_source:
+            if forcing_source and "MEDIUM_RANGE" in forcing_source:
                 ensemble_member = int(forcing_source[-1]) 
                 nhrs_shift = 6 * (ensemble_member - 1) 
                 m = re.search(r'/(\d{2})/.*?t(\d{2})z', forcing_file)
