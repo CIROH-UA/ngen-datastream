@@ -1,5 +1,19 @@
 # Status
 
+Last Updated: 05/2026
+Changes
+* A new datastream has been deployed, `qkrig`, that fetches USGS Instantaneous Value discharge for ~7,300 active gauges, fits an ordinary-kriging field across CONUS at hourly resolution, and samples the field at every NextGen v2.2 catchment centroid. Other datastream deployments have not been updated.
+
+## Status qkrig DataStream
+* Output data exists at `outputs/qkrig/qkrig.{YYYYMMDD}/`
+* Input USGS Instantaneous Value (IV) discharge for ~7,300 active gauges via `dataretrieval.nwis`
+* Hydrofabric: v2.2 CONUS gpkg (`resources/v2.2_hydrofabric/conus_nextgen.gpkg`)
+* Processing by [DualEarth/qkrig](https://github.com/DualEarth/qkrig), image `awiciroh/qkrig:2.2.0` (multi-arch linux/amd64 + linux/arm64)
+* Schedule: daily 00:30 ET (processes yesterday's UTC data)
+* Per-day artifacts: 24 hourly kriged NetCDFs + variograms, 1 parquet (~13 MB, 831k catchments × 24 hours), kriging PNGs + daily GIF, run logs
+* v2.2 hydrofabric
+
+---
 Last Updated: 04/2026
 Changes
 * A new datastream has been deployed, `restart`, that processes NWM channel routing files onto the NextGen hydrofabric to be used as restart files for troute. The created files are ingested by the `routing-only` datastream to provide initial streamflow conditions. Other datastream deployments have not been updated.
