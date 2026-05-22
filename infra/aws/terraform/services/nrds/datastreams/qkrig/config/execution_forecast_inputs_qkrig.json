@@ -1,0 +1,6 @@
+{
+  "init_cycles": ["00"],
+  "instance_type": "m8g.4xlarge",
+  "volume_size": 100,
+  "timeout_s": 9000
+}

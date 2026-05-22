@@ -64,6 +64,12 @@ variable "restart_ami_id" {
   default     = "ami-038132f534157b5c3"
 }
 
+variable "qkrig_ami_id" {
+  type        = string
+  description = "AMI ID for qkrig (USGS streamflow kriging) EC2 instances"
+  default     = "ami-0dd297f1f6c52facb"
+}
+
 # Schedule settings
 variable "schedule_timezone" {
   type        = string
