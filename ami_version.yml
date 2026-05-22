@@ -1,4 +1,4 @@
-datastream-ami-version: "1.6.4"
-DS_TAG: "1.0.2"
-FP_TAG: "1.0.3"
-NGIAB_TAG: "1.0.5"
+datastream-ami-version: "1.7.0"
+DS_TAG: "1.7.1"
+FP_TAG: "2.2.1"
+NGIAB_TAG: "v1.8.0"
