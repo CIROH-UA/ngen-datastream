@@ -90,8 +90,8 @@ jobs:
           export DS_TAG="$DS_TAG"
           export FP_TAG="$FP_TAG"
           export NGIAB_TAG="$NGIAB_TAG"
-          chmod +x scripts/create_ami.sh
-          ./scripts/create_ami.sh
+          chmod +x shell/create_ami.sh
+          ./shell/create_ami.sh
           
   get-ami-info:
     needs: build-test-push-ami
