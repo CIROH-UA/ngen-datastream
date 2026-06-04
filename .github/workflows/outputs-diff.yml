@@ -1,0 +1,218 @@
+name: Outputs Diff — Datastream Regression Check
+
+# Triggered only when EXISTING execution JSONs are modified in a PR.
+# --diff-filter=M excludes new files, so adding a new datastream won't fire this.
+# Finds all modified datastreamcli templates, re-runs all VPUs against the most
+# recent production date with the new version tags, then reports how (if at all)
+# the parquet outputs differ from production.
+# The workflow never blocks a merge — output changes are informational.
+#
+# Required secrets:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY — standard AWS credentials
+#   COMMUNITY_SM_ARN                         — Step Functions state machine ARN
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/aws/terraform/modules/schedules/executions/templates/*.json'
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: outputs-diff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── Job 1: detect which datastream changed and enumerate VPUs ──────────────
+  detect-changes:
+    name: Detect version-tag changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_version_change: ${{ steps.detect.outputs.has_version_change }}
+      templates_json:     ${{ steps.detect.outputs.templates_json }}
+      vpus_json:          ${{ steps.detect.outputs.vpus_json }}
+      date:               ${{ steps.detect.outputs.date }}
+      changes_summary:    ${{ steps.detect.outputs.changes_summary }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: pip install -q boto3
+
+      - name: Detect version-tag changes and find baseline date
+        id: detect
+        env:
+          BASE_REF:  ${{ github.base_ref }}
+          S3_BUCKET: ciroh-community-ngen-datastream
+        run: python .github/python/detect_changes.py
+
+  # ── Job 2: run each VPU with new version tags and compare outputs ───────────
+  outputs-diff:
+    name: "Outputs Diff ${{ matrix.template.slug }} / VPU_${{ matrix.vpu }}"
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_version_change == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.detect-changes.outputs.templates_json) }}
+        vpu: ${{ fromJSON(needs.detect-changes.outputs.vpus_json) }}
+
+    env:
+      S3_BUCKET:   ciroh-community-ngen-datastream
+      DATE:        ${{ needs.detect-changes.outputs.date }}
+      TEST_PREFIX: test/outputs_diff/${{ needs.detect-changes.outputs.date }}/${{ matrix.template.slug }}/VPU_${{ matrix.vpu }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -q boto3 pandas pyarrow
+
+      # Builds test_execution.json, submits to Step Functions, polls to completion.
+      # Also writes prod_prefix to $GITHUB_OUTPUT for the download step below.
+      - name: Build execution JSON and run simulation
+        id: run_sim
+        env:
+          TEMPLATE_FILE: ${{ matrix.template.file }}
+          VPU:           ${{ matrix.vpu }}
+          DATE:          ${{ env.DATE }}
+          TEST_PREFIX:   ${{ env.TEST_PREFIX }}
+          S3_BUCKET:     ${{ env.S3_BUCKET }}
+          RUN_ID:        ${{ github.run_id }}
+          SM_ARN:        ${{ secrets.COMMUNITY_SM_ARN }}
+        run: python .github/python/build_exec_json.py
+
+      # Sync troute parquet files directly from S3 (stored next to the tarball
+      # under outputs/troute/) and diff them. No tarball download needed.
+      # Always exits 0 — the report is informational, never blocks the PR.
+      - name: Download and compare outputs
+        run: |
+          PROD_PREFIX="${{ steps.run_sim.outputs.prod_prefix }}"
+          TEST_PREFIX="${{ env.TEST_PREFIX }}"
+
+          mkdir -p baseline test
+
+          echo "Syncing production troute parquet (VPU_${{ matrix.vpu }})..."
+          aws s3 sync \
+            "s3://${{ env.S3_BUCKET }}/${PROD_PREFIX}/outputs/troute/" \
+            baseline/ \
+            --exclude "*" --include "*.parquet"
+
+          echo "Syncing test troute parquet (VPU_${{ matrix.vpu }})..."
+          aws s3 sync \
+            "s3://${{ env.S3_BUCKET }}/${TEST_PREFIX}/outputs/troute/" \
+            test/ \
+            --exclude "*" --include "*.parquet"
+
+          echo "Parquet files — baseline:"
+          find baseline/ -name '*.parquet' | sort | sed 's/^/  /'
+          echo "Parquet files — test:"
+          find test/ -name '*.parquet' | sort | sed 's/^/  /'
+
+          python .github/python/compare_parquet.py \
+            --baseline-dir baseline/ \
+            --test-dir     test/
+
+      - name: Clean up test S3 output
+        if: always()
+        run: |
+          aws s3 rm --recursive \
+            "s3://${{ env.S3_BUCKET }}/${{ env.TEST_PREFIX }}/" || true
+
+  # ── Job 3: post aggregate report to the PR ────────────────────────────────
+  post-report:
+    name: Post PR Report
+    needs: [detect-changes, outputs-diff]
+    if: always() && needs.detect-changes.outputs.has_version_change == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post result to PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const diffResult     = '${{ needs.outputs-diff.result }}';
+            const date           = '${{ needs.detect-changes.outputs.date }}';
+            const templates      = JSON.parse('${{ needs.detect-changes.outputs.templates_json }}');
+            const changesSummary = '${{ needs.detect-changes.outputs.changes_summary }}';
+            const runUrl         = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+            const vpus           = JSON.parse('${{ needs.detect-changes.outputs.vpus_json }}');
+
+            const icon = diffResult === 'success' ? '✅' : '⚠️';
+
+            let statusLine;
+            if (diffResult === 'failure') {
+              statusLine = '⚠️ One or more VPU simulations failed (infrastructure error — check logs)';
+            } else if (diffResult === 'success') {
+              statusLine = '✅ All VPU simulations completed — see per-job logs for parquet comparison';
+            } else {
+              statusLine = `ℹ️ Simulation result: ${diffResult}`;
+            }
+
+            // Format pipe-separated changes_summary as a markdown list
+            const changeLines = changesSummary
+              ? changesSummary.split(' | ').map(c => `  - \`${c}\``).join('\n')
+              : '  - (unknown)';
+
+            let body = `### Outputs Diff ${icon}\n\n`;
+            body += `${statusLine}\n\n`;
+            body += `| | |\n|---|---|\n`;
+            body += `| Baseline date | \`${date}\` |\n`;
+            body += `| Templates | ${templates.map(t => `\`${t.file}\``).join(', ')} |\n`;
+            body += `| VPUs tested | ${vpus.map(v => `\`VPU_${v}\``).join(', ')} |\n`;
+            body += `| Test S3 prefix | ${templates.map(t => `\`test/outputs_diff/${date}/${t.slug}/VPU_*\``).join(', ')} |\n`;
+            body += `\n**Changes detected:**\n${changeLines}\n`;
+            body += `\nParquet comparison details are in each VPU's job log.\n`;
+            body += `[View full run logs](${runUrl})\n`;
+
+            const marker = '### Outputs Diff';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              c => c.user.type === 'Bot' && c.body.includes(marker)
+            );
+            const params = { owner: context.repo.owner, repo: context.repo.repo, body };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
+            }
