@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research_datastream_lxd"
+version = "0.1.0"
+description = "Orchestrator and scheduler for the NextGen Research DataStream on LXD"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+dependencies = [
+    "pylxd>=2.3",
+    "apscheduler>=3.10",
+    "pyyaml>=6.0",
+    "boto3>=1.34",                  # only used when a datastream's output sink is S3
+    "research_datastream_core",     # shared DAILY/command logic (infra/common/python)
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+research-datastream-lxd = "research_datastream_lxd.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
