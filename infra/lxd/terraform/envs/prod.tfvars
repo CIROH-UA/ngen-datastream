@@ -11,7 +11,7 @@ controller_cpu    = 2
 controller_memory = "4GiB"
 
 # Pin the code version with a tag/commit; the controller installs from git.
-package_ref = "main"
+package_ref = "nrds_lxd"
 
 output_check = "s3"
 aws_region   = "us-east-1"

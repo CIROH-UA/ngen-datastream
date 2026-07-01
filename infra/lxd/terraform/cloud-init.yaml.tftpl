@@ -2,6 +2,15 @@
 # Bootstraps the controller instance: Python, the LXD client cert, the
 # research_datastream_lxd package, and a systemd unit for the scheduler.
 
+# bootcmd runs before `packages:`. Fresh Ubuntu images fire the apt-daily /
+# unattended-upgrades units at boot; they grab the dpkg lock and stall the
+# package install below for minutes. Mask them (and stop any already running)
+# so `packages:` gets the lock immediately and first boot is deterministic.
+# This trades OS auto-patching for a predictable boot — re-patch by rebuilding
+# the controller from an updated base image, not in place.
+bootcmd:
+  - systemctl mask --now apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service apt-daily.service apt-daily-upgrade.service || true
+
 package_update: true
 packages:
   - python3
