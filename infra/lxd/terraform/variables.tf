@@ -19,11 +19,6 @@ variable "lxd_project" {
   default = "default"
 }
 
-variable "lxd_network" {
-  type    = string
-  default = "eth0"
-}
-
 variable "lxd_storage_pool" {
   type    = string
   default = "default"

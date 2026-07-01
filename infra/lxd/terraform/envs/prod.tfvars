@@ -3,7 +3,6 @@ environment_suffix = "prod"
 lxd_endpoint     = "https://nextstream.ciroh.ua.edu:443"
 lxd_remote_name  = "nextstream"
 lxd_project      = "NRDS-Onpremise"
-lxd_network      = "nrds_nat"
 lxd_storage_pool = "remote"
 
 controller_image  = "ubuntu:22.04"

@@ -1,11 +1,9 @@
 # NRDS on LXD
 
-LXD deployment of the NextGen Research DataStream (NRDS). The sibling
-`infra/aws/` deployment uses EventBridge + Step Functions + five Lambdas
-to orchestrate ephemeral EC2 workers. This deployment collapses that
+LXD deployment of the NextGen Research DataStream (NRDS) on the UA Nextstream HPC. The sibling`infra/aws/` deployment uses EventBridge + Step Functions + five Lambdas to orchestrate ephemeral EC2 workers. This deployment collapses that
 architecture to one always-on LXD "controller" instance that hosts a
 Python process combining the scheduler and orchestrator. Ephemeral
-worker instances are still launched per run; only the glue changed.
+worker instances are still launched per run.
 
 ```
                      +---------------------------------------+
@@ -26,7 +24,7 @@ worker instances are still launched per run; only the glue changed.
 ```
 infra/common/python/                  # shared, deployment-agnostic core logic
 └── src/research_datastream_core/
-    └── commands.py                   # DAILY-token resolution (AWS + LXD share this)
+    └── commands.py                   # DAILY-token resolution (AWS + LXD share this logic)
 
 infra/lxd/
 ├── python/                       # the orchestrator + scheduler process
@@ -44,18 +42,17 @@ infra/lxd/
     ├── cloud-init.yaml.tftpl     # installs packages + systemd unit
     ├── envs/{prod.tfvars, prod.backend.hcl}
     └── datastreams/              # one datastream = one YAML + template(s)
-        ├── forcing/              # VPUs split inside one command
+        ├── forcing/              # NWM 2 NGEN forcing datastream
         │   ├── forcing.yaml
         │   └── templates/execution_forcing.json.tpl
-        └── cfe-nom/              # fans out one ngen run per (init, vpu[, member])
+        └── cfe-nom/              # CFE-NOM-Troute datastream
             ├── cfe-nom.yaml
             └── templates/execution_cfe_nom.json.tpl
 ```
 
 `research_datastream_core` holds logic that is identical across the AWS and
 LXD deployments — currently the `DAILY` → forecast-date substitution rules
-(ported from the AWS `streamcommander` lambda). The LXD package depends on it;
-the AWS lambda still inlines an equivalent and can adopt it later.
+(ported from the AWS `streamcommander` lambda). 
 
 ## What maps to what (AWS → LXD)
 
@@ -134,8 +131,9 @@ $EDITOR envs/prod.tfvars
 Set at minimum:
 
 - `lxd_endpoint` — what you tested with `lxc remote add`
-- `lxd_project`, `lxd_network`, `lxd_storage_pool` — ask the admin, or
-  `lxc project list` / `lxc network list` / `lxc storage list`
+- `lxd_project`, `lxd_storage_pool` — ask the admin, or
+  `lxc project list` / `lxc storage list`. (Networking is inherited from the
+  `default` profile — the same NIC the workers get — so there's no network var.)
 - `environment_suffix` — e.g. `prod`, `dev`
 - `output_check` — `s3` if you want the S3 checker wired up, else `none`
 - `package_ref` — git tag/branch/commit the controller installs from

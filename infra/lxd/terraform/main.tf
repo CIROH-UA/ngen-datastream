@@ -77,14 +77,10 @@ resource "lxd_instance" "controller" {
     "security.nesting" = "true"
   }
 
-  device {
-    name = "eth0"
-    type = "nic"
-    properties = {
-      network = var.lxd_network
-      name    = "eth0"
-    }
-  }
+  # Networking (eth0) is inherited from the `default` profile — the same NIC the
+  # ephemeral workers get in lxd.launch_instance, which declares no nic device.
+  # Keeping both on the default profile guarantees the controller can't land on
+  # a different network than the workers it launches.
 
   # Pin the root disk to the configured pool.
   device {
