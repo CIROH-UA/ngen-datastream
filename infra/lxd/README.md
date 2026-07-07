@@ -1,9 +1,11 @@
 # NRDS on LXD
 
-LXD deployment of the NextGen Research DataStream (NRDS) on the UA Nextstream HPC. The sibling`infra/aws/` deployment uses EventBridge + Step Functions + five Lambdas to orchestrate ephemeral EC2 workers. This deployment collapses that
+LXD deployment of the NextGen Research DataStream (NRDS) on the UA Nextstream HPC. The sibling `infra/aws/` deployment uses EventBridge + Step Functions + five Lambdas to orchestrate ephemeral EC2 workers. This deployment collapses that
 architecture to one always-on LXD "controller" instance that hosts a
 Python process combining the scheduler and orchestrator. Ephemeral
 worker instances are still launched per run.
+
+> Issue #264 originally scoped this on OpenStack (`infra/on-premise/openstack`); it landed on LXD here instead.
 
 ```
                      +---------------------------------------+
