@@ -56,6 +56,11 @@ USER_DATA_VARS
 
 # Add the rest of the setup script
 cat >> /tmp/user_data_script.sh << 'USER_DATA_SETUP'
+# Fail fast: any setup error aborts before the self-stop below, so the builder
+# never stops, the poll times out, and the build fails instead of imaging a
+# half-provisioned machine.
+set -euo pipefail
+
 echo "Updating system packages..."
 dnf update -y
 
