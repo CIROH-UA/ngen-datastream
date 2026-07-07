@@ -1,6 +1,27 @@
 name: Build, Test, and Push Datastream AMI
 on:
-  workflow_dispatch:   
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Build the AMI even if ami_version.yml is unchanged'
+        type: boolean
+        default: false
+      datastream_ami_version:
+        description: 'AMI version to build (names the AMI datastream-<version>)'
+        type: string
+        default: '1.7.1'
+      ds_tag:
+        description: 'Datastream Docker tag'
+        type: string
+        default: '1.7.1'
+      fp_tag:
+        description: 'ForcingProcessor Docker tag'
+        type: string
+        default: '2.2.1'
+      ngiab_tag:
+        description: 'NGIAB Docker tag'
+        type: string
+        default: 'v1.8.0'
   push:
     branches: 
       - main
@@ -43,6 +64,15 @@ jobs:
           DS_TAG=$(yq -r e '.DS_TAG' ami_version.yml)
           FP_TAG=$(yq -r e '.FP_TAG' ami_version.yml)
           NGIAB_TAG=$(yq -r e '.NGIAB_TAG' ami_version.yml)
+
+          # Manual dispatch overrides tags with the inputs (which default to these values);
+          # push events keep the ami_version.yml values.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CURRENT_DS_AMI="${{ inputs.datastream_ami_version }}"
+            DS_TAG="${{ inputs.ds_tag }}"
+            FP_TAG="${{ inputs.fp_tag }}"
+            NGIAB_TAG="${{ inputs.ngiab_tag }}"
+          fi
       
           # Ensure previous commit and file exist
           if git rev-parse HEAD~1 >/dev/null 2>&1 && git cat-file -e HEAD~1:ami_version.yml 2>/dev/null; then
@@ -54,7 +84,7 @@ jobs:
           PREVIOUS_DS_AMI=$(yq -r e '."datastream-ami-version"' previous_versions.yml)
       
           # Outputs for AMI change detection
-          if [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
+          if [ "${{ inputs.force_build }}" = "true" ] || [ "$CURRENT_DS_AMI" != "$PREVIOUS_DS_AMI" ]; then
             echo "datastream-ami-version changed: $PREVIOUS_DS_AMI -> $CURRENT_DS_AMI"
             echo "build_ds_ami=true" >> "$GITHUB_OUTPUT"
           else
