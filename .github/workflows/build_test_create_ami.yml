@@ -6,6 +6,10 @@ on:
         description: 'Build the AMI even if ami_version.yml is unchanged'
         type: boolean
         default: false
+      keep_failed_ami:
+        description: 'Keep the built AMI even if VPU tests fail (skip auto-deregister)'
+        type: boolean
+        default: false
       datastream_ami_version:
         description: 'AMI version to build (names the AMI datastream-<version>)'
         type: string
@@ -357,7 +361,7 @@ jobs:
           echo "any_failed=$any_failed" >> $GITHUB_ENV
 
       - name: Deregister AMI on any test failure
-        if: env.any_failed == 'true'
+        if: env.any_failed == 'true' && inputs.keep_failed_ami != true
         run: |
           echo " VPU tests failed - checking for custom AMI to deregister..."
           ami_id="${{ needs.get-ami-info.outputs.ami_id }}"
@@ -406,7 +410,11 @@ jobs:
           
           if [ "${{ env.any_failed }}" == "true" ]; then
             echo " OVERALL RESULT: Some VPU tests failed"
-            echo "  Custom AMI has been deregistered due to failures"
+            if [ "${{ inputs.keep_failed_ami }}" == "true" ]; then
+              echo "  keep_failed_ami was set — AMI kept for debugging despite failures"
+            else
+              echo "  Custom AMI has been deregistered due to failures"
+            fi
             echo " Review failed VPU logs above for troubleshooting"
             exit 1
           else
