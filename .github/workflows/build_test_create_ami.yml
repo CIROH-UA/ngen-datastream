@@ -27,14 +27,20 @@ on:
         type: string
         default: 'v1.8.0'
   push:
-    branches: 
+    branches:
       - main
     paths:
       - 'ami_version.yml'
       - '.github/workflows/build_test_create_ami.yml'
 
+# One build at a time, across all refs: concurrent runs would collide on the
+# AMI name and on the shared test S3 prefixes. Never cancel a build mid-run.
+concurrency:
+  group: datastream-ami-build
+  cancel-in-progress: false
+
 permissions:
-  contents: read   
+  contents: read
 
 jobs:
   build-test-push-ami:
@@ -212,15 +218,18 @@ jobs:
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn "$SM_ARN" --name fp_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
           echo "Execution ARN: $execution_arn"
           status="RUNNING"
-          while [ "$status" != "SUCCEEDED" ]; do
+          elapsed=0
+          # Handle every terminal state (FAILED, TIMED_OUT, ABORTED) and cap the
+          # wait so a stuck execution can't spin the runner for 6 hours.
+          while [ "$status" = "RUNNING" ] && [ $elapsed -lt 2400 ]; do
             status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
-            echo "Current status: $status"
-            if [ "$status" == "FAILED" ]; then
-              echo "State machine execution failed!"
-              exit 1
-            fi
-            sleep 5
+            echo "[$elapsed s] $status"
+            if [ "$status" = "RUNNING" ]; then sleep 15; elapsed=$((elapsed + 15)); fi
           done
+          if [ "$status" != "SUCCEEDED" ]; then
+            echo "State machine execution ended as: $status"
+            exit 1
+          fi
           echo "State machine execution succeeded!"
 
 
@@ -297,16 +306,19 @@ jobs:
           execution_arn=$(aws stepfunctions start-execution --state-machine-arn "$SM_ARN" --name VPU_${{ env.VPU }}_test_$(env TZ=US/Eastern date +'%Y%m%d%H%M%S') --input "file://temp.json" --region us-east-1 --query 'executionArn' --output text)
           echo "Execution ARN: $execution_arn"
           status="RUNNING"
-          while [ "$status" != "SUCCEEDED" ]; do
+          elapsed=0
+          # Handle every terminal state (FAILED, TIMED_OUT, ABORTED) and cap the
+          # wait so a stuck execution can't spin the runner for 6 hours.
+          while [ "$status" = "RUNNING" ] && [ $elapsed -lt 2400 ]; do
             status=$(aws stepfunctions describe-execution --execution-arn "$execution_arn" --region us-east-1 --query 'status' --output text)
-            echo "Current status: $status"
-            if [ "$status" == "FAILED" ]; then
-              echo "State machine execution failed for VPU ${{ env.VPU }}!"
-              echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-            sleep 5
+            echo "[$elapsed s] $status"
+            if [ "$status" = "RUNNING" ]; then sleep 15; elapsed=$((elapsed + 15)); fi
           done
+          if [ "$status" != "SUCCEEDED" ]; then
+            echo "State machine execution ended as: $status for VPU ${{ env.VPU }}"
+            echo "stepfunction_failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           echo "State machine execution succeeded for VPU ${{ env.VPU }}!"
           echo "stepfunction_failed=false" >> "$GITHUB_OUTPUT"
 
