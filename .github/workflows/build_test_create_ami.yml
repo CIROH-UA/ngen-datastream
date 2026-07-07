@@ -6,6 +6,10 @@ on:
         description: 'Build the AMI even if ami_version.yml is unchanged'
         type: boolean
         default: false
+      datastream_ami_version:
+        description: 'AMI version to build (names the AMI datastream-<version>)'
+        type: string
+        default: '1.7.1'
       ds_tag:
         description: 'Datastream Docker tag'
         type: string
@@ -64,6 +68,7 @@ jobs:
           # Manual dispatch overrides tags with the inputs (which default to these values);
           # push events keep the ami_version.yml values.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CURRENT_DS_AMI="${{ inputs.datastream_ami_version }}"
             DS_TAG="${{ inputs.ds_tag }}"
             FP_TAG="${{ inputs.fp_tag }}"
             NGIAB_TAG="${{ inputs.ngiab_tag }}"
