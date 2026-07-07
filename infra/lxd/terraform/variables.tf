@@ -116,12 +116,7 @@ variable "controller_lxd_key_file" {
 variable "controller_lxd_verify" {
   type        = string
   default     = "false"
-  description = <<-DESC
-    TLS verification for the controller's HTTPS connection to the LXD API (sets LXD_VERIFY).
-      false = skip verification (insecure; the default because LXD serves a self-signed cert)
-      true  = verify against the system CA store
-      <path> = pin the LXD server cert at this path on the controller (must be delivered separately)
-  DESC
+  description = "LXD_VERIFY on the controller: false (skip), true (system CA), or a cert path to pin."
 }
 
 # ---- S3 connection-pressure tuning --------------------------------------
