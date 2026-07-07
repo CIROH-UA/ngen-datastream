@@ -48,7 +48,7 @@ def lambda_handler(event, context):
             raise Exception(f'User specified ii_check_s3, but no s3_bucket or s3_prefix were not found in commands')
             
         if ii_ds_cmd:
-            prefix += "/ngen-run.tar.gz"
+            prefix += "/merkdir.file"
         else:
             prefix += "/metadata/forcings_metadata/metadata.csv"
         print(f'Checking if any objects with prefix {prefix} exists in {bucket}')
