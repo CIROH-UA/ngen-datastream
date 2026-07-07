@@ -113,6 +113,17 @@ variable "controller_lxd_key_file" {
   description = "Path to the PEM private key for controller_lxd_cert_file. Read at apply time and written onto the controller."
 }
 
+variable "controller_lxd_verify" {
+  type        = string
+  default     = "false"
+  description = <<-DESC
+    TLS verification for the controller's HTTPS connection to the LXD API (sets LXD_VERIFY).
+      false = skip verification (insecure; the default because LXD serves a self-signed cert)
+      true  = verify against the system CA store
+      <path> = pin the LXD server cert at this path on the controller (must be delivered separately)
+  DESC
+}
+
 # ---- S3 connection-pressure tuning --------------------------------------
 
 variable "s3_max_concurrent_requests" {

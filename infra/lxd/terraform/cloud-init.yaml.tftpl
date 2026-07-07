@@ -44,7 +44,7 @@ write_files:
       LXD_ENDPOINT=${controller_lxd_endpoint}
       LXD_CERT_FILE=/root/.config/lxc/client.crt
       LXD_KEY_FILE=/root/.config/lxc/client.key
-      LXD_VERIFY=false
+      LXD_VERIFY=${lxd_verify}
 
   # Client cert/key read from controller_lxd_cert_file/_key_file at apply time
   # (trust it on the LXD server once). Lets pylxd drive instance lifecycle over

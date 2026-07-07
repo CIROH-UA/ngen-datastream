@@ -54,6 +54,7 @@ locals {
     stagger_s   = var.stagger_s
 
     controller_lxd_endpoint = local.controller_lxd_endpoint
+    lxd_verify              = var.controller_lxd_verify
     client_cert_pem         = file(pathexpand(var.controller_lxd_cert_file))
     client_key_pem          = file(pathexpand(var.controller_lxd_key_file))
   })
