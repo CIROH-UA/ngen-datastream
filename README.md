@@ -4,6 +4,7 @@ See the Research DataStream related documentation:
 * **Find daily output data at:** https://datastream.ciroh.org/index.html
 * **Make improvements to NextGen configuration:**
 Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/CONTRIBUTE.md)!
+* **Datastream catalog & summary tables:** Browse every deployed datastream — models, inputs, outputs, cadence, domain, and compute — [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/DATASTREAMS.md)!
 * **Current status and configuration:** Read [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/STATUS_AND_METADATA.md)!
 * **Infrastructure as Code:** See the NRDS AWS architecture [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/ARCHITECTURE.md). 
 * **Open Discussions**: Check out our discussions [here](https://github.com/CIROH-UA/ngen-datastream/discussions)! Feel free to start your own discussion, or participate in any that are ongoing. 
