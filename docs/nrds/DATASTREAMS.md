@@ -6,7 +6,7 @@ A static summary of every datastream the **NextGen Research Datastream (NRDS)**
 currently runs. Three tables are given that describe aspects of each datastream: the hydrology/modeling,
 deployment configuration, and the characteristics of the technical backend driving the datastreams.
 This document aims to answer the question *"what makes up the NRDS?"*
-without having to read the bucket, code repositroy, or dashboard.
+without having to read the bucket, code repository, or dashboard.
 
 > **The NRDS is research-grade, not operational.** NRDS is an experimental testbed that runs the NextGen
 > *prototype* on a forecast-like cadence to shrink research-to-operations (R2O) latency. It is
@@ -31,7 +31,7 @@ cover **full CONUS** (all 21 VPUs); the model streams `cfe-nom` and `lstm_0` run
 
 ## Data locations
 
-NRDS data is stored in the public bucket `s3://ciroh-community-ngen-datastream/` under the  `/forcings`, `/outputs`, and `/restart` prefixes (outputs are further keyed by `.../v2.2_hydrofabric/ngen.<date>/<run_type>/<init>/VPU_<id>/`).
+NRDS data is stored in the public bucket `s3://ciroh-community-ngen-datastream/` under the  `/forcings`, `/outputs`, and `/restarts` prefixes (outputs are further keyed by `.../v2.2_hydrofabric/ngen.<date>/<run_type>/<init>/VPU_<id>/`).
 **Dynamic inputs** are time-varying data fetched per run; **static inputs** are the fixed
 hydrofabric/config resources shared across runs. Concrete examples (dated objects — swap the
 date to browse current data): an example
