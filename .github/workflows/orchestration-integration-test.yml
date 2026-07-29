@@ -221,7 +221,16 @@ jobs:
           script: |
             const result = '${{ steps.monitor.outputs.result }}' || 'DID_NOT_RUN';
             const icon = result === 'SUCCEEDED' ? '\u2705' : '\u274C';
-            const history = `${{ steps.monitor.outputs.history }}` || '';
+            // Read the history from disk rather than interpolating it into this
+            // script: a large history blows the exec argument-size limit, and
+            // GitHub comments cap at 65536 chars anyway.
+            const fs = require('fs');
+            let history = '';
+            try { history = fs.readFileSync('/tmp/history.json', 'utf8'); } catch {}
+            const CAP = 55000;
+            if (history.length > CAP) {
+              history = '... (truncated, full history in the workflow log)\n' + history.slice(-CAP);
+            }
 
             let body = `### Orchestration Integration Test ${icon}\n\n`;
             body += `**Result: ${result}**\n\n`;
