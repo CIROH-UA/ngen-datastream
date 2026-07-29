@@ -56,6 +56,60 @@ def get_ondemand_price(instance_type: str, region: str, os: str = "Linux") -> fl
 
     return price_per_hour
 
+# Error codes that mean "this instance type in this AZ is sold out right now" —
+# worth retrying elsewhere. Anything else (throttles, auth, bad params) must
+# bubble up so the state machine's backoff handles it instead of amplifying it.
+CAPACITY_ERROR_CODES = {
+    "InsufficientInstanceCapacity",
+    "InsufficientCapacityOnHost",
+    "InsufficientHostCapacity",
+    "InsufficientReservedInstanceCapacity",
+    "Unsupported",
+}
+
+def get_default_subnets():
+    try:
+        resp = client_ec2.describe_subnets(
+            Filters=[{"Name": "default-for-az", "Values": ["true"]}]
+        )
+        return [s["SubnetId"] for s in sorted(resp["Subnets"], key=lambda s: s["AvailabilityZone"])]
+    except Exception as e:
+        print(f"Could not list default subnets, AZ fallback disabled: {e}")
+        return []
+
+def build_instance_type_ladder(primary):
+    if "." not in primary:
+        return [primary]
+    family, size = primary.split(".", 1)
+    fallback_families = os.environ.get("FALLBACK_INSTANCE_FAMILIES", "m7g,r8g")
+    families = [f.strip() for f in fallback_families.split(",") if f.strip() and f.strip() != family]
+    return [primary] + [f"{f}.{size}" for f in families]
+
+def launch_with_capacity_fallbacks(params, original_error):
+    """Walk instance-type x AZ combinations until one has capacity.
+
+    The normal launch omits SubnetId, letting EC2 pick an AZ — which fails as a
+    unit when that AZ is out of capacity. Here we retry the same size across
+    sibling families and explicit per-AZ default subnets. Each miss costs ~1s,
+    versus a full state-machine retry that re-asks the same sold-out AZ.
+    """
+    subnets = get_default_subnets() or [params.get("SubnetId")]
+    for itype in build_instance_type_ladder(params["InstanceType"]):
+        for subnet in subnets:
+            attempt = dict(params)
+            attempt["InstanceType"] = itype
+            if subnet:
+                attempt["SubnetId"] = subnet
+            try:
+                print(f"capacity fallback attempt: {itype} in {subnet or 'EC2-chosen AZ'}")
+                return client_ec2.run_instances(**attempt)
+            except botocore.exceptions.ClientError as e:
+                code = e.response["Error"]["Code"]
+                if code not in CAPACITY_ERROR_CODES:
+                    raise
+                print(f"no capacity for {itype} in {subnet}: {code}")
+    raise Exception(f"No capacity across fallback instance types/AZs. Original error: {original_error}")
+
 def wait_for_instance_running(instance_id, timeout=300):
     start = time.time()
     retries = 0
@@ -112,22 +166,33 @@ def lambda_handler(event, context):
     params             = event['instance_parameters']
     try:
         response = client_ec2.run_instances(**params)
-        instance_id = response['Instances'][0]['InstanceId']
     except botocore.exceptions.ClientError as e:
-        error_msg = e.response['Error']['Message']
-        print(f"run_instances failed: {error_msg}")
-        
-        if event['instance_parameters'].get('InstanceMarketOptions', None):
+        error_msg  = e.response['Error']['Message']
+        error_code = e.response['Error']['Code']
+        print(f"run_instances failed: {error_code}: {error_msg}")
+
+        if params.get('InstanceMarketOptions', None):
             print("Spot instance request failed, falling back to on-demand instance")
-            event['instance_parameters'].pop('InstanceMarketOptions', None)
-            response = client_ec2.run_instances(**event['instance_parameters'])
-            instance_id = response['Instances'][0]['InstanceId']
+            params.pop('InstanceMarketOptions', None)
+            try:
+                response = client_ec2.run_instances(**params)
+            except botocore.exceptions.ClientError as e2:
+                error_code = e2.response['Error']['Code']
+                if error_code not in CAPACITY_ERROR_CODES:
+                    raise
+                response = launch_with_capacity_fallbacks(params, e2.response['Error']['Message'])
+        elif error_code in CAPACITY_ERROR_CODES:
+            response = launch_with_capacity_fallbacks(params, error_msg)
         else:
             raise Exception(f"Instance request failed, no fallback available. Error: {error_msg}")
     except Exception as e:
         # Catch any other unexpected errors
         print(f"Unexpected error: {e}")
         raise
+
+    launched    = response['Instances'][0]
+    instance_id = launched['InstanceId']
+    print(f"Launched {instance_id} type={launched['InstanceType']} az={launched['Placement']['AvailabilityZone']}")
 
     if not instance_id is None:
         if not wait_for_instance_running(instance_id):
