@@ -77,38 +77,26 @@ def get_default_subnets():
         print(f"Could not list default subnets, AZ fallback disabled: {e}")
         return []
 
-def build_instance_type_ladder(primary):
-    if "." not in primary:
-        return [primary]
-    family, size = primary.split(".", 1)
-    fallback_families = os.environ.get("FALLBACK_INSTANCE_FAMILIES", "m7g,r8g")
-    families = [f.strip() for f in fallback_families.split(",") if f.strip() and f.strip() != family]
-    return [primary] + [f"{f}.{size}" for f in families]
-
 def launch_with_capacity_fallbacks(params, original_error):
-    """Walk instance-type x AZ combinations until one has capacity.
+    """Retry the launch across per-AZ default subnets until one has capacity.
 
     The normal launch omits SubnetId, letting EC2 pick an AZ — which fails as a
-    unit when that AZ is out of capacity. Here we retry the same size across
-    sibling families and explicit per-AZ default subnets. Each miss costs ~1s,
-    versus a full state-machine retry that re-asks the same sold-out AZ.
+    unit when that AZ is out of capacity. Capacity errors are AZ-specific, so
+    walking the other AZs usually resolves in seconds, versus a full
+    state-machine retry that re-asks the same sold-out AZ.
     """
-    subnets = get_default_subnets() or [params.get("SubnetId")]
-    for itype in build_instance_type_ladder(params["InstanceType"]):
-        for subnet in subnets:
-            attempt = dict(params)
-            attempt["InstanceType"] = itype
-            if subnet:
-                attempt["SubnetId"] = subnet
-            try:
-                print(f"capacity fallback attempt: {itype} in {subnet or 'EC2-chosen AZ'}")
-                return client_ec2.run_instances(**attempt)
-            except botocore.exceptions.ClientError as e:
-                code = e.response["Error"]["Code"]
-                if code not in CAPACITY_ERROR_CODES:
-                    raise
-                print(f"no capacity for {itype} in {subnet}: {code}")
-    raise Exception(f"No capacity across fallback instance types/AZs. Original error: {original_error}")
+    for subnet in get_default_subnets():
+        attempt = dict(params)
+        attempt["SubnetId"] = subnet
+        try:
+            print(f"capacity fallback attempt in {subnet}")
+            return client_ec2.run_instances(**attempt)
+        except botocore.exceptions.ClientError as e:
+            code = e.response["Error"]["Code"]
+            if code not in CAPACITY_ERROR_CODES:
+                raise
+            print(f"no capacity in {subnet}: {code}")
+    raise Exception(f"No capacity in any availability zone. Original error: {original_error}")
 
 def wait_for_instance_running(instance_id, timeout=300):
     start = time.time()

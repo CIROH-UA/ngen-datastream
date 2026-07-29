@@ -36,12 +36,6 @@ resource "aws_lambda_function" "starter_lambda" {
   filename         = "${path.module}/lambdas/starter_lambda.zip"
   source_code_hash = data.archive_file.python_lambda_starter.output_base64sha256
   timeout          = 900
-
-  environment {
-    variables = {
-      FALLBACK_INSTANCE_FAMILIES = var.fallback_instance_families
-    }
-  }
 }
 
 resource "aws_lambda_function" "commander_lambda" {
