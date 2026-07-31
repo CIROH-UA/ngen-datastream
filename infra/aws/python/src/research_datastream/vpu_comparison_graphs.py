@@ -21,39 +21,51 @@ from datetime import datetime
 import numpy as np
 import argparse
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--date", type=str, required=True, help="Date in YYYYMMDD format")
-    parser.add_argument("-r", "--runtype", type=str, required=True, 
-                        choices=['analysis_assim_extend', 'medium_range', 'short_range'], 
-                        help="Run type")
-    parser.add_argument("-t", "--time", type=str, required=True, help="Time (e.g., 00, 06, 12, 18)")
+    parser.add_argument(
+        "-d", "--date", type=str, required=True, help="Date in YYYYMMDD format"
+    )
+    parser.add_argument(
+        "-r",
+        "--runtype",
+        type=str,
+        required=True,
+        choices=["analysis_assim_extend", "medium_range", "short_range"],
+        help="Run type",
+    )
+    parser.add_argument(
+        "-t", "--time", type=str, required=True, help="Time (e.g., 00, 06, 12, 18)"
+    )
     args = parser.parse_args()
     date = args.date
-    runtype = args.runtype 
+    runtype = args.runtype
     time = args.time
 
-    vpu_num_cats = {'VPU_01': 20567,
-    'VPU_02': 35494,
-    'VPU_03N': 31326,
-    'VPU_03S': 30844,
-    'VPU_03W': 14138,
-    'VPU_04': 36312,
-    'VPU_05': 51582,
-    'VPU_06': 14167,
-    'VPU_07': 57595,
-    'VPU_08': 32993,
-    'VPU_09': 11204,
-    'VPU_10L': 55050,
-    'VPU_10U': 84376,
-    'VPU_11': 63177,
-    'VPU_12': 36611,
-    'VPU_13': 25471,
-    'VPU_14': 32977,
-    'VPU_15': 39696,
-    'VPU_16': 34401,
-    'VPU_17': 81841,
-    'VPU_18': 41955}
+    vpu_num_cats = {
+        "VPU_01": 20567,
+        "VPU_02": 35494,
+        "VPU_03N": 31326,
+        "VPU_03S": 30844,
+        "VPU_03W": 14138,
+        "VPU_04": 36312,
+        "VPU_05": 51582,
+        "VPU_06": 14167,
+        "VPU_07": 57595,
+        "VPU_08": 32993,
+        "VPU_09": 11204,
+        "VPU_10L": 55050,
+        "VPU_10U": 84376,
+        "VPU_11": 63177,
+        "VPU_12": 36611,
+        "VPU_13": 25471,
+        "VPU_14": 32977,
+        "VPU_15": 39696,
+        "VPU_16": 34401,
+        "VPU_17": 81841,
+        "VPU_18": 41955,
+    }
 
     s3 = S3FileSystem(anon=True)
     url = f"s3://ciroh-community-ngen-datastream/v2.2/ngen.{date}/{runtype}/{time}/"
@@ -74,7 +86,9 @@ def main():
             profile = {}
             for line in lines:
                 cleaned_line = line.strip().split(": ")
-                profile[cleaned_line[0]] = datetime.strptime(cleaned_line[1], "%Y%m%d%H%M%S")
+                profile[cleaned_line[0]] = datetime.strptime(
+                    cleaned_line[1], "%Y%m%d%H%M%S"
+                )
         steps = []
         for key in list(profile.keys()):
             if key == "DATASTREAM_START" or key == "DATASTREAM_END":
@@ -86,7 +100,7 @@ def main():
                 step = key.replace("_END", "")
                 if step not in steps:
                     steps.append(step)
-        
+
         # unnormed data
         for step in steps:
             start_key = f"{step}_START"
@@ -101,8 +115,9 @@ def main():
         for step in steps:
             if durations_normed.get(step) is None:
                 durations_normed[step] = np.array([])
-            durations_normed[step] = np.append(durations_normed[step],
-                                               durations[step][-1] / vpu_num_cats[vpu])
+            durations_normed[step] = np.append(
+                durations_normed[step], durations[step][-1] / vpu_num_cats[vpu]
+            )
 
     # unnormed graph
     fig, ax = plt.subplots()
@@ -119,7 +134,7 @@ def main():
     fig.set_figwidth(20)
     fig.set_figheight(10)
 
-    plt.savefig(f"vpu_comparison_{date}_{runtype}_{time}z.png")  
+    plt.savefig(f"vpu_comparison_{date}_{runtype}_{time}z.png")
 
     # normed graph
     fig, ax = plt.subplots()
@@ -129,7 +144,9 @@ def main():
         ax.bar(vpus, length, bottom=bottom, label=step)
         bottom += length
 
-    ax.set_title(f"VPU Performance Comparison for {runtype} {date} {time}z Normalized by Number of Catchments")
+    ax.set_title(
+        f"VPU Performance Comparison for {runtype} {date} {time}z Normalized by Number of Catchments"
+    )
     ax.set_ylabel("Duration (s/# catchments)")
     ax.set_xlabel("VPUs")
     ax.legend()
