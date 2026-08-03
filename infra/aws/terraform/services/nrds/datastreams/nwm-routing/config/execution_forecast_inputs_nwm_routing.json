@@ -1,0 +1,15 @@
+{
+  "short_range": {
+    "init_cycles": ["12"],
+    "instance_types": {
+      "03W": "m8g.xlarge"
+    },
+    "volume_size": 64,
+    "timeout_s": 2700
+  },
+  "images": {
+    "preprocess": "awiciroh/routing-only-preprocess:0.1.0",
+    "postprocess": "awiciroh/routing-only-postprocess:0.1.0",
+    "routing": "awiciroh/ciroh-ngen-image:v1.7.0"
+  }
+}
