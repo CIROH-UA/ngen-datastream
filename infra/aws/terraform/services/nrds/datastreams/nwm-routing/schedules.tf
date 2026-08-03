@@ -53,7 +53,7 @@ resource "aws_scheduler_schedule" "nwm_routing_schedule" {
     init               = each.value.init
     vpu                = each.value.vpu
     nprocs             = each.value.nprocs
-    ami_id             = var.ami_id
+    ami_id             = var.nwm_routing_ami_id
     instance_type      = each.value.instance_type
     instance_profile   = var.ec2_instance_profile
     volume_size        = each.value.volume_size

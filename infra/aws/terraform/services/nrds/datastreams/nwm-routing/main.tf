@@ -24,7 +24,7 @@ variable "ec2_instance_profile" {
   description = "IAM instance profile name for EC2"
 }
 
-variable "ami_id" {
+variable "nwm_routing_ami_id" {
   type        = string
   description = "Datastream AMI ID (must have docker + awiciroh/ciroh-ngen-image + zwills/merkdir pre-pulled; the pre/postprocess images are pulled at runtime)"
 }

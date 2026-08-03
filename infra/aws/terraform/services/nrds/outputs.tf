@@ -60,3 +60,7 @@ output "lstm_0_analysis_assim_schedule_count" {
 output "qkrig_daily_schedule_names" {
   value = module.qkrig_schedules.qkrig_daily_schedule_names
 }
+
+output "nwm_routing_schedule_names" {
+  value = module.nwm_routing_schedules.nwm_routing_schedule_names
+}
