@@ -60,7 +60,6 @@ module "nwm_routing_schedules" {
 - **Both .nc and converted parquet uploaded** under `ngen-run/outputs/troute/`
   (mirrors routing-only layout). The 45 MB NWM-native .nc × 24 cycles ≈ 1 GB/day
   if all cycles enabled — revisit before CONUS/all-init expansion.
-- **Pilot scope**: init 12 only, VPU 03W only (matches the validated local run).
-  Expand `init_cycles` in config after the first clean scheduled runs.
+- **Scope**: all 24 init cycles (matching routing-only), VPU 03W only.
 - **nprocs = 4 on m8g.xlarge (4 vCPU)** — sized to match, unlike the
   routing-only module's known 4-on-2-vCPU oversubscription.
