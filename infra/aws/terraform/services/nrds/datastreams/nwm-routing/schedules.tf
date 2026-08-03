@@ -60,9 +60,6 @@ resource "aws_scheduler_schedule" "nwm_routing_schedule" {
     timeout_s          = each.value.timeout_s
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
-    preprocess_image   = local.nwm_routing_config.images.preprocess
-    postprocess_image  = local.nwm_routing_config.images.postprocess
-    routing_image      = local.nwm_routing_config.images.routing
 }))}
 }
 EOT

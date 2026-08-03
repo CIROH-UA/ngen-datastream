@@ -1,20 +1,35 @@
 {
   "short_range": {
     "init_cycles": [
-      "00", "01", "02", "03", "04", "05",
-      "06", "07", "08", "09", "10", "11",
-      "12", "13", "14", "15", "16", "17",
-      "18", "19", "20", "21", "22", "23"
+      "00",
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23"
     ],
     "instance_types": {
       "03W": "m8g.xlarge"
     },
     "volume_size": 64,
     "timeout_s": 2700
-  },
-  "images": {
-    "preprocess": "awiciroh/routing-only-preprocess:0.1.0",
-    "postprocess": "awiciroh/routing-only-postprocess:0.1.0",
-    "routing": "awiciroh/ciroh-ngen-image:v1.7.0"
   }
 }

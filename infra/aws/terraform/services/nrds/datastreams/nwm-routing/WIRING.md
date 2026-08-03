@@ -14,8 +14,7 @@ t-route, convert to NextGen IDs after). Three containers per run:
 ## Do not apply until
 
 - [ ] Repo org decision settled (AWI vs BYU) — Quinn said hold
-- [ ] Both images pushed to Docker Hub with pinned tags; update
-      `config/execution_forecast_inputs_nwm_routing.json` `images` block to match
+- [x] Images on Docker Hub (awiciroh/routing-only-preprocess:0.1.0, postprocess:0.1.0) — hardcoded
 - [ ] S3 prefix `outputs/nwm_routing/` blessed by team
 - [ ] One manual SM execution validated (same procedure as the 2026-07-20
       routing-only test: clone input, redirect prefix to `test_runs/`, verify S3)
