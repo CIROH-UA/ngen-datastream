@@ -85,7 +85,10 @@ def launch_with_capacity_fallbacks(params, original_error):
     walking the other AZs usually resolves in seconds, versus a full
     state-machine retry that re-asks the same sold-out AZ.
     """
-    for subnet in get_default_subnets():
+    subnets = get_default_subnets()
+    if not subnets:
+        raise Exception(f"AZ fallback unavailable (default subnet lookup failed or returned none). Original capacity error: {original_error}")
+    for subnet in subnets:
         attempt = dict(params)
         attempt["SubnetId"] = subnet
         try:
@@ -96,7 +99,7 @@ def launch_with_capacity_fallbacks(params, original_error):
             if code not in CAPACITY_ERROR_CODES:
                 raise
             print(f"no capacity in {subnet}: {code}")
-    raise Exception(f"No capacity in any availability zone. Original error: {original_error}")
+    raise Exception(f"No capacity in any of {len(subnets)} availability zones tried. Original error: {original_error}")
 
 def wait_for_instance_running(instance_id, timeout=300):
     start = time.time()

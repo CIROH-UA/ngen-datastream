@@ -114,10 +114,6 @@ jobs:
             --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed' || type=='LambdaFunctionFailed' || type=='LambdaFunctionScheduleFailed' || type=='ExecutionFailed']" \
             --output json | tee /tmp/history.json
 
-          echo "history<<EOF" >> "$GITHUB_OUTPUT"
-          cat /tmp/history.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
           if [ "$STATUS" = "SUCCEEDED" ]; then
             echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
           elif [ "$STATUS" = "RUNNING" ]; then
