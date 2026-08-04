@@ -114,10 +114,6 @@ jobs:
             --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed' || type=='LambdaFunctionFailed' || type=='LambdaFunctionScheduleFailed' || type=='ExecutionFailed']" \
             --output json | tee /tmp/history.json
 
-          echo "history<<EOF" >> "$GITHUB_OUTPUT"
-          cat /tmp/history.json >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
           if [ "$STATUS" = "SUCCEEDED" ]; then
             echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
           elif [ "$STATUS" = "RUNNING" ]; then
@@ -221,7 +217,13 @@ jobs:
           script: |
             const result = '${{ steps.monitor.outputs.result }}' || 'DID_NOT_RUN';
             const icon = result === 'SUCCEEDED' ? '\u2705' : '\u274C';
-            const history = `${{ steps.monitor.outputs.history }}` || '';
+            const fs = require('fs');
+            let history = '';
+            try { history = fs.readFileSync('/tmp/history.json', 'utf8'); } catch {}
+            const CAP = 55000;
+            if (history.length > CAP) {
+              history = '... (truncated, full history in the workflow log)\n' + history.slice(-CAP);
+            }
 
             let body = `### Orchestration Integration Test ${icon}\n\n`;
             body += `**Result: ${result}**\n\n`;
