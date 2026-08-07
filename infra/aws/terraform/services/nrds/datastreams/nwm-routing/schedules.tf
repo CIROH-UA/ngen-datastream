@@ -45,7 +45,7 @@ resource "aws_scheduler_schedule" "nwm_routing_schedule" {
   target {
     arn      = "arn:aws:scheduler:::aws-sdk:sfn:startExecution"
     role_arn = var.scheduler_role_arn
-    input    = <<-EOT
+    input = <<-EOT
 {
   "StateMachineArn": "${var.state_machine_arn}",
   "Name": "nwm_routing_short_range_vpu${each.value.vpu}_init${each.value.init}_<aws.scheduler.execution-id>",
@@ -63,5 +63,5 @@ resource "aws_scheduler_schedule" "nwm_routing_schedule" {
 }))}
 }
 EOT
-  }
+}
 }
