@@ -3,6 +3,27 @@ import time
 
 client_ec2 = boto3.client("ec2")
 
+# Defaults used to space out retries when the upstream NWM forcings are not
+# yet available (see https://github.com/CIROH-UA/ngen-datastream/issues/391).
+# Retry N waits min(base * backoff_rate**N, max) seconds before the next
+# EC2StarterFromAMI attempt, instead of retrying immediately.
+DEFAULT_RETRY_BACKOFF_BASE_S = 1800  # 30 minutes
+DEFAULT_RETRY_BACKOFF_MAX_S = 7200  # 2 hours
+DEFAULT_RETRY_BACKOFF_RATE = 2
+
+
+def compute_backoff_seconds(retry_attempt, run_options):
+    """
+    Exponential backoff for state machine retries triggered by a failed
+    s3 object check (e.g. delayed upstream NWM forcings). retry_attempt is
+    0-indexed, so the wait before the *next* attempt uses retry_attempt + 1.
+    """
+    base = run_options.get("retry_backoff_base_s", DEFAULT_RETRY_BACKOFF_BASE_S)
+    max_wait = run_options.get("retry_backoff_max_s", DEFAULT_RETRY_BACKOFF_MAX_S)
+    rate = run_options.get("retry_backoff_rate", DEFAULT_RETRY_BACKOFF_RATE)
+    wait_seconds = base * (rate ** (retry_attempt + 1))
+    return int(min(wait_seconds, max_wait))
+
 
 def confirm_detach(volume_id):
     while True:
@@ -73,6 +94,10 @@ def lambda_handler(event, context):
                 f"Volume {volume_id} remains attached or available and is still incurring costs."
             )
 
+    # wait_seconds defaults to 0 so the "Wait" state added to the state
+    # machine is a no-op unless we're actually about to retry.
+    event["wait_seconds"] = 0
+
     if "failedInput" in event or (
         event["run_options"].get("ii_check_s3", False)
         and not event["run_options"].get("ii_s3_object_checked", False)
@@ -88,5 +113,15 @@ def lambda_handler(event, context):
                 del event["command_id"]
             if "failedInput" in event:
                 del event["failedInput"]
+
+            event["wait_seconds"] = compute_backoff_seconds(
+                event["retry_attempt"], event["run_options"]
+            )
+            print(
+                f"Retry {event['retry_attempt'] + 1} of "
+                f"{event['run_options']['n_retries_allowed']}: waiting "
+                f"{event['wait_seconds']}s before next attempt to allow "
+                f"delayed upstream forcings to become available."
+            )
 
     return event

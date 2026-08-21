@@ -149,7 +149,7 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "EC2StarterFromAMI",
+          "Next": "RetryBackoffWait",
           "And": [
             {
               "Variable": "$.ii_s3_object_checked",
@@ -163,6 +163,12 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
         }
       ],
       "Default": "Success, Go to End"
+    },
+    "RetryBackoffWait": {
+      "Type": "Wait",
+      "Comment": "Exponential backoff before retrying, giving delayed upstream NWM forcings time to become available (see issue #391)",
+      "SecondsPath": "$.wait_seconds",
+      "Next": "EC2StarterFromAMI"
     },
     "Success, Go to End": {
       "Type": "Pass",

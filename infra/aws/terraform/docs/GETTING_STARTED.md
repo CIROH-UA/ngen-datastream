@@ -115,6 +115,17 @@ If `s3_bucket` and `s3_prefix` are provided in `datastream_command_options` and 
 
 `timeout_s` is a timeout for the commands issued during execution. This is valuable for shutting down hanging instances that may become unresponsive due to memory overflow, etc. Default is 3600.
 
+If the `ii_check_s3` check fails (e.g. the source is not yet available) and `n_retries_allowed` is greater than 0, the state machine waits before restarting the run rather than retrying immediately, since an immediate retry will typically fail again if an upstream data source (e.g. NWM forcings) is simply running late. The wait duration grows exponentially with each retry attempt and can be tuned with:
+```
+  "run_options":{
+    "n_retries_allowed"      : 2,
+    "retry_backoff_base_s"   : 1800,
+    "retry_backoff_max_s"    : 7200,
+    "retry_backoff_rate"     : 2
+},
+```
+`retry_backoff_base_s` (default 1800s / 30 min) is the base wait before the first retry. `retry_backoff_rate` (default 2) is the multiplier applied per additional retry, and `retry_backoff_max_s` (default 7200s / 2 hr) caps how long any single wait can be.
+
 Edit Instance Options
 4) Define the AMI ID. 
 ```

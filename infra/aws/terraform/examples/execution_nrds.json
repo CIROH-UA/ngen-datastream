@@ -11,7 +11,10 @@
     },
     "ii_cheapo": true,
     "timeout_s": 3600,
-    "n_retries_allowed": 2
+    "n_retries_allowed": 2,
+    "retry_backoff_base_s": 1800,
+    "retry_backoff_max_s": 7200,
+    "retry_backoff_rate": 2
   },
   "instance_parameters": {
     "ImageId": "<your-prebuilt-ami>",
