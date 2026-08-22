@@ -158,6 +158,10 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
             {
               "Variable": "$.run_options.n_retries_allowed",
               "NumericGreaterThanPath": "$.retry_attempt"
+            },
+            {
+              "Variable": "$.run_options.ii_check_s3",
+              "BooleanEquals": true
             }
           ]
         }
