@@ -51,6 +51,38 @@ jobs:
       - name: Terraform Init
         run: terraform init -backend-config="${{ github.workspace }}/${{ env.CI_CONFIG }}/ci.backend.hcl"
 
+      # Waits for a previous run's state machine to finish deleting before creating a new one, 
+      # since the fixed name (nrds_ci_sm) collides if the old one is still DELETING.
+      - name: Wait for any leftover state machine deletion
+        working-directory: .
+        run: |
+          SM_NAME=$(grep '^sm_name' "${{ env.CI_CONFIG }}/ci.tfvars" | sed -E 's/.*"(.*)".*/\1/')
+          ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
+          SM_ARN="arn:aws:states:${{ env.AWS_REGION }}:${ACCOUNT_ID}:stateMachine:${SM_NAME}"
+
+          ELAPSED=0
+          TIMEOUT=600
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            STATUS=$(aws stepfunctions describe-state-machine \
+              --state-machine-arn "$SM_ARN" \
+              --query 'status' --output text 2>/tmp/describe_err) || true
+            if grep -q "StateMachineDoesNotExist" /tmp/describe_err 2>/dev/null; then
+              echo "No leftover state machine found, proceeding."
+              break
+            elif [ "$STATUS" = "DELETING" ]; then
+              echo "[$ELAPSED s] Leftover $SM_NAME still DELETING, waiting..."
+              sleep 20
+              ELAPSED=$((ELAPSED + 20))
+            else
+              echo "State machine status: '$STATUS' (not DELETING), proceeding."
+              break
+            fi
+          done
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "::error::Leftover $SM_NAME did not finish deleting within ${TIMEOUT}s. Manual cleanup may be required."
+            exit 1
+          fi
+
       - name: Terraform Apply (orchestration only)
         id: deploy
         run: |
