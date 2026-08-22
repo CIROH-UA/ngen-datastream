@@ -2,6 +2,15 @@
 resource "aws_sfn_state_machine" "datastream_state_machine" {
   name       = var.sm_name
   role_arn   = aws_iam_role.iam_for_sfn.arn
+
+  # AWS's default 5m delete timeout can be too short if the state machine
+  # still has an execution parked in the RetryBackoffWait state (#391) when
+  # destroy runs, since Step Functions won't finish tearing the state
+  # machine down until in-flight executions have actually stopped.
+  timeouts {
+    delete = "15m"
+  }
+
   definition = <<EOF
 {
   "Comment": "The conductor of the daily ngen datastream",

@@ -130,12 +130,42 @@ jobs:
         if: always()
         run: aws s3 rm "s3://ciroh-community-ngen-datastream/test/cicd/orchestration-test/" --recursive || true
 
+      # ── Cancel any still-running executions before destroy ─────────
+      # Needed because a failed ii_check_s3 retry now waits in the new
+      # RetryBackoffWait state (see #391 fix) for up to n_retries_allowed
+      # rounds of exponential backoff. If the monitor loop above timed
+      # out while an execution was still RUNNING (parked in that Wait
+      # state), Terraform's state machine delete can hang waiting for
+      # the execution to stop on its own. Stop it explicitly first.
+      - name: Cancel active state machine executions
+        if: always() && steps.deploy.outcome == 'success'
+        continue-on-error: true
+        run: |
+          SM_ARN="${{ steps.deploy.outputs.sm_arn }}"
+          RUNNING=$(aws stepfunctions list-executions \
+            --state-machine-arn "$SM_ARN" \
+            --status-filter RUNNING \
+            --query 'executions[].executionArn' \
+            --output text)
+          if [ -n "$RUNNING" ]; then
+            echo "Stopping running executions: $RUNNING"
+            for EXEC_ARN in $RUNNING; do
+              aws stepfunctions stop-execution --execution-arn "$EXEC_ARN" \
+                --cause "Stopped by CI cleanup before terraform destroy" 2>/dev/null || true
+            done
+            # give AWS a moment to transition executions out of RUNNING
+            # before we ask Terraform to delete the state machine
+            sleep 15
+          else
+            echo "No running executions found"
+          fi
+
       # ── Always destroy (orchestration only) ────────────────────────
       - name: Terraform Destroy
         id: destroy
         if: always() && steps.deploy.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           for attempt in 1 2; do
             echo "Destroy attempt $attempt..."
