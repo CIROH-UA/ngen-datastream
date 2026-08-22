@@ -124,7 +124,7 @@ If the `ii_check_s3` check fails (e.g. the source is not yet available) and `n_r
     "retry_backoff_rate"     : 2
 },
 ```
-`retry_backoff_base_s` (default 1800s / 30 min) is the base wait before the first retry. `retry_backoff_rate` (default 2) is the multiplier applied per additional retry, and `retry_backoff_max_s` (default 7200s / 2 hr) caps how long any single wait can be.
+`retry_backoff_base_s` (default 1800s / 30 min) is the base factor in the exponential backoff calculation: `wait_seconds = min(base * rate**(retry_attempt+1), max)` (where `retry_attempt` is 0 on the initial run). `retry_backoff_rate` (default 2) is the multiplier applied per additional retry, and `retry_backoff_max_s` (default 7200s / 2 hr) caps how long any single wait can be.
 
 Edit Instance Options
 4) Define the AMI ID. 
