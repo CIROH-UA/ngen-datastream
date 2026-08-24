@@ -37,14 +37,20 @@ def substitute_daily(path: str, today: str) -> str:
     return re.sub(r"(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])", today, path)
 
 
+client_s3 = boto3.client("s3")
+
+
 def s3_object_exists(bucket: str, key: str) -> bool:
     """Return True if the S3 object at bucket/key exists."""
-    client_s3 = boto3.client("s3")
     try:
         client_s3.head_object(Bucket=bucket, Key=key)
         return True
     except botocore.exceptions.ClientError as e:
-        if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+        if e.response.get("Error", {}).get("Code") in (
+            "404",
+            "NoSuchKey",
+            "NotFound",
+        ):
             return False
         raise
 
@@ -52,7 +58,7 @@ def s3_object_exists(bucket: str, key: str) -> bool:
 def extract_forcing_file(commands: list) -> Optional[str]:
     """Return the first -F argument found in the command list, or None."""
     for cmd in commands:
-        match = re.search(r"(?<!\w)-F[=\s']+([^\s']+)", cmd)
+        match = re.search(r"(?<!\w)-F[=\s'\"]+([^\s'\"]+)", cmd)
         if match:
             return match.group(1)
     return None
@@ -87,9 +93,30 @@ def lambda_handler(event, context):
     if "forcing_check_start_time" not in event:
         event["forcing_check_start_time"] = now
 
-    timeout_s = run_options.get(
-        "forcing_check_timeout_s", DEFAULT_FORCING_CHECK_TIMEOUT_S
-    )
+    try:
+        timeout_s = int(
+            run_options.get(
+                "forcing_check_timeout_s",
+                DEFAULT_FORCING_CHECK_TIMEOUT_S,
+            )
+        )
+        wait_s = int(
+            run_options.get(
+                "forcing_check_wait_s",
+                DEFAULT_FORCING_CHECK_WAIT_S,
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "forcing_check_timeout_s and forcing_check_wait_s must be integers."
+        ) from exc
+
+    if timeout_s <= 0:
+        raise ValueError("forcing_check_timeout_s must be greater than 0.")
+
+    if wait_s <= 0:
+        raise ValueError("forcing_check_wait_s must be greater than 0.")
+
     elapsed = now - event["forcing_check_start_time"]
     if elapsed >= timeout_s:
         raise RuntimeError(
@@ -97,19 +124,16 @@ def lambda_handler(event, context):
             f"(timeout={timeout_s}s). Giving up."
         )
 
-    event["forcing_check_wait_s"] = run_options.get(
-        "forcing_check_wait_s", DEFAULT_FORCING_CHECK_WAIT_S
-    )
-
+    event["forcing_check_wait_s"] = wait_s
     # Locate the -F argument in the command list.
     commands = event.get("commands", [])
     forcing_file = extract_forcing_file(commands)
 
     if forcing_file is None:
-        # No forcing file argument found; nothing to wait on.
-        print("No -F argument found in commands; skipping forcing-file check.")
-        event["ii_forcing_found"] = True
-        return event
+        raise RuntimeError(
+            "ii_check_forcing is enabled but no -F forcing-file argument "
+            "was found in commands."
+        )
 
     # Replace the DAILY placeholder with today's UTC date.
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -118,9 +142,10 @@ def lambda_handler(event, context):
     try:
         bucket, key = resolve_forcing_s3_path(resolved)
     except ValueError as exc:
-        print(f"Forcing file is not an S3 path ({exc}); skipping existence check.")
-        event["ii_forcing_found"] = True
-        return event
+        raise RuntimeError(
+            "ii_check_forcing is enabled but forcing file is not "
+            f"a valid s3:// URI: {forcing_file!r}"
+        ) from exc
 
     print(f"Checking for forcing file: s3://{bucket}/{key}")
     found = s3_object_exists(bucket, key)

@@ -38,14 +38,7 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
           "BackoffRate": 2
         }
       ],
-      "Next": "ForcingCheckerChoice",
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "Next": "ForcingFileNotFound",
-          "ResultPath": "$.failedInput"
-        }
-      ]
+      "Next": "ForcingCheckerChoice"
     },
     "ForcingCheckerChoice": {
       "Type": "Choice",
