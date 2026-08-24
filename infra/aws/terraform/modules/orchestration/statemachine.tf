@@ -14,8 +14,66 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
   definition = <<EOF
 {
   "Comment": "The conductor of the daily ngen datastream",
-  "StartAt": "EC2StarterFromAMI",
+  "StartAt": "ForcingChecker",
   "States": {
+    "ForcingChecker": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${aws_lambda_function.forcing_checker_lambda.arn}:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "ForcingCheckerChoice",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "ForcingFileNotFound",
+          "ResultPath": "$.failedInput"
+        }
+      ]
+    },
+    "ForcingCheckerChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.ii_forcing_found",
+          "BooleanEquals": true,
+          "Next": "EC2StarterFromAMI"
+        },
+        {
+          "Variable": "$.ii_forcing_found",
+          "BooleanEquals": false,
+          "Next": "ForcingCheckerWait"
+        }
+      ],
+      "Default": "ForcingFileNotFound"
+    },
+    "ForcingCheckerWait": {
+      "Type": "Wait",
+      "Comment": "Poll interval between forcing-file existence checks. Controlled by forcing_check_wait_s in the event.",
+      "SecondsPath": "$.forcing_check_wait_s",
+      "Next": "ForcingChecker"
+    },
+    "ForcingFileNotFound": {
+      "Type": "Fail",
+      "Error": "ForcingFileNotFound",
+      "Cause": "Forcing file was not available within the configured timeout."
+    },
     "EC2StarterFromAMI": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",

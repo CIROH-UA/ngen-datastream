@@ -27,6 +27,7 @@ module "nrds_orchestration" {
 
   region                    = var.region
   starter_lambda_name       = var.starter_lambda_name
+  forcing_checker_lambda_name = var.forcing_checker_lambda_name
   commander_lambda_name     = var.commander_lambda_name
   poller_lambda_name        = var.poller_lambda_name
   checker_lambda_name       = var.checker_lambda_name
