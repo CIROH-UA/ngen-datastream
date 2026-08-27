@@ -1,0 +1,263 @@
+name: Propose a New Datastream
+description: Propose a new scheduled pipeline for the NextGen Research DataStream
+title: "[New Datastream] "
+labels: ["community contribution", "new datastream"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A datastream is a versioned, scheduled pipeline: defined inputs, defined processing, defined outputs, fixed cadence, containerized execution environment.
+
+        **Proposing a NextGen model formulation?** NRDS simulations run in the maintained `awiciroh/ciroh-ngen-image` container, the image we refer to as NGIAB, so the formulation needs to be built into a tagged release of that image before it can run here.
+
+        - **Model not yet in NGIAB:** open a [Model Integration Checklist](https://github.com/CIROH-UA/NGIAB-CloudInfra/issues/new?template=model_integration_request.yml) in NGIAB-CloudInfra first. That template covers BMI implementation, dependencies, build instructions, and licensing. Come back here once the model ships in a tagged image.
+        - **Model already in NGIAB:** you are in the right place. You will need the container version below.
+
+        **A new datastream scales up system compute**, consuming EC2 hours every cycle and storing output in S3 for as long as it is retained. The workflow description below is what lets us map your processing onto EC2 resources and estimate what it will cost to run.
+
+        See [NEW_DATASTREAM.md](../../docs/community/NEW_DATASTREAM.md).
+
+  - type: input
+    id: summary
+    attributes:
+      label: One-line summary
+      placeholder: "Deploy the XYZ differentiable rainfall-runoff formulation as a CONUS short-range datastream"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: datastream_type
+    attributes:
+      label: Type of datastream
+      options:
+        - NextGen model simulation
+        - Downstream application (consumes NRDS output)
+        - Alternative forcing preparation pipeline
+        - Retrospective or scenario configuration
+        - Ensemble or probabilistic configuration
+        - Hydrologic post-processing (bias correction, statistical post-processing)
+        - Other processing workflow
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What does it do?
+      description: For a model formulation, what it predicts and how it was developed or trained. For a processing datastream, the transformation it performs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Scientific or operational rationale
+      description: What does this let the community answer that it currently cannot? What limitation does it remove? This is what justifies the recurring compute cost.
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## Execution environment
+
+        We enforce semantic versioning on every container used for processing, so that any execution can be reproduced exactly from its metadata later. Give the semver tag rather than `latest`, a bare commit SHA, or a branch name.
+
+  - type: input
+    id: ngiab_version
+    attributes:
+      label: NGIAB container version (NextGen simulations only)
+      description: The `awiciroh/ciroh-ngen-image` version your model is incorporated into. If the model is not yet in a tagged image, open a Model Integration Checklist in NGIAB-CloudInfra first.
+      placeholder: "v1.9.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: containers
+    attributes:
+      label: All containers required
+      description: Every image the processing depends on, each with its semver tag and registry location.
+      placeholder: |
+        awiciroh/ciroh-ngen-image:v1.9.0
+        ghcr.io/my-org/my-postprocessor:v0.3.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Required inputs
+      description: |
+        Datastreams are composable: the output of one can be the input to another. Catchment-averaged forcings, hydrofabric data, and channel restart states are already produced by the NRDS; consuming them is cheaper and easier to review than duplicating that processing.
+
+        Flag anything unusual: extended warm-up lookback, variables outside the standard forcing set, static inputs beyond the hydrofabric.
+      placeholder: |
+        - Consumes: existing forcing datastream output (short_range)
+        - Static inputs: model weights, hosted at <url>
+        - Not currently produced by the NRDS: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: execution_profile
+    attributes:
+      label: Domain and cadence
+      placeholder: |
+        Domain: CONUS (all 20 VPUs) / VPU 09 only / other
+        Cadence: hourly / daily / one-time retrospective over <period>
+        Forecast configurations: short_range, medium_range, analysis_assim
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## A single processing run
+
+        Describe one execution end to end. This is how we map your workflow onto EC2 instance types and estimate AWS cost, so concrete measured numbers are far more useful than estimates.
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow of a single run
+      description: |
+        Walk through what happens in one execution: what it reads, what it does, what it writes.
+
+        Include the host resources you used and what you measured.
+      placeholder: |
+        Host: 16 cores, 64 GB RAM, 200 GB disk
+        Input size: ~4 GB forcings + ~1 GB static per VPU
+        Processing: reads forcings → runs simulation → writes t-route output
+        Duration: ~35 min per VPU wall clock, ~28 min of that in the model
+        Output size: ~2.5 GB per VPU per cycle
+        Parallelization: scales to 16 processes; memory-bound above 8
+    validations:
+      required: true
+
+  - type: input
+    id: example_package
+    attributes:
+      label: Example data package
+      description: |
+        **Please place a complete, runnable example in public storage and link it here.** Inputs, configuration, and expected outputs for one execution over a small domain. Being able to pull and run it ourselves is the fastest path from proposal to deployment.
+      placeholder: "s3://my-bucket/nrds-example/ or https://..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: commands
+    attributes:
+      label: Commands to reproduce the run
+      description: |
+        **NextGen simulation:** the DataStreamCLI invocation, with the realization file and execution configuration used.
+
+        **Non-NextGen processing:** the exact commands that run your processing, including how the container is invoked.
+      placeholder: |
+        ./scripts/datastream -s DAILY -e DAILY -d $(pwd)/data/my_run \
+          -g <gpkg> -R <realization> -i <image>:<tag>
+    validations:
+      required: true
+
+  - type: dropdown
+    id: testing
+    attributes:
+      label: Scale the run has been tested at
+      options:
+        - CONUS, all VPUs
+        - One or more full VPUs
+        - Small subset (gage-defined domain or similar)
+        - Not yet run end to end
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## Scope and maintenance
+
+  - type: dropdown
+    id: retention
+    attributes:
+      label: How long should the outputs be retained?
+      description: |
+        Storage is a recurring cost that scales with how much history the system keeps. Datastreams do not need to retain output forever, and a shorter window may be entirely sufficient for what you are doing.
+
+        Pick what your science actually needs. We will discuss it in the issue.
+      options:
+        - A rolling window of recent cycles is enough
+        - 1 year
+        - 5 years
+        - For the operational life of the datastream
+        - Not sure, would like to discuss
+    validations:
+      required: true
+
+  - type: dropdown
+    id: future_work
+    attributes:
+      label: Do you plan further improvements to this deployment?
+      description: Shapes how we version and schedule it. Both answers are fine.
+      options:
+        - Yes, active development with regular updates expected
+        - Yes, occasional updates as the method evolves
+        - No, a one-time deployment, stable as proposed
+        - Unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deadline
+    attributes:
+      label: Is there a deadline or project requirement tied to this deployment?
+      description: A real deadline helps us sequence work. Its absence carries no penalty.
+      options:
+        - No deadline
+        - Preferred timeline, but flexible
+        - Yes, tied to a project milestone or deliverable
+        - Yes, tied to a grant, report, or publication deadline
+        - Yes, tied to a conference or demonstration
+    validations:
+      required: true
+
+  - type: input
+    id: deadline_detail
+    attributes:
+      label: Deadline detail
+      description: If you selected a deadline above, what and when.
+      placeholder: "CIROH annual report, March 2027"
+    validations:
+      required: false
+
+  - type: textarea
+    id: limitations
+    attributes:
+      label: Known limitations and unusual requirements
+      description: Atypical memory footprints, regions where the method is not expected to perform, dependencies the system does not currently satisfy. None of these disqualify a contribution; they shape the deployment approach and are cheaper to surface now than during integration.
+    validations:
+      required: false
+
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Links to code, weights, parameters, and documentation
+      description: Every artifact required to reproduce an NRDS execution is public by design.
+    validations:
+      required: true
+
+  - type: input
+    id: hydrofabric_version
+    attributes:
+      label: Hydrofabric version
+      placeholder: "v2.2"
+    validations:
+      required: false
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contributor and affiliation
+    validations:
+      required: false
