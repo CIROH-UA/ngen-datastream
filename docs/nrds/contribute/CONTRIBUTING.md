@@ -38,14 +38,6 @@ Hydrofabric corrections go to [community.fabric](https://github.com/lynker-spati
 
 ---
 
-## Contribution Ideas
-
-Calibrated parameters, alternative catchment averaging and forcing weight generation, additional forcing sources, new model formulations, ensemble capability, post-processing datastreams, execution metadata, and efficiency improvements.
-
-[UPDATE_DATASTREAM.md](UPDATE_DATASTREAM.md#contribution-ideas) covers each with the relevant literature. Contributions outside the list are equally welcome.
-
----
-
 ## Things to Keep in Mind
 
 **Write for the people who come after you.** Every issue and discussion here is public and is a source of knowledge for future researchers engaging with the system. Outside of future papers, these threads are the best description of what the system does and the clearest guide for the next contributor. Explain your reasoning, the science behind the contribution, and any existing issues you might be aware of. The [δHBV 2.0 integration issue](https://github.com/CIROH-UA/ngen-datastream/issues/337) shows the depth worth aiming for when filling out the now existing issue templates. 

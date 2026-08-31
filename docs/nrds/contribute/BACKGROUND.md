@@ -58,7 +58,7 @@ Once a researcher evaluates their method and finds it ready for deployment in th
 ## The NRDS–Research Loop
 
 <p align="center">
-  <img src="./NRDS_loop.jpg" alt="The NRDS community loop" width="100%">
+  <img src="./NRDS_Loop.jpg" alt="The NRDS community loop" width="100%">
 </p>
 
 The two layers are connected by a cycle: develop and test at the experimentation layer, promote to deployment, accumulate public reproducible outputs, evaluate them as community science, refine, redeploy.
