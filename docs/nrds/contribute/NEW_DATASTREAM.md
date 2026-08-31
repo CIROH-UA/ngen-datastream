@@ -10,9 +10,9 @@ The path depends on whether your method simulates through the NextGen framework.
 
 **NextGen simulating datastreams** run a model formulation inside the NextGen Prototype ([Ogden et al., 2026](https://doi.org/10.1111/1752-1688.70089)). The formulation must be [BMI](https://doi.org/10.21105/joss.02317)-compliant and built into the NGIAB container ([Patel et al., 2025](https://doi.org/10.1016/j.envsoft.2025.106666)). [DataStreamCLI](https://github.com/CIROH-UA/datastreamcli) is the workflow tool for these. CFE-NOM and LSTM_0 are examples.
 
-**General processing datastreams** The deployed qkrig datastream interpolates streamflow observations spatially, running its own containerized processing on the NRDS schedule without touching NextGen. Forcing preparation and the restart datastream are likewise non-simulating.
+**General processing datastreams** run their own containerized processing on the NRDS schedule without touching NextGen. The deployed qkrig datastream interpolates streamflow observations spatially. Forcing preparation and the restart datastream are likewise non-simulating.
 
-Each datastream type are explained below.
+Each datastream type is explained below.
 
 ---
 
@@ -81,6 +81,6 @@ See this related [discussion](https://github.com/CIROH-UA/ngen-datastream/discus
 
 The development team writes the pull request, working from your issue.
 
-The datastream is expressed as a self-contained module holding its schedule definitions, forecast configuration, and execution template. See this [pull request](https://github.com/CIROH-UA/ngen-datastream/pull/330) if you're curious to investiage the exact mechanism of datastream deployment. Automated checks validate the configuration, preview the exact cloud resources the change creates, and run security and integration tests. 
+The datastream is expressed as a self-contained module holding its schedule definitions, forecast configuration, and execution template. See this [pull request](https://github.com/CIROH-UA/ngen-datastream/pull/330) if you're curious to investigate the exact mechanism of datastream deployment. Automated checks validate the configuration, preview the exact cloud resources the change creates, and run security and integration tests. 
 
 Once a pull request is merged, the NRDS system will immediately scale up and begin orchestrating the new datastream. 

@@ -8,12 +8,12 @@ body:
       value: |
         For changes to what the NRDS already runs: realization files, model configuration, or input data.
 
-        **Adding a new scheduled pipeline?** Use *Propose a New Datastream* or *Propose a New Model Formulation* instead.
+        **Adding a new scheduled pipeline?** Use *Propose a New Datastream* instead.
         **Contributing calibrated parameters?** Use *Contribute Calibrated Parameters*.
         **Changing forcing processing?** Open the issue in [forcingprocessor](https://github.com/CIROH-UA/forcingprocessor/issues/new?template=forcing_contribution.yml).
         **Requesting different execution metadata?** Open a [Request Execution Metadata](https://github.com/CIROH-UA/datastreamcli/issues/new?template=metadata_request.yml) issue in datastreamcli.
 
-        See [UPDATE_DATASTREAM.md](../../docs/community/UPDATE_DATASTREAM.md).
+        See [UPDATE_DATASTREAM.md](../../docs/nrds/contribute/UPDATE_DATASTREAM.md).
 
   - type: input
     id: summary

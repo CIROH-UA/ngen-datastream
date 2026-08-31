@@ -38,11 +38,11 @@ NextGen operates on catchments, so it requires forcings as catchment-averaged ti
 
 It runs as its own scheduled datastream over CONUS, feeding every simulation datastream in the system. It is a standalone containerized project, so it can be developed and tested independently of the NRDS deployment.
 
-Because forcing preparation in the NRDS is model-agnostic and supplies several datastreams with input, improvements effect those downstream. 
+Because forcing preparation in the NRDS is model-agnostic and supplies several datastreams with input, improvements affect those downstream. 
 
 Changes here are code contributions: the code that processes a product is what makes it available to the system. Ideas without code are welcome as a [suggestion issue](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=suggestion.yml), where they sit on the record as a demand signal.
 
-Changes that land here include support for new forcing sources, handling for different temporal or spatial resolutions, and alternative approaches to weight generation and catchment averaging. See [Contribution Ideas](#contribution-ideas) below.
+Changes that land here include support for new forcing sources, handling for different temporal or spatial resolutions, and alternative approaches to weight generation and catchment averaging. See [Contribution Ideas](CONTRIBUTING.md#contribution-ideas).
 
 ### Output format and efficiency
 

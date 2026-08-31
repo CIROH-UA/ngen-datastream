@@ -51,13 +51,33 @@ Hydrofabric corrections go to [community.fabric](https://github.com/lynker-spati
 
 ## Contribution Ideas
 
-Ideas the development team would find valuable. Contributions outside this list are equally welcome.
+Ideas the development team would find valuable, grouped by the path each one takes. Contributions outside this list are equally welcome.
 
-### Calibrated parameters
+### Ideas for New Datastreams
+
+Each of these adds a new scheduled pipeline. See [NEW_DATASTREAM.md](NEW_DATASTREAM.md).
+
+#### New model formulations
+
+Process-based and machine learning approaches beyond what is deployed today. LSTM approaches have shown competitive skill since [Kratzert et al. (2018)](https://doi.org/10.5194/hess-22-6005-2018), with continued development through [Nearing et al. (2024)](https://doi.org/10.1038/s41586-024-07145-1) and within NextGen specifically in [Frame et al. (2025)](https://doi.org/10.1111/1752-1688.70000). Process-based contributions are equally wanted.
+
+#### Ensemble and probabilistic capability
+
+The NRDS produces deterministic point forecasts. Ensemble output would align it with operational practice ([Demargne et al., 2014](https://doi.org/10.1175/BAMS-D-12-00081.1)) and support methods producing distributions. Ensemble realization files, forcing and initial-condition perturbation strategies, and member-management patterns are all open.
+
+#### Post-processing datastreams
+
+Statistical and machine learning post-processing of simulation output is well established for the NWM ([Frame et al., 2021](https://doi.org/10.1111/1752-1688.12964); [Naser Neisary et al., 2025](https://doi.org/10.1016/j.envsoft.2025.106459)) and composes naturally as a downstream datastream consuming an upstream one.
+
+### Ideas for Updates to Existing Datastreams
+
+Each of these changes something the NRDS already runs. See [UPDATE_DATASTREAM.md](UPDATE_DATASTREAM.md).
+
+#### Calibrated parameters
 
 The deployed configurations run parameters derived from the hydrofabric, which are uncalibrated. Note that skill scores depend heavily on the metric chosen ([Gupta et al., 2009](https://doi.org/10.1016/j.jhydrol.2009.08.003); [Clark et al., 2021](https://doi.org/10.1029/2020WR029001)), so state what you optimized and why.
 
-### Alternative catchment averaging and weight generation
+#### Alternative catchment averaging and weight generation
 
 Catchment weights are currently produced with [exactextract](https://github.com/isciences/exactextract), which computes exact fractional area coverage of each grid cell by each catchment polygon, and forcings are the area-weighted mean of the cells a catchment overlaps.
 
@@ -71,27 +91,16 @@ Approaches worth building:
 
 Include a characterization of how the resulting forcings differ from current behavior, which is what makes a new algorithm evaluable. Approaches tuned to one formulation's assumptions relax the model-agnostic character of forcing preparation, which is acceptable and worth stating, since the right structure may then be a separate upstream datastream.
 
-### Support for additional forcing sources
+#### Support for additional forcing sources
 
 The Forcing Processor currently reads NWM operational gridded products. Each additional source becomes an axis of experimentation for every datastream in the system. A contribution here is a reader for the source format, the variable mapping to NextGen-expected fields, and the handling needed to produce compliant output.
 
 Related: sources arriving at sub-hourly, three-hourly, or daily cadence need aggregation or disaggregation to align with the simulation timestep, and formulations with long warm-up requirements need extended-lookback handling. Grid geometries other than the current products need corresponding weight generation.
 
-### New model formulations
+#### Output format and efficiency
 
-Process-based and machine learning approaches beyond what is deployed today. LSTM approaches have shown competitive skill since [Kratzert et al. (2018)](https://doi.org/10.5194/hess-22-6005-2018), with continued development through [Nearing et al. (2024)](https://doi.org/10.1038/s41586-024-07145-1) and within NextGen specifically in [Frame et al. (2025)](https://doi.org/10.1111/1752-1688.70000). Process-based contributions are equally wanted. See [NEW_DATASTREAM.md](NEW_DATASTREAM.md).
+Forcing output is read by every downstream datastream, so serialization format, compression, chunking, and precision trade-offs reduce both storage cost and the I/O time of every simulation that reads it. Options are under discussion in [forcingprocessor #62](https://github.com/CIROH-UA/forcingprocessor/discussions/62).
 
-### Ensemble and probabilistic capability
-
-The NRDS produces deterministic point forecasts. Ensemble output would align it with operational practice ([Demargne et al., 2014](https://doi.org/10.1175/BAMS-D-12-00081.1)) and support methods producing distributions. Ensemble realization files, forcing and initial-condition perturbation strategies, and member-management patterns are all open.
-
-### Post-processing datastreams
-
-Statistical and machine learning post-processing of simulation output is well established for the NWM ([Frame et al., 2021](https://doi.org/10.1111/1752-1688.12964); [Naser Neisary et al., 2025](https://doi.org/10.1016/j.envsoft.2025.106459)) and composes naturally as a downstream datastream consuming an upstream one.
-
-### Execution metadata
+#### Execution metadata
 
 Tell us what provenance information you need that we are not tracking. Check [STANDARD_DIRECTORIES.md](https://github.com/CIROH-UA/datastreamcli/blob/main/docs/STANDARD_DIRECTORIES.md) first.
-
-
-
