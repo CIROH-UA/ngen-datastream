@@ -1,0 +1,164 @@
+name: Contribute Calibrated Parameters
+description: Submit calibrated NextGen parameters for use in future NRDS executions
+title: "[Parameters] "
+labels: ["community contribution", "NRDS Community Contributions"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The hydrologic simulations conducted by the NRDS are configured with the NextGen realization file. By default the NRDS calculates model parameters from the hydrofabric, which means **the parameters currently running are uncalibrated**.
+
+        These parameters are open to the community. If you have calibrated parameters and would like them used in future executions, prepare a data package following the standard below and submit it here.
+
+        Accepted parameters are used in the next and all following executions. Proposing parameters has no effect on the running system until they are accepted, and the two steps are decoupled.
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## Submission standard
+
+        A submission data package contains two files:
+
+        ```
+        ├── hydrofabric_subset.gpkg
+        └── realization.json
+        ```
+
+        **1. The geopackage** holding the hydrofabric used during calibration.
+
+        The hydrofabric is an evolving data product, with new version releases expected semi-annually. Calibrated parameters apply to simulations over the hydrofabric version they were derived from. Submissions are currently accepted against **v2.2**.
+
+        **2. A NextGen realization** holding the parameters and model selection. Two forms are accepted:
+
+        - [Lumped](https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/lumped_realization_example.json): a single set of parameters applied to every catchment in the geopackage.
+        - [Per-catchment](https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_16.json): a distinct set of parameters for each catchment.
+
+        Tar the package into a single object and host it publicly. [HydroShare](https://www.hydroshare.org/) is recommended, in line with the [CIROH data and code sharing policy](https://docs.ciroh.org/docs/policies/DataAndCodeSharingPolicy/Recommendations), because it issues a DOI you can cite later.
+
+        ```
+        tar -czvf example_community_contribution.tar.gz example_community_contribution/
+        example_community_contribution/
+        example_community_contribution/gage-10154200_subset.gpkg
+        example_community_contribution/realization.json
+        ```
+
+        Example package: https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/submissions/example_community_contribution.tar.gz
+
+  - type: input
+    id: package_url
+    attributes:
+      label: Data package URL
+      description: The publicly accessible location of your tarred data package.
+      placeholder: "https://www.hydroshare.org/resource/..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: realization_type
+    attributes:
+      label: Realization type
+      options:
+        - Lumped (one parameter set applied to all catchments)
+        - Per-catchment (a parameter set for each catchment)
+    validations:
+      required: true
+
+  - type: input
+    id: hydrofabric_version
+    attributes:
+      label: Hydrofabric version
+      description: The version the geopackage was subset from, and the version these parameters apply to.
+      placeholder: "v2.2"
+    validations:
+      required: true
+
+  - type: input
+    id: domain
+    attributes:
+      label: Spatial coverage
+      description: What the parameters cover. A gage-defined watershed, a set of VPUs, CONUS, or something else.
+      placeholder: "Catchments draining USGS gage 10154200"
+    validations:
+      required: true
+
+  - type: input
+    id: formulation
+    attributes:
+      label: Model formulation
+      description: Which formulation these parameters configure.
+      placeholder: "CFE, SLOTH, PET, NOM"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## How the parameters were produced
+
+        Describe your work in enough detail that another researcher could understand and build on it. These issues are public and permanent, and they are likely to be the clearest available record of how NRDS parameters came to be what they are.
+
+  - type: textarea
+    id: method
+    attributes:
+      label: Calibration method
+      description: The tooling, algorithm, and setup used. If you used ngen-cal, say which configuration.
+      placeholder: |
+        Tool: ngen-cal
+        Algorithm: DDS, 5000 iterations
+        Parameters calibrated: ...
+        Parameter ranges: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: observations
+    attributes:
+      label: Observations and calibration period
+      description: What you calibrated against, over what period, and how you split calibration from validation.
+      placeholder: |
+        Observations: USGS daily streamflow at gage 10154200
+        Calibration period: 2008-2016
+        Validation period: 2017-2021
+        Spin-up: 2 years, discarded
+    validations:
+      required: true
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective function and performance
+      description: The objective function used, and how the calibrated parameters perform relative to the uncalibrated defaults over the same domain and period.
+      placeholder: |
+        Objective: KGE on daily streamflow
+        Default parameters: KGE 0.41
+        Calibrated: KGE 0.72 (calibration), 0.68 (validation)
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes, caveats, and anything you learned
+      description: |
+        Where the parameters perform well and where they do not, regimes or seasons you would be cautious about, approaches you tried that did not work, and anything a future contributor would benefit from knowing.
+
+        This section is worth writing at length.
+    validations:
+      required: false
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contributor and affiliation
+    validations:
+      required: false
+
+  - type: input
+    id: citation
+    attributes:
+      label: How would you like this contribution cited?
+      description: A DOI, paper, or preferred attribution, if you have one.
+    validations:
+      required: false

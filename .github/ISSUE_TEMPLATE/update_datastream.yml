@@ -1,0 +1,159 @@
+name: Propose a Datastream Update
+description: Propose a change to existing NRDS tooling, configuration, or input data
+title: "[Update] "
+labels: ["community contribution", "datastream update"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For changes to what the NRDS already runs: realization files, model configuration, or input data.
+
+        **Adding a new scheduled pipeline?** Use *Propose a New Datastream* instead.
+        **Contributing calibrated parameters?** Use *Contribute Calibrated Parameters*.
+        **Changing forcing processing?** Open the issue in [forcingprocessor](https://github.com/CIROH-UA/forcingprocessor/issues/new?template=forcing_contribution.yml).
+        **Requesting different execution metadata?** Open a [Request Execution Metadata](https://github.com/CIROH-UA/datastreamcli/issues/new?template=metadata_request.yml) issue in datastreamcli.
+
+        See [UPDATE_DATASTREAM.md](../../docs/nrds/contribute/UPDATE_DATASTREAM.md).
+
+  - type: input
+    id: summary
+    attributes:
+      label: One-line summary
+      placeholder: "Calibrated CFE-NOM parameters for VPUs 01-06 derived against USGS daily streamflow"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: update_type
+    attributes:
+      label: Type of update
+      options:
+        - Realization file change
+        - BMI configuration change
+        - NGIAB model or runtime change
+        - Hydrofabric-related
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: affected
+    attributes:
+      label: Which datastream(s) does this affect?
+      description: If it touches shared tooling, say so, because those changes propagate to everything downstream.
+      placeholder: "CFE-NOM short_range only / all NextGen simulation datastreams"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What does the change do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Justification
+      description: What scientific or operational limitation does this remove, or what question does it let the community answer?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compute_impact
+    attributes:
+      label: Compute impact
+      description: An expensive change with a good case for it is entirely acceptable. Being explicit is the fastest route to evaluation.
+      options:
+        - None (configuration or parameter swap)
+        - Negative, makes an existing step faster or output smaller
+        - Neutral, same cost with different behavior
+        - Increases cost (explain below)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: compute_detail
+    attributes:
+      label: Compute impact detail
+      description: If the change affects runtime, memory, or storage, quantify it. Profile before contributing. Knowing where your code spends time is expected for anything touching a CONUS-scale step.
+      placeholder: |
+        Before: ~X minutes per VPU
+        After: ~Y minutes per VPU
+        Profiling method: ...
+        Why the added cost is justified: ...
+    validations:
+      required: false
+
+  - type: input
+    id: hydrofabric_version
+    attributes:
+      label: Hydrofabric version
+      description: |
+        **Required for parameter and configuration contributions.** Spatial geometry and model parameters are derived from the hydrofabric and change with each release, so a contribution applies to the version it was built against.
+      placeholder: "v2.2"
+    validations:
+      required: false
+
+  - type: textarea
+    id: parameter_provenance
+    attributes:
+      label: Parameter provenance (parameter contributions only)
+      description: The NRDS does not calibrate and does not adjudicate calibration methodology. What it needs is the parameters, their provenance, and enough information to know where they apply.
+      placeholder: |
+        Formulation: CFE-NOM
+        Method: ...
+        Calibration period: ...
+        Objective function: ...
+        Gauge set: ...
+        Spatial coverage: which catchments/VPUs are covered
+        Uncovered catchments: fall back to defaults?
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence of improvement
+      description: Whatever you have. For parameter sets, performance against observations.
+    validations:
+      required: false
+
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Links to publicly hosted files, code, or branches
+      description: Parameter archives, a fork or branch, a draft PR, whatever exists.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: testing
+    attributes:
+      label: Testing status
+      options:
+        - Tested end-to-end with DataStreamCLI
+        - Tested in the affected component only
+        - Not yet tested
+        - Not applicable
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: All contributed files and code are publicly hosted and versioned
+        - label: I have stated the compute impact of this change
+        - label: For parameter or configuration changes, I have specified the target hydrofabric version
+        - label: If this affects shared tooling, I have considered the impact on downstream datastreams
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contributor and affiliation
+    validations:
+      required: false

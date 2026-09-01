@@ -1,0 +1,75 @@
+name: Suggest an Idea
+description: Suggest something the NRDS should do, without contributing code yourself
+title: "[Suggestion] "
+labels: ["suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For ideas you want on the record but aren't in a position to implement: a forcing product the NRDS should read, a formulation worth deploying, a capability that's missing.
+
+        **These are welcome.** A suggestion becomes deployable once someone writes the code or supplies the data. Until then it sits in the queue as demand signal. Several suggestions for the same thing are useful evidence that it's worth prioritizing.
+
+        If you *can* implement it, use one of the proposal templates instead. Those move faster.
+
+  - type: input
+    id: summary
+    attributes:
+      label: One-line summary
+      placeholder: "The Forcing Processor should support MRMS precipitation"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: What kind of suggestion is this?
+      options:
+        - A forcing product the NRDS should ingest
+        - A model formulation worth deploying
+        - A processing capability that's missing
+        - An output or data format change
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What are you suggesting?
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why is it worth doing?
+      description: What would it let the community do that it currently cannot? What limitation does it remove?
+    validations:
+      required: true
+
+  - type: textarea
+    id: pointers
+    attributes:
+      label: Pointers
+      description: Links to the data source, the model, a paper, or an existing implementation. Anything that would give whoever picks this up a head start.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: involvement
+    attributes:
+      label: Would you want to be involved if someone takes this on?
+      options:
+        - Yes, I could advise or test
+        - Yes, I might be able to contribute code or data later
+        - No, just putting the idea on the record
+    validations:
+      required: false
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contributor and affiliation
+    validations:
+      required: false
