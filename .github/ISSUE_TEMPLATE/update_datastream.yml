@@ -13,7 +13,7 @@ body:
         **Changing forcing processing?** Open the issue in [forcingprocessor](https://github.com/CIROH-UA/forcingprocessor/issues/new?template=forcing_contribution.yml).
         **Requesting different execution metadata?** Open a [Request Execution Metadata](https://github.com/CIROH-UA/datastreamcli/issues/new?template=metadata_request.yml) issue in datastreamcli.
 
-        See [UPDATE_DATASTREAM.md](../../docs/nrds/contribute/UPDATE_DATASTREAM.md).
+        See [UPDATE_DATASTREAM.md](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/contribute/UPDATE_DATASTREAM.md).
 
   - type: input
     id: summary
