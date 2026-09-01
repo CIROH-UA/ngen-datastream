@@ -15,7 +15,7 @@ body:
 
         **A new datastream scales up system compute**, consuming EC2 hours every cycle and storing output in S3 for as long as it is retained. The workflow description below is what lets us map your processing onto EC2 resources and estimate what it will cost to run.
 
-        See [NEW_DATASTREAM.md](../../docs/nrds/contribute/NEW_DATASTREAM.md).
+        See [NEW_DATASTREAM.md](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/contribute/NEW_DATASTREAM.md).
 
   - type: input
     id: summary

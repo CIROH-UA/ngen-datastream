@@ -66,7 +66,7 @@ maintains it.*
 - lstm_0 — `realizations/lstm/realization_rust_lstm_troute.json`
 - routing-only — `realizations/routing_only/realization_sloth_troute.json`
 
-To propose parameter changes, see [CONTRIBUTE.md](./CONTRIBUTE.md).
+To propose parameter changes, see [CONTRIBUTING.md](./contribute/CONTRIBUTING.md).
 
 ---
 
@@ -226,4 +226,4 @@ development.
 It's a PR review cycle, not infrastructure work: develop/test locally with
 DataStreamCLI/NGIAB → open a PR adding an execution spec → automated config check, resource
 plan preview, and integration tests post on the PR → gated merge → a daily drift check keeps
-the deployment honest. See [CONTRIBUTE.md](./CONTRIBUTE.md).
+the deployment honest. See [CONTRIBUTING.md](./contribute/CONTRIBUTING.md).

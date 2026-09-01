@@ -1,9 +1,9 @@
 # NextGen Research DataStream
-The NextGen Research DataStream is an array of daily [NextGen](https://github.com/NOAA-OWP/ngen)-based hydrolgic simulations in the AWS cloud. An exciting aspect of the Research DataStream is the NextGen configuration is [open-sourced](https://datastream.ciroh.org/) and [community editable](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/CONTRIBUTE.md), which allows any member of the hydrologic community to contribute to improving streamflow predictions. By making the NextGen forcings, outputs, and configuration publicly available, it is now possible to leverage regional expertise and incrementally improve streamflow predictions configured with the NextGen Framework. 
+The NextGen Research DataStream is an array of daily [NextGen](https://github.com/NOAA-OWP/ngen)-based hydrolgic simulations in the AWS cloud. An exciting aspect of the Research DataStream is the NextGen configuration is [open-sourced](https://datastream.ciroh.org/) and [community editable](https://github.com/CIROH-UA/ngen-datastream/tree/main/docs/nrds/contribute), which allows any member of the hydrologic community to contribute to improving streamflow predictions. By making the NextGen forcings, outputs, and configuration publicly available, it is now possible to leverage regional expertise and incrementally improve streamflow predictions configured with the NextGen Framework. 
 See the Research DataStream related documentation:
 * **Find daily output data at:** https://datastream.ciroh.org/index.html
 * **Make improvements to NextGen configuration:**
-Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/CONTRIBUTE.md)!
+Find out how you can contribute [here](https://github.com/CIROH-UA/ngen-datastream/tree/main/docs/nrds/contribute)!
 * **Datastream catalog & summary tables:** Browse every deployed datastream — models, inputs, outputs, cadence, domain, and compute — [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/DATASTREAMS.md)!
 * **Current status and configuration:** Read [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/docs/nrds/STATUS_AND_METADATA.md)!
 * **Infrastructure as Code:** See the NRDS AWS architecture [here](https://github.com/CIROH-UA/ngen-datastream/blob/main/infra/aws/terraform/docs/ARCHITECTURE.md). 
