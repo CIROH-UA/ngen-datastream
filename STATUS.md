@@ -1,5 +1,5 @@
 # Research DataStream
-* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/research_datastream_terraform.yaml/badge.svg)
+* ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/terraform-deploy.yml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_research_datastream_fp.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_research_datastream_vpu_01.yaml/badge.svg)
 * ![](https://github.com/CIROH-UA/ngen-datastream/actions/workflows/test_research_datastream_vpu_02.yaml/badge.svg)
