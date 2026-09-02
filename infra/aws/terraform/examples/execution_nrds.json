@@ -9,6 +9,9 @@
       "bucket": "ciroh-community-ngen-datastream",
       "prefix": "test/cicd/nrds/orca_test/ngen-run.tar.gz"
     },
+    "ii_check_forcing": true,
+    "forcing_check_wait_s": 60,
+    "forcing_check_timeout_s": 86400,
     "ii_cheapo": true,
     "timeout_s": 3600,
     "n_retries_allowed": 2,
