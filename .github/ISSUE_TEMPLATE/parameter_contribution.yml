@@ -18,12 +18,14 @@ body:
         ---
         ## Submission standard
 
-        A submission data package contains two files:
+        A submission data package for a single calibrated domain contains two files:
 
         ```
         ├── hydrofabric_subset.gpkg
         └── realization.json
         ```
+
+        Contributions covering several gages are also accepted. See **More than one gage** below.
 
         **1. The geopackage** holding the hydrofabric used during calibration.
 
@@ -31,8 +33,28 @@ body:
 
         **2. A NextGen realization** holding the parameters and model selection. Two forms are accepted:
 
-        - [Lumped](https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/lumped_realization_example.json): a single set of parameters applied to every catchment in the geopackage.
+        - [Lumped](https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/lumped_realization_example.json): a single set of parameters, assigned to every catchment in the geopackage it is paired with.
         - [Per-catchment](https://ciroh-community-ngen-datastream.s3.us-east-1.amazonaws.com/realizations/realization_VPU_16.json): a distinct set of parameters for each catchment.
+
+        ---
+        ## More than one gage
+
+        Calibrating several gages in one experiment is common. Submit them as one package, with a directory per gage holding that gage's geopackage and realization.
+
+        ```
+        example_community_contribution/
+        ├── gage-10154200/
+        │   ├── gage-10154200_subset.gpkg
+        │   └── realization.json
+        └── gage-10126000/
+            ├── gage-10126000_subset.gpkg
+            └── realization.json
+        ```
+
+        One package and one issue per contribution, not one issue per gage. Describe every gage in the package below. A lumped realization applies to every catchment in the geopackage sitting beside it, so each gage directory gets its own parameters.
+
+        ---
+        ## Hosting
 
         Tar the package into a single object and host it publicly. [HydroShare](https://www.hydroshare.org/) is recommended, in line with the [CIROH data and code sharing policy](https://docs.ciroh.org/docs/policies/DataAndCodeSharingPolicy/Recommendations), because it issues a DOI you can cite later.
 
@@ -58,6 +80,7 @@ body:
     id: realization_type
     attributes:
       label: Realization type
+      description: If the package holds a realization per gage, choose the form they share.
       options:
         - Lumped (one parameter set applied to all catchments)
         - Per-catchment (a parameter set for each catchment)
@@ -77,8 +100,8 @@ body:
     id: domain
     attributes:
       label: Spatial coverage
-      description: What the parameters cover. A gage-defined watershed, a set of VPUs, CONUS, or something else.
-      placeholder: "Catchments draining USGS gage 10154200"
+      description: What the parameters cover. A gage-defined watershed, a set of VPUs, CONUS, or something else. List every gage in the package.
+      placeholder: "Catchments draining USGS gages 10154200 and 10126000"
     validations:
       required: true
 
@@ -118,7 +141,7 @@ body:
       label: Observations and calibration period
       description: What you calibrated against, over what period, and how you split calibration from validation.
       placeholder: |
-        Observations: USGS daily streamflow at gage 10154200
+        Observations: USGS daily streamflow at gages 10154200 and 10126000
         Calibration period: 2008-2016
         Validation period: 2017-2021
         Spin-up: 2 years, discarded
@@ -129,11 +152,12 @@ body:
     id: objective
     attributes:
       label: Objective function and performance
-      description: The objective function used, and how the calibrated parameters perform relative to the uncalibrated defaults over the same domain and period.
+      description: The objective function used, and how the calibrated parameters perform relative to the uncalibrated defaults over the same domain and period. Report performance for each gage in the package.
       placeholder: |
         Objective: KGE on daily streamflow
-        Default parameters: KGE 0.41
-        Calibrated: KGE 0.72 (calibration), 0.68 (validation)
+
+        gage-10154200: default KGE 0.41, calibrated 0.72 (calibration), 0.68 (validation)
+        gage-10126000: default KGE 0.55, calibrated 0.79 (calibration), 0.74 (validation)
     validations:
       required: true
 
