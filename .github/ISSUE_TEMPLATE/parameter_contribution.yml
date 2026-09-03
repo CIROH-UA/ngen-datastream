@@ -39,7 +39,7 @@ body:
         ---
         ## More than one gage
 
-        Calibrating several gages in one experiment is common. Submit them as one package, with a directory per gage holding that gage's geopackage and realization.
+        If you calibrated multiple gages as a part of the same experiment (calibration proceedure same for all gages), then submit them as one package, with a directory per gage holding that gage's geopackage and realization.
 
         ```
         example_community_contribution/
@@ -51,7 +51,7 @@ body:
             └── realization.json
         ```
 
-        One package and one issue per contribution, not one issue per gage. Describe every gage in the package below. A lumped realization applies to every catchment in the geopackage sitting beside it, so each gage directory gets its own parameters.
+        Describe every gage in the package below. A lumped realization is assumed to apply to every catchment in the geopackage sitting beside it.
 
         ---
         ## Hosting
@@ -80,7 +80,6 @@ body:
     id: realization_type
     attributes:
       label: Realization type
-      description: If the package holds a realization per gage, choose the form they share.
       options:
         - Lumped (one parameter set applied to all catchments)
         - Per-catchment (a parameter set for each catchment)
