@@ -1,0 +1,94 @@
+#cloud-config
+# Bootstraps the controller instance: Python, the LXD client cert, the
+# research_datastream_lxd package, and a systemd unit for the scheduler.
+
+# bootcmd runs before `packages:`. Fresh Ubuntu images fire the apt-daily /
+# unattended-upgrades units at boot; they grab the dpkg lock and stall the
+# package install below for minutes. Mask them (and stop any already running)
+# so `packages:` gets the lock immediately and first boot is deterministic.
+# This trades OS auto-patching for a predictable boot — re-patch by rebuilding
+# the controller from an updated base image, not in place.
+bootcmd:
+  - systemctl mask --now apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service apt-daily.service apt-daily-upgrade.service || true
+
+package_update: true
+packages:
+  - python3
+  - python3-pip
+  - python3-venv
+  - git
+
+write_files:
+  - path: /etc/research-datastream-lxd/env
+    permissions: "0600"
+    content: |
+      RDS_LXD_DATASTREAMS_DIR=${datastreams_dir}
+      RDS_LXD_OUTPUT_CHECK=${output_check}
+      RDS_LXD_FAILURE_LOG=/var/log/research-datastream-lxd/failures.log
+      RDS_LXD_LOG_LEVEL=${log_level}
+      AWS_REGION=${aws_region}
+      AWS_DEFAULT_REGION=${aws_region}
+      LXD_PROJECT=${lxd_project}
+      # --- AWS credentials (static IAM keys; forwarded into worker containers) ---
+      AWS_ACCESS_KEY_ID=${aws_access_key_id}
+      AWS_SECRET_ACCESS_KEY=${aws_secret_access_key}
+      # --- S3 connection-pressure tuning under fan-out ---
+      RDS_LXD_S3_MAX_CONCURRENT_REQUESTS=${s3_max_concurrent_requests}
+      AWS_MAX_ATTEMPTS=${aws_max_attempts}
+      AWS_RETRY_MODE=${aws_retry_mode}
+      # --- scheduler concurrency budgets ---
+      RDS_LXD_CORE_BUDGET=${core_budget}
+      RDS_LXD_MEMORY_PCT=${memory_pct}
+      RDS_LXD_STAGGER_S=${stagger_s}
+      # --- LXD API connection (controller reaches the API over HTTPS + client cert) ---
+      LXD_ENDPOINT=${controller_lxd_endpoint}
+      LXD_CERT_FILE=/root/.config/lxc/client.crt
+      LXD_KEY_FILE=/root/.config/lxc/client.key
+      LXD_VERIFY=${lxd_verify}
+
+  # Client cert/key read from controller_lxd_cert_file/_key_file at apply time
+  # (trust it on the LXD server once). Lets pylxd drive instance lifecycle over
+  # the HTTPS API, since the controller is a container with no host socket.
+  - path: /root/.config/lxc/client.crt
+    permissions: "0644"
+    content: |
+      ${indent(6, client_cert_pem)}
+  - path: /root/.config/lxc/client.key
+    permissions: "0600"
+    content: |
+      ${indent(6, client_key_pem)}
+
+  - path: /etc/systemd/system/research-datastream-lxd.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=NextGen Research DataStream orchestrator (LXD)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      EnvironmentFile=/etc/research-datastream-lxd/env
+      ExecStart=/opt/rds-lxd/venv/bin/python -m research_datastream_lxd
+      Restart=on-failure
+      RestartSec=10
+      User=root
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # Python venv with the orchestrator package + its shared core dependency.
+  - python3 -m venv /opt/rds-lxd/venv
+  - /opt/rds-lxd/venv/bin/pip install --upgrade pip
+  # Shared core logic (infra/common/python). Installed first so the named
+  # dependency is satisfied without needing it on a PyPI the controller can
+  # reach. If you publish both packages, drop this line.
+  - /opt/rds-lxd/venv/bin/pip install "git+https://github.com/CIROH-UA/ngen-datastream.git@${package_ref}#subdirectory=infra/common/python"
+  # The orchestrator itself — installed from this repo's git subdirectory (it is
+  # not published to PyPI). package_ref must point at a commit that contains
+  # infra/lxd/python.
+  - /opt/rds-lxd/venv/bin/pip install "git+https://github.com/CIROH-UA/ngen-datastream.git@${package_ref}#subdirectory=infra/lxd/python"
+  - mkdir -p ${datastreams_dir}
+  - systemctl daemon-reload
+  - systemctl enable --now research-datastream-lxd.service

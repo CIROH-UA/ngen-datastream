@@ -1,8 +1,9 @@
 # Terraform
+# .terraform.lock.hcl is intentionally NOT ignored — commit it to pin provider
+# versions + checksums for reproducible `terraform init` across the team.
 **/.terraform/
-**/.terraform.lock.hcl
-**/terraform.tfstate
-**/terraform.tfstate.backup
+**/*.tfstate
+**/*.tfstate.*
 *.tfplan
 
 # Lambda zips (generated)
@@ -31,3 +32,6 @@ Thumbs.db
 
 # Disabled files
 *.disabled
+
+# LXD orchestrator local failure logs
+infra/lxd/failures.log*
