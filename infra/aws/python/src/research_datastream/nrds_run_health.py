@@ -10,9 +10,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import boto3
 from urllib.parse import urlparse
 import seaborn as sns
+
 s3 = boto3.client("s3")
 
-plt.style.use('dark_background')
+plt.style.use("dark_background")
 
 BASE_URL = "https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2"
 
@@ -20,14 +21,36 @@ BASE_URL = "https://ciroh-community-ngen-datastream.s3.amazonaws.com/v2.2"
 INIT_CYCLES_ALLOWED = {
     "short_range": [f"{i:02d}" for i in range(24)],
     "medium_range": ["00", "06", "12", "18"],
-    "analysis_assim_extend": ["16"]
+    "analysis_assim_extend": ["16"],
 }
 
 # Default VPU list
-ALL_VPUS = ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08",
-            "09", "10U", "10L", "11", "12", "13", "14", "15", "16", "17", "18"]
+ALL_VPUS = [
+    "01",
+    "02",
+    "03N",
+    "03S",
+    "03W",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "10U",
+    "10L",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+]
 
 ALL_ENSEMBLES = ["1", "2", "3", "4", "5", "6", "7"]
+
 
 def get_lead_time_minutes(exec_url, end_time):
     """
@@ -51,25 +74,38 @@ def get_lead_time_minutes(exec_url, end_time):
         bucket = parsed.netloc
         key = parsed.path.lstrip("/")
         response = s3.head_object(Bucket=bucket, Key=key)
-        ngen_forcing_end_time = response['LastModified']   
-        lead_time_ngen_minutes = end_time - ngen_forcing_end_time 
+        ngen_forcing_end_time = response["LastModified"]
+        lead_time_ngen_minutes = end_time - ngen_forcing_end_time
     else:
         print(f"Could not fetch conf_fp.json, status={r.status_code}")
 
     base_prefix = "/".join(key.split("/")[:-1])
-    nwm_forcing_url = f"s3://{bucket}/{base_prefix}/metadata/forcings_metadata/filenamelist.txt"
+    nwm_forcing_url = (
+        f"s3://{bucket}/{base_prefix}/metadata/forcings_metadata/filenamelist.txt"
+    )
     parsed = urlparse(nwm_forcing_url, allow_fragments=False)
     bucket = parsed.netloc
     key = parsed.path.lstrip("/")
-    nwm_file = s3.get_object(Bucket=bucket, Key=key)['Body'].read().decode('utf-8').strip().splitlines()[-1]
+    nwm_file = (
+        s3.get_object(Bucket=bucket, Key=key)["Body"]
+        .read()
+        .decode("utf-8")
+        .strip()
+        .splitlines()[-1]
+    )
     parsed = urlparse(nwm_file, allow_fragments=False)
-    bucket = parsed.netloc.split(".")[0] 
+    bucket = parsed.netloc.split(".")[0]
     key = parsed.path.lstrip("/")
     response = s3.head_object(Bucket=bucket, Key=key)
-    nwm_forcing_end_time = response['LastModified'].astimezone(timezone.utc)
+    nwm_forcing_end_time = response["LastModified"].astimezone(timezone.utc)
     lead_time_nwm_minutes = end_time - nwm_forcing_end_time
 
-    out = (lead_time_nwm_minutes.total_seconds() / 60, lead_time_ngen_minutes.total_seconds() / 60, nwm_forcing_end_time, ngen_forcing_end_time)
+    out = (
+        lead_time_nwm_minutes.total_seconds() / 60,
+        lead_time_ngen_minutes.total_seconds() / 60,
+        nwm_forcing_end_time,
+        ngen_forcing_end_time,
+    )
 
     return out
 
@@ -90,7 +126,9 @@ def fetch_execution_times(exec_json_url, run_url):
             # Adjust the key based on your JSON structure
             start_time_str = data.get("t0")
             if start_time_str:
-                start_time = datetime.datetime.fromtimestamp(start_time_str, tz=timezone.utc)
+                start_time = datetime.datetime.fromtimestamp(
+                    start_time_str, tz=timezone.utc
+                )
                 print(f"Start time from execution.json: {start_time}")
             else:
                 print(f"No start_time in {exec_json_url}")
@@ -105,7 +143,9 @@ def fetch_execution_times(exec_json_url, run_url):
         if r.status_code == 200:
             last_modified = r.headers.get("Last-Modified")
             if last_modified:
-                end_time = datetime.datetime.strptime(last_modified, "%a, %d %b %Y %H:%M:%S %Z")
+                end_time = datetime.datetime.strptime(
+                    last_modified, "%a, %d %b %Y %H:%M:%S %Z"
+                )
                 # convert to UTC if needed
                 end_time = end_time.replace(tzinfo=datetime.timezone.utc)
                 print(f"End time from run file headers: {end_time}")
@@ -125,12 +165,15 @@ def fetch_execution_times(exec_json_url, run_url):
 
     return start_time, end_time, execution_time_minutes
 
+
 def process_run(date_str, run_type, hour, vpu, ens, cached_urls, df_cache):
     if run_type == "medium_range":
         run_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/{ens}/VPU_{vpu}/ngen-run.tar.gz"
         exec_json_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/{ens}/VPU_{vpu}/datastream-metadata/execution.json"
     else:
-        run_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/ngen-run.tar.gz"
+        run_url = (
+            f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/ngen-run.tar.gz"
+        )
         exec_json_url = f"{BASE_URL}/ngen.{date_str}/{run_type}/{hour}/VPU_{vpu}/datastream-metadata/execution.json"
 
     print(f"Processing run: {run_url}")
@@ -143,12 +186,20 @@ def process_run(date_str, run_type, hour, vpu, ens, cached_urls, df_cache):
     status = check_url(run_url)
     retry, retries_allowed = fetch_execution_metadata(exec_json_url)
 
-    print(f"Checked run URL: status={status}, retry={retry}, retries_allowed={retries_allowed}")
+    print(
+        f"Checked run URL: status={status}, retry={retry}, retries_allowed={retries_allowed}"
+    )
 
-    start_time, end_time, execution_time_minutes = fetch_execution_times(exec_json_url, run_url)
-    print(f"Execution time: start_time={start_time}, end_time={end_time}, execution_time_minutes={execution_time_minutes}")
+    start_time, end_time, execution_time_minutes = fetch_execution_times(
+        exec_json_url, run_url
+    )
+    print(
+        f"Execution time: start_time={start_time}, end_time={end_time}, execution_time_minutes={execution_time_minutes}"
+    )
 
-    (lead_time_nwm_minutes, lead_time_ngen_minutes, nwm_end_time, ngen_end_time) = get_lead_time_minutes(exec_json_url,end_time)
+    (lead_time_nwm_minutes, lead_time_ngen_minutes, nwm_end_time, ngen_end_time) = (
+        get_lead_time_minutes(exec_json_url, end_time)
+    )
     print(f"Lead times: NWM={lead_time_nwm_minutes}, NGEN={lead_time_ngen_minutes}")
 
     return {
@@ -168,8 +219,9 @@ def process_run(date_str, run_type, hour, vpu, ens, cached_urls, df_cache):
         "nwm_forcing_end_time": nwm_end_time,
         "ngen_forcing_end_time": ngen_end_time,
         "lead_time_nwm_minutes": lead_time_nwm_minutes,
-        "lead_time_ngen_minutes": lead_time_ngen_minutes
+        "lead_time_ngen_minutes": lead_time_ngen_minutes,
     }
+
 
 def plot_violin_group(df, output_file, title):
     group_cols = [
@@ -178,7 +230,7 @@ def plot_violin_group(df, output_file, title):
         ("vpu", "By VPU"),
         ("run_type", "By Run Type"),
         ("init_cycle", "By Init Cycle"),
-        ("ensemble", "By Ensemble")
+        ("ensemble", "By Ensemble"),
     ]
 
     n_plots = len(group_cols)
@@ -199,15 +251,21 @@ def plot_violin_group(df, output_file, title):
         # Melt dataframe for Seaborn
         df_melted = df_sub.melt(
             id_vars=[group_col],
-            value_vars=["execution_time_minutes", "lead_time_nwm_minutes", "lead_time_ngen_minutes"],
+            value_vars=[
+                "execution_time_minutes",
+                "lead_time_nwm_minutes",
+                "lead_time_ngen_minutes",
+            ],
             var_name="Metric",
-            value_name="Minutes"
+            value_name="Minutes",
         )
-        df_melted["Metric"] = df_melted["Metric"].replace({
-            "execution_time_minutes": "Execution Time",
-            "lead_time_nwm_minutes": "Lead Time NWM",
-            "lead_time_ngen_minutes": "Lead Time NGEN"
-        })
+        df_melted["Metric"] = df_melted["Metric"].replace(
+            {
+                "execution_time_minutes": "Execution Time",
+                "lead_time_nwm_minutes": "Lead Time NWM",
+                "lead_time_ngen_minutes": "Lead Time NGEN",
+            }
+        )
 
         # plot boxplots
         sns.violinplot(
@@ -218,7 +276,7 @@ def plot_violin_group(df, output_file, title):
             palette=["deepskyblue", "mediumseagreen", "orange"],
             split=False,
             inner="quartile",
-            ax=ax
+            ax=ax,
         )
 
         ax.set_title(subtitle, fontsize=12)
@@ -233,23 +291,18 @@ def plot_violin_group(df, output_file, title):
 
     # Single legend for the figure
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(
-        handles,
-        labels,
-        loc="upper center",
-        ncol=3,
-        fontsize=12,
-        frameon=False
-    )
+    fig.legend(handles, labels, loc="upper center", ncol=3, fontsize=12, frameon=False)
 
     fig.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.savefig(output_file)
     plt.close()
 
+
 def daterange(start_date: datetime.date, end_date: datetime.date):
     for n in range((end_date - start_date).days + 1):
         yield start_date + datetime.timedelta(n)
+
 
 def check_url(url: str) -> int:
     try:
@@ -257,6 +310,7 @@ def check_url(url: str) -> int:
         return r.status_code
     except Exception:
         return 0
+
 
 def fetch_execution_metadata(url: str):
     try:
@@ -270,28 +324,27 @@ def fetch_execution_metadata(url: str):
         pass
     return None, None
 
+
 import matplotlib.patches as mpatches
+
 
 def plot_all_grouped_counts(df, output_file, title):
     group_cols = [
-        ("date",         "By Date"),
-        ("retry_attempt","By Retry Attempt"),
-        ("vpu",          "By VPU"),
-        ("run_type",     "By Run Type"),
-        ("init_cycle",   "By Init Cycle"),
-        ("ensemble",     "By Ensemble"),
+        ("date", "By Date"),
+        ("retry_attempt", "By Retry Attempt"),
+        ("vpu", "By VPU"),
+        ("run_type", "By Run Type"),
+        ("init_cycle", "By Init Cycle"),
+        ("ensemble", "By Ensemble"),
     ]
 
-    color_map = {
-        "success": "limegreen",
-        "failure": "darkred"
-    }
+    color_map = {"success": "limegreen", "failure": "darkred"}
 
     n_plots = len(group_cols)
     n_cols = 2
     n_rows = (n_plots + 1) // n_cols
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, n_rows*5))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, n_rows * 5))
     axes = axes.flatten()
 
     for ax, (group_col, subtitle) in zip(axes, group_cols):
@@ -305,13 +358,13 @@ def plot_all_grouped_counts(df, output_file, title):
         if counts.empty:
             ax.set_title(f"{subtitle} (no data)")
             ax.axis("off")  # Hide empty plot
-            continue        
+            continue
 
         counts.plot(
             kind="bar",
             ax=ax,
             color=[color_map[col] for col in counts.columns],
-            legend=False
+            legend=False,
         )
 
         ax.set_title(subtitle, fontsize=12)
@@ -328,55 +381,55 @@ def plot_all_grouped_counts(df, output_file, title):
         fig.delaxes(axes[i])
 
     # Create a proper legend manually
-    legend_handles = [mpatches.Patch(color=color_map[col], label=col) for col in ["success", "failure"]]
+    legend_handles = [
+        mpatches.Patch(color=color_map[col], label=col)
+        for col in ["success", "failure"]
+    ]
     fig.legend(
-        handles=legend_handles,
-        loc="upper center",
-        ncol=2,
-        fontsize=12,
-        frameon=False
+        handles=legend_handles, loc="upper center", ncol=2, fontsize=12, frameon=False
     )
 
-    fig.suptitle(
-        f"\n{title}"
-        f"\nNRDS CFE NOM START\n",        
-        fontsize=14, fontweight="bold"
-    )
+    fig.suptitle(f"\n{title}\nNRDS CFE NOM START\n", fontsize=14, fontweight="bold")
 
     plt.tight_layout(rect=[0, 0, 1, 0.92])
     plt.savefig(output_file)
     plt.close()
 
+
 def plot_all_grouped_boxnwhisker(df, output_file, title):
     group_cols = [
-        ("date",         "By Date"),
-        ("retry_attempt","By Retry Attempt"),
-        ("vpu",          "By VPU"),
-        ("run_type",     "By Run Type"),
-        ("init_cycle",   "By Init Cycle"),
-        ("ensemble",     "By Ensemble"),
+        ("date", "By Date"),
+        ("retry_attempt", "By Retry Attempt"),
+        ("vpu", "By VPU"),
+        ("run_type", "By Run Type"),
+        ("init_cycle", "By Init Cycle"),
+        ("ensemble", "By Ensemble"),
     ]
 
     color_map = {
         "execution_time_minutes": "green",
         "lead_time_nwm_minutes": "magenta",
-        "lead_time_ngen_minutes": "blue"
+        "lead_time_ngen_minutes": "blue",
     }
 
     n_plots = len(group_cols)
     n_cols = 2
     n_rows = (n_plots + 1) // n_cols
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, n_rows*5))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(16, n_rows * 5))
     axes = axes.flatten()
 
     for ax, (group_col, subtitle) in zip(axes, group_cols):
-        vals = df.groupby([group_col, "execution_time_minutes"]).size().unstack(fill_value=0)
+        vals = (
+            df.groupby([group_col, "execution_time_minutes"])
+            .size()
+            .unstack(fill_value=0)
+        )
 
         if vals.empty:
             ax.set_title(f"{subtitle} (no data)")
             ax.axis("off")  # Hide empty plot
-            continue        
+            continue
 
         # counts.plot(
         #     kind="bar",
@@ -389,7 +442,7 @@ def plot_all_grouped_boxnwhisker(df, output_file, title):
         # vals.boxplot("lead_time_nwm_minutes", by=group_col, ax=ax, color=color_map["lead_time_nwm_minutes"])
         # vals.boxplot("lead_time_ngen_minutes", by=group_col, ax=ax, color=color_map["lead_time_ngen_minutes"])
         #
-        # 
+        #
         # vals.boxplot(by=group_col, ax=ax, color=[color_map[col] for col in vals.columns])
 
         ax.set_title(subtitle, fontsize=12)
@@ -406,19 +459,18 @@ def plot_all_grouped_boxnwhisker(df, output_file, title):
         fig.delaxes(axes[i])
 
     # Create a proper legend manually
-    legend_handles = [mpatches.Patch(color=color_map[col], label=col) for col in ["success", "failure"]]
+    legend_handles = [
+        mpatches.Patch(color=color_map[col], label=col)
+        for col in ["success", "failure"]
+    ]
     fig.legend(
-        handles=legend_handles,
-        loc="upper center",
-        ncol=2,
-        fontsize=12,
-        frameon=False
+        handles=legend_handles, loc="upper center", ncol=2, fontsize=12, frameon=False
     )
 
     fig.suptitle(
-        f"\n{title}"
-        f"\nNRDS CFE NOM START {start_date} END {end_date}\n",        
-        fontsize=14, fontweight="bold"
+        f"\n{title}\nNRDS CFE NOM START {start_date} END {end_date}\n",
+        fontsize=14,
+        fontweight="bold",
     )
 
     plt.tight_layout(rect=[0, 0, 1, 0.92])
@@ -442,45 +494,77 @@ def output_anomaly_csvs(df, output_dir):
     exec_lim = 120
     lead_lim = 720
 
-    df_retry = df[df['retry_attempt'] > 0]
+    df_retry = df[df["retry_attempt"] > 0]
     if not df_retry.empty:
         df_retry.to_csv(os.path.join(output_dir, "retries_gt0.csv"), index=False)
-        print(f"Found {len(df_retry)} rows with retry_attempt > 0. Saved to retries_gt0.csv")
+        print(
+            f"Found {len(df_retry)} rows with retry_attempt > 0. Saved to retries_gt0.csv"
+        )
 
-    df_exec_anomaly = df[(df['execution_time_minutes'] < 0) | (df['execution_time_minutes'] > exec_lim)]
+    df_exec_anomaly = df[
+        (df["execution_time_minutes"] < 0) | (df["execution_time_minutes"] > exec_lim)
+    ]
     if not df_exec_anomaly.empty:
-        df_exec_anomaly.to_csv(os.path.join(output_dir, "execution_time_anomalies.csv"), index=False)
-        print(f"Found {len(df_exec_anomaly)} rows with abnormal execution_time_minutes. Saved to execution_time_anomalies.csv")
+        df_exec_anomaly.to_csv(
+            os.path.join(output_dir, "execution_time_anomalies.csv"), index=False
+        )
+        print(
+            f"Found {len(df_exec_anomaly)} rows with abnormal execution_time_minutes. Saved to execution_time_anomalies.csv"
+        )
 
     df_lead_anomaly = df[
-        (df['lead_time_nwm_minutes'] < 0) | (df['lead_time_nwm_minutes'] > lead_lim) |
-        (df['lead_time_ngen_minutes'] < 0) | (df['lead_time_ngen_minutes'] > lead_lim)
+        (df["lead_time_nwm_minutes"] < 0)
+        | (df["lead_time_nwm_minutes"] > lead_lim)
+        | (df["lead_time_ngen_minutes"] < 0)
+        | (df["lead_time_ngen_minutes"] > lead_lim)
     ]
     if not df_lead_anomaly.empty:
-        df_lead_anomaly.to_csv(os.path.join(output_dir, "lead_time_anomalies.csv"), index=False)
-        print(f"Found {len(df_lead_anomaly)} rows with abnormal lead times. Saved to lead_time_anomalies.csv")
+        df_lead_anomaly.to_csv(
+            os.path.join(output_dir, "lead_time_anomalies.csv"), index=False
+        )
+        print(
+            f"Found {len(df_lead_anomaly)} rows with abnormal lead times. Saved to lead_time_anomalies.csv"
+        )
 
     df_anomaly_free = df[
-        (df['retry_attempt'] == 0) &
-        (df['execution_time_minutes'] >= 0) & (df['execution_time_minutes'] <= exec_lim) &
-        (df['lead_time_nwm_minutes'] >= 0) & (df['lead_time_nwm_minutes'] <= lead_lim) &
-        (df['lead_time_ngen_minutes'] >= 0) & (df['lead_time_ngen_minutes'] <= lead_lim)
+        (df["retry_attempt"] == 0)
+        & (df["execution_time_minutes"] >= 0)
+        & (df["execution_time_minutes"] <= exec_lim)
+        & (df["lead_time_nwm_minutes"] >= 0)
+        & (df["lead_time_nwm_minutes"] <= lead_lim)
+        & (df["lead_time_ngen_minutes"] >= 0)
+        & (df["lead_time_ngen_minutes"] <= lead_lim)
     ]
     df_anomaly_free.to_csv(os.path.join(output_dir, "anomaly_free.csv"), index=False)
     print(f"Saved {len(df_anomaly_free)} anomaly-free rows to anomaly_free.csv")
 
     return df_anomaly_free
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Check datastream outputs and record results in CSV with charts.")
+    parser = argparse.ArgumentParser(
+        description="Check datastream outputs and record results in CSV with charts."
+    )
     parser.add_argument("--start", required=True, help="Start date YYYYMMDD")
     parser.add_argument("--end", required=True, help="End date YYYYMMDD")
     parser.add_argument("--vpus", default="16", help="Comma-separated VPUs or 'all'")
-    parser.add_argument("--run_types", default="all", help="Comma-separated run types or 'all'")
-    parser.add_argument("--init_cycles", default="all", help="Comma-separated init cycles or 'all'")
-    parser.add_argument("--ensembles", default="all", help="Comma-separated ensembles or 'all' (medium_range only)")
-    parser.add_argument("--csv", default="datastream_results.csv", help="Output CSV file")
-    parser.add_argument("--charts_dir", default="charts", help="Directory to save charts")
+    parser.add_argument(
+        "--run_types", default="all", help="Comma-separated run types or 'all'"
+    )
+    parser.add_argument(
+        "--init_cycles", default="all", help="Comma-separated init cycles or 'all'"
+    )
+    parser.add_argument(
+        "--ensembles",
+        default="all",
+        help="Comma-separated ensembles or 'all' (medium_range only)",
+    )
+    parser.add_argument(
+        "--csv", default="datastream_results.csv", help="Output CSV file"
+    )
+    parser.add_argument(
+        "--charts_dir", default="charts", help="Directory to save charts"
+    )
 
     args = parser.parse_args()
 
@@ -488,9 +572,17 @@ def main():
     end_date = datetime.datetime.strptime(args.end, "%Y%m%d").date()
 
     vpus = ALL_VPUS if args.vpus == "all" else args.vpus.split(",")
-    run_types = ["short_range", "medium_range", "analysis_assim_extend"] if args.run_types == "all" else args.run_types.split(",")
+    run_types = (
+        ["short_range", "medium_range", "analysis_assim_extend"]
+        if args.run_types == "all"
+        else args.run_types.split(",")
+    )
     ensembles = ALL_ENSEMBLES if args.ensembles == "all" else args.ensembles.split(",")
-    custom_cycles = None if args.init_cycles == "all" else [f"{int(x):02d}" for x in args.init_cycles.split(",")]
+    custom_cycles = (
+        None
+        if args.init_cycles == "all"
+        else [f"{int(x):02d}" for x in args.init_cycles.split(",")]
+    )
 
     # Load cache CSV if exists
     if os.path.exists(args.csv):
@@ -502,39 +594,61 @@ def main():
         cached_urls = set()
 
     rows = []
-    tasks = []   
-
+    tasks = []
 
     # Hardcoded debug call
     row = process_run(
-        date_str="20250906",      # one date to test
-        run_type="medium_range",    # run type to test
-        hour="00",                 # init cycle
-        vpu="02",                 # VPU
-        ens=7,                  # ensemble (None for short_range)
-        cached_urls=set(),         # no cache for debugging
-        df_cache=pd.DataFrame()    # empty DataFrame for debugging
+        date_str="20250906",  # one date to test
+        run_type="medium_range",  # run type to test
+        hour="00",  # init cycle
+        vpu="02",  # VPU
+        ens=7,  # ensemble (None for short_range)
+        cached_urls=set(),  # no cache for debugging
+        df_cache=pd.DataFrame(),  # empty DataFrame for debugging
     )
     rows.append(row)
     print("DEBUG row output:", row)
 
-
-    with ThreadPoolExecutor(max_workers=20) as executor:  # adjust worker count if needed
+    with ThreadPoolExecutor(
+        max_workers=20
+    ) as executor:  # adjust worker count if needed
         for current_date in daterange(start_date, end_date):
             date_str = current_date.strftime("%Y%m%d")
             for run_type in run_types:
                 allowed_hours = INIT_CYCLES_ALLOWED[run_type]
-                hours_to_check = allowed_hours if custom_cycles is None else [h for h in custom_cycles if h in allowed_hours]
+                hours_to_check = (
+                    allowed_hours
+                    if custom_cycles is None
+                    else [h for h in custom_cycles if h in allowed_hours]
+                )
                 for hour in hours_to_check:
                     for vpu in vpus:
                         if run_type == "medium_range":
                             for ens in ensembles:
                                 tasks.append(
-                                    executor.submit(process_run, date_str, run_type, hour, vpu, ens, cached_urls, df_cache)
+                                    executor.submit(
+                                        process_run,
+                                        date_str,
+                                        run_type,
+                                        hour,
+                                        vpu,
+                                        ens,
+                                        cached_urls,
+                                        df_cache,
+                                    )
                                 )
                         else:
                             tasks.append(
-                                executor.submit(process_run, date_str, run_type, hour, vpu, None, cached_urls, df_cache)
+                                executor.submit(
+                                    process_run,
+                                    date_str,
+                                    run_type,
+                                    hour,
+                                    vpu,
+                                    None,
+                                    cached_urls,
+                                    df_cache,
+                                )
                             )
 
         for future in as_completed(tasks):
@@ -544,7 +658,9 @@ def main():
     # Combine with cache and write CSV
     df_new = pd.DataFrame(rows)
     if not df_cache.empty:
-        df_combined = pd.concat([df_cache, df_new]).drop_duplicates(subset="run_url", keep="first")
+        df_combined = pd.concat([df_cache, df_new]).drop_duplicates(
+            subset="run_url", keep="first"
+        )
     else:
         df_combined = df_new
 
@@ -560,32 +676,33 @@ def main():
     plot_all_grouped_counts(
         df_combined,
         os.path.join(args.charts_dir, "success_failure_all.png"),
-        "Success vs Failure Summary"
+        "Success vs Failure Summary",
     )
 
     df_clean = output_anomaly_csvs(df_combined, args.charts_dir)
 
     for df, label in [
-    (df_combined, "all_runs"),
-    (df_clean, "clean_runs"),
+        (df_combined, "all_runs"),
+        (df_clean, "clean_runs"),
     ]:
         plot_violin_group(
             df,
             os.path.join(args.charts_dir, f"{label}_violin.png"),
-            f"{label.replace('_', ' ').upper()} Execution & Lead Time Distribution"
+            f"{label.replace('_', ' ').upper()} Execution & Lead Time Distribution",
         )
 
     for df, label in [
-    (df_combined, "all_runs"),
-    (df_clean, "clean_runs"),
+        (df_combined, "all_runs"),
+        (df_clean, "clean_runs"),
     ]:
         plot_all_grouped_boxnwhisker(
             df,
             os.path.join(args.charts_dir, f"{label}_violin.png"),
-            f"{label.replace('_', ' ').upper()} Execution & Lead Time Distribution"
-        )        
+            f"{label.replace('_', ' ').upper()} Execution & Lead Time Distribution",
+        )
 
     print(f"Charts saved to {args.charts_dir}/")
+
 
 if __name__ == "__main__":
     main()

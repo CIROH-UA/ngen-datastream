@@ -41,7 +41,7 @@ resource "aws_iam_policy" "datastreamlambda_policy" {
       },
       {
         Effect   = "Allow",
-        Action   = ["ec2:DescribeInstances", "ec2:DescribeVolumes", "ec2:DescribeTags"],
+        Action   = ["ec2:DescribeInstances", "ec2:DescribeVolumes", "ec2:DescribeTags", "ec2:DescribeSubnets"],
         Resource = "*"
       },
       {
