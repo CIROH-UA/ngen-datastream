@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'infra/aws/terraform/**'
+      # Contribution manifests live under terraform but are not terraform.
+      # Merging one must not fire an apply; deploy-contribution.yml owns them.
+      - '!infra/aws/terraform/services/nrds/datastreams/*/contributions/**'
       - '.github/workflows/terraform-deploy.yml'
   workflow_dispatch:
 

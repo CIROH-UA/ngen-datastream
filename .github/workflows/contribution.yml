@@ -1,0 +1,164 @@
+name: Parameter Contribution
+
+# Checks a parameter contribution on a pull request, runs the merged realization
+# through a real simulation, and deploys it on merge to main. The file format and
+# the process are documented beside the contributions themselves:
+# infra/aws/terraform/services/nrds/datastreams/*/contributions/README.md
+
+on:
+  pull_request:
+    paths: ['infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml']
+  push:
+    branches: [main]
+    paths: ['infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml']
+  workflow_dispatch:
+    inputs:
+      contribution:
+        description: Path to a contribution file
+        required: true
+
+concurrency:
+  group: parameter-contribution
+  cancel-in-progress: false
+
+env:
+  GLOB: 'infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contribution:
+    name: Check and simulate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the contribution
+        id: file
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ inputs.contribution }}" ]]; then
+            echo "path=${{ inputs.contribution }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            RANGE="origin/${{ github.base_ref }}...HEAD"
+          elif git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            RANGE="${{ github.event.before }} ${{ github.sha }}"
+          else
+            # The null SHA on a new branch, and unreliable after a force push.
+            RANGE="HEAD^ HEAD"
+          fi
+          CHANGED=$(git diff --name-only --diff-filter=d $RANGE -- "$GLOB")
+          if [[ "$(echo "$CHANGED" | grep -c .)" != 1 ]]; then
+            echo "::error::Change exactly one contribution file per pull request."
+            exit 1
+          fi
+          echo "path=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "Contribution: $CHANGED"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # datastreamcli's own requirement line, so the schema enforced here is the
+      # one the preprocessor builds to.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
+          pip install -e infra/aws/python
+
+      - name: Check and build the merged realization
+        run: |
+          python -m research_datastream.contribution_parameters check \
+            "${{ steps.file.outputs.path }}" \
+            --workdir "${{ runner.temp }}/work" \
+            --out "${{ runner.temp }}/realization.json" \
+            --record "${{ runner.temp }}/spec.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Image tags come from the execution template, so the simulation tracks
+      # production without a second place to update.
+      - name: Read the run settings
+        if: github.event_name != 'push'
+        id: run
+        run: |
+          set -euo pipefail
+          python -c "import json;s=json.load(open('${{ runner.temp }}/spec.json'));print('vpu=%s\ndatastream=%s'%(s['vpu'],s['datastream']))" >> "$GITHUB_OUTPUT"
+          TPL=$(dirname "${{ steps.file.outputs.path }}")/../templates/*.tpl
+          echo "ds_tag=$(grep -m1 -ho 'DS_TAG=[^ ]*' $TPL | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "ngiab_tag=$(grep -m1 -ho 'NGIAB_TAG=[^ ]*' $TPL | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      # Any recent forecast will do; the realization is what is under test.
+      - name: Find a recent short-range forcing
+        if: github.event_name != 'push'
+        id: forcing
+        run: |
+          set -euo pipefail
+          BASE="https://ciroh-community-ngen-datastream.s3.amazonaws.com/forcings/v2.2_hydrofabric"
+          for BACK in $(seq 1 10); do
+            DAY=$(date -u -d "$BACK days ago" +%Y%m%d)
+            URL="$BASE/ngen.$DAY/forcing_short_range/00/ngen.t00z.short_range.forcing.f001_f018.VPU_${{ steps.run.outputs.vpu }}.nc"
+            if curl -fsSI "$URL" >/dev/null 2>&1; then
+              echo "url=$URL" >> "$GITHUB_OUTPUT"
+              echo "date=$DAY" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::error::No short-range forcing for VPU ${{ steps.run.outputs.vpu }} in the last 10 days."
+          exit 1
+
+      - name: Check out datastreamcli
+        if: github.event_name != 'push'
+        uses: actions/checkout@v4
+        with:
+          repository: CIROH-UA/datastreamcli
+          ref: v${{ steps.run.outputs.ds_tag }}
+          path: datastreamcli
+
+      # The execution template's invocation, pointed at the candidate and writing
+      # nothing. SKIP_VALIDATION is left unset so datastreamcli resolves the BMI
+      # config and forcing paths the realization names, which CI cannot do.
+      - name: Simulate
+        if: github.event_name != 'push'
+        env:
+          DS_TAG: ${{ steps.run.outputs.ds_tag }}
+          NGIAB_TAG: ${{ steps.run.outputs.ngiab_tag }}
+        run: |
+          set -euo pipefail
+          VPU="${{ steps.run.outputs.vpu }}"
+          RESOURCES="https://ciroh-community-ngen-datastream.s3.amazonaws.com/resources/v2.2_hydrofabric"
+          ./datastreamcli/scripts/datastream \
+            -s "${{ steps.forcing.outputs.date }}0000" \
+            -n 4 \
+            -F "${{ steps.forcing.outputs.url }}" \
+            -C NWM_V3_SHORT_RANGE_00 \
+            -d "${{ runner.temp }}/run" \
+            -N "$RESOURCES/bmi_configs/${{ steps.run.outputs.datastream }}_fixed/VPU_$VPU/ngen-bmi-configs.tar.gz" \
+            -g "$RESOURCES/geopackages/VPU_$VPU/nextgen_VPU_$VPU.gpkg" \
+            -R "${{ runner.temp }}/realization.json" \
+            -v v2.2
+          test -n "$(find "${{ runner.temp }}/run/ngen-run/outputs" -type f -print -quit)" \
+            || { echo "::error::The datastream reported success but wrote no output."; exit 1; }
+
+      - name: Configure AWS credentials
+        if: github.event_name == 'push'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Deploy
+        if: github.event_name == 'push'
+        run: |
+          pip install boto3
+          python -m research_datastream.contribution_parameters deploy \
+            "${{ steps.file.outputs.path }}" \
+            --workdir "${{ runner.temp }}/deploy" \
+            --commit "${{ github.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
