@@ -1,0 +1,126 @@
+name: Outputs Diff — Datastream Regression Check
+
+# Re-runs a datastream for one or more VPUs against a recent production date using
+# this branch's templates, then diffs the troute parquet against production output
+# for that same date. Informational — never blocks a merge.
+# Manual-only for now; see docs/nrds/OUTPUTS_DIFF.md to wire it to pull_request.
+
+on:
+  workflow_dispatch:
+    inputs:
+      datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
+      vpus:          {description: 'Comma-separated VPUs, or "all"', default: '01'}
+      init:          {description: Init cycle, default: '00'}
+      run_type:      {description: Run type, type: choice, default: short_range, options: [short_range, medium_range, analysis_assim_extend]}
+      baseline_date: {description: Baseline YYYYMMDD (blank = most recent with output), default: ''}
+      rtol:          {description: Relative tolerance, default: '1e-5'}
+      atol:          {description: Absolute tolerance, default: '1e-8'}
+      dry_run:       {description: Render only, launch nothing, type: boolean, default: false}
+
+concurrency: {group: 'outputs-diff-${{ github.ref }}-${{ inputs.datastream }}', cancel-in-progress: false}
+permissions: {contents: read, id-token: write}
+
+env:
+  AWS_REGION: us-east-1
+  ACCOUNT_ID: '879381264451'
+  S3_BUCKET: ciroh-community-ngen-datastream
+  DIFF: python .github/python/outputs_diff.py
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      vpus_json: ${{ steps.p.outputs.vpus_json }}
+      sm_arn:    ${{ steps.p.outputs.sm_arn }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.x'}
+      - id: p
+        env: {BASE_REF: '${{ github.event.repository.default_branch || ''main'' }}'}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF" || true
+          $DIFF changes --base-ref "$BASE_REF"
+          $DIFF vpus --datastream '${{ inputs.datastream }}' \
+                     --run-type '${{ inputs.run_type }}' --vpus '${{ inputs.vpus }}'
+          SM=$(sed -nE 's/^\s*sm_name\s*=\s*"(.*)".*/\1/p' infra/aws/terraform/services/nrds/envs/prod.tfvars)
+          echo "sm_arn=arn:aws:states:$AWS_REGION:$ACCOUNT_ID:stateMachine:$SM" >> "$GITHUB_OUTPUT"
+
+  diff:
+    name: VPU_${{ matrix.vpu }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: {vpu: '${{ fromJSON(needs.plan.outputs.vpus_json) }}'}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.x'}
+      - uses: hashicorp/setup-terraform@v3
+        with: {terraform_version: '1.10.0', terraform_wrapper: false}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+      - run: pip install -q boto3 pandas pyarrow
+
+      # Renders this branch's template via terraform templatefile(), pins the run to
+      # the baseline date, redirects output to a per-run test prefix, then runs it.
+      - name: Run simulation
+        run: |
+          $DIFF run --datastream '${{ inputs.datastream }}' --vpu '${{ matrix.vpu }}' \
+            --init '${{ inputs.init }}' --run-type '${{ inputs.run_type }}' \
+            --date '${{ inputs.baseline_date }}' --bucket "$S3_BUCKET" \
+            --sm-arn '${{ needs.plan.outputs.sm_arn }}' --run-id '${{ github.run_id }}' \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Sync and compare outputs
+        if: ${{ !inputs.dry_run }}
+        run: |
+          SUB=$(jq -r .troute run_info.json)
+          for side in baseline:prod_prefix test:test_prefix; do
+            aws s3 sync "s3://$S3_BUCKET/$(jq -r ".${side#*:}" run_info.json)/$SUB/" "${side%%:*}/" \
+              --exclude '*' --include '*.parquet' --no-progress
+          done
+          $DIFF compare --baseline-dir baseline --test-dir test --run-info run_info.json \
+            --rtol '${{ inputs.rtol }}' --atol '${{ inputs.atol }}'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: outputs-diff-VPU_${{ matrix.vpu }}
+          path: |
+            test_execution.json
+            run_info.json
+            diff_result.json
+          if-no-files-found: warn
+
+      # Read the prefix back from run_info.json rather than rebuilding the string, so it
+      # cannot drift from the one run_sim actually wrote to and leave objects behind.
+      # It carries the run id, so this can never touch production data.
+      - name: Clean up test output
+        if: always()
+        run: |
+          PFX=$(jq -re .test_prefix run_info.json 2>/dev/null) || {
+            echo "no run_info.json; nothing to clean"; exit 0; }
+          case "$PFX" in
+            test/outputs_diff/*) aws s3 rm --recursive "s3://$S3_BUCKET/$PFX/" --only-show-errors || true ;;
+            *) echo "::error::refusing to delete unexpected prefix '$PFX'"; exit 1 ;;
+          esac
+
+  report:
+    name: Report
+    needs: [plan, diff]
+    if: ${{ always() && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.x'}
+      - uses: actions/download-artifact@v4
+        with: {pattern: outputs-diff-*, path: results}
+      - run: $DIFF report --results-dir results
