@@ -1,0 +1,71 @@
+# Forcing datastream (LXD port of the AWS forcing schedules.tf + inputs).
+# The loader expands each schedule_group into one run per init_cycles entry;
+# VPUs are fanned out inside one command via --forcing_split_vpu.
+
+name: forcing
+template: templates/execution_forcing.json.tpl
+timezone: America/New_York
+
+defaults:
+  resources:
+    image: forcing-0.1
+    storage_pool: remote
+    profiles: [default]
+    type: container
+  run_options:
+    ii_terminate_instance: true
+    ii_delete_volume: true
+    ii_check_output: true
+    n_retries_allowed: 2
+  context:
+    s3_bucket: ciroh-community-ngen-datastream
+    vpu_list: "01,02,03N,03S,03W,04,05,06,07,08,09,10L,10U,11,12,13,14,15,16,18"
+
+schedule_groups:
+
+  # Equivalent to: cron(0 ${tonumber(init) % 24} * * ? *)
+  short_range:
+    hour_expr: "{init} % 24"
+    init_cycles:
+      ["00","01","02","03","04","05","06","07","08","09","10","11",
+       "12","13","14","15","16","17","18","19","20","21","22","23"]
+    resources:
+      cpu: 8
+      memory: 32GiB
+      disk: 64GiB
+    run_options:
+      timeout_s: 3600
+    context:
+      run_type_l: short_range
+      run_type_h: SHORT_RANGE
+      member_suffix: ""
+
+  # Equivalent to: cron(0 ${(tonumber(init) + 2) % 24} * * ? *)
+  medium_range:
+    hour_expr: "({init} + 2) % 24"
+    init_cycles: ["00", "06", "12", "18"]
+    resources:
+      cpu: 16
+      memory: 64GiB
+      disk: 64GiB
+    run_options:
+      timeout_s: 7200
+    context:
+      run_type_l: medium_range
+      run_type_h: MEDIUM_RANGE
+      member_suffix: "_0"
+
+  # Equivalent to: cron(0 ${(tonumber(init) + 23) % 24} * * ? *)
+  analysis_assim_extend:
+    hour_expr: "({init} + 23) % 24"
+    init_cycles: ["16"]
+    resources:
+      cpu: 8
+      memory: 32GiB
+      disk: 64GiB
+    run_options:
+      timeout_s: 3600
+    context:
+      run_type_l: analysis_assim_extend
+      run_type_h: ANALYSIS_ASSIM_EXTEND
+      member_suffix: ""
