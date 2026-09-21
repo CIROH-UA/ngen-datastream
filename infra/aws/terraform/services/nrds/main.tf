@@ -149,3 +149,20 @@ module "qkrig_schedules" {
 
   s3_bucket = var.s3_bucket
 }
+
+module "nwm_routing_schedules" {
+  source = "./datastreams/nwm-routing"
+
+  region               = var.region
+  state_machine_arn    = module.nrds_orchestration.datastream_arn
+  scheduler_role_arn   = aws_iam_role.scheduler_role.arn
+  ec2_instance_profile = module.nrds_orchestration.ec2_instance_profile_name
+
+  nwm_routing_ami_id = var.nwm_routing_ami_id
+
+  schedule_timezone   = var.schedule_timezone
+  schedule_group_name = var.schedule_group_name
+  environment_suffix  = var.environment_suffix
+
+  s3_bucket = var.s3_bucket
+}
