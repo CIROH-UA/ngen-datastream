@@ -135,7 +135,8 @@ jobs:
           VPU="${{ steps.run.outputs.vpu }}"
           RESOURCES="https://ciroh-community-ngen-datastream.s3.amazonaws.com/resources/v2.2_hydrofabric"
           ./datastreamcli/scripts/datastream \
-            -s "${{ steps.forcing.outputs.date }}0000" \
+            -s DAILY \
+            -e "${{ steps.forcing.outputs.date }}0000" \
             -n 4 \
             -F "${{ steps.forcing.outputs.url }}" \
             -C NWM_V3_SHORT_RANGE_00 \
