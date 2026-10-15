@@ -16,6 +16,10 @@ Open a [Contribute Calibrated Parameters](https://github.com/CIROH-UA/ngen-datas
 
 Write that part at length. The NRDS neither calibrates nor adjudicates calibration methodology, so what it needs is the parameters, their provenance, and enough context for the next contributor to build on your work.
 
+### Contributions covering several gages
+
+Calibrating several gages in one experiment may leave the researcher with a geopackage and a realization per gage. Submit them as one package and one issue, with a directory per gage holding that gage's files. The [Contribute Calibrated Parameters](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=parameter_contribution.yml) template shows the layout and asks for per-gage performance.
+
 ### A note on overlapping submissions
 
 Parameters for the same catchments may arrive from more than one contributor. Where submissions overlap, accepting one set replaces the other, and the reasoning belongs in the open on the relevant issues. Systematic evaluation against observations is the eventual basis for these decisions, and community input on standards and metrics is welcome.
