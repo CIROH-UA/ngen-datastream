@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Outputs-diff regression check. Renders a datastream execution template, re-runs
-it against a production baseline date, and diffs the troute parquet.
+it against a production baseline date, and diffs the troute parquet. A parameter
+contribution runs the same way with its merged realization swapped in for the live one.
 
-Subcommands: vpus | changes | render | run | compare | report.
+Subcommands: targets | vpus | changes | render | run | compare | error | report.
 See docs/nrds/OUTPUTS_DIFF.md."""
 
-import argparse, json, os, re, subprocess, sys, tempfile, time
+import argparse, json, os, re, subprocess, sys, tempfile, time, urllib.request
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 try:  # only `run` and `compare` need these
     import boto3, numpy as np, pandas as pd
@@ -25,8 +27,17 @@ REGION    = "us-east-1"
 MARKER    = "datastreamcli/scripts/datastream"
 KEYS      = ["feature_id", "time", "type"]         # troute parquet primary key
 EXCLUDED  = {"SKIP_VALIDATION", "--S3_PREFIX", "--S3_BUCKET", "-d"}  # cannot alter outputs
-ICON      = {"IDENTICAL": "✅", "WITHIN_TOL": "✅", "DIFFERS": "⚠️", "ERROR": "❌"}
+ICON      = {"IDENTICAL": "🟰", "WITHIN_TOL": "🟰", "DIFFERS": "🔀", "ERROR": "❌"}
+OUTCOME   = {"IDENTICAL": "Same", "WITHIN_TOL": "Same (within tolerance)",
+             "DIFFERS": "Different", "ERROR": "Could not compare"}
 RANK      = {"IDENTICAL": 0, "WITHIN_TOL": 1, "DIFFERS": 2, "ERROR": 3}
+COMMENT   = "<!-- outputs-diff -->"  # marks the workflow's PR comments
+# A datastream file whose change can alter what a datastream simulates.
+WATCHED   = re.compile(r"^infra/aws/terraform/services/nrds/datastreams/([^/]+)/"
+                       r"(templates/.+|config/.+|contributions/[^/]+\.ya?ml)$")
+# The AMI each datastream's instances boot, as prod.tfvars names it.
+AMI_OF    = {"fp_ami_id": "forcing", **{f"{d.replace('-', '_')}_ami_id": d
+                                         for d in [*SUPPORTED, "restart", "qkrig"]}}
 
 RUN_TYPES = {
     "short_range":           dict(run_type_l="short_range", run_type_h="SHORT_RANGE",
@@ -70,9 +81,10 @@ def tf_block(text, name):
     die(f"unbalanced braces in {name}")
 
 
-def tfvars():
+def tfvars(text=None):
     pat = re.compile(r'\s*([a-z_0-9]+)\s*=\s*"?([^"#\n]*?)"?\s*(?:#.*)?$')
-    return {m[1]: m[2] for line in open(TFVARS) if (m := pat.match(line)) and m[2]}
+    lines = open(TFVARS) if text is None else text.splitlines()
+    return {m[1]: m[2] for line in lines if (m := pat.match(line)) and m[2]}
 
 
 def vpus_of(ds, run_type):
@@ -157,6 +169,27 @@ def baseline_date(s3, bucket, daily, days):
     die(f"no production troute parquet in the past {days} days")
 
 
+def fetch(url, s3=None):
+    """Body and Last-Modified of an s3:// or http(s) object."""
+    if url.startswith("s3://"):
+        bucket, key = url[5:].split("/", 1)
+        o = (s3 or boto3.client("s3", region_name=REGION)).get_object(Bucket=bucket, Key=key)
+        return o["Body"].read(), o["LastModified"]
+    with urllib.request.urlopen(url, timeout=60) as r:
+        return r.read(), parsedate_to_datetime(r.headers["Last-Modified"])
+
+
+def changed_features(live, candidate):
+    """troute feature_ids of the divides whose realization entry the candidate changes.
+
+    A contribution writes one catchment entry per divide; cat-N routes through wb-N,
+    which troute reports as feature_id N.
+    """
+    lc, cc = live.get("catchments") or {}, candidate.get("catchments") or {}
+    return sorted({int(m[1]) for k, v in cc.items()
+                   if v != lc.get(k) and (m := re.fullmatch(r"cat-(\d+)", k))})
+
+
 def cmd_run(a):
     ex = render(a.datastream, a.vpu, a.init, a.run_type)
     if not (m := re.search(r"--S3_PREFIX\s+([^\s'\"]+)", ex["commands"][0])):
@@ -164,7 +197,9 @@ def cmd_run(a):
     s3   = boto3.client("s3", region_name=REGION)
     date = a.date or baseline_date(s3, a.bucket, m[1], a.max_days_back)
     prod = m[1].replace("ngen.DAILY", f"ngen.{date}")
-    test = f"test/outputs_diff/{a.run_id}/{a.datastream}/VPU_{a.vpu}"
+    key  = a.key or f"{a.datastream}_VPU_{a.vpu}"
+    test = f"test/outputs_diff/{a.run_id}/{key}"
+    live = (r := re.search(r"\s-R\s+([^\s'\"]+)", ex["commands"][0])) and r[1]
 
     cmds = []
     for c in ex["commands"]:
@@ -175,13 +210,39 @@ def cmd_run(a):
         if "-s DAILY" in c and "-e " not in c:
             c = c.replace("-s DAILY", f"-s DAILY -e {date}0000")
         cmds.append(re.sub(r"--S3_PREFIX\s+[^\s'\"]+", f"--S3_PREFIX {test}", c))
+    info = dict(key=key, datastream=a.datastream, vpu=a.vpu, init=a.init, run_type=a.run_type,
+                date=date, bucket=a.bucket, prod_prefix=prod, test_prefix=test, troute=TROUTE,
+                contribution=a.contribution)
+
+    # Production's output for the baseline date only stands for the live realization
+    # if that realization was already in place when production ran.
+    if live:
+        body, modified = fetch(live, s3)
+        info["realization_modified"] = modified.isoformat()
+        if modified >= datetime.strptime(date, "%Y%m%d").replace(tzinfo=timezone.utc):
+            info["note"] = (f"The live realization changed on {modified:%Y-%m-%d %H:%M} UTC, "
+                            f"after the {date} baseline began, so the baseline may reflect an "
+                            "earlier realization.")
+
+    # A contribution: run the merged realization in place of the live one. The
+    # instance reads it from S3 under the test prefix, which cleanup removes.
+    if a.realization:
+        if not live:
+            die("the rendered execution names no -R realization to replace")
+        cand = f"{test}/candidate/{os.path.basename(live)}"
+        if not a.dry_run:
+            s3.upload_file(a.realization, a.bucket, cand)
+        cmds = [re.sub(r"(\s-R\s+)[^\s'\"]+", rf"\g<1>s3://{a.bucket}/{cand}", c) for c in cmds]
+        info["contributed_features"] = changed_features(json.loads(body),
+                                                        json.load(open(a.realization)))
+        print(f"candidate s3://{a.bucket}/{cand}: "
+              f"{len(info['contributed_features'])} contributed catchment(s)")
+
     ex["commands"] = cmds
     ex["instance_parameters"]["TagSpecifications"] = [{"ResourceType": "instance", "Tags": [
-        {"Key": "Name", "Value": f"outputs_diff_{a.datastream}_VPU{a.vpu}"},
+        {"Key": "Name", "Value": f"outputs_diff_{key}"[:255]},
         {"Key": "Project", "Value": f"outputs_diff_{a.run_id}"}]}]
 
-    info = dict(datastream=a.datastream, vpu=a.vpu, init=a.init, run_type=a.run_type,
-                date=date, bucket=a.bucket, prod_prefix=prod, test_prefix=test, troute=TROUTE)
     json.dump(ex, open("test_execution.json", "w"), indent=2)
     print(f"prod {prod}\ntest {test}\ncmd  {cmds[0][:400]}")
 
@@ -191,7 +252,7 @@ def cmd_run(a):
         if not a.sm_arn:
             die("--sm-arn is required to submit")
         sfn  = boto3.client("stepfunctions", region_name=REGION)
-        name = f"outputs-diff-{a.run_id}-{a.datastream}-VPU{a.vpu}-{int(time.time())}"[:80]
+        name = f"outputs-diff-{a.run_id}-{key}-{int(time.time())}"[:80]
         arn  = sfn.start_execution(stateMachineArn=a.sm_arn, name=name,
                                    input=json.dumps(ex))["executionArn"]
         print(f"started {arn}")
@@ -254,7 +315,22 @@ def read_parquet(path):
     return d
 
 
-def cmp_file(label, bp, tp, rtol, atol):
+def cmp_features(common, cols, feats, rtol, atol):
+    """How many of `feats` have any value outside tolerance, among the joined rows."""
+    sel = common[common["feature_id"].isin(feats)]
+    hit = np.zeros(len(sel), bool)
+    for col in cols:
+        b = pd.to_numeric(sel[f"{col}_b"], errors="coerce").to_numpy("float64")
+        t = pd.to_numeric(sel[f"{col}_t"], errors="coerce").to_numpy("float64")
+        hit |= (np.abs(t - b) > atol + rtol * np.abs(b)) | (np.isnan(b) != np.isnan(t))
+    s = {"contributed": len(feats), "present": int(sel["feature_id"].nunique()),
+         "differ": int(sel.loc[hit, "feature_id"].nunique())}
+    print(f"\n  contributed catchments: {s['differ']} of {s['present']} present "
+          f"({s['contributed']} contributed) differ")
+    return s
+
+
+def cmp_file(label, bp, tp, rtol, atol, feats=()):
     print(f"\n{'='*72}\n  {label}\n{'='*72}")
     b, t = read_parquet(bp), read_parquet(tp)
     r = {"file": label, "baseline_rows": len(b), "test_rows": len(t), "columns": {}}
@@ -292,6 +368,9 @@ def cmp_file(label, bp, tp, rtol, atol):
             same = common[f"{col}_b"].equals(common[f"{col}_t"])
             r["columns"][col] = {"verdict": "IDENTICAL" if same else "DIFFERS", "non_numeric": True}
             print(f"    {col:<12} {r['columns'][col]['verdict']:<13}(non-numeric)")
+    if feats and "feature_id" in keys:
+        num = [c for c in b.columns if c not in keys and pd.api.types.is_numeric_dtype(b[c])]
+        r["contributed"] = cmp_features(common, num, feats, rtol, atol)
     return r
 
 
@@ -300,6 +379,8 @@ def cmd_compare(a):
                          for d, _, fs in os.walk(root) for f in fs if f.endswith(".parquet")}
     b, t = find(a.baseline_dir), find(a.test_dir)
     print(f"baseline {len(b)} file(s), test {len(t)} file(s)")
+    meta  = json.load(open(a.run_info)) if a.run_info and os.path.exists(a.run_info) else {}
+    feats = meta.get("contributed_features") or []
 
     if not b or not t:
         # A missing output must not look like a clean diff.
@@ -316,7 +397,7 @@ def cmd_compare(a):
                 side = "baseline" if k in b else "test"
                 print(f"  *** {k}: present in {side} only")
                 res.append({"file": k, "error": f"present in {side} only", "columns": {}})
-        res += [cmp_file(l, x, y, a.rtol, a.atol) for l, x, y in pairs]
+        res += [cmp_file(l, x, y, a.rtol, a.atol, feats) for l, x, y in pairs]
 
         verdicts = [c["verdict"] for r in res for c in r["columns"].values()]
         overall = ("ERROR"    if any("error" in r for r in res) else
@@ -325,40 +406,96 @@ def cmd_compare(a):
                    "WITHIN_TOL" if "WITHIN_TOL" in verdicts else "IDENTICAL")
 
     print(f"\n{'='*72}\nOVERALL: {overall}  (rtol={a.rtol}, atol={a.atol})\n{'='*72}")
-    meta = json.load(open(a.run_info)) if a.run_info and os.path.exists(a.run_info) else {}
     json.dump({"overall": overall, "meta": meta, "rtol": a.rtol, "atol": a.atol, "files": res},
               open(a.json_out, "w"), indent=2)
 
 
+# ── error ────────────────────────────────────────────────────────────────────
+def cmd_error(a):
+    """Record a target that never reached a comparison, so the report still lists it."""
+    meta = {**json.loads(a.target or "{}"),
+            **(json.load(open(a.run_info)) if os.path.exists(a.run_info) else {})}
+    json.dump({"overall": "ERROR", "meta": meta, "error": a.message, "files": []},
+              open(a.json_out, "w"), indent=2)
+
+
 # ── report ───────────────────────────────────────────────────────────────────
-def cmd_report(a):
-    res = [json.load(open(f"{d}/{f}")) for d, _, fs in os.walk(a.results_dir)
-           for f in fs if f == "diff_result.json"]
-    if not res:
-        out = "## Outputs Diff\n\nNo results — every VPU job failed before comparing.\n"
+def detail(r):
+    """The detail cell for one target's result."""
+    m = r.get("meta", {})
+    if r["overall"] == "ERROR":
+        errs = [r.get("error")] + [f.get("error") for f in r.get("files", [])]
+        out = ["; ".join(e for e in errs if e) or "see the job log"]
     else:
-        res.sort(key=lambda r: r.get("meta", {}).get("vpu", ""))
-        overall = max((r["overall"] for r in res), key=lambda v: RANK.get(v, 0))
-        m = res[0].get("meta", {})
-        lines = [f"## Outputs Diff {ICON.get(overall, '')} `{overall}`", "",
-                 f"`{m.get('datastream', '?')}` · {m.get('run_type', '?')} · init "
-                 f"{m.get('init', '?')} · baseline `{m.get('date', '?')}` · {len(res)} VPU(s) · "
-                 f"rtol={res[0].get('rtol')} atol={res[0].get('atol')}", "",
-                 "| VPU | verdict | rows compared | columns differing |", "|---|---|---|---|"]
+        rows = sum(f.get("rows_compared") or 0 for f in r["files"])
+        diff = ", ".join(
+            f"`{c}` ({s['n_diff']:,} rows"
+            + (f", max rel {s['max_rel']:.3g})" if s.get("max_rel") is not None else ")")
+            for f in r["files"] for c, s in f["columns"].items() if s["verdict"] == "DIFFERS")
+        out = [f"{rows:,} rows compared" + (f"; differs in {diff}" if diff else "")]
+
+    if m.get("contribution") and r["overall"] != "ERROR" and not m.get("contributed_features"):
+        out.append("⚠️ no contributed catchments found in the candidate realization")
+    elif m.get("contribution") and r["overall"] != "ERROR":
+        got = [f["contributed"] for f in r["files"] if f.get("contributed")]
+        c = max(got, key=lambda x: x["differ"]) if got else None
+        if c:
+            out.append(f"{c['differ']:,} of {c['contributed']:,} contributed catchments' "
+                       "flowpaths changed")
+        if not c or not c["differ"]:
+            out.append("⚠️ **the contributed parameters did not change the outputs of the "
+                       "catchments they were contributed for**")
+    return "<br>".join(out)
+
+
+def cmd_report(a):
+    targets, skipped = json.loads(a.targets or "[]"), json.loads(a.skipped or "[]")
+    found = {}
+    for d, _, fs in os.walk(a.results_dir):
+        if "diff_result.json" in fs:
+            r = json.load(open(f"{d}/diff_result.json"))
+            found[r.get("meta", {}).get("key") or os.path.basename(d)] = r
+    # A target whose job died before writing anything still gets a row.
+    res = [found.pop(t["key"], None) or {"overall": "ERROR", "meta": t, "files": [],
+                                         "error": "the job produced no result; see the run"}
+           for t in targets] + list(found.values())
+    label = {t["key"]: t.get("label") for t in targets}
+
+    lines = [COMMENT]
+    if not a.plan_ok:
+        lines += ["## Outputs diff ❌ Could not plan", "",
+                  "Working out which datastreams to simulate failed; see the run."]
+    elif not res:
+        lines += ["## Outputs diff: nothing simulated", "",
+                  "This change touches no datastream that runs datastreamcli."]
+    else:
+        ran = [r["overall"] for r in res if r["overall"] != "ERROR"]
+        top = max(ran, key=lambda v: RANK[v]) if ran else "ERROR"
+        head = {"IDENTICAL": "Same", "WITHIN_TOL": "Same", "DIFFERS": "Different"}.get(top, OUTCOME[top])
+        errs = len(res) - len(ran)
+        lines += [f"## Outputs diff {ICON[top]} {head}"
+                  + (f" ({errs} could not be compared)" if ran and errs else ""), "",
+                  "| Change | VPU | Baseline | Outputs | Detail |", "|---|---|---|---|---|"]
         for r in res:
-            rows = sum(f.get("rows_compared", 0) or 0 for f in r["files"])
-            diff = ", ".join(
-                f"`{c}` ({s['n_diff']} rows"
-                + (f", max rel {s['max_rel']:.3g})" if s.get("max_rel") is not None else ")")
-                for f in r["files"] for c, s in f["columns"].items() if s["verdict"] == "DIFFERS"
-            ) or "—"
-            lines.append(f"| VPU_{r.get('meta', {}).get('vpu', '?')} | "
-                         f"{ICON.get(r['overall'], '')} {r['overall']} | {rows:,} | {diff} |")
-        lines += ["", "`IDENTICAL` equal · `WITHIN_TOL` within tolerance · `DIFFERS` outside it "
-                  "· `ERROR` could not compare. Informational only — never blocks a merge."]
-        out = "\n".join(lines) + "\n"
+            m = r.get("meta", {})
+            lines.append(f"| {label.get(m.get('key')) or m.get('key', '?')} | {m.get('vpu') or '?'} "
+                         f"| {m.get('date', '—')} | {ICON[r['overall']]} {OUTCOME[r['overall']]} "
+                         f"| {detail(r)} |")
+        notes = [f"> {label.get(r['meta'].get('key')) or r['meta'].get('key')}: {r['meta']['note']}"
+                 for r in res if r.get("meta", {}).get("note")]
+        lines += [""] + notes if notes else []
+        lines += ["", f"Each change was run as production runs it ({a.run_type}, init {a.init}) "
+                  "against the production output of the baseline date, with troute output "
+                  f"compared at rtol={a.rtol}, atol={a.atol}."]
+    if skipped:
+        lines += ["", "Not simulated, as they do not run datastreamcli: "
+                  + ", ".join(f"`{s}`" for s in skipped) + "."]
+    lines += ["", f"<sub>{a.commit[:7]} · [run]({a.run_url}) · informational only, never "
+              "fails the workflow</sub>" if a.run_url else ""]
+    out = "\n".join(lines).rstrip() + "\n"
 
     print(out)
+    open(a.out, "w").write(out)
     if s := os.environ.get("GITHUB_STEP_SUMMARY"):
         open(s, "a").write(out)
 
@@ -417,16 +554,78 @@ def cmd_changes(a):
 
 
 # ── vpus ─────────────────────────────────────────────────────────────────────
-def cmd_vpus(a):
-    known = vpus_of(a.datastream, a.run_type)
-    if not a.vpus.strip():  # "all" must be explicit; a blank field should launch nothing
+def select_vpus(ds, run_type, vpus):
+    known = vpus_of(ds, run_type)
+    if not vpus.strip():  # "all" must be explicit; a blank field should launch nothing
         die('vpus is empty; pass a VPU list or "all"')
-    sel = known if a.vpus.strip().lower() == "all" else [v.strip() for v in a.vpus.split(",") if v.strip()]
+    sel = known if vpus.strip().lower() == "all" else [v.strip() for v in vpus.split(",") if v.strip()]
     if bad := [v for v in sel if v not in known]:
-        die(f"VPUs {bad} not configured for {a.datastream}; known: {known}")
+        die(f"VPUs {bad} not configured for {ds}; known: {known}")
+    return sel
+
+
+def cmd_vpus(a):
+    sel = select_vpus(a.datastream, a.run_type, a.vpus)
     print(f"::notice::testing {len(sel)} VPU(s) of {a.datastream}: {','.join(sel)}", file=sys.stderr)
     gh_output(vpus_json=json.dumps(sel))
     print(json.dumps(sel))
+
+
+# ── targets ──────────────────────────────────────────────────────────────────
+def contribution_target(path):
+    """A contribution's VPU comes from its geopackage, so the diff job resolves it."""
+    ds, name = path.split("/")[-3], os.path.splitext(os.path.basename(path))[0]
+    return dict(key=f"{ds}_contribution_{name}", label=f"`{ds}` contribution `{os.path.basename(path)}`",
+                datastream=ds, vpu="", contribution=path)
+
+
+def cmd_targets(a):
+    """What to simulate: the requested datastream and VPUs or contribution on a manual
+    run; on a pull request, one VPU of each datastream whose configuration or AMI
+    changed, and each contribution added or changed."""
+    targets, skipped = [], set()
+    if a.contribution:
+        targets.append(contribution_target(a.contribution))
+    elif a.datastream:
+        targets = [dict(key=f"{a.datastream}_VPU_{v}", label=f"`{a.datastream}`",
+                        datastream=a.datastream, vpu=v, contribution="")
+                   for v in select_vpus(a.datastream, a.run_type, a.vpus)]
+    else:
+        base = a.base_ref if "/" in a.base_ref else f"origin/{a.base_ref}"
+        files = subprocess.run(["git", "diff", "--name-only", "--diff-filter=d", f"{base}...HEAD"],
+                               capture_output=True, text=True, check=True).stdout.split()
+        configs, contributions = {}, []
+        for f in files:
+            if not (m := WATCHED.match(f)):
+                continue
+            if m[1] not in SUPPORTED:
+                skipped.add(m[1])
+            elif m[2].startswith("contributions/"):
+                contributions.append(contribution_target(f))
+            else:
+                configs.setdefault(m[1], []).append(f"`{os.path.basename(f)}`")
+        if os.path.relpath(TFVARS, ROOT) in files:
+            p = subprocess.run(["git", "show", f"{base}:{os.path.relpath(TFVARS, ROOT)}"],
+                               capture_output=True, text=True)
+            old, new = tfvars(p.stdout if not p.returncode else ""), tfvars()
+            for k, ds in AMI_OF.items():
+                if old.get(k) == new.get(k):
+                    continue
+                if ds not in SUPPORTED:
+                    skipped.add(ds)
+                else:
+                    configs.setdefault(ds, []).append(f"AMI `{old.get(k)}` → `{new.get(k)}`")
+        for ds, fs in sorted(configs.items()):
+            v = vpus_of(ds, a.run_type)[0]
+            targets.append(dict(key=f"{ds}_VPU_{v}", label=f"`{ds}` " + ", ".join(fs),
+                                datastream=ds, vpu=v, contribution=""))
+        targets += contributions
+
+    for t in targets:
+        print(f"{t['key']}: {t['label']}")
+    if skipped:
+        print(f"not simulated (no datastreamcli): {', '.join(sorted(skipped))}")
+    gh_output(targets_json=json.dumps(targets), skipped_json=json.dumps(sorted(skipped)))
 
 
 # ── cli ──────────────────────────────────────────────────────────────────────
@@ -446,6 +645,13 @@ def main():
         p.add_argument("--init", default="00")
         p.add_argument("--run-type", default="short_range", choices=list(RUN_TYPES))
         return p
+
+    p = target("targets", "what to simulate, as a job matrix", fn=cmd_targets)
+    p.add_argument("--base-ref", default=os.environ.get("BASE_REF", "main"))
+    p.add_argument("--datastream", default="", choices=["", *SUPPORTED])
+    p.add_argument("--vpus", default="")
+    p.add_argument("--contribution", default="", help="a contribution file to simulate")
+    p.add_argument("--run-type", default="short_range", choices=list(RUN_TYPES))
 
     p = target("vpus", "resolve the VPU matrix", fn=cmd_vpus)
     p.add_argument("--datastream", required=True, choices=SUPPORTED)
@@ -468,6 +674,9 @@ def main():
     p.add_argument("--timeout-s", type=int, default=5400)
     p.add_argument("--out", default="run_info.json")
     p.add_argument("--dry-run", action="store_true", help="render and patch, submit nothing")
+    p.add_argument("--key", default="", help="names the target; defaults to <datastream>_VPU_<vpu>")
+    p.add_argument("--realization", default="", help="a candidate realization to run in place of the live one")
+    p.add_argument("--contribution", default="", help="the contribution the candidate came from")
 
     p = target("compare", "diff baseline vs test parquet", fn=cmd_compare)
     p.add_argument("--baseline-dir", required=True)
@@ -477,8 +686,25 @@ def main():
     p.add_argument("--run-info", default="")
     p.add_argument("--json-out", default="diff_result.json")
 
-    p = target("report", "aggregate per-VPU results into the job summary", fn=cmd_report)
+    p = target("error", "record a target that failed before comparing", fn=cmd_error)
+    p.add_argument("--target", default="", help="the target's matrix entry, as JSON")
+    p.add_argument("--message", required=True)
+    p.add_argument("--run-info", default="run_info.json")
+    p.add_argument("--json-out", default="diff_result.json")
+
+    p = target("report", "aggregate results into the job summary and a PR comment", fn=cmd_report)
     p.add_argument("--results-dir", required=True)
+    p.add_argument("--targets", default="", help="the plan's targets, as JSON")
+    p.add_argument("--skipped", default="", help="changed datastreams not simulated, as JSON")
+    p.add_argument("--plan-ok", type=lambda v: v.lower() == "true", default=True,
+                   help="the plan job's ok output; anything but 'true' means it failed")
+    p.add_argument("--run-type", default="short_range")
+    p.add_argument("--init", default="00")
+    p.add_argument("--rtol", default="1e-5")
+    p.add_argument("--atol", default="1e-8")
+    p.add_argument("--commit", default="")
+    p.add_argument("--run-url", default="")
+    p.add_argument("--out", default="comment.md")
 
     a = ap.parse_args()
     a.fn(a)

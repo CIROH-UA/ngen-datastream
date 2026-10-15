@@ -2,66 +2,116 @@ name: Outputs Diff — Datastream Regression Check
 
 # Re-runs a datastream for one or more VPUs against a recent production date using
 # this branch's templates, then diffs the troute parquet against production output
-# for that same date. Informational — never blocks a merge.
-# Manual-only for now; see docs/nrds/OUTPUTS_DIFF.md to wire it to pull_request.
+# for that same date. A parameter contribution runs the same way with its merged
+# realization in place of the live one.
+#
+# On a pull request it simulates one VPU of each datastream whose configuration or
+# AMI the change touches, and each contribution it adds or changes, then comments on the PR
+# whether the outputs are the same or different. Informational: it never fails.
+# See docs/nrds/OUTPUTS_DIFF.md.
 
 on:
+  pull_request:
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/*/templates/**'
+      - 'infra/aws/terraform/services/nrds/datastreams/*/config/**'
+      - 'infra/aws/terraform/services/nrds/envs/prod.tfvars'  # the datastreams' AMIs
+      - 'infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml'
   workflow_dispatch:
     inputs:
       datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
       vpus:          {description: 'Comma-separated VPUs, or "all"', default: '01'}
+      contribution:  {description: 'Contribution file to simulate instead (overrides datastream and VPUs)', default: ''}
       init:          {description: Init cycle, default: '00'}
       run_type:      {description: Run type, type: choice, default: short_range, options: [short_range, medium_range, analysis_assim_extend]}
       baseline_date: {description: Baseline YYYYMMDD (blank = most recent with output), default: ''}
       rtol:          {description: Relative tolerance, default: '1e-5'}
       atol:          {description: Absolute tolerance, default: '1e-8'}
-      dry_run:       {description: Render only, launch nothing, type: boolean, default: false}
+      dry_run:       {description: 'Render only, launch nothing', type: boolean, default: false}
 
-concurrency: {group: 'outputs-diff-${{ github.ref }}-${{ inputs.datastream }}', cancel-in-progress: false}
-permissions: {contents: read, id-token: write}
+concurrency: {group: 'outputs-diff-${{ github.ref }}-${{ inputs.datastream }}-${{ inputs.contribution }}', cancel-in-progress: false}
+permissions: {contents: read, id-token: write, pull-requests: write}
 
 env:
   AWS_REGION: us-east-1
   ACCOUNT_ID: '879381264451'
   S3_BUCKET: ciroh-community-ngen-datastream
   DIFF: python .github/python/outputs_diff.py
+  # A pull request has no inputs, so it takes these defaults.
+  INIT: ${{ inputs.init || '00' }}
+  RUN_TYPE: ${{ inputs.run_type || 'short_range' }}
+  BASELINE_DATE: ${{ inputs.baseline_date }}
+  RTOL: ${{ inputs.rtol || '1e-5' }}
+  ATOL: ${{ inputs.atol || '1e-8' }}
 
 jobs:
   plan:
     name: Plan
     runs-on: ubuntu-latest
     outputs:
-      vpus_json: ${{ steps.p.outputs.vpus_json }}
-      sm_arn:    ${{ steps.p.outputs.sm_arn }}
+      ok:           ${{ steps.p.outcome == 'success' }}
+      targets_json: ${{ steps.p.outputs.targets_json }}
+      skipped_json: ${{ steps.p.outputs.skipped_json }}
+      sm_arn:       ${{ steps.p.outputs.sm_arn }}
     steps:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with: {python-version: '3.x'}
+        with: {python-version: '3.12'}
       - id: p
-        env: {BASE_REF: '${{ github.event.repository.default_branch || ''main'' }}'}
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch || 'main' }}
+          DATASTREAM: ${{ github.event_name == 'workflow_dispatch' && inputs.datastream || '' }}
+          VPUS: ${{ inputs.vpus }}
+          CONTRIBUTION: ${{ inputs.contribution }}
         run: |
-          git fetch --no-tags --depth=1 origin "$BASE_REF" || true
-          $DIFF changes --base-ref "$BASE_REF"
-          $DIFF vpus --datastream '${{ inputs.datastream }}' \
-                     --run-type '${{ inputs.run_type }}' --vpus '${{ inputs.vpus }}'
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF" || true
+          $DIFF changes --base-ref "$BASE_REF" || true  # informational
+          $DIFF targets --base-ref "$BASE_REF" --datastream "$DATASTREAM" --vpus "$VPUS" \
+                        --contribution "$CONTRIBUTION" --run-type "$RUN_TYPE"
           SM=$(sed -nE 's/^\s*sm_name\s*=\s*"(.*)".*/\1/p' infra/aws/terraform/services/nrds/envs/prod.tfvars)
           echo "sm_arn=arn:aws:states:$AWS_REGION:$ACCOUNT_ID:stateMachine:$SM" >> "$GITHUB_OUTPUT"
 
   diff:
-    name: VPU_${{ matrix.vpu }}
+    name: ${{ matrix.target.key }}
     needs: plan
+    if: ${{ needs.plan.outputs.targets_json != '' && needs.plan.outputs.targets_json != '[]' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 150
+    # A failed target is reported as "could not compare", never as a failed workflow.
+    continue-on-error: true
     strategy:
       fail-fast: false
       max-parallel: 6
-      matrix: {vpu: '${{ fromJSON(needs.plan.outputs.vpus_json) }}'}
+      matrix: {target: '${{ fromJSON(needs.plan.outputs.targets_json) }}'}
+    env:
+      TARGET: ${{ toJSON(matrix.target) }}
+      KEY: ${{ matrix.target.key }}
+      DATASTREAM: ${{ matrix.target.datastream }}
+      CONTRIBUTION: ${{ matrix.target.contribution }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.x'}
+        with: {python-version: '3.12'}
       - uses: hashicorp/setup-terraform@v3
         with: {terraform_version: '1.10.0', terraform_wrapper: false}
+
+      # The same check the Parameter Contribution workflow runs, which writes the
+      # live realization with the contributed parameters merged in.
+      - name: Build the contributed realization
+        id: build
+        if: ${{ matrix.target.contribution != '' }}
+        run: |
+          set -euo pipefail
+          pip install -q 'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
+          pip install -q -e infra/aws/python
+          python -m research_datastream.contribution_parameters check "$CONTRIBUTION" \
+            --workdir "$RUNNER_TEMP/work" --out candidate_realization.json --record spec.json \
+            | tee build.log
+          echo "vpu=$(jq -r .vpu spec.json)" >> "$GITHUB_OUTPUT"
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
@@ -71,32 +121,52 @@ jobs:
       # Renders this branch's template via terraform templatefile(), pins the run to
       # the baseline date, redirects output to a per-run test prefix, then runs it.
       - name: Run simulation
+        id: run
+        env:
+          VPU: ${{ steps.build.outputs.vpu || matrix.target.vpu }}
         run: |
-          $DIFF run --datastream '${{ inputs.datastream }}' --vpu '${{ matrix.vpu }}' \
-            --init '${{ inputs.init }}' --run-type '${{ inputs.run_type }}' \
-            --date '${{ inputs.baseline_date }}' --bucket "$S3_BUCKET" \
+          set -euo pipefail
+          $DIFF run --key "$KEY" --datastream "$DATASTREAM" --vpu "$VPU" \
+            --init "$INIT" --run-type "$RUN_TYPE" --date "$BASELINE_DATE" --bucket "$S3_BUCKET" \
             --sm-arn '${{ needs.plan.outputs.sm_arn }}' --run-id '${{ github.run_id }}' \
+            ${CONTRIBUTION:+--realization candidate_realization.json --contribution "$CONTRIBUTION"} \
             ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Sync and compare outputs
+        id: compare
         if: ${{ !inputs.dry_run }}
         run: |
+          set -euo pipefail
           SUB=$(jq -r .troute run_info.json)
           for side in baseline:prod_prefix test:test_prefix; do
             aws s3 sync "s3://$S3_BUCKET/$(jq -r ".${side#*:}" run_info.json)/$SUB/" "${side%%:*}/" \
               --exclude '*' --include '*.parquet' --no-progress
           done
           $DIFF compare --baseline-dir baseline --test-dir test --run-info run_info.json \
-            --rtol '${{ inputs.rtol }}' --atol '${{ inputs.atol }}'
+            --rtol "$RTOL" --atol "$ATOL"
+
+      - name: Record the failure
+        if: ${{ failure() }}
+        env:
+          OUTCOMES: >-
+            build=${{ steps.build.outcome }} run=${{ steps.run.outcome }}
+            compare=${{ steps.compare.outcome }}
+        run: |
+          STEP=$(tr ' ' '\n' <<< "$OUTCOMES" | sed -n 's/=failure$//p' | head -1)
+          # A contribution that fails its check says why in its first failing check.
+          WHY=$(grep -m1 -F '[FAIL]' build.log 2>/dev/null || true)
+          $DIFF error --target "$TARGET" \
+            --message "failed at ${STEP:-setup}${WHY:+: $WHY}; see the job log"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: outputs-diff-VPU_${{ matrix.vpu }}
+          name: outputs-diff-${{ matrix.target.key }}
           path: |
             test_execution.json
             run_info.json
             diff_result.json
+            spec.json
           if-no-files-found: warn
 
       # Read the prefix back from run_info.json rather than rebuilding the string, so it
@@ -117,10 +187,34 @@ jobs:
     needs: [plan, diff]
     if: ${{ always() && !inputs.dry_run }}
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.x'}
+        with: {python-version: '3.12'}
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with: {pattern: outputs-diff-*, path: results}
-      - run: $DIFF report --results-dir results
+      - name: Summarize
+        env:
+          TARGETS: ${{ needs.plan.outputs.targets_json }}
+          SKIPPED: ${{ needs.plan.outputs.skipped_json }}
+        run: |
+          mkdir -p results
+          $DIFF report --results-dir results --targets "$TARGETS" --skipped "$SKIPPED" \
+            --plan-ok '${{ needs.plan.outputs.ok }}' --run-type "$RUN_TYPE" --init "$INIT" \
+            --rtol "$RTOL" --atol "$ATOL" \
+            --commit '${{ github.event.pull_request.head.sha || github.sha }}' \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      # On a manual run, comment on the branch's open pull request if it has one.
+      - name: Comment on the pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          PR=${PR:-$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" \
+                       --state open --json number --jq '.[0].number // empty')}
+          if [ -z "$PR" ]; then echo "No open pull request for $GITHUB_REF_NAME"; exit 0; fi
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file comment.md
