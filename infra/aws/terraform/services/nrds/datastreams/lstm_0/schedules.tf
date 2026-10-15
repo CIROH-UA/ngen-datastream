@@ -100,7 +100,7 @@ locals {
         for vpu in local.vpus : {
           key           = "${init}_${vpu}"
           init          = init
-          restart_init  = (tonumber(init) - 28) % 24
+          restart_init  = format("%02d", (tonumber(init) + 20) % 24)
           vpu           = vpu
           instance_type = local.init_cycles_config_lstm_0.analysis_assim_extend.instance_types[vpu]
           volume_size   = local.init_cycles_config_lstm_0.analysis_assim_extend.volume_size
