@@ -17,6 +17,7 @@ locals {
         for vpu in local.vpus : {
           key           = "${init}_${vpu}"
           init          = init
+          restart_init  = init
           vpu           = vpu
           instance_type = local.init_cycles_config_lstm_0.short_range.instance_types[vpu]
           volume_size   = local.init_cycles_config_lstm_0.short_range.volume_size
@@ -50,6 +51,7 @@ locals {
           for member in local.init_cycles_config_lstm_0.medium_range.ensemble_members : {
             key           = "${init}_${member}_${vpu}"
             init          = init
+            restart_init  = init
             vpu           = vpu
             instance_type = local.init_cycles_config_lstm_0.medium_range.instance_types[vpu]
             volume_size   = local.init_cycles_config_lstm_0.medium_range.volume_size
@@ -98,6 +100,7 @@ locals {
         for vpu in local.vpus : {
           key           = "${init}_${vpu}"
           init          = init
+          restart_init  = (tonumber(init) - 28) % 24
           vpu           = vpu
           instance_type = local.init_cycles_config_lstm_0.analysis_assim_extend.instance_types[vpu]
           volume_size   = local.init_cycles_config_lstm_0.analysis_assim_extend.volume_size
