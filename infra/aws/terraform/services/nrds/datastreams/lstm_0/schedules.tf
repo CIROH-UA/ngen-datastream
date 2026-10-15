@@ -152,6 +152,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_lstm_0" {
   "Input": ${jsonencode(templatefile(local.lstm_0_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
+    restart_init       = each.value.restart_init
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
@@ -196,6 +197,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_lstm_0" {
   "Input": ${jsonencode(templatefile(local.lstm_0_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
+    restart_init       = each.value.restart_init
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
@@ -240,6 +242,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_lstm_0" {
   "Input": ${jsonencode(templatefile(local.lstm_0_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
+    restart_init       = each.value.restart_init
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
