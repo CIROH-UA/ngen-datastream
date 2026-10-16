@@ -17,6 +17,8 @@ locals {
         for vpu in local.vpus : {
           key           = "${init}_${vpu}"
           init          = init
+          restart_init  = init
+          restart_date  = "DAILY"
           vpu           = vpu
           instance_type = local.init_cycles_config_cfe_nom.short_range.instance_types[vpu]
           volume_size   = local.init_cycles_config_cfe_nom.short_range.volume_size
@@ -50,6 +52,8 @@ locals {
           for member in local.init_cycles_config_cfe_nom.medium_range.ensemble_members : {
             key           = "${init}_${member}_${vpu}"
             init          = init
+            restart_init  = init
+            restart_date  = "DAILY"
             vpu           = vpu
             instance_type = local.init_cycles_config_cfe_nom.medium_range.instance_types[vpu]
             volume_size   = local.init_cycles_config_cfe_nom.medium_range.volume_size
@@ -98,6 +102,10 @@ locals {
         for vpu in local.vpus : {
           key           = "${init}_${vpu}"
           init          = init
+          # Sim starts at init-27h (tm27); t-route needs state 1 h earlier (init-28h, previous day for init >= 4).
+          # Wall-clock "yesterday" holds while the run ends before 00:00 UTC, 8 h after the 16:00 fire.
+          restart_init  = format("%02d", (tonumber(init) + 20) % 24)
+          restart_date  = "$(date -u -d yesterday +%Y%m%d)"
           vpu           = vpu
           instance_type = local.init_cycles_config_cfe_nom.analysis_assim_extend.instance_types[vpu]
           volume_size   = local.init_cycles_config_cfe_nom.analysis_assim_extend.volume_size
@@ -149,6 +157,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
   "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
+    restart_init       = each.value.restart_init
+    restart_date       = each.value.restart_date
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
@@ -193,6 +203,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
   "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
+    restart_init       = each.value.restart_init
+    restart_date       = each.value.restart_date
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
@@ -237,6 +249,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
   "Input": ${jsonencode(templatefile(local.cfe_nom_template_path, {
     vpu                = each.value.vpu
     init               = each.value.init
+    restart_init       = each.value.restart_init
+    restart_date       = each.value.restart_date
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
