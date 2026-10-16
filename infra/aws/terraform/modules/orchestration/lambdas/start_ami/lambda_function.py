@@ -189,17 +189,28 @@ def lambda_handler(event, context):
         print(f"run_instances failed: {error_code}: {error_msg}")
 
         if params.get("InstanceMarketOptions", None):
-            print("Spot instance request failed, falling back to on-demand instance")
-            params.pop("InstanceMarketOptions", None)
-            try:
-                response = client_ec2.run_instances(**params)
-            except botocore.exceptions.ClientError as e2:
-                error_code = e2.response["Error"]["Code"]
-                if error_code not in CAPACITY_ERROR_CODES:
-                    raise
-                response = launch_with_capacity_fallbacks(
-                    params, e2.response["Error"]["Message"]
+            response = None
+            # Try launching spot instances in other AZs before falling back to on-demand
+            if error_code in CAPACITY_ERROR_CODES:
+                print("No spot capacity in default AZ, trying spot in other AZs")
+                try:
+                    response = launch_with_capacity_fallbacks(params, error_msg)
+                except Exception as e_spot:
+                    print(f"Spot AZ fallback failed: {e_spot}")
+            if response is None:
+                print(
+                    "Spot instance request failed, falling back to on-demand instance"
                 )
+                params.pop("InstanceMarketOptions", None)
+                try:
+                    response = client_ec2.run_instances(**params)
+                except botocore.exceptions.ClientError as e2:
+                    error_code = e2.response["Error"]["Code"]
+                    if error_code not in CAPACITY_ERROR_CODES:
+                        raise
+                    response = launch_with_capacity_fallbacks(
+                        params, e2.response["Error"]["Message"]
+                    )
         elif error_code in CAPACITY_ERROR_CODES:
             response = launch_with_capacity_fallbacks(params, error_msg)
         else:
