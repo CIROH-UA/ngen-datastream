@@ -18,6 +18,7 @@ locals {
           key           = "${init}_${vpu}"
           init          = init
           restart_init  = init
+          restart_date  = "DAILY"
           vpu           = vpu
           instance_type = local.init_cycles_config_lstm_0.short_range.instance_types[vpu]
           volume_size   = local.init_cycles_config_lstm_0.short_range.volume_size
@@ -52,6 +53,7 @@ locals {
             key           = "${init}_${member}_${vpu}"
             init          = init
             restart_init  = init
+            restart_date  = "DAILY"
             vpu           = vpu
             instance_type = local.init_cycles_config_lstm_0.medium_range.instance_types[vpu]
             volume_size   = local.init_cycles_config_lstm_0.medium_range.volume_size
@@ -98,9 +100,12 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config_lstm_0.analysis_assim_extend.init_cycles : [
         for vpu in local.vpus : {
-          key           = "${init}_${vpu}"
-          init          = init
+          key  = "${init}_${vpu}"
+          init = init
+          # Sim starts at init-27h (tm27); t-route needs state 1 h earlier (init-28h, previous day for init >= 4).
+          # Wall-clock "yesterday" holds while the run ends before 00:00 UTC, 8 h after the 16:00 fire.
           restart_init  = format("%02d", (tonumber(init) + 20) % 24)
+          restart_date  = "$(date -u -d yesterday +%Y%m%d)"
           vpu           = vpu
           instance_type = local.init_cycles_config_lstm_0.analysis_assim_extend.instance_types[vpu]
           volume_size   = local.init_cycles_config_lstm_0.analysis_assim_extend.volume_size
@@ -153,6 +158,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_lstm_0" {
     vpu                = each.value.vpu
     init               = each.value.init
     restart_init       = each.value.restart_init
+    restart_date       = each.value.restart_date
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
@@ -198,6 +204,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_lstm_0" {
     vpu                = each.value.vpu
     init               = each.value.init
     restart_init       = each.value.restart_init
+    restart_date       = each.value.restart_date
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
@@ -243,6 +250,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_lstm_0" {
     vpu                = each.value.vpu
     init               = each.value.init
     restart_init       = each.value.restart_init
+    restart_date       = each.value.restart_date
     run_type_l         = each.value.run_type_l
     run_type_h         = each.value.run_type_h
     fcst               = each.value.fcst
