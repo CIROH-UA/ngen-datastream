@@ -73,7 +73,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install 'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
-          pip install -e infra/aws/python
+          pip install -e python
 
       - name: Check and build the merged realization
         run: |

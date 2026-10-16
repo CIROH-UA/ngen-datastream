@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research_datastream"
+dynamic = ["version"]
+description = "Tools for working with NextGen Research DataStream (NRDS) data, independent of the AWS or LXD deployment"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+# Kept to what contribution_parameters and s3mv need, so CI installs stay light.
+# The plotting/health scripts pull the `plots` extra.
+dependencies = [
+    "boto3",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+plots = [
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "requests",
+    "s3fs",
+    "seaborn",
+]
+test = ["pytest>=7"]
+
+[tool.setuptools.dynamic]
+version = { attr = "research_datastream._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

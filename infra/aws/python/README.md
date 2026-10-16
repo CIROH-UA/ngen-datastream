@@ -1,11 +1,23 @@
-# gen_vpu_execs
+# research_datastream_aws
+
+AWS-specific tooling for the NextGen Research DataStream. Deployment-agnostic
+tools (contributions, health checks, plots) live in the root [`python/`](../../../python) package.
+
+- `gen_vpu_execs` — generate state machine execution files (below).
+- `datastream_cost_nrds` — report what the AWS deployment costs over a time window.
+
+```bash
+pip install -e infra/aws/python
+```
+
+## gen_vpu_execs
 This script will generate all required execution files for the NextGen Research DataStream.
 
 Run the script with:
 
 ```
 cd infra/aws
-python python/src/research_datastream/gen_vpu_execs.py \
+python python/src/research_datastream_aws/gen_vpu_execs.py \
 --arch arm \
 --inputs terraform/modules/schedules/config/execution_forecast_inputs.json \
 --ami_file terraform/modules/schedules/config/community_ami.txt \

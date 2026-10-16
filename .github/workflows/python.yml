@@ -1,0 +1,52 @@
+name: Python
+
+# Installs every Python package in the repo together and runs their tests, so a
+# move or rename that breaks an import fails here instead of in a deployment.
+
+on:
+  pull_request:
+    paths:
+      - 'python/**'
+      - 'infra/*/python/**'
+      - '.github/workflows/python.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'python/**'
+      - 'infra/*/python/**'
+      - '.github/workflows/python.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e infra/common/python -e "python[plots]" -e infra/aws/python -e infra/lxd/python pytest
+
+      - name: Test
+        run: |
+          pytest infra/common/python
+          pytest infra/lxd/python
+
+      - name: Import every CLI
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          for m in research_datastream.contribution_parameters research_datastream.nrds_run_health \
+                   research_datastream.vpu_comparison_graphs research_datastream.s3mv \
+                   research_datastream_aws.gen_vpu_execs research_datastream_aws.datastream_cost_nrds \
+                   research_datastream_lxd; do
+            python -m "$m" --help > /dev/null
+          done
