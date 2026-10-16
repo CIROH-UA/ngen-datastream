@@ -46,7 +46,7 @@ jobs:
         run: |
           for m in research_datastream.contribution_parameters research_datastream.nrds_run_health \
                    research_datastream.vpu_comparison_graphs research_datastream.s3mv \
-                   research_datastream_aws.gen_vpu_execs research_datastream_aws.datastream_cost_nrds \
+                   research_datastream_aws.datastream_cost_nrds \
                    research_datastream_lxd; do
             python -m "$m" --help > /dev/null
           done

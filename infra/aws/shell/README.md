@@ -1,6 +1,6 @@
 Scripts related to the NRDS system.
 
-Confirm NRDS outputs with `check_datastream_outputs.sh` and `check_datastream_retries.sh`
+Confirm NRDS outputs and retries with [`nrds_run_health`](../../../python)
 
 Pull NRDS metadata with `collect_metadata.sh`
 
