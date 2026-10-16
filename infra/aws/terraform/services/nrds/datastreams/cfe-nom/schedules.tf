@@ -100,8 +100,8 @@ locals {
     for pair in flatten([
       for init in local.init_cycles_config_cfe_nom.analysis_assim_extend.init_cycles : [
         for vpu in local.vpus : {
-          key           = "${init}_${vpu}"
-          init          = init
+          key  = "${init}_${vpu}"
+          init = init
           # Sim starts at init-27h (tm27); t-route needs state 1 h earlier (init-28h, previous day for init >= 4).
           # Wall-clock "yesterday" holds while the run ends before 00:00 UTC, 8 h after the 16:00 fire.
           restart_init  = format("%02d", (tonumber(init) + 20) % 24)
