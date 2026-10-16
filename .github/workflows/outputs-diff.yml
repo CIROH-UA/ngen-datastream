@@ -1,0 +1,132 @@
+name: Outputs Diff
+
+# Runs a change to a datastream the way production runs it (short_range, init 00) and
+# comments on the pull request whether its troute output matches production's for the
+# same date. A parameter contribution runs with its merged realization in place of the
+# live one. Informational: it never fails. See docs/nrds/OUTPUTS_DIFF.md.
+
+on:
+  pull_request:
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/*/templates/**'
+      - 'infra/aws/terraform/services/nrds/datastreams/*/config/**'
+      - 'infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml'
+      - 'infra/aws/terraform/services/nrds/envs/prod.tfvars'  # the datastreams' AMIs
+  workflow_dispatch:
+    inputs:
+      datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
+      vpus:          {description: Comma-separated VPUs, default: '01'}
+      contribution:  {description: 'Contribution file to simulate instead of the datastream', default: ''}
+      baseline_date: {description: 'Baseline YYYYMMDD (blank = yesterday)', default: ''}
+
+permissions: {contents: read, id-token: write, pull-requests: write}
+
+env:
+  DIFF: python .github/python/outputs_diff.py
+  BUCKET: ciroh-community-ngen-datastream
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs: {targets: '${{ steps.t.outputs.targets }}'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - id: t
+        continue-on-error: true
+        env:
+          BASE: ${{ github.base_ref || 'main' }}
+          DATASTREAM: ${{ inputs.datastream }}
+          VPUS: ${{ inputs.vpus }}
+          CONTRIBUTION: ${{ inputs.contribution }}
+        run: |
+          pip install -q boto3 pandas pyarrow
+          git fetch --no-tags origin "$BASE"
+          T=$($DIFF targets --base "origin/$BASE" --datastream "$DATASTREAM" --vpus "$VPUS" --contribution "$CONTRIBUTION")
+          echo "$T" && echo "targets=$T" >> "$GITHUB_OUTPUT"
+
+  diff:
+    name: ${{ matrix.key }}
+    needs: plan
+    if: needs.plan.outputs.targets != '' && needs.plan.outputs.targets != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    continue-on-error: true  # a failed target is reported as "could not compare"
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: {include: '${{ fromJSON(needs.plan.outputs.targets) }}'}
+    env:
+      KEY: ${{ matrix.key }}
+      LABEL: ${{ matrix.label }}
+      CONTRIBUTION: ${{ matrix.contribution }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -q boto3 pandas pyarrow
+
+      # The Parameter Contribution workflow's own check, which merges the contributed
+      # parameters into the live realization.
+      - name: Build the contributed realization
+        id: build
+        if: matrix.contribution != ''
+        run: |
+          set -o pipefail
+          pip install -q -e infra/aws/python \
+            'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
+          python -m research_datastream.contribution_parameters check "$CONTRIBUTION" \
+            --workdir "$RUNNER_TEMP/work" --out candidate.json --record spec.json | tee build.log
+          echo "vpu=$(jq -r .vpu spec.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Simulate
+        id: run
+        run: |
+          $DIFF run --key "$KEY" --datastream '${{ matrix.datastream }}' \
+            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' --date '${{ inputs.baseline_date }}' \
+            --run-id '${{ github.run_id }}-${{ github.run_attempt }}' ${CONTRIBUTION:+--realization candidate.json}
+
+      - name: Compare with production
+        run: |
+          for side in baseline:prod_prefix test:test_prefix; do
+            aws s3 sync "s3://$BUCKET/$(jq -r ".${side#*:}" run_info.json)/ngen-run/outputs/troute/" \
+              "${side%%:*}/" --exclude '*' --include '*.parquet' --no-progress
+          done
+          $DIFF compare --label "$LABEL"
+
+      - name: Note the failure
+        if: failure()
+        env:
+          STEP: >-
+            ${{ steps.build.outcome == 'failure' && 'building the contributed realization'
+             || steps.run.outcome == 'failure' && 'the simulation' || 'the comparison' }}
+        run: |
+          WHY=$(grep -m1 -F '[FAIL]' build.log 2>/dev/null || true)
+          printf '### Outputs diff: %s\n\n❌ Could not compare: failed at %s%s.\n' \
+            "$LABEL" "$STEP" "${WHY:+ ($WHY)}" > comment.md
+
+      - name: Comment on the pull request
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          echo -e "\n<sub>[run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
+            "· informational only</sub>" >> comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+          PR=${PR:-$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number // empty')}
+          [ -z "$PR" ] || gh pr comment "$PR" --body-file comment.md
+
+      # The prefix carries the run id, so this never touches production data.
+      - name: Clean up
+        if: always()
+        run: |
+          PFX=$(jq -re .test_prefix run_info.json 2>/dev/null) || exit 0
+          [[ $PFX == test/outputs_diff/* ]] && aws s3 rm --recursive "s3://$BUCKET/$PFX/" --only-show-errors
