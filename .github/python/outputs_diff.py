@@ -9,8 +9,8 @@ NRDS, ACCOUNT, BUCKET = "infra/aws/terraform/services/nrds", "879381264451", "ci
 TFVARS = f"{NRDS}/envs/prod.tfvars"
 SUPPORTED = ["cfe-nom", "lstm_0", "routing-only"]  # the datastreams that run datastreamcli
 WATCHED = re.compile(rf"{NRDS}/datastreams/([^/]+)/(templates|config|contributions)/")
-SHORT_RANGE = dict(init="00", run_type_l="short_range", run_type_h="SHORT_RANGE", fcst="f001_f018",
-                   member="", member_suffix="", member_path="", timeout_s=7200)
+SHORT_RANGE = dict(init="00", run_type_l="short_range", run_type_h="SHORT_RANGE", fcst="f001_f018", member="",
+                   member_suffix="", member_path="", restart_init="00", restart_date="DAILY", timeout_s=7200)
 KEYS = ["feature_id", "time", "type"]  # troute's row key
 
 def sh(*cmd): return subprocess.run(cmd, capture_output=True, text=True).stdout
@@ -49,7 +49,8 @@ def render(ds, vpu, tv):
          "ami_id": tv[f"{ds.replace('-', '_')}_ami_id"], "instance_profile": tv["profile_name"], "s3_bucket": BUCKET,
          "environment_suffix": tv["environment_suffix"]}
     tpl = open(glob.glob(f"{NRDS}/datastreams/{ds}/templates/*.tpl")[0]).read()
-    return json.loads(re.sub(r"\$\{(\w+)\}", lambda m: str(v[m[1]]), tpl))
+    # $${x} is templatefile's escape for a literal ${x}, a shell variable.
+    return json.loads(re.sub(r"\$(\$?)\{(\w+)\}", lambda m: f"${{{m[2]}}}" if m[1] else str(v[m[2]]), tpl))
 
 def run(a):
     ex = render(a.datastream, a.vpu, tv := tfvars(open(TFVARS).read()))
