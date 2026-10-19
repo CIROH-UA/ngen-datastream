@@ -23,8 +23,9 @@ used to ensure the contributed data file did not change since validation (PR cre
    from the Actions tab against it, relaying anything that needs fixing.
 2. A maintainer opens a pull request adding the above yaml file corresponding to the contribution issue.
    That validates it, builds the merged realization, and runs it through a real short-range
-   simulation of the VPU. **Outputs Diff** also runs it as production does and comments on
-   the pull request whether the outputs differ from production's
+   simulation of the VPU. A maintainer can also run **Outputs Diff** on the branch, which
+   runs it as production does and comments on the pull request whether the outputs differ
+   from production's
    ([docs/nrds/OUTPUTS_DIFF.md](../../../../../../../../docs/nrds/OUTPUTS_DIFF.md)).
 3. Merging to main archives the live realization and overwrites it.
 

@@ -3,15 +3,10 @@ name: Outputs Diff
 # Runs a change to a datastream the way production runs it (short_range, init 00) and
 # comments on the pull request whether its troute output matches production's for the
 # same date. A parameter contribution runs with its merged realization in place of the
-# live one. Informational: it never fails. See docs/nrds/OUTPUTS_DIFF.md.
+# live one. Informational: it never fails. Run manually; Outputs Diff Hint suggests a run
+# on pull requests that may change a datastream. See docs/nrds/OUTPUTS_DIFF.md.
 
 on:
-  pull_request:
-    paths:
-      - 'infra/aws/terraform/services/nrds/datastreams/*/templates/**'
-      - 'infra/aws/terraform/services/nrds/datastreams/*/config/**'
-      - 'infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml'
-      - 'infra/aws/terraform/services/nrds/envs/prod.tfvars'  # the datastreams' AMIs
   workflow_dispatch:
     inputs:
       datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
@@ -31,20 +26,17 @@ jobs:
     outputs: {targets: '${{ steps.t.outputs.targets }}'}
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - id: t
         continue-on-error: true
         env:
-          BASE: ${{ github.base_ref || 'main' }}
           DATASTREAM: ${{ inputs.datastream }}
           VPUS: ${{ inputs.vpus }}
           CONTRIBUTION: ${{ inputs.contribution }}
         run: |
           pip install -q boto3 pandas pyarrow
-          git fetch --no-tags origin "$BASE"
-          T=$($DIFF targets --base "origin/$BASE" --datastream "$DATASTREAM" --vpus "$VPUS" --contribution "$CONTRIBUTION")
+          T=$($DIFF targets --datastream "$DATASTREAM" --vpus "$VPUS" --contribution "$CONTRIBUTION")
           echo "$T" && echo "targets=$T" >> "$GITHUB_OUTPUT"
 
   diff:
@@ -116,12 +108,11 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
         run: |
           echo -e "\n<sub>[run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" \
             "· informational only</sub>" >> comment.md
           cat comment.md >> "$GITHUB_STEP_SUMMARY"
-          PR=${PR:-$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number // empty')}
+          PR=$(gh pr list --head "$GITHUB_REF_NAME" --state open --json number --jq '.[0].number // empty')
           [ -z "$PR" ] || gh pr comment "$PR" --body-file comment.md
 
       # The prefix carries the run id, so this never touches production data.

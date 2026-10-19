@@ -3,23 +3,26 @@
 `.github/workflows/outputs-diff.yml` answers one question about a change to a datastream:
 does it change what the datastream simulates? It runs the change the way production
 does (short_range, init 00) and compares the troute output with production's output for
-the same date. Then it comments **Same** or **Different** on the pull request. The check
-is informational and never fails.
+the same date. Then it comments **Same** or **Different** on the branch's open pull
+request. The check is informational and never fails.
 
-## What it simulates
+## When to run it
 
-On a pull request, a change to any of these files under `infra/aws/terraform/services/nrds/`:
+Outputs Diff only runs manually: from the Actions tab, **Run workflow** on the branch
+simulates a chosen datastream and VPUs, or a contribution file.
 
-| Change | Simulated as |
+`.github/workflows/outputs-diff-hint.yml` runs on pull requests and starts nothing on AWS.
+When a pull request changes one of these files under `infra/aws/terraform/services/nrds/`,
+it comments with the Outputs Diff run to start for each change:
+
+| Change | Suggested run |
 |---|---|
-| `datastreams/<datastream>/templates/**` or `config/**` | this branch's template, on the datastream's first VPU |
-| a `<datastream>_ami_id` in `envs/prod.tfvars` | this branch's template on the new AMI, on the datastream's first VPU |
-| `datastreams/<datastream>/contributions/<issue>.yml` | this branch's template with the merged realization, on the contribution's VPU |
+| `datastreams/<datastream>/templates/**` or `config/**` | the datastream, on its first VPU |
+| a `<datastream>_ami_id` in `envs/prod.tfvars` | the datastream on the new AMI, on its first VPU |
+| `datastreams/<datastream>/contributions/<issue>.yml` | the contribution file, on its VPU |
 
-Only `cfe-nom`, `lstm_0` and `routing-only` run datastreamcli, so changes to other
-datastreams are not simulated. From the Actions tab, **Run workflow** simulates a chosen
-datastream and VPUs, or a contribution file. A manual run comments on the branch's open
-pull request if there is one.
+The comment is updated on each push. Only `cfe-nom`, `lstm_0` and `routing-only` run
+datastreamcli, so changes to other datastreams get no suggestion.
 
 ## How
 
@@ -41,7 +44,8 @@ If a realization was deployed after that date, rerun with a later `baseline_date
 
 ## Requirements
 
-The `github-actions-terraform-oidc` role must trust `pull_request` runs. It also needs
-permission to start and describe executions of the production state machine, and to
-read, write and delete under `test/outputs_diff/`. Pull requests from forks get no OIDC
-token, so their targets report **Could not compare**.
+The `github-actions-terraform-oidc` role must trust `workflow_dispatch` runs of this
+repository's branches. It also needs permission to start and describe executions of the
+production state machine, and to read, write and delete under `test/outputs_diff/`. A
+pull request from a fork has no branch here to run on, so the hint's command only works
+once its changes are pushed to a branch of this repository.
