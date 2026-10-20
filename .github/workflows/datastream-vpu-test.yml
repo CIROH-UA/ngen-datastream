@@ -1,0 +1,273 @@
+name: Datastream VPU Test
+
+# Runs a datastream once in every VPU it is scheduled for, through the production
+# state machine, so a broken template, config or instance size shows up on the
+# pull request instead of in the nightly runs. The executions are the ones
+# Terraform would schedule (read from a plan), pinned to a past date and writing
+# under test/cicd/vpu-test/, so any datastream module is tested the same way.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/**'
+      - '!infra/aws/terraform/services/nrds/datastreams/*/contributions/**'
+      - '.github/workflows/datastream-vpu-test.yml'
+      - 'infra/aws/python/src/research_datastream_aws/vpu_test.py'
+  workflow_dispatch:
+    inputs:
+      datastreams:
+        description: Datastream directories under services/nrds/datastreams, space separated
+        required: true
+        default: cfe-nom
+      run_types:
+        description: Run types, space separated (short_range medium_range analysis_assim_extend)
+        required: true
+        default: short_range
+      vpus:
+        description: VPUs, space separated (blank for all)
+        required: false
+      date:
+        description: YYYYMMDD to simulate (blank for the latest day with forcing)
+        required: false
+
+concurrency:
+  group: datastream-vpu-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.10.0"
+  AWS_REGION: us-east-1
+  TF_DIR: infra/aws/terraform/services/nrds
+  # Changes to the workflow or its script alone are tested against this one.
+  DEFAULT_DATASTREAM: cfe-nom
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Build executions
+    # OIDC credentials are not issued to pull requests from forks.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve datastreams
+        id: ds
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            DS="${{ inputs.datastreams }}"
+          else
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            DS=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- \
+                   "$TF_DIR/datastreams/" ":(exclude)$TF_DIR/datastreams/*/contributions/**" \
+                 | grep '/datastreams/[^/]*/' | cut -d/ -f7 | sort -u | xargs || true)
+            DS="${DS:-$DEFAULT_DATASTREAM}"
+          fi
+          echo "Datastreams: $DS"
+          echo "list=$DS" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # Read-only: the plan renders each schedule's execution against production
+      # state and is never applied.
+      - name: Plan the datastream schedules
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src
+        run: |
+          set -euo pipefail
+          T=$(python -m research_datastream_aws.vpu_test targets ${{ steps.ds.outputs.list }} --main-tf main.tf)
+          mapfile -t TARGETS <<< "$T"
+          terraform init -input=false -backend-config="envs/prod.backend.hcl"
+          terraform plan -input=false -lock=false -refresh=false \
+            -var-file="envs/prod.tfvars" "${TARGETS[@]}" -out=vputest.tfplan > /dev/null
+          terraform show -json vputest.tfplan > "${{ runner.temp }}/plan.json"
+
+      - name: Select one execution per VPU
+        id: select
+        env:
+          PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src
+        run: |
+          set -euo pipefail
+          for DS in ${{ steps.ds.outputs.list }}; do
+            python -m research_datastream_aws.vpu_test select "${{ runner.temp }}/plan.json" "$DS" \
+              --main-tf "$TF_DIR/main.tf" \
+              --out-dir "${{ runner.temp }}/executions" \
+              --run-types '${{ inputs.run_types || 'short_range' }}' \
+              --vpus '${{ inputs.vpus }}' \
+              --date '${{ inputs.date }}' \
+              --run-id "${{ github.run_id }}-${{ github.run_attempt }}" > "${{ runner.temp }}/matrix_$DS.json"
+          done
+          MATRIX=$(cat "${{ runner.temp }}"/matrix_*.json | jq -cs 'add')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          {
+            echo "| Datastream | Run type | VPU | Schedule | Date |"
+            echo "|---|---|---|---|---|"
+            echo "$MATRIX" | jq -r '.[] | "| \(.datastream) | \(.run_type) | \(.vpu) | `\(.schedule)` | \(.date) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.select.outputs.matrix != '[]'
+        with:
+          name: vputest-executions
+          path: ${{ runner.temp }}/executions
+          retention-days: 14
+
+  run:
+    name: ${{ matrix.datastream }} ${{ matrix.run_type }} VPU ${{ matrix.vpu }}
+    needs: prepare
+    if: needs.prepare.outputs.matrix != '[]' && needs.prepare.outputs.matrix != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vputest-executions
+          path: executions
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Start execution
+        id: start
+        run: |
+          ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ matrix.state_machine_arn }}" \
+            --name "${{ matrix.name }}" \
+            --input "file://executions/${{ matrix.file }}" \
+            --query executionArn --output text)
+          echo "Started $ARN"
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+
+      # The state machine enforces the execution's timeout_s and retries.
+      - name: Wait for the execution
+        id: wait
+        run: |
+          STATUS=RUNNING
+          while [ "$STATUS" = "RUNNING" ]; do
+            sleep 30
+            STATUS=$(aws stepfunctions describe-execution \
+              --execution-arn "${{ steps.start.outputs.arn }}" --query status --output text)
+            echo "$(date -u +%H:%M:%S) $STATUS"
+          done
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          [ "$STATUS" = "SUCCEEDED" ] || { echo "::error::Execution $STATUS"; exit 1; }
+
+      - name: Show the failure
+        if: failure() && steps.start.outcome == 'success'
+        run: |
+          aws stepfunctions get-execution-history \
+            --execution-arn "${{ steps.start.outputs.arn }}" --reverse-order --max-items 25 \
+            --query "events[?contains(type, 'Failed') || contains(type, 'TimedOut')]" --output json
+
+      - name: Stop a still-running execution
+        if: (failure() || cancelled()) && steps.start.outcome == 'success'
+        run: |
+          aws stepfunctions stop-execution --execution-arn "${{ steps.start.outputs.arn }}" \
+            --cause "Stopped by ${{ github.workflow }} run ${{ github.run_id }}" 2>/dev/null || true
+
+      - name: Record the result
+        if: always()
+        run: |
+          mkdir -p result
+          jq -n --arg ds "${{ matrix.datastream }}" --arg rt "${{ matrix.run_type }}" --arg vpu "${{ matrix.vpu }}" \
+                --arg status "${{ steps.wait.outputs.status || steps.start.outcome }}" \
+                --arg arn "${{ steps.start.outputs.arn }}" \
+                '{datastream: $ds, run_type: $rt, vpu: $vpu, status: $status, arn: $arn}' > "result/${{ matrix.file }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vputest-result-${{ strategy.job-index }}
+          path: result
+          retention-days: 14
+
+      - name: Remove the test output
+        if: always()
+        run: aws s3 rm "s3://${{ matrix.s3_bucket }}/${{ matrix.s3_prefix }}" --recursive || true
+
+  report:
+    name: Report
+    needs: [prepare, run]
+    if: always() && needs.prepare.outputs.matrix != '[]' && needs.prepare.outputs.matrix != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vputest-result-*
+          path: results
+          merge-multiple: true
+
+      - name: Summarize
+        env:
+          MATRIX: ${{ needs.prepare.outputs.matrix }}
+        run: |
+          RESULTS=$(cat results/*.json 2>/dev/null | jq -cs 'sort_by(.datastream, .run_type, .vpu)')
+          PASSED=$(echo "$RESULTS" | jq '[.[] | select(.status == "SUCCEEDED")] | length')
+          TOTAL=$(echo "$MATRIX" | jq length)
+          {
+            echo "### Datastream VPU Test $([ "$PASSED" = "$TOTAL" ] && echo ✅ || echo ❌)"
+            echo
+            echo "**$PASSED of $TOTAL VPU executions succeeded.**"
+            echo
+            echo "| Datastream | Run type | VPU | Result |"
+            echo "|---|---|---|---|"
+            echo "$RESULTS" | jq -r '.[] | "| \(.datastream) | \(.run_type) | \(.vpu) | \(if .status == "SUCCEEDED" then "✅" else "❌ \(.status)" end) |"'
+            echo
+            echo "[Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } | tee -a "$GITHUB_STEP_SUMMARY" > summary.md
+
+      - name: Post to the pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = require('fs').readFileSync('summary.md', 'utf8');
+            const marker = '### Datastream VPU Test';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.startsWith(marker));
+            const params = { owner: context.repo.owner, repo: context.repo.repo, body };
+            if (existing) {
+              await github.rest.issues.updateComment({ ...params, comment_id: existing.id });
+            } else {
+              await github.rest.issues.createComment({ ...params, issue_number: context.issue.number });
+            }

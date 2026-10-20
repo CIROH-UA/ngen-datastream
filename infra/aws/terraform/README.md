@@ -73,6 +73,7 @@ aws stepfunctions start-execution \
 4. Add a module block in `services/nrds/main.tf` passing `scheduler_role_arn`, `state_machine_arn`, etc.
 5. Add the AMI variable to `services/nrds/variables.tf` and `envs/prod.tfvars`
 6. Run `terraform plan` to verify — no workflow changes needed
+7. Open the pull request: `datastream-vpu-test.yml` runs the new datastream once in every VPU it schedules
 
 ## CI/CD Workflows
 
@@ -81,6 +82,14 @@ aws stepfunctions start-execution \
 | `terraform-deploy.yml` | Push to main | Plan + apply with manual approval |
 | `terraform-pr-validate.yml` | Pull request | Format check, validate, plan with PR comment |
 | `terraform-drift-detection.yml` | Daily at 6 AM UTC | Detect infrastructure drift |
+| `orchestration-integration-test.yml` | PR touching the orchestration module | Deploy a throwaway state machine and run one execution through it |
+| `datastream-vpu-test.yml` | PR touching `services/nrds/datastreams/` (not contributions), or manual | Run each changed datastream once per VPU through the production state machine |
+
+### Datastream VPU test
+
+The executions come from a read-only `terraform plan` of the changed datastream modules, so they are exactly what the schedules would send. Each run type is scheduled once per init cycle, so for every run type and VPU the workflow takes the init 00 schedule (or the run type's earliest init where it has no 00, as for `analysis_assim_extend`). Pull requests test `short_range` in all VPUs; manual runs take space-separated run types, VPUs and a date. It pins `DAILY` to the latest day whose forcing exists for every VPU, retags the instances `Project=nrds_vpu_test`, and moves the output under `test/cicd/vpu-test/<run>/`, which each job deletes when it finishes. Results are posted to the pull request.
+
+A full short-range run is one EC2 instance per VPU (20 for `cfe-nom`), each roughly as long as a production run. Datastreams without per-VPU schedules, such as `forcing` and `qkrig`, have nothing to select and are skipped. Pull requests from forks are skipped because they get no AWS credentials.
 
 ## Documentation
 

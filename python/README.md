@@ -8,7 +8,7 @@ datastream lives under `infra/`:
 | --- | --- | --- |
 | `research_datastream` | `python/` (here) | Deployment-agnostic tools: contributions, health checks, plots, S3 utilities |
 | `research_datastream_core` | `infra/common/python/` | Logic shared by the AWS and LXD orchestrators |
-| `research_datastream_aws` | `infra/aws/python/` | AWS-only tooling (cost reporting) |
+| `research_datastream_aws` | `infra/aws/python/` | AWS-only tooling (cost reporting, VPU test executions) |
 | `research_datastream_lxd` | `infra/lxd/python/` | LXD orchestrator and scheduler |
 
 ## Install

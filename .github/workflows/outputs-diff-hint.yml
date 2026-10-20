@@ -1,0 +1,54 @@
+name: Outputs Diff Hint
+
+# Comments on a pull request that may change what a datastream simulates, suggesting a
+# manual Outputs Diff run for each change. Runs nothing on AWS. See docs/nrds/OUTPUTS_DIFF.md.
+
+on:
+  pull_request:
+    paths:
+      - 'infra/aws/terraform/services/nrds/datastreams/*/templates/**'
+      - 'infra/aws/terraform/services/nrds/datastreams/*/config/**'
+      - 'infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml'
+      - 'infra/aws/terraform/services/nrds/envs/prod.tfvars'  # the datastreams' AMIs
+
+permissions: {contents: read, pull-requests: write}
+
+jobs:
+  hint:
+    runs-on: ubuntu-latest
+    continue-on-error: true  # informational
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Comment on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          pip install -q boto3 pandas pyarrow
+          git fetch --no-tags origin "$BASE"
+          T=$(python .github/python/outputs_diff.py targets --base "origin/$BASE")
+          [ "$T" != "[]" ] || exit 0
+          MARK='<!-- outputs-diff-hint -->'
+          {
+            echo "$MARK"
+            echo "### Outputs diff"
+            echo
+            echo "This pull request may change what a datastream simulates. Consider running"
+            echo "[Outputs Diff]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/outputs-diff.yml)"
+            echo "on \`$HEAD\` to check whether its outputs differ from production's:"
+            echo
+            echo "$T" | jq -r --arg ref "$HEAD" '.[] | "- \(.label):\n  `gh workflow run outputs-diff.yml --ref \($ref) " +
+              (if .contribution != "" then "-f contribution=\(.contribution)"
+               else "-f datastream=\(.datastream) -f vpus=\(.vpu)" end) + "`"'
+          } > comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+          # One comment per pull request, updated on each push.
+          ID=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.body | startswith(\"$MARK\")) | .id" | head -1)
+          if [ -n "$ID" ]; then gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$ID" -F body=@comment.md
+          else gh pr comment "$PR" --body-file comment.md; fi
