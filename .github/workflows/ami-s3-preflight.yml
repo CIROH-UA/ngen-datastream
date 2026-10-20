@@ -1,0 +1,46 @@
+name: AMI S3 Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check-s3-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Check restart and crosswalk inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BUCKET="ciroh-community-ngen-datastream"
+          RESTART_PREFIX="restarts/v2.2_hydrofabric/ngen.20260209/"
+          CROSSWALK_KEY="resources/v2.2_hydrofabric/troute_restart/crosswalk.nc"
+
+          echo "Checking restart files..."
+          RESTART_COUNT=$(aws s3api list-objects-v2 \
+            --bucket "$BUCKET" \
+            --prefix "$RESTART_PREFIX" \
+            --query 'KeyCount' \
+            --output text)
+
+          echo "Restart objects found: $RESTART_COUNT"
+          if [ "$RESTART_COUNT" -eq 0 ]; then
+            echo "::error::No restart files found under $RESTART_PREFIX"
+            exit 1
+          fi
+
+          echo "Checking crosswalk..."
+          aws s3api head-object \
+            --bucket "$BUCKET" \
+            --key "$CROSSWALK_KEY" \
+            --query '{Size:ContentLength,Modified:LastModified}'
