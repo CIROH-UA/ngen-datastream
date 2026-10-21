@@ -1,3 +1,10 @@
+# Lambdas that share logic with the LXD orchestrator get research_datastream_core
+# (infra/common/python, stdlib only) copied into their zip beside the handler.
+locals {
+  core_src   = "${path.module}/../../../../common/python/src"
+  core_files = fileset(local.core_src, "research_datastream_core/*.py")
+}
+
 data "archive_file" "python_lambda_starter" {
   type        = "zip"
   source_file = "${path.module}/lambdas/start_ami/lambda_function.py"
@@ -6,8 +13,20 @@ data "archive_file" "python_lambda_starter" {
 
 data "archive_file" "python_lambda_commander" {
   type        = "zip"
-  source_file = "${path.module}/lambdas/streamcommander/lambda_function.py"
   output_path = "${path.module}/lambdas/commander_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/streamcommander/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 data "archive_file" "python_lambda_poller" {
@@ -18,8 +37,20 @@ data "archive_file" "python_lambda_poller" {
 
 data "archive_file" "python_lambda_checker" {
   type        = "zip"
-  source_file = "${path.module}/lambdas/checker/lambda_function.py"
   output_path = "${path.module}/lambdas/checker_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/checker/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 data "archive_file" "python_lambda_stopper" {

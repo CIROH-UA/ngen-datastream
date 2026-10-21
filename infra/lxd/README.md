@@ -26,7 +26,8 @@ worker instances are still launched per run.
 ```
 infra/common/python/                  # shared, deployment-agnostic core logic
 └── src/research_datastream_core/
-    └── commands.py                   # DAILY-token resolution (AWS + LXD share this logic)
+    ├── commands.py                   # DAILY-token resolution (AWS + LXD share this logic)
+    └── outputs.py                    # completion marker the output check looks for
 
 infra/lxd/
 ├── python/                       # the orchestrator + scheduler process
@@ -52,9 +53,10 @@ infra/lxd/
             └── templates/execution_cfe_nom.json.tpl
 ```
 
-`research_datastream_core` holds logic that is identical across the AWS and
-LXD deployments — currently the `DAILY` → forecast-date substitution rules
-(ported from the AWS `streamcommander` lambda). 
+`research_datastream_core` holds logic both deployments must agree on: the
+`DAILY` → forecast-date rules and the S3 object that marks a finished run. The
+AWS `streamcommander` and `checker` lambdas use the same package, so fix shared
+behavior there, not here. See [its README](../common/python/README.md).
 
 ## What maps to what (AWS → LXD)
 

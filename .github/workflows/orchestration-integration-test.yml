@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'infra/aws/terraform/modules/orchestration/**'
+      - 'infra/common/python/src/**'   # vendored into the lambda zips
       - 'infra/aws/terraform/services/nrds/iam_*.tf'
       - '.github/workflows/orchestration-integration-test.yml'
   workflow_dispatch:

@@ -17,6 +17,9 @@ from typing import Any
 
 from research_datastream_core import (
     extract_forcing_source,
+    extract_s3_bucket,
+    extract_s3_prefix,
+    output_marker,
     resolve_daily_date,
     substitute_daily,
 )
@@ -223,8 +226,9 @@ def _record_failure(run_spec: ScheduledRun, execution: dict, attempts: int) -> N
     """
     error = execution.get("failedInput", {}).get("error", "unknown")
     commands = execution.get("commands", [])
-    bucket, prefix = _extract_bucket_prefix(commands)
-    # Resolve DAILY (left literal by cfe-nom) so failures are attributable to a date.
+    bucket = extract_s3_bucket(commands)
+    prefix = extract_s3_prefix(commands)
+    # A run that failed before exec still has DAILY in its commands.
     date = _forecast_date(commands, execution.get("t0"))
     if prefix and "DAILY" in prefix:
         prefix = prefix.replace("DAILY", date)
@@ -311,16 +315,11 @@ class S3OutputCheck(OutputCheck):
         self._s3 = boto3.client("s3", region_name=region)
 
     def verify(self, execution: dict) -> bool:
-        bucket, prefix = _extract_bucket_prefix(execution.get("commands", []))
-        if not bucket or not prefix:
+        marker = output_marker(execution.get("commands", []))
+        if marker is None:
             log.warning("no bucket/prefix in commands; skipping output check")
             return False
-        # forcing writes metadata.csv; ngen-run writes ngen-run.tar.gz
-        key = (
-            f"{prefix}/ngen-run.tar.gz"
-            if any("/scripts/datastream" in c for c in execution["commands"])
-            else f"{prefix}/metadata/forcings_metadata/metadata.csv"
-        )
+        bucket, key = marker
         log.info("checking s3://%s/%s", bucket, key)
         for _ in range(10):
             resp = self._s3.list_objects_v2(Bucket=bucket, Prefix=key)
@@ -328,15 +327,3 @@ class S3OutputCheck(OutputCheck):
                 return True
             time.sleep(1)
         return False
-
-
-def _extract_bucket_prefix(commands: list[str]) -> tuple[str | None, str | None]:
-    bucket = prefix = None
-    for c in commands:
-        m = re.search(r"(?i)--s3_bucket[=\s']+([^\s']+)", c)
-        if m:
-            bucket = m.group(1)
-        m = re.search(r"(?i)--s3_prefix[=\s']+([^\s']+)", c)
-        if m:
-            prefix = m.group(1)
-    return bucket, prefix
