@@ -1,3 +1,33 @@
+# regenerate_missing
+Finds NRDS simulations whose outputs are missing and relaunches them on the state machine ([#397](https://github.com/CIROH-UA/ngen-datastream/issues/397)). Run it from GitHub: **Actions → Regenerate Missing NRDS Data → Run workflow** on `main`, and fill in the range. It defaults to a dry run. Check the job summary, which lists every missing simulation, and the `regenerate-missing-<run id>` artifact, which holds each rendered execution and a `manifest.json`. Then run it again with **dry_run** unchecked to submit. Submitting is only allowed from `main`. A pull request that changes the tool runs the tests and a small dry run against the deployed schedules.
+
+Or run it locally with AWS credentials:
+
+```
+pip install -e infra/aws/python
+python -m research_datastream.regenerate_missing \
+  --start 20260820 --end 20260823 \
+  --datastreams cfe_nom,forcing --run-types short_range --init-cycles 23 \
+  --out ./regenerate --dry-run
+```
+
+`--datastreams`, `--run-types`, `--init-cycles`, `--vpus` and `--members` take a comma-separated list or `all` (the default). A filter only narrows simulations that have that dimension, so the CONUS-wide `forcing` run is kept by `--vpus 01`. Leave a datastream out with `--datastreams`.
+
+How it works:
+1. The deployed EventBridge schedules (`--environment`, default `prod`) are the list of simulations. Each schedule's payload is the clean, rendered execution for one datastream, run type, init, member and VPU, with `DAILY` in place of the date.
+2. For each date, a simulation is complete when the object the checker lambda looks for exists: `merkdir.file` for datastream runs, `metadata/forcings_metadata/metadata.csv` for forcing and restart runs.
+3. A missing simulation's execution comes from the `execution.json` the commander lambda stored beside its outputs, with the failed run's state removed (`InstanceId`, `t0`, `retry_attempt`, ...). If none was stored, or with `--source schedule`, the schedule's payload is used instead. Every `DAILY` is set to the date, and `-s DAILY` gets `-e <date>0000` so datastreamcli simulates that day and not today. Shell that reads the instance clock to find the run date is pinned to the date too: `$(date -u +%Y%m%d)` becomes the date, `$(date -u -d yesterday +%Y%m%d)` the day before, and `$(date -u +%H)` becomes `23`. A simulation whose command reads the clock in any other way is skipped rather than sent with the wrong date.
+4. Each execution is written to `--out/executions/` and, without `--dry-run`, started with `stepfunctions start-execution`.
+
+It skips a simulation that:
+- already has its outputs (the check in step 2), so only the holes in the requested range are sent;
+- is less than `--min-age-hours` old (default 12), measured from its cycle time (date + init hour, UTC), so the schedules and their retries can still finish it;
+- already has a regeneration running: a RUNNING execution on the state machine whose name, minus the trailing tag, matches (`regen_<datastream>_<run_type>_<date>_i<init>[_m<member>][_v<vpu>]`).
+
+Inputs are not checked. If a run's forcing or restart is missing, the execution fails like any other run. qkrig is not regenerated.
+
+`--max-executions` (default 500) refuses an oversized batch before anything is submitted.
+
 # gen_vpu_execs
 This script will generate all required execution files for the NextGen Research DataStream.
 

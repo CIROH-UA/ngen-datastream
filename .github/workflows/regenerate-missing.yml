@@ -1,0 +1,184 @@
+name: Regenerate Missing NRDS Data
+
+# Finds NRDS simulations whose outputs are missing and relaunches them on the
+# production state machine (#397). For each missing simulation in the requested
+# range it renders the execution (the execution.json stored with the failed run,
+# cleaned of run state, or the deployed schedule's payload), pins it to the
+# date, and starts a Step Functions execution with it. Simulations whose outputs
+# exist are skipped.
+#
+# Run it from the Actions tab: "Run workflow" on main. It runs as a dry run by
+# default; check the summary and the uploaded executions, then run it again
+# with dry_run unchecked. Submitting is only allowed from main.
+#
+# Fields take a comma-separated list or "all". The CLI behind this is
+# infra/aws/python/src/research_datastream/regenerate_missing.py; its README
+# section is in infra/aws/python/README.md.
+#
+# On a pull request that changes the tool, the tests run and a small dry run
+# checks it against the deployed schedules.
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: First date, YYYYMMDD
+        required: true
+      end_date:
+        description: Last date, YYYYMMDD (blank = start_date)
+        default: ''
+      datastreams:
+        description: 'Datastreams: cfe_nom, lstm_0, routing_only, forcing, restart'
+        default: all
+      run_types:
+        description: 'Run types: short_range, medium_range, analysis_assim_extend'
+        default: all
+      init_cycles:
+        description: Init cycles, e.g. 00,06,12,18
+        default: all
+      vpus:
+        description: VPUs, e.g. 01,03W,10L
+        default: all
+      members:
+        description: Medium-range ensemble members, e.g. 1
+        default: all
+      source:
+        description: 'execution: stored execution.json, cleaned (schedule if absent). schedule: deployed schedule payload'
+        type: choice
+        options: [execution, schedule]
+        default: execution
+      max_executions:
+        description: Refuse to submit more than this many
+        default: '500'
+      dry_run:
+        description: Only report and render; submit nothing
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - '.github/workflows/regenerate-missing.yml'
+      - 'infra/aws/python/src/research_datastream/regenerate_missing.py'
+      - 'infra/aws/python/tests/test_regenerate_missing.py'
+
+concurrency:
+  group: regenerate-missing-${{ github.event_name == 'pull_request' && github.ref || 'dispatch' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  OUT: ${{ github.workspace }}/regenerate
+
+jobs:
+  regenerate:
+    name: ${{ github.event_name == 'pull_request' && 'Test and dry run' || (inputs.dry_run && 'Dry run' || 'Regenerate') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # Inputs reach the shell as environment variables, never interpolated.
+      - name: Resolve inputs
+        id: in
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          MAX_EXECUTIONS: ${{ inputs.max_executions }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == "pull_request" ]]; then
+            # A small window old enough to be settled.
+            START_DATE=$(date -u -d '3 days ago' +%Y%m%d)
+            END_DATE=$START_DATE
+            DRY_RUN=true
+          fi
+          valid_date() { [[ "$1" =~ ^[0-9]{8}$ ]] && date -u -d "$1" >/dev/null 2>&1; }
+          valid_date "$START_DATE" || { echo "::error::start_date must be YYYYMMDD, got '$START_DATE'"; exit 1; }
+          END_DATE=${END_DATE:-$START_DATE}
+          valid_date "$END_DATE" || { echo "::error::end_date must be YYYYMMDD, got '$END_DATE'"; exit 1; }
+          [[ "$END_DATE" -ge "$START_DATE" ]] || { echo "::error::end_date is before start_date"; exit 1; }
+          [[ "${MAX_EXECUTIONS:-500}" =~ ^[0-9]+$ ]] || { echo "::error::max_executions must be a number"; exit 1; }
+          if [[ "$DRY_RUN" != "true" && "$REF" != "refs/heads/main" ]]; then
+            echo "::error::Executions are only submitted from main. Run from main, or keep dry_run checked."
+            exit 1
+          fi
+          {
+            echo "start=$START_DATE"
+            echo "end=$END_DATE"
+            echo "dry_run=$DRY_RUN"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e 'infra/aws/python[develop]'
+
+      - name: Test
+        run: pytest -q infra/aws/python/tests/test_regenerate_missing.py
+
+      # Fork pull requests get no OIDC token; the tests above are their check.
+      - name: Configure AWS credentials
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        id: aws
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Find missing simulations${{ steps.in.outputs.dry_run != 'true' && ' and submit' || '' }}
+        if: steps.aws.outcome == 'success'
+        env:
+          EVENT: ${{ github.event_name }}
+          START_DATE: ${{ steps.in.outputs.start }}
+          END_DATE: ${{ steps.in.outputs.end }}
+          DRY_RUN: ${{ steps.in.outputs.dry_run }}
+          DATASTREAMS: ${{ inputs.datastreams || 'all' }}
+          RUN_TYPES: ${{ inputs.run_types || 'all' }}
+          INIT_CYCLES: ${{ inputs.init_cycles || 'all' }}
+          VPUS: ${{ inputs.vpus || 'all' }}
+          MEMBERS: ${{ inputs.members || 'all' }}
+          SOURCE: ${{ inputs.source || 'execution' }}
+          MAX_EXECUTIONS: ${{ inputs.max_executions || '500' }}
+          TAG: gh${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          [[ "$DRY_RUN" == "true" ]] && FLAGS+=(--dry-run)
+          if [[ "$EVENT" == "pull_request" ]]; then
+            # Every datastream, one VPU and one cycle: exercises the schedule
+            # catalogue, completeness checks and rendering without a long scan.
+            INIT_CYCLES=00
+            VPUS=01
+          fi
+          python -m research_datastream.regenerate_missing \
+            --start "$START_DATE" \
+            --end "$END_DATE" \
+            --datastreams "$DATASTREAMS" \
+            --run-types "$RUN_TYPES" \
+            --init-cycles "$INIT_CYCLES" \
+            --vpus "$VPUS" \
+            --members "$MEMBERS" \
+            --source "$SOURCE" \
+            --max-executions "$MAX_EXECUTIONS" \
+            --tag "$TAG" \
+            --out "$OUT" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            "${FLAGS[@]}"
+
+      - name: Upload executions
+        if: always() && steps.aws.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerate-missing-${{ github.run_id }}
+          path: ${{ env.OUT }}
+          if-no-files-found: ignore
