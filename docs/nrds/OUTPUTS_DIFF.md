@@ -28,7 +28,7 @@ datastreamcli, so changes to other datastreams get no suggestion.
 
 1. The template is filled in the way `schedules.tf` fills it, with values from
    `config/`, `schedules.tf` and `envs/prod.tfvars`.
-2. The run is pinned to yesterday, or to `baseline_date`, and its output goes to
+2. The run is pinned to yesterday (UTC), forcing included, and its output goes to
    `test/outputs_diff/<run>/<target>`. For a contribution,
    `research_datastream.contribution_parameters check` builds the merged realization.
    That realization is uploaded beside the output, and `-R` points to it.
@@ -39,8 +39,9 @@ datastreamcli, so changes to other datastreams get no suggestion.
    N). It warns when none did.
 5. The test prefix is deleted.
 
-A comparison is only fair if production ran the live realization on the baseline date.
-If a realization was deployed after that date, rerun with a later `baseline_date`.
+A comparison is only fair if production ran yesterday with what the branch leaves
+unchanged. A change deployed today, such as a new template or realization, shows up as a
+difference until tomorrow's run.
 
 ## Requirements
 

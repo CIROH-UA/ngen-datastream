@@ -56,10 +56,12 @@ def run(a):
     ex = render(a.datastream, a.vpu, tv := tfvars(open(TFVARS).read()))
     (cmd,) = ex["commands"]
     daily, live = re.search(r"--S3_PREFIX\s+([^\s']+)", cmd)[1], re.search(r" -R\s+([^\s']+)", cmd)[1]
-    date = a.date or (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
+    date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")  # yesterday, which production has run
     test = f"test/outputs_diff/{a.run_id}/{a.key}"
-    # With -s DAILY, datastreamcli reads -e as the run date.
-    cmd = re.sub(r"--S3_PREFIX\s+[^\s']+", f"--S3_PREFIX {test}", cmd.replace("-s DAILY", f"-s DAILY -e {date}0000"))
+    # With -s DAILY, datastreamcli reads -e as the run date. The forcing is pinned too: streamcommander
+    # would fill its ngen.DAILY with the day the test runs.
+    cmd = cmd.replace("-s DAILY", f"-s DAILY -e {date}0000").replace("ngen.DAILY", f"ngen.{date}")
+    cmd = re.sub(r"--S3_PREFIX\s+[^\s']+", f"--S3_PREFIX {test}", cmd)
     info = dict(vpu=a.vpu, date=date, prod_prefix=daily.replace("DAILY", date), test_prefix=test)
     if a.realization:  # a contribution runs its merged realization in place of the live one
         boto3.client("s3").upload_file(a.realization, BUCKET, cand := f"{test}/candidate/{os.path.basename(live)}")
@@ -94,7 +96,7 @@ def compare(a):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("cmd", choices=["targets", "run", "compare"])
-    for o in "base datastream vpus vpu contribution key label run-id date realization".split():
+    for o in "base datastream vpus vpu contribution key label run-id realization".split():
         p.add_argument(f"--{o}", default="")
     a = p.parse_args()
     globals()[a.cmd](a)

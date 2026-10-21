@@ -12,7 +12,6 @@ on:
       datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
       vpus:          {description: Comma-separated VPUs, default: '01'}
       contribution:  {description: 'Contribution file to simulate instead of the datastream', default: ''}
-      baseline_date: {description: 'Baseline YYYYMMDD (blank = yesterday)', default: ''}
 
 permissions: {contents: read, id-token: write, pull-requests: write}
 
@@ -82,7 +81,7 @@ jobs:
         id: run
         run: |
           $DIFF run --key "$KEY" --datastream '${{ matrix.datastream }}' \
-            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' --date '${{ inputs.baseline_date }}' \
+            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' \
             --run-id '${{ github.run_id }}-${{ github.run_attempt }}' ${CONTRIBUTION:+--realization candidate.json}
 
       - name: Compare with production
