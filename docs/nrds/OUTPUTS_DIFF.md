@@ -19,6 +19,7 @@ it comments with the Outputs Diff run to start for each change:
 |---|---|
 | `datastreams/<datastream>/templates/**` or `config/**` | the datastream, on its first VPU |
 | a `<datastream>_ami_id` in `envs/prod.tfvars` | the datastream on the new AMI, on its first VPU |
+| a VPU's entry in `vpu_resources` in `datastreams/<datastream>/main.tf` | the datastream, on each VPU whose geopackage or BMI configs changed |
 | `datastreams/<datastream>/contributions/<issue>.yml` | the contribution file, on its VPU |
 
 The comment is updated on each push. Only `cfe-nom`, `lstm_0` and `routing-only` run
@@ -27,7 +28,7 @@ datastreamcli, so changes to other datastreams get no suggestion.
 ## How
 
 1. The template is filled in the way `schedules.tf` fills it, with values from
-   `config/`, `schedules.tf` and `envs/prod.tfvars`.
+   `config/`, `schedules.tf`, `main.tf` and `envs/prod.tfvars`.
 2. The run is pinned to yesterday, or to `baseline_date`, and its output goes to
    `test/outputs_diff/<run>/<target>`. For a contribution,
    `research_datastream.contribution_parameters check` builds the merged realization.
