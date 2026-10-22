@@ -2,8 +2,8 @@
 
 `.github/workflows/outputs-diff.yml` answers one question about a change to a datastream:
 does it change what the datastream simulates? It runs the change the way production
-does (short_range, init 00) and compares the troute output with production's output for
-the same date. Then it comments **Same** or **Different** on the branch's open pull
+does (short_range, init 00 by default) and compares the troute output with production's
+output for the same date and init. Then it comments **Same** or **Different** on the branch's open pull
 request. The check is informational and never fails.
 
 ## When to run it
@@ -29,7 +29,8 @@ datastreamcli, so changes to other datastreams get no suggestion.
 
 1. The template is filled in the way `schedules.tf` fills it, with values from
    `config/`, `schedules.tf`, `main.tf` and `envs/prod.tfvars`.
-2. The run is pinned to yesterday, or to `baseline_date`, and its output goes to
+2. The run is pinned to `baseline_date` (default yesterday, UTC) and `init` (default `00`),
+   forcing included, and its output goes to
    `test/outputs_diff/<run>/<target>`. For a contribution,
    `research_datastream.contribution_parameters check` builds the merged realization.
    That realization is uploaded beside the output, and `-R` points to it.
@@ -40,8 +41,9 @@ datastreamcli, so changes to other datastreams get no suggestion.
    N). It warns when none did.
 5. The test prefix is deleted.
 
-A comparison is only fair if production ran the live realization on the baseline date.
-If a realization was deployed after that date, rerun with a later `baseline_date`.
+A comparison is only fair if production ran that date and init with what the branch
+leaves unchanged. If a template or realization was deployed after it, rerun with a later
+`baseline_date`.
 
 ## Requirements
 
