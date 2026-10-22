@@ -1,8 +1,8 @@
 name: Outputs Diff
 
-# Runs a change to a datastream the way production runs it (short_range, init 00) and
-# comments on the pull request whether its troute output matches production's for the
-# same date. A parameter contribution runs with its merged realization in place of the
+# Runs a change to a datastream the way production runs it (short_range, at a chosen date
+# and init) and comments on the pull request whether its troute output matches production's
+# for the same run. A parameter contribution runs with its merged realization in place of the
 # live one. Informational: it never fails. Run manually; Outputs Diff Hint suggests a run
 # on pull requests that may change a datastream. See docs/nrds/OUTPUTS_DIFF.md.
 
@@ -13,6 +13,7 @@ on:
       vpus:          {description: Comma-separated VPUs, default: '01'}
       contribution:  {description: 'Contribution file to simulate instead of the datastream', default: ''}
       baseline_date: {description: 'Baseline YYYYMMDD (blank = yesterday)', default: ''}
+      init:          {description: 'Short-range init cycle, 00-23', default: '00'}
 
 permissions: {contents: read, id-token: write, pull-requests: write}
 
@@ -82,7 +83,7 @@ jobs:
         id: run
         run: |
           $DIFF run --key "$KEY" --datastream '${{ matrix.datastream }}' \
-            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' --date '${{ inputs.baseline_date }}' \
+            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' --date '${{ inputs.baseline_date }}' --init '${{ inputs.init }}' \
             --run-id '${{ github.run_id }}-${{ github.run_attempt }}' ${CONTRIBUTION:+--realization candidate.json}
 
       - name: Compare with production

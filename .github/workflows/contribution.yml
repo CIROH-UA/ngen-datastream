@@ -73,7 +73,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install 'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
-          pip install -e infra/aws/python
+          pip install -e infra/aws/python boto3 pandas
 
       - name: Check and build the merged realization
         run: |
@@ -83,17 +83,22 @@ jobs:
             --out "${{ runner.temp }}/realization.json" \
             --record "${{ runner.temp }}/spec.json" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # Image tags come from the execution template, so the simulation tracks
-      # production without a second place to update.
+      # Image tags come from the execution template, and the geopackage and BMI
+      # configs from the datastream's main.tf, so the simulation tracks production
+      # without a second place to update.
       - name: Read the run settings
         if: github.event_name != 'push'
         id: run
         run: |
           set -euo pipefail
           python -c "import json;s=json.load(open('${{ runner.temp }}/spec.json'));print('vpu=%s\ndatastream=%s'%(s['vpu'],s['datastream']))" >> "$GITHUB_OUTPUT"
-          TPL=$(dirname "${{ steps.file.outputs.path }}")/../templates/*.tpl
+          DS_DIR=$(dirname "$(dirname "${{ steps.file.outputs.path }}")")
+          TPL=$DS_DIR/templates/*.tpl
           echo "ds_tag=$(grep -m1 -ho 'DS_TAG=[^ ]*' $TPL | cut -d= -f2)" >> "$GITHUB_OUTPUT"
           echo "ngiab_tag=$(grep -m1 -ho 'NGIAB_TAG=[^ ]*' $TPL | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          VPU=$(python -c "import json;print(json.load(open('${{ runner.temp }}/spec.json'))['vpu'])")
+          python .github/python/outputs_diff.py uris --datastream "$(basename "$DS_DIR")" --vpu "$VPU" \
+            | sed 's#_s3_uri=s3://\([^/]*\)/#_url=https://\1.s3.amazonaws.com/#' >> "$GITHUB_OUTPUT"
 
       # Any recent forecast will do; the realization is what is under test.
       - name: Find a recent short-range forcing
@@ -132,8 +137,6 @@ jobs:
           NGIAB_TAG: ${{ steps.run.outputs.ngiab_tag }}
         run: |
           set -euo pipefail
-          VPU="${{ steps.run.outputs.vpu }}"
-          RESOURCES="https://ciroh-community-ngen-datastream.s3.amazonaws.com/resources/v2.2_hydrofabric"
           ./datastreamcli/scripts/datastream \
             -s DAILY \
             -e "${{ steps.forcing.outputs.date }}0000" \
@@ -141,8 +144,8 @@ jobs:
             -F "${{ steps.forcing.outputs.url }}" \
             -C NWM_V3_SHORT_RANGE_00 \
             -d "${{ runner.temp }}/run" \
-            -N "$RESOURCES/bmi_configs/${{ steps.run.outputs.datastream }}_fixed/VPU_$VPU/ngen-bmi-configs.tar.gz" \
-            -g "$RESOURCES/geopackages/VPU_$VPU/nextgen_VPU_$VPU.gpkg" \
+            -N "${{ steps.run.outputs.bmi_configs_url }}" \
+            -g "${{ steps.run.outputs.geopackage_url }}" \
             -R "${{ runner.temp }}/realization.json" \
             -v v2.2
           test -n "$(find "${{ runner.temp }}/run/ngen-run/outputs" -type f -print -quit)" \

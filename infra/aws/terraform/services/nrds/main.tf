@@ -44,6 +44,17 @@ module "nrds_orchestration" {
 }
 
 # =============================================================================
+# VPUs
+# =============================================================================
+locals {
+  # All VPUs; each datastream picks which of these it deploys
+  all_vpus = [
+    "01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09",
+    "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"
+  ]
+}
+
+# =============================================================================
 # Datastream Schedules
 # To add a new datastream: add a module block here and a directory under datastreams/
 # =============================================================================
@@ -63,6 +74,7 @@ module "cfe_nom_schedules" {
   environment_suffix  = var.environment_suffix
 
   s3_bucket = var.s3_bucket
+  all_vpus  = local.all_vpus
 }
 
 module "forcing_schedules" {
@@ -97,6 +109,7 @@ module "routing_only_schedules" {
   environment_suffix  = var.environment_suffix
 
   s3_bucket = var.s3_bucket
+  all_vpus  = local.all_vpus
 }
 
 module "restart_schedules" {
@@ -131,6 +144,7 @@ module "lstm_0_schedules" {
   environment_suffix  = var.environment_suffix
 
   s3_bucket = var.s3_bucket
+  all_vpus  = local.all_vpus
 }
 
 module "qkrig_schedules" {

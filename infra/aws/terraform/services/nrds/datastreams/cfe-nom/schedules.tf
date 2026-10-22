@@ -173,6 +173,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_cfe_nom" {
     timeout_s          = 3600
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
+    geopackage_s3_uri  = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].geopackage}"
+    bmi_configs_s3_uri = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].bmi_configs}"
 }))}
 }
 EOT
@@ -219,6 +221,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_medium_range_cfe_nom" {
     timeout_s          = 7200
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
+    geopackage_s3_uri  = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].geopackage}"
+    bmi_configs_s3_uri = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].bmi_configs}"
 }))}
 }
 EOT
@@ -265,6 +269,8 @@ resource "aws_scheduler_schedule" "datastream_schedule_AnA_range_cfe_nom" {
     timeout_s          = 3600
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
+    geopackage_s3_uri  = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].geopackage}"
+    bmi_configs_s3_uri = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].bmi_configs}"
 }))}
 }
 EOT
