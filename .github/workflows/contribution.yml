@@ -16,6 +16,12 @@ on:
       contribution:
         description: Path to a contribution file
         required: true
+      # Redeploys a merged contribution whose push run failed, without a
+      # throwaway commit. Ignored off main; deploys only if the simulation passes.
+      deploy:
+        description: Deploy after the simulation passes (main only)
+        type: boolean
+        default: false
 
 concurrency:
   group: parameter-contribution
@@ -26,6 +32,7 @@ env:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   contribution:
@@ -39,10 +46,17 @@ jobs:
 
       - name: Resolve the contribution
         id: file
+        env:
+          CONTRIBUTION: ${{ inputs.contribution }}
         run: |
           set -euo pipefail
-          if [[ -n "${{ inputs.contribution }}" ]]; then
-            echo "path=${{ inputs.contribution }}" >> "$GITHUB_OUTPUT"
+          if [[ -n "$CONTRIBUTION" ]]; then
+            # shellcheck disable=SC2053  # $GLOB is matched as a pattern
+            if [[ "$CONTRIBUTION" != $GLOB || ! -f "$CONTRIBUTION" ]]; then
+              echo "::error::No contribution file at $CONTRIBUTION."
+              exit 1
+            fi
+            echo "path=$CONTRIBUTION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -152,16 +166,15 @@ jobs:
             || { echo "::error::The datastream reported success but wrote no output."; exit 1; }
 
       - name: Configure AWS credentials
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (inputs.deploy && github.ref == 'refs/heads/main')
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
           aws-region: us-east-1
 
       - name: Deploy
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (inputs.deploy && github.ref == 'refs/heads/main')
         run: |
-          pip install boto3
           python -m research_datastream.contribution_parameters deploy \
             "${{ steps.file.outputs.path }}" \
             --workdir "${{ runner.temp }}/deploy" \
