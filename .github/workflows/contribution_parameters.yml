@@ -1,0 +1,220 @@
+name: Parameter Contribution
+
+# Checks a parameter contribution on a pull request, runs the merged realization
+# through the Datastream VPU Test, which executes the VPU's production schedule
+# on its production instance with the candidate swapped in, and deploys it on
+# merge to main. The file format and the process are documented beside the
+# contributions themselves:
+# infra/aws/terraform/services/nrds/datastreams/*/contributions/README.md
+
+on:
+  pull_request:
+    paths: ['infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml']
+  push:
+    branches: [main]
+    paths: ['infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml']
+  workflow_dispatch:
+    inputs:
+      contribution:
+        description: Path to a contribution file
+        required: true
+      # Redeploys a merged contribution whose push run failed, without a
+      # throwaway commit. Ignored off main; deploys only if the simulation passes.
+      deploy:
+        description: Deploy after the simulation passes (main only)
+        type: boolean
+        default: false
+
+concurrency:
+  group: parameter-contribution
+  cancel-in-progress: false
+
+env:
+  GLOB: 'infra/aws/terraform/services/nrds/datastreams/*/contributions/*.yml'
+  BUCKET: ciroh-community-ngen-datastream
+  # Inputs under test, removed when the test finishes.
+  TEST_PREFIX: test/cicd/contribution-inputs/${{ github.run_id }}-${{ github.run_attempt }}
+
+permissions:
+  contents: read
+
+jobs:
+  contribution:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      path: ${{ steps.file.outputs.path }}
+      datastream: ${{ steps.run.outputs.datastream }}
+      vpu: ${{ steps.run.outputs.vpu }}
+      overrides: ${{ steps.upload.outputs.overrides }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the contribution
+        id: file
+        env:
+          CONTRIBUTION: ${{ inputs.contribution }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$CONTRIBUTION" ]]; then
+            # shellcheck disable=SC2053  # $GLOB is matched as a pattern
+            if [[ "$CONTRIBUTION" != $GLOB || ! -f "$CONTRIBUTION" ]]; then
+              echo "::error::No contribution file at $CONTRIBUTION."
+              exit 1
+            fi
+            echo "path=$CONTRIBUTION" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            RANGE="origin/${{ github.base_ref }}...HEAD"
+          elif git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            RANGE="${{ github.event.before }} ${{ github.sha }}"
+          else
+            # The null SHA on a new branch, and unreliable after a force push.
+            RANGE="HEAD^ HEAD"
+          fi
+          CHANGED=$(git diff --name-only --diff-filter=d $RANGE -- "$GLOB")
+          if [[ "$(echo "$CHANGED" | grep -c .)" != 1 ]]; then
+            echo "::error::Change exactly one contribution file per pull request."
+            exit 1
+          fi
+          echo "path=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "Contribution: $CHANGED"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # datastreamcli's own requirement line, so the schema enforced here is the
+      # one the preprocessor builds to.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
+          pip install -e infra/aws/python
+
+      - name: Check and build the merged realization
+        run: |
+          python -m research_datastream.contribution_parameters check \
+            "${{ steps.file.outputs.path }}" \
+            --workdir "${{ runner.temp }}/work" \
+            --out "${{ runner.temp }}/realization.json" \
+            --record "${{ runner.temp }}/spec.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Read the contribution
+        if: github.event_name != 'push'
+        id: run
+        run: |
+          set -euo pipefail
+          python -c "import json;s=json.load(open('${{ runner.temp }}/spec.json'));print('vpu=%s'%s['vpu'])" >> "$GITHUB_OUTPUT"
+          # The datastream directory, as the VPU test names datastreams.
+          echo "datastream=$(basename "$(dirname "$(dirname "${{ steps.file.outputs.path }}")")")" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        if: github.event_name != 'push'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Upload the merged realization
+        if: github.event_name != 'push'
+        id: upload
+        run: |
+          set -euo pipefail
+          VPU="${{ steps.run.outputs.vpu }}"
+          KEY="$TEST_PREFIX/realization_VPU_$VPU.json"
+          aws s3 cp "${{ runner.temp }}/realization.json" "s3://$BUCKET/$KEY"
+          echo "overrides=${{ steps.run.outputs.datastream }} -R $VPU s3://$BUCKET/$KEY" >> "$GITHUB_OUTPUT"
+
+  # The VPU's production schedule, run once with the merged realization.
+  simulate:
+    name: Simulate
+    if: github.event_name != 'push'
+    needs: contribution
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: ./.github/workflows/datastream-vpu-test.yml
+    with:
+      datastreams: ${{ needs.contribution.outputs.datastream }}
+      vpus: ${{ needs.contribution.outputs.vpu }}
+      overrides: ${{ needs.contribution.outputs.overrides }}
+
+  result:
+    name: Result
+    if: always() && github.event_name != 'push' && needs.contribution.result == 'success'
+    needs: [contribution, simulate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Remove the inputs under test
+        run: aws s3 rm "s3://$BUCKET/$TEST_PREFIX" --recursive || true
+
+      - name: Result
+        run: |
+          VPU="${{ needs.contribution.outputs.vpu }}"
+          DS="${{ needs.contribution.outputs.datastream }}"
+          if [[ "${{ needs.simulate.outputs.matrix }}" == "[]" || -z "${{ needs.simulate.outputs.matrix }}" ]]; then
+            echo "::error::VPU $VPU has no $DS schedule, so the contribution could not be run."
+            exit 1
+          fi
+          [[ "${{ needs.simulate.result }}" == success ]] || { echo "::error::The VPU test failed."; exit 1; }
+
+  # On push, the merge is the deployment. A manual redeploy waits for the simulation.
+  deploy:
+    name: Deploy
+    needs: [contribution, result]
+    if: >-
+      always() && needs.contribution.result == 'success' &&
+      (github.event_name == 'push' ||
+       (inputs.deploy && github.ref == 'refs/heads/main' && needs.result.result == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # Deploy rebuilds and rechecks the realization, so it needs ngen-cal too.
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
+          pip install -e infra/aws/python boto3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Deploy
+        run: |
+          python -m research_datastream.contribution_parameters deploy \
+            "${{ needs.contribution.outputs.path }}" \
+            --workdir "${{ runner.temp }}/deploy" \
+            --commit "${{ github.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
