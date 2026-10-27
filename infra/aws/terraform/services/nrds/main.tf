@@ -25,22 +25,23 @@ terraform {
 module "nrds_orchestration" {
   source = "../../modules/orchestration"
 
-  region                    = var.region
-  starter_lambda_name       = var.starter_lambda_name
-  commander_lambda_name     = var.commander_lambda_name
-  poller_lambda_name        = var.poller_lambda_name
-  checker_lambda_name       = var.checker_lambda_name
-  stopper_lambda_name       = var.stopper_lambda_name
-  lambda_policy_name        = var.lambda_policy_name
-  lambda_role_name          = var.lambda_role_name
-  lambda_invoke_policy_name = var.lambda_invoke_policy_name
-  sm_name                   = var.sm_name
-  sm_role_name              = var.sm_role_name
-  ec2_role                  = var.ec2_role
-  ec2_policy_name           = var.ec2_policy_name
-  profile_name              = var.profile_name
-  resource_prefix           = var.resource_prefix
-  s3_bucket                 = var.s3_bucket
+  region                      = var.region
+  starter_lambda_name         = var.starter_lambda_name
+  forcing_checker_lambda_name = var.forcing_checker_lambda_name
+  commander_lambda_name       = var.commander_lambda_name
+  poller_lambda_name          = var.poller_lambda_name
+  checker_lambda_name         = var.checker_lambda_name
+  stopper_lambda_name         = var.stopper_lambda_name
+  lambda_policy_name          = var.lambda_policy_name
+  lambda_role_name            = var.lambda_role_name
+  lambda_invoke_policy_name   = var.lambda_invoke_policy_name
+  sm_name                     = var.sm_name
+  sm_role_name                = var.sm_role_name
+  ec2_role                    = var.ec2_role
+  ec2_policy_name             = var.ec2_policy_name
+  profile_name                = var.profile_name
+  resource_prefix             = var.resource_prefix
+  s3_bucket                   = var.s3_bucket
 }
 
 # =============================================================================
