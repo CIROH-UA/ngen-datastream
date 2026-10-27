@@ -1,0 +1,204 @@
+name: BMI Configurations
+
+# Regenerates a datastream's per-VPU BMI configuration tarballs with a chosen
+# datastreamcli version, uploads them to <s3_prefix>/VPU_XX/ngen-bmi-configs.tar.gz,
+# and runs them through the Datastream VPU Test on the production schedule and
+# instance. The geopackage is the one production runs for each VPU unless
+# geopackage_prefix names others, and the realization is the execution
+# template's. Nothing reads the new tarballs until a VPU's entry in the
+# datastream's vpu_resource_overrides (main.tf) points at them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      datastream:
+        description: Datastream directory under services/nrds/datastreams
+        type: choice
+        options: [cfe-nom, lstm_0]
+      ds_tag:
+        description: datastreamcli version that generates the configurations, e.g. 1.7.3
+        required: true
+      s3_prefix:
+        description: Where the tarballs go; VPU_XX/ngen-bmi-configs.tar.gz is appended (key prefix or s3:// URI)
+        required: true
+      vpus:
+        description: VPUs, space separated
+        required: true
+      geopackage_prefix:
+        description: Prefix holding nextgen_VPU_XX.gpkg to build from (blank for the geopackages production runs)
+        required: false
+      test:
+        description: Run the new configurations through the Datastream VPU Test
+        type: boolean
+        default: true
+      overwrite:
+        description: Replace tarballs already under s3_prefix
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      datastream:
+        type: string
+        required: true
+      ds_tag:
+        description: Blank for the execution template's
+        type: string
+        default: ''
+      s3_prefix:
+        type: string
+        required: true
+      vpus:
+        type: string
+        required: true
+      geopackage_prefix:
+        type: string
+        default: ''
+      test:
+        type: boolean
+        default: false
+      overwrite:
+        type: boolean
+        default: false
+
+concurrency:
+  group: bmi-configs-${{ inputs.s3_prefix }}
+  cancel-in-progress: false
+
+env:
+  BUCKET: ciroh-community-ngen-datastream
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.datastream }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      overrides: ${{ steps.upload.outputs.overrides }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af >/dev/null
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: pip install -e infra/aws/python
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Resolve the inputs
+        id: inputs
+        env:
+          DATASTREAM: ${{ inputs.datastream }}
+          DS_TAG: ${{ inputs.ds_tag }}
+          S3_PREFIX: ${{ inputs.s3_prefix }}
+          VPUS: ${{ inputs.vpus }}
+          GPKG_PREFIX: ${{ inputs.geopackage_prefix }}
+        run: |
+          set -euo pipefail
+          uri() { local p="${1%/}"; [[ "$p" == s3://* ]] && echo "$p" || echo "s3://$BUCKET/${p#/}"; }
+          # realization keeps a literal ${vpu}, so it is read, not sourced.
+          python -m research_datastream.vpu_resources settings "$DATASTREAM" > settings.txt
+          setting() { grep -m1 "^$1=" settings.txt | cut -d= -f2-; }
+          {
+            echo "ds_tag=${DS_TAG:-$(setting ds_tag)}"
+            echo "realization=$(setting realization)"
+            echo "prefix=$(uri "$S3_PREFIX")"
+          } >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2086  # VPUS is a list
+          python -m research_datastream.vpu_resources uris "$DATASTREAM" $VPUS > uris.txt
+          if [[ "$(awk '$3 == "-"' uris.txt)" ]]; then
+            echo "::error::$DATASTREAM takes no BMI configurations."
+            exit 1
+          fi
+          {
+            echo "geopackages<<EOF"
+            while read -r VPU GPKG _; do
+              [[ -n "$GPKG_PREFIX" ]] && GPKG="$(uri "$GPKG_PREFIX")/nextgen_VPU_$VPU.gpkg"
+              echo "$VPU $GPKG"
+            done < uris.txt
+            echo "EOF"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Refuse to overwrite
+        if: ${{ !inputs.overwrite }}
+        env:
+          PREFIX: ${{ steps.inputs.outputs.prefix }}
+          VPUS: ${{ inputs.vpus }}
+        run: |
+          set -euo pipefail
+          for VPU in $VPUS; do
+            if aws s3 ls "$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz" >/dev/null 2>&1; then
+              echo "::error::$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz exists; choose a new prefix or set overwrite."
+              exit 1
+            fi
+          done
+
+      - name: Build
+        uses: ./.github/actions/nrds-bmi-configs
+        with:
+          geopackages: ${{ steps.inputs.outputs.geopackages }}
+          realization: ${{ steps.inputs.outputs.realization }}
+          ds-tag: ${{ steps.inputs.outputs.ds_tag }}
+          out: ${{ runner.temp }}/bmi_configs
+
+      - name: Upload
+        id: upload
+        env:
+          DATASTREAM: ${{ inputs.datastream }}
+          PREFIX: ${{ steps.inputs.outputs.prefix }}
+          GEOPACKAGES: ${{ steps.inputs.outputs.geopackages }}
+          GPKG_PREFIX: ${{ inputs.geopackage_prefix }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "${{ runner.temp }}/bmi_configs" "$PREFIX" --recursive --only-show-errors
+          {
+            echo "| VPU | Geopackage | BMI configurations |"
+            echo "|---|---|---|"
+            while read -r VPU GPKG; do
+              echo "| $VPU | \`$GPKG\` | \`$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz\` |"
+            done <<< "$GEOPACKAGES"
+            echo
+            echo "Built with datastreamcli ${{ steps.inputs.outputs.ds_tag }}. To deploy, point each VPU's"
+            echo "\`bmi_configs\` in \`vpu_resource_overrides\` of \`datastreams/$DATASTREAM/main.tf\` at its tarball."
+          } >> "$GITHUB_STEP_SUMMARY"
+          # The VPU test swaps these in; geopackages only when they are not production's.
+          {
+            echo "overrides<<EOF"
+            while read -r VPU GPKG; do
+              echo "$DATASTREAM -N $VPU $PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz"
+              [[ -z "$GPKG_PREFIX" ]] || echo "$DATASTREAM -g $VPU $GPKG"
+            done <<< "$GEOPACKAGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test
+    if: inputs.test
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: ./.github/workflows/datastream-vpu-test.yml
+    with:
+      datastreams: ${{ inputs.datastream }}
+      vpus: ${{ inputs.vpus }}
+      overrides: ${{ needs.build.outputs.overrides }}
