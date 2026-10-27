@@ -1,0 +1,87 @@
+name: NRDS BMI configurations
+description: >
+  Build an ngen-bmi-configs.tar.gz for each of several VPUs from its geopackage
+  and a realization, with the generators and tarball exclusions of the selected
+  datastreamcli version, as an execution given no tarball would. Which models
+  are configured follows the realization. Tarballs are written to
+  <out>/VPU_XX/ngen-bmi-configs.tar.gz.
+
+inputs:
+  geopackages:
+    description: One "VPU geopackage" pair per line; the geopackage is an s3:// URI, a URL or a local path
+    required: true
+  realization:
+    description: s3:// URI, URL or local path of the realization. A literal ${vpu} is replaced with each VPU.
+    required: true
+  ds-tag:
+    description: datastreamcli version, e.g. 1.7.1; selects the awiciroh/datastream image and the tarball exclusions
+    required: true
+  out:
+    description: Directory the tarballs are written under
+    required: true
+  workdir:
+    required: false
+    default: ${{ runner.temp }}/nrds-bmi-configs
+
+runs:
+  using: composite
+  steps:
+    - name: Check out datastreamcli
+      uses: actions/checkout@v4
+      with:
+        repository: CIROH-UA/datastreamcli
+        ref: v${{ inputs.ds-tag }}
+        path: ${{ inputs.workdir }}/datastreamcli
+        sparse-checkout: scripts/datastream
+        sparse-checkout-cone-mode: false
+
+    - name: Build the BMI configurations
+      shell: bash
+      env:
+        GEOPACKAGES: ${{ inputs.geopackages }}
+        REALIZATION: ${{ inputs.realization }}
+        WORKDIR: ${{ inputs.workdir }}
+        OUT: ${{ inputs.out }}
+        IMAGE: awiciroh/datastream:${{ inputs.ds-tag }}
+      run: |
+        set -euo pipefail
+        PY=/datastreamcli/src/datastreamcli
+        PKL="noah-owp-modular-init.namelist.input.pkl"
+
+        # The excludes of the version's own `tar ... > $NGENCON_TAR`.
+        mapfile -t EXCLUDES < <(grep -m1 'tar -c.*NGENCON_TAR' "$WORKDIR/datastreamcli/scripts/datastream" \
+          | grep -o -- '--exclude="[^"]*"' | sed 's/^--exclude="\(.*\)"$/--exclude=\1/')
+        [[ ${#EXCLUDES[@]} -gt 0 ]] || { echo "::error::No BMI tarball excludes found in the datastreamcli of $IMAGE"; exit 1; }
+        echo "Excluding: ${EXCLUDES[*]}"
+
+        fetch() {
+          case "$1" in
+            s3://*) aws s3 cp --only-show-errors "$1" "$2" ;;
+            http://*|https://*) curl -fsSL -o "$2" "$1" ;;
+            *) cp "$1" "$2" ;;
+          esac
+        }
+        gen() { docker run --rm -v "$RUN":/mounted_dir -u "$(id -u):$(id -g)" "$IMAGE" python3 "$@"; }
+
+        docker pull -q "$IMAGE"
+        while read -r VPU SOURCE; do
+          [[ -n "$VPU" ]] || continue
+          echo "::group::VPU $VPU"
+          RUN="$WORKDIR/VPU_$VPU/ngen-run"
+          CONFIG="$RUN/config"
+          GPKG="nextgen_VPU_$VPU.gpkg"
+          rm -rf "$RUN" && mkdir -p "$CONFIG" "$OUT/VPU_$VPU"
+          fetch "$SOURCE" "$CONFIG/$GPKG"
+          fetch "${REALIZATION//\$\{vpu\}/$VPU}" "$CONFIG/realization.json"
+
+          gen "$PY/noahowp_pkl.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config
+          gen "$PY/ngen_configs_gen.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config \
+            --pkl_file "/mounted_dir/config/$PKL" --realization /mounted_dir/config/realization.json \
+            --lstm_ensembles 0
+
+          TARBALL="$OUT/VPU_$VPU/ngen-bmi-configs.tar.gz"
+          tar -czf "$TARBALL" "${EXCLUDES[@]}" -C "$CONFIG" .
+          echo "Built $TARBALL: $(tar -tzf "$TARBALL" | grep -c .) entries"
+          rm -rf "$RUN"
+          echo "::endgroup::"
+        done <<< "$GEOPACKAGES"

@@ -4,13 +4,26 @@ Build one test execution per run type and VPU for an NRDS datastream, from the e
 Terraform would schedule in production.
 
     python -m research_datastream.vpu_test targets cfe-nom lstm_0 --main-tf main.tf
-    python -m research_datastream.vpu_test select plan.json cfe-nom --main-tf main.tf --out-dir execs
+    python -m research_datastream.vpu_test select plan.json cfe-nom --main-tf main.tf --out-dir execs \
+        [--overrides overrides.txt]
 
 `targets` prints the Terraform module address of each datastream directory.
 `select` reads `terraform show -json` of a plan that includes those modules,
 keeps one schedule per run type and VPU, and rewrites it to run on a fixed past date and
 write under a test prefix. Nothing here knows a particular datastream: the
 template, instance sizes and run options are the ones production uses.
+
+`--overrides` swaps inputs under test into those executions, so a candidate
+geopackage, BMI configuration tarball or realization can be run exactly as
+production would run it. Each line is
+
+    DATASTREAM FLAG VPU VALUE
+
+for example `* -g 17 s3://bucket/test/nextgen_VPU_17.gpkg` or
+`cfe-nom -N 17 s3://bucket/test/ngen-bmi-configs.tar.gz`. DATASTREAM and VPU
+may be `*`. The value replaces the argument of FLAG in the datastreamcli
+command. An override naming its datastream must find FLAG there; a `*` one
+applies where FLAG is present, since not every datastream takes every input.
 
 Author: Jordan Laser
 jlaser@lynker.com
@@ -26,7 +39,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 TEST_ROOT = "test/cicd/vpu-test"
 TEST_TAG = "nrds_vpu_test"
@@ -97,6 +110,47 @@ def rewrite(execution: dict, date: str, prefix_root: str) -> dict:
     return ex
 
 
+Override = Tuple[str, str, str, str]
+
+
+def load_overrides(path: Optional[Path]) -> List[Override]:
+    """(datastream, flag, vpu, value) per non-blank, non-comment line."""
+    if path is None:
+        return []
+    overrides = []
+    for n, line in enumerate(path.read_text().splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 4 or not parts[1].startswith("-"):
+            raise SystemExit(f"{path}:{n}: expected 'DATASTREAM FLAG VPU VALUE', got {line!r}")
+        overrides.append(tuple(parts))
+    return overrides
+
+
+def override(execution: dict, datastream: str, vpu: str, overrides: List[Override]) -> List[str]:
+    """Apply the overrides matching this datastream and VPU in place; return what was applied."""
+    applied = []
+    for ds, flag, ov_vpu, value in overrides:
+        if ds not in ("*", datastream) or ov_vpu not in ("*", vpu):
+            continue
+        pattern = re.compile(rf"(?<!\S)({re.escape(flag)})([=\s]+)([^\s']+)")
+        hits = 0
+        commands = []
+        for cmd in execution["commands"]:
+            cmd, n = pattern.subn(lambda m: m.group(1) + m.group(2) + value, cmd)
+            hits += n
+            commands.append(cmd)
+        if not hits:
+            if ds == "*":
+                continue
+            raise SystemExit(f"{datastream} VPU {vpu}: the execution has no {flag} to override")
+        execution["commands"] = commands
+        applied.append(f"{flag} {value}")
+    return applied
+
+
 def first(pattern: re.Pattern, commands: List[str], group: int = 1) -> Optional[str]:
     for cmd in commands:
         m = pattern.search(cmd)
@@ -162,6 +216,7 @@ def cmd_select(args) -> None:
     if address is None:
         raise SystemExit(f"{args.datastream}: not a datastream module in {args.main_tf}")
     vpus = args.vpus.split() if args.vpus else None
+    overrides = load_overrides(args.overrides)
     planned = schedules(plan, address)
     if not planned:
         raise SystemExit(f"{args.datastream}: the plan has no schedules under {address}; was it targeted?")
@@ -179,6 +234,7 @@ def cmd_select(args) -> None:
     for (run_type, vpu), sel in selected.items():
         prefix_root = f"{TEST_ROOT}/{args.run_id}"
         ex = rewrite(sel["execution"], date, prefix_root)
+        applied = override(ex, args.datastream, vpu, overrides)
         out = args.out_dir / f"{slug}_{run_type}_VPU_{vpu}.json"
         out.write_text(json.dumps(ex, indent=2))
         matrix.append({
@@ -192,6 +248,7 @@ def cmd_select(args) -> None:
             "s3_bucket": first(BUCKET_RE, ex["commands"]),
             "s3_prefix": first(PREFIX_RE, ex["commands"], 2),
             "name": f"vputest_{slug}_{run_type}_{vpu}_{args.run_id}"[:80],
+            "overrides": applied,
         })
     print(json.dumps(matrix))
 
@@ -215,6 +272,7 @@ def main(argv=None) -> None:
     s.add_argument("--date", help="YYYYMMDD, default the latest day with forcing")
     s.add_argument("--days-back", type=int, default=5)
     s.add_argument("--run-id", default="local")
+    s.add_argument("--overrides", type=Path, help="file of 'DATASTREAM FLAG VPU VALUE' lines")
     s.set_defaults(func=cmd_select)
 
     args = p.parse_args(argv)

@@ -1,0 +1,346 @@
+name: Hydrofabric Contribution
+
+# Checks each contributed VPU geopackage against the one the NRDS runs, builds
+# its BMI configurations with the BMI Configurations workflow, and runs it
+# through the Datastream VPU Test, which executes each datastream that reads it
+# on its production schedule and instance with the candidate swapped in.
+# Merging to main uploads the geopackages and BMI configurations under the
+# issue number. Nothing runs them until each VPU's vpu_resource_overrides entry
+# in the datastreams' main.tf points at them; the merge run prints those entries.
+# The file format and the process are documented beside the contributions:
+# infra/aws/terraform/services/nrds/hydrofabric/contributions/README.md
+
+on:
+  pull_request:
+    paths: ['infra/aws/terraform/services/nrds/hydrofabric/contributions/*.yml']
+  push:
+    branches: [main]
+    paths: ['infra/aws/terraform/services/nrds/hydrofabric/contributions/*.yml']
+  workflow_dispatch:
+    inputs:
+      contribution:
+        description: Path to a contribution file
+        required: true
+
+concurrency:
+  group: hydrofabric-contribution-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+env:
+  GLOB: 'infra/aws/terraform/services/nrds/hydrofabric/contributions/*.yml'
+  BUCKET: ciroh-community-ngen-datastream
+  # The checked geopackages, as contribution_hydrofabric.py deploy --stage expects.
+  STAGE: ${{ github.workspace }}/.stage
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Resolve the contribution
+    runs-on: ubuntu-latest
+    outputs:
+      path: ${{ steps.file.outputs.path }}
+      vpus: ${{ steps.paths.outputs.vpus }}
+      vpus_json: ${{ steps.paths.outputs.vpus_json }}
+      datastreams: ${{ steps.paths.outputs.datastreams }}
+      bmi_datastreams: ${{ steps.paths.outputs.bmi_datastreams }}
+      geopackage_prefix: ${{ steps.paths.outputs.geopackage_prefix }}
+      bmi_prefixes: ${{ steps.paths.outputs.bmi_prefixes }}
+      test_prefix: ${{ steps.paths.outputs.test_prefix }}
+      overrides: ${{ steps.paths.outputs.overrides }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the contribution
+        id: file
+        env:
+          CONTRIBUTION: ${{ inputs.contribution }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$CONTRIBUTION" ]]; then
+            # shellcheck disable=SC2053  # $GLOB is matched as a pattern
+            if [[ "$CONTRIBUTION" != $GLOB || ! -f "$CONTRIBUTION" ]]; then
+              echo "::error::No hydrofabric contribution file at $CONTRIBUTION."
+              exit 1
+            fi
+            echo "path=$CONTRIBUTION" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            RANGE="origin/${{ github.base_ref }}...HEAD"
+          elif git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            RANGE="${{ github.event.before }} ${{ github.sha }}"
+          else
+            # The null SHA on a new branch, and unreliable after a force push.
+            RANGE="HEAD^ HEAD"
+          fi
+          # shellcheck disable=SC2086  # RANGE is one or two revisions
+          CHANGED=$(git diff --name-only --diff-filter=d $RANGE -- "$GLOB")
+          if [[ "$(echo "$CHANGED" | grep -c .)" != 1 ]]; then
+            echo "::error::Change exactly one hydrofabric contribution file per pull request."
+            exit 1
+          fi
+          echo "path=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "Contribution: $CHANGED"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # A merge builds where the contribution is deployed; anything else builds
+      # under a test prefix that is removed when the run finishes.
+      - name: Resolve where it is placed
+        id: paths
+        env:
+          TEST_PREFIX: test/cicd/contribution-inputs/${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          pip install -e infra/aws/python
+          P=$(python -m research_datastream.contribution_hydrofabric paths "${{ steps.file.outputs.path }}")
+          if [[ "${{ github.event_name }}" == push ]]; then
+            GPKG=$(jq -r .geopackage_prefix <<< "$P")
+            BMI=$(jq -c .bmi_prefixes <<< "$P")
+          else
+            GPKG="$TEST_PREFIX/geopackages"
+            BMI=$(jq -c --arg t "$TEST_PREFIX" '.bmi_datastreams | map({(.): "\($t)/bmi_configs/\(.)"}) | add' <<< "$P")
+          fi
+          {
+            echo "vpus=$(jq -r '.vpus | join(" ")' <<< "$P")"
+            echo "vpus_json=$(jq -c .vpus <<< "$P")"
+            echo "datastreams=$(jq -r '.geopackage_datastreams | join(" ")' <<< "$P")"
+            echo "bmi_datastreams=$(jq -c .bmi_datastreams <<< "$P")"
+            echo "geopackage_prefix=$GPKG"
+            echo "bmi_prefixes=$BMI"
+            echo "test_prefix=$TEST_PREFIX"
+            # What the VPU test swaps in: each geopackage everywhere, and each
+            # datastream's own BMI configurations.
+            echo "overrides<<EOF"
+            for VPU in $(jq -r '.vpus[]' <<< "$P"); do
+              echo "* -g $VPU s3://$BUCKET/$GPKG/nextgen_VPU_$VPU.gpkg"
+              jq -r --arg v "$VPU" --arg b "$BUCKET" \
+                'to_entries[] | "\(.key) -N \($v) s3://\($b)/\(.value)/VPU_\($v)/ngen-bmi-configs.tar.gz"' <<< "$BMI"
+            done
+            echo "EOF"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  # Every VPU is checked once, against the HydroShare version pinned in the
+  # file. On a merge this reruns on what was merged and deploys from it.
+  check:
+    name: Check and upload the geopackages
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: pip install -e infra/aws/python boto3
+
+      - name: Check the geopackages
+        id: check
+        run: |
+          set -uo pipefail
+          mkdir -p "$STAGE" "${{ runner.temp }}/report"
+          python -m research_datastream.contribution_hydrofabric check \
+            "${{ needs.plan.outputs.path }}" \
+            --workdir "${{ runner.temp }}/work" \
+            --record "$STAGE/record.json" \
+            --report "${{ runner.temp }}/report/report.md"
+          STATUS=$?
+          cat "${{ runner.temp }}/report/report.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "passed=$([[ $STATUS == 0 ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: ${{ runner.temp }}/report/
+
+      - name: Stage the geopackages
+        if: steps.check.outputs.passed == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$STAGE/geopackages"
+          python - <<'PY'
+          import json, os, shutil
+          stage = os.environ["STAGE"]
+          for r in json.load(open(f"{stage}/record.json"))["results"]:
+              shutil.move(r["geopackage"], f"{stage}/geopackages/nextgen_VPU_{r['vpu']}.gpkg")
+          PY
+
+      - name: Configure AWS credentials
+        if: steps.check.outputs.passed == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Upload for the test
+        if: steps.check.outputs.passed == 'true' && github.event_name != 'push'
+        run: |
+          aws s3 cp "$STAGE/geopackages" "s3://$BUCKET/${{ needs.plan.outputs.geopackage_prefix }}" \
+            --recursive --only-show-errors
+
+      - name: Deploy
+        if: steps.check.outputs.passed == 'true' && github.event_name == 'push'
+        run: |
+          set -o pipefail
+          python -m research_datastream.contribution_hydrofabric deploy --stage "$STAGE" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Result
+        run: |
+          [[ "${{ steps.check.outputs.passed }}" == true ]] || { echo "::error::Geopackage checks failed."; exit 1; }
+
+  # Rebuilt from each candidate with the datastreamcli the datastream runs.
+  bmi:
+    name: BMI configurations
+    needs: [plan, check]
+    strategy:
+      fail-fast: false
+      matrix:
+        datastream: ${{ fromJSON(needs.plan.outputs.bmi_datastreams) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: ./.github/workflows/bmi_configs.yml
+    with:
+      datastream: ${{ matrix.datastream }}
+      s3_prefix: ${{ fromJSON(needs.plan.outputs.bmi_prefixes)[matrix.datastream] }}
+      vpus: ${{ needs.plan.outputs.vpus }}
+      geopackage_prefix: ${{ needs.plan.outputs.geopackage_prefix }}
+
+  # Each of the contribution's VPUs, in each datastream that schedules it.
+  simulate:
+    name: Simulate
+    if: github.event_name != 'push'
+    needs: [plan, bmi]
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: ./.github/workflows/datastream-vpu-test.yml
+    with:
+      datastreams: ${{ needs.plan.outputs.datastreams }}
+      vpus: ${{ needs.plan.outputs.vpus }}
+      overrides: ${{ needs.plan.outputs.overrides }}
+
+  report:
+    name: Report
+    if: always() && github.event_name != 'push' && needs.plan.result == 'success'
+    needs: [plan, check, bmi, simulate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
+          aws-region: us-east-1
+
+      - name: Remove the inputs under test
+        run: aws s3 rm "s3://$BUCKET/${{ needs.plan.outputs.test_prefix }}" --recursive --only-show-errors || true
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: report
+          path: results
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VPUS: ${{ needs.plan.outputs.vpus_json }}
+          DATASTREAMS: ${{ needs.plan.outputs.datastreams }}
+          MATRIX: ${{ needs.simulate.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          BODY="${{ runner.temp }}/comment.md"
+          outcome() { case "$1" in success) echo PASS ;; skipped|'') echo "not run" ;; *) echo FAIL ;; esac; }
+          # A VPU no datastream schedules has nothing to run; it is tested when
+          # it is added to the schedules.
+          UNTESTED=$(jq -rn --argjson v "$VPUS" --argjson m "${MATRIX:-[]}" '$v - ($m | map(.vpu)) | join(", ")')
+          PASSED=false
+          [[ "${{ needs.check.result }}" == success && "${{ needs.bmi.result }}" == success \
+             && "${{ needs.simulate.result }}" == success ]] && PASSED=true
+          {
+            echo "### Hydrofabric contribution: ${{ needs.plan.outputs.path }}"
+            echo
+            if [[ $PASSED == true ]]; then
+              echo "Every geopackage passed its checks, its BMI configurations built, and every scheduled execution of it succeeded. Merging deploys them."
+            else
+              echo "At least one geopackage failed its checks, its BMI configuration build or its test."
+            fi
+            echo
+            cat results/report.md 2>/dev/null || echo "The check did not produce a report."
+            echo
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Geopackage checks | $(outcome "${{ needs.check.result }}") |"
+            echo "| BMI configurations | $(outcome "${{ needs.bmi.result }}") |"
+            echo "| Datastream VPU Test ($DATASTREAMS) | $(outcome "${{ needs.simulate.result }}") |"
+            if [[ -n "$UNTESTED" ]]; then
+              echo
+              echo "Not scheduled in any of $DATASTREAMS, so not run: VPU $UNTESTED."
+            fi
+            echo
+            echo "The Datastream VPU Test comment lists each execution. [Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } | tee -a "$GITHUB_STEP_SUMMARY" > "$BODY"
+          if [[ "${{ github.event_name }}" == pull_request ]]; then
+            gh pr comment "${{ github.event.pull_request.number }}" -R "${{ github.repository }}" \
+              --body-file "$BODY" --edit-last --create-if-none
+          fi
+          [[ $PASSED == true ]] || exit 1
+
+  # The files are in place; a pull request editing main.tf puts them to use.
+  deployed:
+    name: Deployed
+    if: github.event_name == 'push'
+    needs: [plan, bmi]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Print the vpu_resource_overrides entries
+        run: |
+          set -euo pipefail
+          pip install -e infra/aws/python
+          {
+            echo "### Deployed ${{ needs.plan.outputs.path }}"
+            echo
+            echo "The geopackages and BMI configurations are uploaded. To run them, add these entries to"
+            echo "\`vpu_resource_overrides\` in each datastream's main.tf, under"
+            echo "\`infra/aws/terraform/services/nrds/\`, and open a pull request:"
+            echo
+            echo '```hcl'
+            python -m research_datastream.contribution_hydrofabric overrides "${{ needs.plan.outputs.path }}"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

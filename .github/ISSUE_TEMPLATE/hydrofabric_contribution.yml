@@ -1,0 +1,131 @@
+name: Contribute a Hydrofabric Update
+description: Submit corrected VPU geopackages for use in NRDS executions
+title: "[Hydrofabric] "
+labels: ["NRDS Community Contributions", "update to existing datastream"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every NRDS simulation runs on a geopackage per VPU, copied from the v2.2 hydrofabric. This template is for replacing one or more of those copies, for example to fix an identifier that breaks routing ([#199](https://github.com/CIROH-UA/ngen-datastream/issues/199)) or to correct catchment attributes.
+
+        Corrections meant for the hydrofabric itself, for every user and every future release, belong upstream in [lynker-spatial/community.fabric](https://github.com/lynker-spatial/community.fabric/issues). Submitting here as well is welcome when the NRDS needs the fix before the next release.
+
+        Accepted geopackages are used in the next and all following executions. Proposing has no effect on the running system until the geopackage is accepted.
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ## Submission standard
+
+        **One complete VPU per geopackage.** A submission may hold several geopackages, one per VPU, when they share one fix. Start each from the geopackage the NRDS runs:
+
+        ```
+        https://ciroh-community-ngen-datastream.s3.amazonaws.com/resources/v2.2_hydrofabric/geopackages/VPU_XX/nextgen_VPU_XX.gpkg
+        ```
+
+        Make your changes and keep the rest as it is:
+
+        - every layer and column the original has, with the same names,
+        - every divide in the VPU, with its `vpuid`; subsets are not accepted,
+        - identifiers in the form `prefix-integer`, e.g. `wb-3000000`, never `wb-3e+06`.
+
+        Changes that add, remove or reshape catchments are accepted but cost more to deploy, because the forcing weights are derived from the catchment polygons. Say so below. BMI configurations are rebuilt from every accepted geopackage.
+
+        ---
+        ## Hosting
+
+        Host the geopackage publicly on [HydroShare](https://www.hydroshare.org/), in line with the [CIROH data and code sharing policy](https://docs.ciroh.org/docs/policies/DataAndCodeSharingPolicy/Recommendations). Upload the `.gpkg` files themselves, or one tarball holding them, and make the resource **public**: the validation reads it without credentials. Publishing it issues a DOI and freezes it. If you keep editing an unpublished resource after review, the review has to be redone.
+
+  - type: input
+    id: package_url
+    attributes:
+      label: HydroShare resource URL
+      placeholder: "https://www.hydroshare.org/resource/..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: vpu
+    attributes:
+      label: VPUs
+      description: Every VPU the resource holds a geopackage for.
+      multiple: true
+      options: ["01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09", "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18"]
+    validations:
+      required: true
+
+  - type: input
+    id: hydrofabric_version
+    attributes:
+      label: Hydrofabric version
+      description: The version of the geopackage you started from.
+      placeholder: "v2.2"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: change_type
+    attributes:
+      label: What changed
+      description: Tick everything that applies. This decides what else has to be regenerated on deployment.
+      options:
+        - label: Identifiers (flowpath, nexus or divide IDs)
+        - label: Connectivity (`toid` values)
+        - label: Divide geometry, or divides added or removed
+        - label: Divide attributes (`divide-attributes`)
+        - label: Flowpath attributes (`flowpath-attributes`, `flowpath-attributes-ml`)
+        - label: Something else (describe below)
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What does the change do?
+      description: Which layers, columns and features changed, and how many. The validation reports the same thing, so a mismatch is worth knowing about early.
+    validations:
+      required: true
+
+  - type: textarea
+    id: method
+    attributes:
+      label: How the geopackages were produced
+      description: The script or steps that turn the NRDS copy into yours, so the change can be reproduced or applied to a future release.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Justification
+      description: The failure it fixes, or the scientific case for the correction.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: testing
+    attributes:
+      label: Testing status
+      options:
+        - Tested end-to-end with DataStreamCLI
+        - Opened in GIS or SQLite only
+        - Not yet tested
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Each geopackage covers one whole VPU and started from the NRDS copy
+          required: true
+        - label: The HydroShare resource is public
+          required: true
+        - label: I have described every layer I changed
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contributor and affiliation
+    validations:
+      required: false
