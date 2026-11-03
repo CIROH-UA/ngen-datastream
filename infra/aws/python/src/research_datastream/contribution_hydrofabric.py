@@ -404,6 +404,31 @@ def diff(db, cand: Dict[str, List[str]], live: Dict[str, List[str]]) -> Dict[str
     return changes
 
 
+def identical(db, cand: Dict[str, List[str]], live: Dict[str, List[str]]) -> bool:
+    """
+    Whether every layer holds the same rows as the NRDS copy, over every column
+    but fid. Unlike diff(), which counts only what decides the impacts, this
+    sees any change. Rows are compared with their multiplicity, since some
+    layers repeat them.
+    """
+    if set(cand) != set(live):
+        return False
+    for table, cols in cand.items():
+        if set(cols) != set(live[table]):
+            return False
+        select = ", ".join(q(c) for c in sorted(cols) if c != "fid")
+        if not select:
+            continue
+        t = q(table)
+        if count(db, f"SELECT count(*) FROM main.{t}") != count(db, f"SELECT count(*) FROM live.{t}"):
+            return False
+        grouped = "SELECT {s}, count(*) FROM {d}.{t} GROUP BY {s}"
+        if count(db, f"SELECT count(*) FROM ({grouped.format(s=select, d='main', t=t)} "
+                     f"EXCEPT {grouped.format(s=select, d='live', t=t)})"):
+            return False
+    return True
+
+
 def impacts(changes: Dict[str, int], vpu: str) -> List[str]:
     """The derived resources a deployment leaves stale. BMI configurations are rebuilt with it."""
     divides_set = changes["divides_added"] or changes["divides_removed"]
@@ -441,12 +466,15 @@ def check_vpu(vpu: str, gpkg: Path, workdir: Path) -> dict:
             checks.append(check_ids(db, cand, live))
             checks.append(check_topology(db))
             result["changes"] = diff(db, cand, live)
+            # A counted change already settles it; only otherwise is every row compared.
+            same = not any(result["changes"].values()) and identical(db, cand, live)
         finally:
             db.close()
-        if not any(result["changes"].values()):
+        if same:
             raise Failed(Check("diff", "fail", "The candidate is identical to the geopackage in production"))
         result["stale"] = impacts(result["changes"], vpu)
-        checks.append(Check("diff", "pass", ", ".join(f"{k}={v}" for k, v in result["changes"].items() if v)))
+        counted = ", ".join(f"{k}={v}" for k, v in result["changes"].items() if v)
+        checks.append(Check("diff", "pass", counted or "Changes only outside the layers and columns counted"))
     except Failed as failure:
         checks.append(failure.check)
     finally:

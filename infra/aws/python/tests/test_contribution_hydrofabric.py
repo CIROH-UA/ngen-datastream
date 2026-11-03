@@ -69,6 +69,25 @@ def test_checks_against_live(tmp_path):
         hf.check_layers(l | {"lakes": ["fid", "id"]}, c | {"extra": ["id"]})
 
 
+def test_identical_sees_what_diff_does_not_count(tmp_path):
+    live = gpkg(tmp_path / "live.gpkg")
+    cand = gpkg(tmp_path / "cand.gpkg")
+    db = attached(cand, live)
+    c, l = hf.layers(db, "main"), hf.layers(db, "live")
+    assert hf.identical(db, c, l)
+    # A divides column diff() does not examine.
+    db.execute("UPDATE main.divides SET vpuid = '16' WHERE divide_id = 'cat-1'")
+    assert not any(hf.diff(db, c, l).values())
+    assert not hf.identical(db, c, l)
+    # The same rows, one repeated in place of another.
+    db.execute("UPDATE main.divides SET vpuid = '17'")
+    db.execute("UPDATE main.nexus SET id = 'nex-1', toid = 'wb-2' WHERE fid = 2")
+    db.execute("INSERT INTO live.nexus VALUES (3, 'nex-2', NULL)")
+    db.execute("INSERT INTO main.nexus VALUES (3, 'nex-2', NULL)")
+    assert not hf.identical(db, c, l)
+    db.close()
+
+
 def test_malformed_nexus_id_fails(tmp_path):
     live = gpkg(tmp_path / "live.gpkg")
     cand = gpkg(tmp_path / "cand.gpkg", nexus=("nex-1", "nex-3e+06"))
