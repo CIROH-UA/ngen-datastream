@@ -168,15 +168,19 @@ jobs:
       - name: Remove the inputs under test
         run: aws s3 rm "s3://$BUCKET/$TEST_PREFIX" --recursive || true
 
+      # The matrix holds the overrides' JSON, so it reaches the shell as data.
       - name: Result
+        env:
+          VPU: ${{ needs.contribution.outputs.vpu }}
+          DS: ${{ needs.contribution.outputs.datastream }}
+          MATRIX: ${{ needs.simulate.outputs.matrix }}
+          SIMULATE: ${{ needs.simulate.result }}
         run: |
-          VPU="${{ needs.contribution.outputs.vpu }}"
-          DS="${{ needs.contribution.outputs.datastream }}"
-          if [[ "${{ needs.simulate.outputs.matrix }}" == "[]" || -z "${{ needs.simulate.outputs.matrix }}" ]]; then
+          if [[ "$MATRIX" == "[]" || -z "$MATRIX" ]]; then
             echo "::error::VPU $VPU has no $DS schedule, so the contribution could not be run."
             exit 1
           fi
-          [[ "${{ needs.simulate.result }}" == success ]] || { echo "::error::The VPU test failed."; exit 1; }
+          [[ "$SIMULATE" == success ]] || { echo "::error::The VPU test failed."; exit 1; }
 
   # On push, the merge is the deployment. A manual redeploy waits for the simulation.
   deploy:
