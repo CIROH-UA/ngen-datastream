@@ -279,6 +279,7 @@ jobs:
         run: |
           set -euo pipefail
           BODY="${{ runner.temp }}/comment.md"
+          MARK='<!-- hydrofabric-contribution-report -->'
           outcome() { case "$1" in success) echo PASS ;; skipped|'') echo "not run" ;; *) echo FAIL ;; esac; }
           # A VPU no datastream schedules has nothing to run; it is tested when
           # it is added to the schedules.
@@ -287,6 +288,7 @@ jobs:
           [[ "${{ needs.check.result }}" == success && "${{ needs.bmi.result }}" == success \
              && "${{ needs.simulate.result }}" == success ]] && PASSED=true
           {
+            echo "$MARK"
             echo "### Hydrofabric contribution: ${{ needs.plan.outputs.path }}"
             echo
             if [[ $PASSED == true ]]; then
@@ -309,9 +311,14 @@ jobs:
             echo
             echo "The Datastream VPU Test comment lists each execution. [Workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           } | tee -a "$GITHUB_STEP_SUMMARY" > "$BODY"
+          # Its own comment, updated on each run. The VPU test posts its results
+          # as the same bot, so the last comment may be that one.
           if [[ "${{ github.event_name }}" == pull_request ]]; then
-            gh pr comment "${{ github.event.pull_request.number }}" -R "${{ github.repository }}" \
-              --body-file "$BODY" --edit-last --create-if-none
+            PR="${{ github.event.pull_request.number }}"
+            ID=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+              --jq ".[] | select(.body | startswith(\"$MARK\")) | .id" | head -1)
+            if [[ -n "$ID" ]]; then gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$ID" -F body=@"$BODY"
+            else gh pr comment "$PR" -R "$GITHUB_REPOSITORY" --body-file "$BODY"; fi
           fi
           [[ $PASSED == true ]] || exit 1
 
