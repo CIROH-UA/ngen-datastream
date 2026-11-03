@@ -4,7 +4,8 @@ description: >
   and a realization, with the generators and tarball exclusions of the selected
   datastreamcli version, as an execution given no tarball would. Which models
   are configured follows the realization. Tarballs are written to
-  <out>/VPU_XX/ngen-bmi-configs.tar.gz.
+  <out>/VPU_XX/ngen-bmi-configs.tar.gz, each beside an inputs.sha256 naming
+  the geopackage, realization and image it was built from.
 
 inputs:
   geopackages:
@@ -74,6 +75,9 @@ runs:
           rm -rf "$RUN" && mkdir -p "$CONFIG" "$OUT/VPU_$VPU"
           fetch "$SOURCE" "$CONFIG/$GPKG"
           fetch "${REALIZATION//\$\{vpu\}/$VPU}" "$CONFIG/realization.json"
+          # What the tarball is a function of; tar and gzip timestamps make the tarball itself differ.
+          { sha256sum "$CONFIG/$GPKG" "$CONFIG/realization.json" | cut -d' ' -f1; echo "$IMAGE"; } \
+            | sha256sum | cut -d' ' -f1 > "$OUT/VPU_$VPU/inputs.sha256"
 
           gen "$PY/noahowp_pkl.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config
           gen "$PY/ngen_configs_gen.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config \

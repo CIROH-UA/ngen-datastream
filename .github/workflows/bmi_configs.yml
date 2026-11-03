@@ -137,6 +137,9 @@ jobs:
             echo "EOF"
           } | tee -a "$GITHUB_OUTPUT"
 
+      # A tarball this workflow uploaded carries the fingerprint of its inputs,
+      # so a rerun can tell its own finished VPUs apart. One without it is never
+      # reused, so that fails before anything is built.
       - name: Refuse to overwrite
         if: ${{ !inputs.overwrite }}
         env:
@@ -144,9 +147,23 @@ jobs:
           VPUS: ${{ inputs.vpus }}
         run: |
           set -euo pipefail
+          # The inputs fingerprint an s3:// object was uploaded with: empty if it is
+          # absent, None if it carries none. Any error but a 404 stops the run.
+          held() {
+            local path="${1#s3://}" out
+            if out=$(aws s3api head-object --bucket "${path%%/*}" --key "${path#*/}" \
+                  --query Metadata.inputs --output text 2>"$RUNNER_TEMP/head.err"); then
+              echo "$out"
+            elif ! grep -q '(404)' "$RUNNER_TEMP/head.err"; then
+              cat "$RUNNER_TEMP/head.err" >&2
+              return 1
+            fi
+          }
           for VPU in $VPUS; do
-            if aws s3 ls "$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz" >/dev/null 2>&1; then
-              echo "::error::$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz exists; choose a new prefix or set overwrite."
+            KEY="$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz"
+            HELD=$(held "$KEY")
+            if [[ "$HELD" == None ]]; then
+              echo "::error::$KEY exists and was not built here; choose a new prefix or set overwrite."
               exit 1
             fi
           done
@@ -166,9 +183,43 @@ jobs:
           PREFIX: ${{ steps.inputs.outputs.prefix }}
           GEOPACKAGES: ${{ steps.inputs.outputs.geopackages }}
           GPKG_PREFIX: ${{ inputs.geopackage_prefix }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          OUT: ${{ runner.temp }}/bmi_configs
         run: |
           set -euo pipefail
-          aws s3 cp "${{ runner.temp }}/bmi_configs" "$PREFIX" --recursive --only-show-errors
+          # The inputs fingerprint an s3:// object was uploaded with: empty if it is
+          # absent, None if it carries none. Any error but a 404 stops the run.
+          held() {
+            local path="${1#s3://}" out
+            if out=$(aws s3api head-object --bucket "${path%%/*}" --key "${path#*/}" \
+                  --query Metadata.inputs --output text 2>"$RUNNER_TEMP/head.err"); then
+              echo "$out"
+            elif ! grep -q '(404)' "$RUNNER_TEMP/head.err"; then
+              cat "$RUNNER_TEMP/head.err" >&2
+              return 1
+            fi
+          }
+          # A tarball already built from the same inputs is kept, so a rerun after
+          # a partial upload finishes it; one from other inputs is refused. Every
+          # VPU is checked before any is uploaded.
+          UPLOAD=()
+          while read -r VPU _; do
+            KEY="$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz"
+            HELD=""
+            [[ "$OVERWRITE" == true ]] || HELD=$(held "$KEY")
+            if [[ -z "$HELD" ]]; then
+              UPLOAD+=("$VPU")
+            elif [[ "$HELD" == "$(cat "$OUT/VPU_$VPU/inputs.sha256")" ]]; then
+              echo "$KEY already holds this build"
+            else
+              echo "::error::$KEY holds a build from other inputs; choose a new prefix or set overwrite."
+              exit 1
+            fi
+          done <<< "$GEOPACKAGES"
+          for VPU in "${UPLOAD[@]}"; do
+            aws s3 cp "$OUT/VPU_$VPU/ngen-bmi-configs.tar.gz" "$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz" \
+              --only-show-errors --metadata "inputs=$(cat "$OUT/VPU_$VPU/inputs.sha256")"
+          done
           {
             echo "| VPU | Geopackage | BMI configurations |"
             echo "|---|---|---|"
