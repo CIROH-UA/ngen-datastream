@@ -20,8 +20,9 @@ inputs:
     description: Directory the tarballs are written under
     required: true
   workdir:
+    description: Scratch directory; inside the workspace, where actions/checkout requires its path to be
     required: false
-    default: ${{ runner.temp }}/nrds-bmi-configs
+    default: ${{ github.workspace }}/.nrds-bmi-configs
 
 runs:
   using: composite
