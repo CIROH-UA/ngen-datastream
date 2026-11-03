@@ -93,3 +93,27 @@ def test_live_key_agrees_on_main():
     key, warning = hf.live_key("17")
     assert key == "resources/v2.2_hydrofabric/geopackages/VPU_17/nextgen_VPU_17.gpkg"
     assert warning is None
+
+
+class FakeS3:
+    def __init__(self, heads):
+        self.heads = heads
+
+    def head_object(self, Bucket, Key):
+        from botocore.exceptions import ClientError
+
+        head = self.heads[Key]
+        if isinstance(head, str):
+            raise ClientError({"Error": {"Code": head}}, "HeadObject")
+        return head
+
+
+def test_existing_sha256_tells_absent_from_unknown():
+    s3 = FakeS3({"gone": "404", "bare": {"Metadata": {}}, "known": {"Metadata": {"sha256": "ab"}},
+                 "denied": "403"})
+    assert hf.existing_sha256(s3, "gone") == (False, None)
+    assert hf.existing_sha256(s3, "bare") == (True, None)
+    assert hf.existing_sha256(s3, "known") == (True, "ab")
+    from botocore.exceptions import ClientError
+    with pytest.raises(ClientError):
+        hf.existing_sha256(s3, "denied")

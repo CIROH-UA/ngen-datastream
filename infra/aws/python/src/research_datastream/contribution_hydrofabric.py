@@ -537,6 +537,22 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def existing_sha256(s3, key: str) -> Tuple[bool, Optional[str]]:
+    """
+    (exists, the sha256 it was uploaded with) of a key. Only a 404 means it is
+    absent; any other error is raised, never taken as leave to upload.
+    """
+    from botocore.exceptions import ClientError
+
+    try:
+        head = s3.head_object(Bucket=BUCKET, Key=key)
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            return False, None
+        raise
+    return True, head.get("Metadata", {}).get("sha256")
+
+
 def cmd_deploy(args) -> int:
     """
     Upload a staged contribution's geopackages under its issue, from the
@@ -546,7 +562,8 @@ def cmd_deploy(args) -> int:
         <stage>/geopackages/nextgen_VPU_XX.gpkg
 
     A key already holding the same file is left as it is, so a rerun
-    resumes; one holding a different file fails.
+    resumes; one holding a different file, or one whose content is unknown,
+    fails.
     """
     stage = Path(args.stage)
     record = json.loads((stage / "record.json").read_text())
@@ -568,20 +585,17 @@ def cmd_deploy(args) -> int:
         return 0
 
     import boto3
-    from botocore.exceptions import ClientError
 
     s3 = boto3.client("s3")
     for path, key in uploads:
         digest = sha256(path)
-        try:
-            existing = s3.head_object(Bucket=BUCKET, Key=key)["Metadata"].get("sha256")
-        except ClientError:
-            existing = None
-        if existing == digest:
+        exists, existing = existing_sha256(s3, key)
+        if exists and existing == digest:
             print(Check("deploy", "pass", f"s3://{BUCKET}/{key} already holds it"))
             continue
-        if existing is not None:
-            print(Check("deploy", "fail", f"s3://{BUCKET}/{key} holds a different file"))
+        if exists:
+            held = "a different file" if existing else "a file with no sha256 to compare"
+            print(Check("deploy", "fail", f"s3://{BUCKET}/{key} holds {held}"))
             return 1
         s3.upload_file(
             str(path), BUCKET, key,
