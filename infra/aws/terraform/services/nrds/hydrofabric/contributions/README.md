@@ -82,6 +82,12 @@ resources/v2.2_hydrofabric/
 The BMI tarballs keep a `VPU_XX` directory because datastreamcli requires the file name
 `ngen-bmi-configs.tar.gz`.
 
+If the merge's deployment fails partway, use **Re-run failed jobs** on that workflow run.
+Uploads resume: a geopackage already holding the same sha256, or a BMI tarball already
+built from the same geopackage, realization and datastreamcli image, is kept and the rest
+are uploaded. A key holding anything else still fails the run, so a rerun never replaces a
+deployed file.
+
 Which files a VPU's executions use is set by hand in each datastream's `main.tf`, where
 `vpu_resource_overrides` replaces the default `geopackage` and `bmi_configs` keys of the
 VPUs it lists. A later contribution for the same VPU gets its own issue directory, so every
