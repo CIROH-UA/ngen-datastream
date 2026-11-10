@@ -139,7 +139,23 @@ def download(url: str, dest: Path) -> Tuple[str, Check]:
     except (urllib.error.URLError, TimeoutError) as exc:
         raise Failed(Check("download", "fail", f"{exc}")) from exc
 
-    return digest.hexdigest(), Check("download", "pass", f"{total} bytes, sha256 {digest.hexdigest()[:16]}...")
+    return digest.hexdigest(), Check("download", "pass", f"{total} bytes, sha256 {digest.hexdigest()}")
+
+
+def check_sha256(spec: dict, sha: str) -> Check:
+    """
+    The package must be the bytes the maintainer reviewed, when the contribution
+    file pins them with an optional `sha256`. last_updated alone pins only the
+    resource's version.
+    """
+    pinned = spec.get("sha256")
+    if pinned is None:
+        return Check("sha256", "pass", "Not pinned; last_updated pins the version")
+    if not isinstance(pinned, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", pinned):
+        return Check("sha256", "fail", "sha256 must be the package's 64 hex digits, quoted")
+    if pinned.lower() != sha:
+        return Check("sha256", "fail", f"The package's sha256 is {sha}, not the pinned {pinned.lower()}")
+    return Check("sha256", "pass", "The pinned package")
 
 
 def wanted(path: Path) -> bool:

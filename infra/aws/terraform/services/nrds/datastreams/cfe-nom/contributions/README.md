@@ -9,12 +9,15 @@ url:          https://www.hydroshare.org/resource/9724840ce2f44072883a099371ca40
 last_updated: 2026-09-02T22:20:14.488159Z
 type:         lumped            # or per_catchment
 subdir:       gage-02369800     # the gage directory, when a package holds several
+sha256:       "<64 hex digits>" # optional: the package that was reviewed
 ```
 
 `last_updated` is the resource's `date_last_updated`, from
 `https://www.hydroshare.org/hsapi/resource/<id>/sysmeta/`. It pins the version
 that was reviewed. An unpublished hydroshare resource is mutable, so this time stamp is
 used to ensure the contributed data file did not change since validation (PR creation). 
+The optional `sha256` pins the package's bytes as well, as the check's `download` line
+prints them; a package that differs fails the check.
 
 ## How a contribution gets here
 

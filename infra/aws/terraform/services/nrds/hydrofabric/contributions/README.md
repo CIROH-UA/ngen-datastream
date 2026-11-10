@@ -10,6 +10,7 @@ issue:        423
 url:          https://www.hydroshare.org/resource/c128e9bf32df4de587b86d698e1b6831
 last_updated: 2026-10-20T20:41:46.431375Z
 vpus:         ["17"]            # every VPU in the package, quoted, as named in the NRDS
+sha256:       "<64 hex digits>" # optional: the package that was reviewed
 ```
 
 The file describes only the contribution. `last_updated` is the resource's
@@ -17,6 +18,9 @@ The file describes only the contribution. `last_updated` is the resource's
 pins the version that was reviewed, as for
 [parameter contributions](../../datastreams/cfe-nom/contributions/README.md). The resource
 must be public for the workflow to read it.
+
+`last_updated` pins the resource's version; the optional `sha256` pins the package's
+bytes, as the check's `download` line prints them, and fails the check if they differ.
 
 ## What is accepted
 

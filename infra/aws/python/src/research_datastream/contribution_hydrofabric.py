@@ -45,6 +45,7 @@ from research_datastream.contribution_common import (
     BUCKET,
     Check,
     Failed,
+    check_sha256,
     check_unchanged,
     download,
     get,
@@ -491,6 +492,9 @@ def build(spec: dict, workdir: Path, only: Optional[str] = None) -> Tuple[List[C
     archive = workdir / "package.bin"
     sha, check = download(spec["url"], archive)
     checks.append(check)
+    checks.append(check_sha256(spec, sha))
+    if not checks[-1].ok:
+        raise Failed(checks[-1])
     candidates, check = find_geopackages(archive, workdir / "extracted", spec["vpus"])
     checks.append(check)
     archive.unlink()
