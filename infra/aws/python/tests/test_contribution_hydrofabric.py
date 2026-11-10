@@ -1,4 +1,9 @@
+import hashlib
+import json
+import shutil
 import sqlite3
+import sys
+import types
 
 import pytest
 
@@ -161,3 +166,101 @@ def test_existing_sha256_tells_absent_from_unknown():
     from botocore.exceptions import ClientError
     with pytest.raises(ClientError):
         hf.existing_sha256(s3, "denied")
+
+
+# ── check_vpu ───────────────────────────────────────────────────────
+
+
+def against(monkeypatch, live):
+    """check_vpu comparing with this file rather than downloading production's."""
+    def fetch_live(vpu, dest):
+        shutil.copy(live, dest)
+        return dest, "live/key.gpkg", [hf.Check(f"live[{vpu}]", "pass", "live/key.gpkg")]
+    monkeypatch.setattr(hf, "fetch_live", fetch_live)
+
+
+def test_check_vpu_passes_a_change(monkeypatch, tmp_path):
+    against(monkeypatch, gpkg(tmp_path / "live.gpkg"))
+    result = hf.check_vpu("17", gpkg(tmp_path / "cand.gpkg", nexus=("nex-1", "nex-3")), tmp_path)
+    assert result["passed"] and result["live_key"] == "live/key.gpkg"
+    assert result["changes"]["nexus_added"] == 1
+    assert any("nwm_to_ngen_map" in s for s in result["stale"])
+    assert not (tmp_path / "live_VPU_17.gpkg").exists()
+
+
+def test_check_vpu_rejects_a_copy_of_production(monkeypatch, tmp_path):
+    against(monkeypatch, gpkg(tmp_path / "live.gpkg"))
+    result = hf.check_vpu("17", gpkg(tmp_path / "cand.gpkg"), tmp_path)
+    assert not result["passed"]
+    assert result["checks"][-1].name == "diff" and "identical" in result["checks"][-1].detail
+
+
+def test_check_vpu_fails_a_missing_layer(monkeypatch, tmp_path):
+    against(monkeypatch, gpkg(tmp_path / "live.gpkg", extra_layer=True))
+    result = hf.check_vpu("17", gpkg(tmp_path / "cand.gpkg"), tmp_path)
+    assert not result["passed"] and "missing layers: lakes" in result["checks"][-1].detail
+
+
+# ── cmd_deploy ──────────────────────────────────────────────────────
+
+
+class Bucket:
+    """boto3's S3 client, over a dict of {key: (bytes, metadata)}."""
+
+    def __init__(self, objects=None):
+        self.objects = dict(objects or {})
+
+    def head_object(self, Bucket, Key):
+        from botocore.exceptions import ClientError
+
+        if Key not in self.objects:
+            raise ClientError({"Error": {"Code": "404"}}, "HeadObject")
+        return {"Metadata": self.objects[Key][1]}
+
+    def upload_file(self, path, bucket, key, ExtraArgs):
+        self.objects[key] = (open(path, "rb").read(), ExtraArgs["Metadata"])
+
+
+def staged(tmp_path, passed=True, vpus=("17",)):
+    stage = tmp_path / "stage"
+    (stage / "geopackages").mkdir(parents=True)
+    for vpu in vpus:
+        (stage / f"geopackages/nextgen_VPU_{vpu}.gpkg").write_bytes(f"gpkg {vpu}".encode())
+    results = [{"vpu": v, "passed": passed} for v in vpus]
+    (stage / "record.json").write_text(json.dumps({"issue": 423, "results": results}))
+    return stage
+
+
+def deploy(monkeypatch, stage, bucket, *flags):
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda name: bucket))
+    return hf.main(["deploy", "--stage", str(stage), *flags])
+
+
+KEY = "resources/v2.2_hydrofabric/geopackages/contributions/423/nextgen_VPU_17.gpkg"
+
+
+def test_deploy_uploads_then_resumes(monkeypatch, tmp_path):
+    stage, bucket = staged(tmp_path, vpus=("16", "17")), Bucket()
+    assert deploy(monkeypatch, stage, bucket) == 0
+    assert bucket.objects[KEY] == (b"gpkg 17", {"sha256": hashlib.sha256(b"gpkg 17").hexdigest()})
+    del bucket.objects[KEY.replace("17", "16")]
+    assert deploy(monkeypatch, stage, bucket) == 0
+    assert len(bucket.objects) == 2
+
+
+def test_deploy_refuses_other_content(monkeypatch, tmp_path, capsys):
+    stage = staged(tmp_path)
+    assert deploy(monkeypatch, stage, Bucket({KEY: (b"other", {"sha256": "0" * 64})})) == 1
+    assert "holds a different file" in capsys.readouterr().out
+    assert deploy(monkeypatch, stage, Bucket({KEY: (b"other", {})})) == 1
+    assert "no sha256" in capsys.readouterr().out
+
+
+def test_deploy_refuses_what_did_not_pass(monkeypatch, tmp_path):
+    bucket = Bucket()
+    assert deploy(monkeypatch, staged(tmp_path, passed=False), bucket) == 1
+    stage = staged(tmp_path / "missing")
+    (stage / "geopackages/nextgen_VPU_17.gpkg").unlink()
+    assert deploy(monkeypatch, stage, bucket) == 1
+    assert deploy(monkeypatch, staged(tmp_path / "dry"), bucket, "--dry-run") == 0
+    assert not bucket.objects
