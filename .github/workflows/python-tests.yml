@@ -1,0 +1,42 @@
+name: Python Tests
+
+# Runs the research_datastream tests. They gate the contribution workflows'
+# uploads, and vpu_resources reads the datastreams' main.tf, so a change to
+# either the package or the NRDS Terraform runs them.
+
+on:
+  pull_request:
+    paths:
+      - 'infra/aws/python/**'
+      - 'infra/aws/terraform/services/nrds/**'
+      - '.github/workflows/python-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/aws/python/**'
+      - 'infra/aws/terraform/services/nrds/**'
+      - '.github/workflows/python-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: research_datastream
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install
+        run: pip install -e 'infra/aws/python[develop]'
+
+      - name: Test
+        working-directory: infra/aws/python
+        run: python -m pytest -v
