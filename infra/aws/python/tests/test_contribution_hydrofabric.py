@@ -4,6 +4,7 @@ import pytest
 
 from research_datastream import contribution_hydrofabric as hf
 from research_datastream.contribution_common import Failed
+from research_datastream.vpu_resources import resources
 
 
 def gpkg(path, vpu="17", nexus=("nex-1", "nex-2"), extra_layer=False):
@@ -108,10 +109,34 @@ def test_paths_and_overrides():
     assert "bmi_configs" not in routing
 
 
-def test_live_key_agrees_on_main():
+MAIN_TF = """
+locals {
+  vpu_resource_overrides = {%s}
+  vpu_resources = {
+    for vpu in var.all_vpus : vpu => merge({
+      geopackage = "resources/geopackages/VPU_${vpu}/nextgen_VPU_${vpu}.gpkg"
+    }, try(local.vpu_resource_overrides[vpu], {}))
+  }
+}
+"""
+
+
+def with_main_tf(monkeypatch, overrides):
+    """live_key reading a fixed main.tf per datastream, not the repository's."""
+    texts = {ds: MAIN_TF % overrides.get(ds, "") for ds in hf.GEOPACKAGE_DATASTREAMS}
+    monkeypatch.setattr(hf, "resources", lambda ds, vpu: resources(ds, vpu, texts[ds]))
+
+
+def test_live_key_when_the_datastreams_agree(monkeypatch):
+    with_main_tf(monkeypatch, {})
+    assert hf.live_key("17") == ("resources/geopackages/VPU_17/nextgen_VPU_17.gpkg", None)
+
+
+def test_live_key_warns_when_one_is_overridden(monkeypatch):
+    with_main_tf(monkeypatch, {"lstm_0": '"17" = { geopackage = "contributions/423/nextgen_VPU_17.gpkg" }'})
     key, warning = hf.live_key("17")
-    assert key == "resources/v2.2_hydrofabric/geopackages/VPU_17/nextgen_VPU_17.gpkg"
-    assert warning is None
+    assert key == "resources/geopackages/VPU_17/nextgen_VPU_17.gpkg"
+    assert warning.status == "warn" and "lstm_0 runs contributions/423/nextgen_VPU_17.gpkg" in warning.detail
 
 
 class FakeS3:
