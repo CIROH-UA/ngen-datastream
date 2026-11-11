@@ -10,6 +10,7 @@ body:
 
         **Adding a new scheduled pipeline?** Use *Propose a New Datastream* instead.
         **Contributing calibrated parameters?** Use *Contribute Calibrated Parameters*.
+        **Replacing a VPU geopackage?** Use *Contribute a Hydrofabric Update*.
         **Changing forcing processing?** Open the issue in [forcingprocessor](https://github.com/CIROH-UA/forcingprocessor/issues/new?template=forcing_contribution.yml).
         **Requesting different execution metadata?** Open a [Request Execution Metadata](https://github.com/CIROH-UA/datastreamcli/issues/new?template=metadata_request.yml) issue in datastreamcli.
 

@@ -5,6 +5,10 @@ name: Datastream VPU Test
 # pull request instead of in the nightly runs. The executions are the ones
 # Terraform would schedule (read from a plan), pinned to a past date and writing
 # under test/cicd/vpu-test/, so any datastream module is tested the same way.
+#
+# Other workflows call it to run inputs under test the way production would:
+# `overrides` swaps a candidate geopackage, BMI tarball or realization into the
+# executions (see research_datastream/vpu_test.py).
 
 on:
   pull_request:
@@ -30,9 +34,34 @@ on:
       date:
         description: YYYYMMDD to simulate (blank for the latest day with forcing)
         required: false
+  workflow_call:
+    inputs:
+      datastreams:
+        description: Datastream directories under services/nrds/datastreams, space separated
+        type: string
+        required: true
+      run_types:
+        type: string
+        default: short_range
+      vpus:
+        description: VPUs, space separated (blank for all)
+        type: string
+        default: ''
+      date:
+        type: string
+        default: ''
+      overrides:
+        description: "'DATASTREAM FLAG VPU VALUE' lines, e.g. '* -g 17 s3://bucket/test/nextgen_VPU_17.gpkg'"
+        type: string
+        default: ''
+    outputs:
+      matrix:
+        description: The executions run, as JSON; [] when no selected VPU is scheduled
+        value: ${{ jobs.prepare.outputs.matrix }}
 
+# A caller's run is grouped apart from this workflow's own on the same ref.
 concurrency:
-  group: datastream-vpu-test-${{ github.ref }}
+  group: datastream-vpu-test-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -65,7 +94,7 @@ jobs:
         id: ds
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ -n "${{ inputs.datastreams }}" ]]; then
             DS="${{ inputs.datastreams }}"
           else
             git fetch --no-tags origin "${{ github.base_ref }}"
@@ -111,8 +140,10 @@ jobs:
         id: select
         env:
           PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src
+          OVERRIDES: ${{ inputs.overrides }}
         run: |
           set -euo pipefail
+          printf '%s\n' "$OVERRIDES" > "${{ runner.temp }}/overrides.txt"
           for DS in ${{ steps.ds.outputs.list }}; do
             python -m research_datastream.vpu_test select "${{ runner.temp }}/plan.json" "$DS" \
               --main-tf "$TF_DIR/main.tf" \
@@ -120,14 +151,15 @@ jobs:
               --run-types '${{ inputs.run_types || 'short_range' }}' \
               --vpus '${{ inputs.vpus }}' \
               --date '${{ inputs.date }}' \
+              --overrides "${{ runner.temp }}/overrides.txt" \
               --run-id "${{ github.run_id }}-${{ github.run_attempt }}" > "${{ runner.temp }}/matrix_$DS.json"
           done
           MATRIX=$(cat "${{ runner.temp }}"/matrix_*.json | jq -cs 'add')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           {
-            echo "| Datastream | Run type | VPU | Schedule | Date |"
-            echo "|---|---|---|---|---|"
-            echo "$MATRIX" | jq -r '.[] | "| \(.datastream) | \(.run_type) | \(.vpu) | `\(.schedule)` | \(.date) |"'
+            echo "| Datastream | Run type | VPU | Schedule | Date | Overrides |"
+            echo "|---|---|---|---|---|---|"
+            echo "$MATRIX" | jq -r '.[] | "| \(.datastream) | \(.run_type) | \(.vpu) | `\(.schedule)` | \(.date) | \(.overrides | map("`\(.)`") | join("<br>")) |"'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4

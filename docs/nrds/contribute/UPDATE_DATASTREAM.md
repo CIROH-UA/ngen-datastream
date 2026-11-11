@@ -7,7 +7,6 @@ The sections below describe the parts of a running datastream that are open to c
 ## Calibrated Parameters
 
 The NRDS configures its simulations with the NextGen realization file. By default it calculates model parameters from the hydrofabric, which means **the parameters currently running are largely uncalibrated**.
-
 Community contributed parameters are used in the next and all executions following updating of the public realization files in AWS s3 storage. Proposing and accepting are decoupled steps, so submitting has no effect on the running system until the parameters are accepted.
 
 ### Submitting
@@ -28,7 +27,7 @@ Parameters for the same catchments may arrive from more than one contributor. Wh
 
 ## Realization Files
 
-The realization file specifies which [BMI](https://doi.org/10.21105/joss.02317)-compliant model components execute in each catchment, how variables are mapped between them, and what runtime parameters apply. Switching a datastream from one formulation to another is accomplished by swapping the realization file referenced in the execution specification, with no infrastructure change.
+The realization file specifies which [BMI](https://doi.org/10.21105/joss.02317)-compliant model components execute in each catchment, how variables are mapped between them, and what runtime parameters apply.
 
 Use the [Propose a Datastream Update](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=update_datastream.yml) template. Contributions here include reconfigured variable mappings, adjusted runtime parameters, and mosaic configurations that apply different formulations across different parts of a domain. NextGen supports heterogeneous mosaic formulations within a single realization. No deployed NRDS datastream exercises this, and the case for diagnostic model selection across CONUS is made in [Johnson (2023)](https://doi.org/10.1029/2023JD038534). A well-motivated mosaic configuration would be a novel contribution.
 
@@ -84,16 +83,21 @@ Getting a model into NGIAB for the first time is a separate path. See [NEW_DATAS
 
 ## Hydrofabric
 
-The hydrofabric is the spatial substrate of every NextGen simulation: catchment polygons, nexus locations, and the connectivity defining how water moves between them. The NRDS currently runs on Lynker Spatial hydrofabric v2.2, and the version is recorded in the execution metadata of every simulation.
+The hydrofabric defines catchment and river network topology and characteristics for every NextGen simulation: catchment polygons, nexus locations, and the connectivity defining how water moves between them. The NRDS currently runs on Lynker Spatial hydrofabric v2.2, and the version is recorded in the execution metadata of every simulation.
 
 The hydrofabric evolves, in both the software and the physical sense. Different versions imply different catchment definitions, different drainage areas, and therefore different model behavior, and the landscape itself changes through storms and human infrastructure. Each release improves on the last. The NRDS tracks new versions, which makes it a natural venue for demonstrating what a hydrofabric update does to continental-scale simulation output.
 
-**Hydrofabric contributions are made upstream**, and the NRDS inherits them:
+**Lasting hydrofabric contributions are made upstream**, and the NRDS inherits them:
 
 - **[lynker-spatial/community.fabric](https://github.com/lynker-spatial/community.fabric)** is the path for changes intended for long-term inclusion in the NextGen hydrofabric. Structured issue templates cover geometry corrections, coordinate fixes, and proposals to integrate new datasets. Reports should reference the reference fabric identifiers.
 - **[CIROH-UA/community_hf_patcher](https://github.com/CIROH-UA/community_hf_patcher)** is the CIROH Community Hydrofabric, a fork of v2.2 carrying patches that improve compatibility with CIROH projects, pending hydrofabric v3.
 
-A hydrofabric version change carries work on the NRDS side. Model configurations are derived per hydrofabric version and are regenerated with each release, and contributed parameters apply to the version they were calibrated against. This is why parameter submissions state their hydrofabric version.
+### Corrections to the NRDS copy of a VPU
 
+The NRDS runs its own copy of each VPU's geopackage, and a correction can be needed there before an upstream release carries it, as when a nexus identifier written in scientific notation stopped t-route on VPU 17 ([#199](https://github.com/CIROH-UA/ngen-datastream/issues/199)).
+
+Open a [Contribute a Hydrofabric Update](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=hydrofabric_contribution.yml) issue with a public HydroShare resource holding the corrected geopackages, one per VPU. Each covers one complete VPU, started from the NRDS copy and keeping every layer and column it has. Subsets are not accepted.
+
+A maintainer then opens a pull request that checks each geopackage against the one production runs, builds its BMI configurations, and runs it in a short-range execution of each datastream that schedules its VPU, on production infrastructure. The pull request reports what changed and which other derived inputs, such as forcing weights, would have to be regenerated with it. Merging uploads the geopackages and their BMI configurations beside the originals, which are kept, and a follow-up pull request points that VPU's executions at them. The process is described in [hydrofabric/contributions](../../../infra/aws/terraform/services/nrds/hydrofabric/contributions/README.md).
 ---
 

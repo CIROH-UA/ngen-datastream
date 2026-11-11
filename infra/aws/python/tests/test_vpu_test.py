@@ -1,11 +1,14 @@
 import json
 
-from research_datastream.vpu_test import module_addresses, pick, rewrite
+import pytest
+
+from research_datastream.vpu_test import load_overrides, module_addresses, override, pick, rewrite
 
 CMD = (
     "runuser -l ec2-user -c 'export DS_TAG=1.7.1 && /home/ec2-user/datastreamcli/scripts/datastream "
     "-s DAILY -n 3 -F s3://bkt/forcings/v2.2_hydrofabric/ngen.DAILY/forcing_short_range/{init}/"
     "ngen.t{init}z.short_range.forcing.f001_f018.VPU_{vpu}.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_{init} "
+    "-N s3://bkt/bmi/VPU_{vpu}/ngen-bmi-configs.tar.gz -g s3://bkt/gpkg/nextgen_VPU_{vpu}.gpkg "
     "--S3_BUCKET bkt --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/short_range/{init}/VPU_{vpu}'"
 )
 
@@ -62,3 +65,40 @@ def test_module_addresses(tmp_path):
     tf.write_text('module "cfe_nom_schedules" {\n  source = "./datastreams/cfe-nom"\n}\n'
                   'module "nrds_orchestration" {\n  source = "../../modules/orchestration"\n}\n')
     assert module_addresses(tf) == {"cfe-nom": "module.cfe_nom_schedules"}
+
+
+def execution(vpu="17"):
+    return json.loads(json.loads(schedule("00", vpu)["target"][0]["input"])["Input"])
+
+
+def test_override_replaces_matching_flags_only(tmp_path):
+    f = tmp_path / "o.txt"
+    f.write_text("# candidate\n* -g 17 s3://t/nextgen_VPU_17.gpkg\ncfe-nom -N 17 s3://t/cfe.tar.gz\n"
+                 "lstm_0 -N 17 s3://t/lstm.tar.gz\n* -g 16 s3://t/16.gpkg\n")
+    ex = execution("17")
+    applied = override(ex, "cfe-nom", "17", load_overrides(f))
+    cmd = ex["commands"][0]
+    assert applied == ["-g s3://t/nextgen_VPU_17.gpkg", "-N s3://t/cfe.tar.gz"]
+    assert "-g s3://t/nextgen_VPU_17.gpkg " in cmd and "-N s3://t/cfe.tar.gz " in cmd
+    assert "lstm" not in cmd and "16.gpkg" not in cmd
+    assert "-F s3://bkt/forcings" in cmd
+
+
+def test_override_after_rewrite_keeps_value_verbatim(tmp_path):
+    ex = rewrite(execution("17"), "20261015", "t")
+    override(ex, "cfe-nom", "17", [("*", "-g", "*", "s3://t/DAILY/nextgen_VPU_17.gpkg")])
+    assert "-g s3://t/DAILY/nextgen_VPU_17.gpkg " in ex["commands"][0]
+
+
+def test_override_wildcard_skips_absent_flag_named_one_fails():
+    ex = execution("17")
+    assert override(ex, "routing-only", "17", [("*", "-R", "17", "x")]) == []
+    with pytest.raises(SystemExit):
+        override(ex, "cfe-nom", "17", [("cfe-nom", "-R", "17", "x")])
+
+
+def test_load_overrides_rejects_malformed(tmp_path):
+    f = tmp_path / "o.txt"
+    f.write_text("cfe-nom 17 s3://x\n")
+    with pytest.raises(SystemExit):
+        load_overrides(f)
