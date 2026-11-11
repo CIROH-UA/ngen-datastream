@@ -5,6 +5,17 @@ set -e
 REGION="us-east-1"
 INSTANCE_TYPE="t4g.large"
 
+# Always terminate the builder on exit (success OR failure) so a mid-run failure
+# (e.g. the AMI wait timing out) can't leave an orphaned instance billing EBS.
+INSTANCE_ID=""
+cleanup() {
+  if [ -n "$INSTANCE_ID" ]; then
+    echo "cleanup: terminating builder instance $INSTANCE_ID" >&2
+    aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
 # Get the latest Amazon Linux 2023 ARM64 AMI ID dynamically
 BASE_AMI=$(aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 --region "$REGION" --query "Parameter.Value" --output text)
 
@@ -45,6 +56,11 @@ USER_DATA_VARS
 
 # Add the rest of the setup script
 cat >> /tmp/user_data_script.sh << 'USER_DATA_SETUP'
+# Fail fast: any setup error aborts before the self-stop below, so the builder
+# never stops, the poll times out, and the build fails instead of imaging a
+# half-provisioned machine.
+set -euo pipefail
+
 echo "Updating system packages..."
 dnf update -y
 
@@ -97,6 +113,9 @@ docker pull zwills/merkdir
 
 echo "=== Setup completed successfully at $(date) ===" > /var/log/setup-complete
 echo "Setup completed successfully!"
+
+# Self-stop on completion so the builder polls for 'stopped' instead of blind-sleeping.
+shutdown -h now
 USER_DATA_SETUP
 
 # Read the complete user data script
@@ -121,13 +140,21 @@ echo "Instance ID: $INSTANCE_ID"
 echo "Waiting for instance to be running..."
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
 
-echo "Waiting 20 minutes for setup to complete..."
-sleep 1200  # 10 minutes for setup
-
-# Stop instance
-echo "Stopping instance..."
-aws ec2 stop-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/null
-aws ec2 wait instance-stopped --region "$REGION" --instance-ids "$INSTANCE_ID"
+echo "Waiting for setup to finish (instance self-stops when done)..."
+set +e
+state=""
+for i in $(seq 1 60); do   # poll every 30s, cap 30 min
+  state=$(aws ec2 describe-instances --region "$REGION" --instance-ids "$INSTANCE_ID" \
+          --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null)
+  echo "[$((i*30))s] state=$state"
+  [ "$state" = "stopped" ] && break
+  sleep 30
+done
+set -e
+if [ "$state" != "stopped" ]; then
+  echo "setup did not complete within 30m (trap will terminate the builder)"
+  exit 1
+fi
 
 # Create AMI
 echo "Creating AMI: $AMI_NAME"
@@ -141,15 +168,26 @@ AMI_ID=$(aws ec2 create-image \
 
 echo "AMI ID: $AMI_ID"
 
-# Wait for AMI
+# Wait for the AMI to be available. (The old `aws ec2 wait image-available` capped
+# at ~10 min and, under set -e, aborted before cleanup — orphaning the builder.
+# Longer cap here, and the EXIT trap guarantees teardown either way.)
 echo "Waiting for AMI to be available..."
-aws ec2 wait image-available --region "$REGION" --image-ids "$AMI_ID"
+set +e
+img_state=""
+for i in $(seq 1 60); do   # cap 30 min
+  img_state=$(aws ec2 describe-images --region "$REGION" --image-ids "$AMI_ID" \
+              --query 'Images[0].State' --output text 2>/dev/null)
+  echo "[$((i*30))s] ami=$img_state"
+  [ "$img_state" = "available" ] && break
+  sleep 30
+done
+set -e
+if [ "$img_state" != "available" ]; then
+  echo "AMI did not become available within 30m"
+  exit 1
+fi
 
-# Cleanup
-echo "Terminating instance..."
-aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/null
-
-# Clean up temporary file
+# Builder instance is terminated by the EXIT trap.
 rm -f /tmp/user_data_script.sh
 
 # Output only the AMI ID
