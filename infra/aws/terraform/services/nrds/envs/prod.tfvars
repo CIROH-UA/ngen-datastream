@@ -35,3 +35,5 @@ environment_suffix  = "prod"
 # S3
 s3_bucket    = "ciroh-community-ngen-datastream"
 qkrig_ami_id = "ami-0dd297f1f6c52facb"
+
+nwm_routing_ami_id = "ami-037115c2affd225a6"

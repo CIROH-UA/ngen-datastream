@@ -94,3 +94,8 @@ variable "s3_bucket" {
   description = "S3 bucket name for datastream resources and outputs"
   default     = "ciroh-community-ngen-datastream"
 }
+
+variable "nwm_routing_ami_id" {
+  description = "AMI ID for nwm-routing EC2 instances (datastream AMI with docker + NGIAB + merkdir pre-pulled)"
+  default     = "ami-037115c2affd225a6"
+}
