@@ -10,7 +10,8 @@ vpu_resources locals of the datastream's main.tf: the defaults merged with any
 vpu_resource_overrides entry. A datastream without BMI configurations prints
 `-` in that column. `settings` prints the datastreamcli tag (`ds_tag=`) and the
 realization (`realization=`, with `${vpu}` left for each VPU to fill) its
-execution template runs.
+execution template runs, and the LSTM ensemble members its BMI configurations
+are built with (`lstm_ensembles=`, blank for a datastream without LSTM).
 
 Author: Jordan Laser
 jlaser@lynker.com
@@ -29,6 +30,9 @@ NRDS = Path(__file__).resolve().parents[3] / "terraform/services/nrds"
 
 BLOCK = r'\{((?:\s*\w+\s*=\s*"[^"]*")*)\s*\}'
 
+# datastreamcli -L members each datastream's tarballs carry; executions never generate them.
+LSTM_ENSEMBLES = {"lstm_0": "45"}
+
 
 def resources(datastream: str, vpu: str, main_tf: Optional[str] = None) -> Dict[str, str]:
     """{name: S3 key} for one VPU, e.g. {"geopackage": ..., "bmi_configs": ...}."""
@@ -44,7 +48,7 @@ def resources(datastream: str, vpu: str, main_tf: Optional[str] = None) -> Dict[
 
 
 def settings(datastream: str, template: Optional[str] = None) -> Dict[str, str]:
-    """{"ds_tag": ..., "realization": ...} from the datastream's execution template."""
+    """{"ds_tag": ..., "realization": ...} from the datastream's execution template, with its "lstm_ensembles"."""
     if template is None:
         paths = sorted((NRDS / "datastreams" / datastream / "templates").glob("*.tpl"))
         if not paths:
@@ -54,7 +58,11 @@ def settings(datastream: str, template: Optional[str] = None) -> Dict[str, str]:
     realization = re.search(r"(?<!\S)-R\s+([^\s']+)", template)
     if not tag or not realization:
         raise SystemExit(f"{datastream}: the template has no DS_TAG or -R")
-    return {"ds_tag": tag.group(1), "realization": realization.group(1).replace("${s3_bucket}", BUCKET)}
+    return {
+        "ds_tag": tag.group(1),
+        "realization": realization.group(1).replace("${s3_bucket}", BUCKET),
+        "lstm_ensembles": LSTM_ENSEMBLES.get(datastream, ""),
+    }
 
 
 def s3_uri(key: str) -> str:
@@ -82,7 +90,7 @@ def main(argv=None) -> None:
     u.add_argument("vpus", nargs="+")
     u.set_defaults(func=cmd_uris)
 
-    s = sub.add_parser("settings", help="print the template's ds_tag and realization")
+    s = sub.add_parser("settings", help="print the template's ds_tag, realization and LSTM ensemble members")
     s.add_argument("datastream", help="directory under services/nrds/datastreams")
     s.set_defaults(func=cmd_settings)
 
