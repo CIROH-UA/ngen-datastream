@@ -87,6 +87,8 @@ def run(a):
         # The divides whose entries the contribution changes; troute reports cat-N's flowpath as feature_id N.
         info["features"] = [int(k[4:]) for k, v in json.load(open(a.realization))["catchments"].items() if v != old.get(k)]
     ex["commands"] = [cmd]
+    # Retries wait hours for late forcings, which a past date never needs, and outlive the workflow's credentials.
+    ex["run_options"]["n_retries_allowed"] = 0
     ex["instance_parameters"]["TagSpecifications"][0]["Tags"][0]["Value"] = f"outputs_diff_{a.key}"  # the instance Name
     json.dump(info, open("run_info.json", "w"))
     sfn = boto3.client("stepfunctions")

@@ -34,7 +34,7 @@ datastreamcli, so changes to other datastreams get no suggestion.
    `test/outputs_diff/<run>/<target>`. For a contribution,
    `research_datastream.contribution_parameters check` builds the merged realization.
    That realization is uploaded beside the output, and `-R` points to it.
-3. The execution runs on the production state machine.
+3. The execution runs on the production state machine, without retries.
 4. The two troute outputs are joined on `feature_id`, `time` and `type`, and compared with
    `numpy.isclose`. For a contribution, the comment also counts the contributed
    catchments whose flowpaths changed (troute reports `cat-N`'s flowpath as `feature_id`
