@@ -9,11 +9,12 @@ request. The check is informational: only an invalid input fails the run.
 ## When to run it
 
 Outputs Diff only runs manually: from the Actions tab, **Run workflow** on the branch
-simulates a chosen datastream on one VPU or `all` of them, or a contribution file.
+simulates a chosen datastream on one VPU or `all` of them, or a parameter contribution.
 
 | Input | Accepted |
 |---|---|
 | `datastream`, `vpu` | a VPU the datastream runs (its `config/` instance types), or `all` |
+| `contribution` | the number of an open `[Parameters]` issue with a `datastreams/<datastream>/contributions/<issue>.yml` on the branch; it overrides `datastream` and `vpu` |
 | `baseline_date`, `init` | `YYYYMMDD` (blank = yesterday) and one of the datastream's short_range init cycles |
 
 `.github/workflows/outputs-diff-hint.yml` runs on pull requests and starts nothing on AWS.

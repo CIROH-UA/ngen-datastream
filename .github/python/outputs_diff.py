@@ -30,8 +30,11 @@ def target(ds, vpu="", label="", path=""):  # a manual run names one; a pull req
                 label=label or f"`{ds}` contribution `{os.path.basename(path)}`")
 
 def targets(a):
-    if a.contribution:
-        found = [target(a.contribution.split("/")[-3], path=a.contribution)]
+    if a.contribution:  # an issue number, resolved to the datastream's contribution file
+        paths = glob.glob(f"{NRDS}/datastreams/*/contributions/{a.contribution}.yml") if a.contribution.isdigit() else []
+        if len(paths) != 1:
+            sys.exit(f"contribution {a.contribution!r} must be the issue number of one datastreams/*/contributions/<issue>.yml")
+        found = [target(paths[0].split("/")[-3], path=paths[0])]
     elif a.datastream:
         vpus = list(config(a.datastream)["instance_types"])
         if a.vpu != "all" and a.vpu not in vpus:

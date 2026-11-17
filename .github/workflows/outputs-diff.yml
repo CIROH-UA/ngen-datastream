@@ -15,11 +15,11 @@ on:
         type: choice
         default: all
         options: [all, '01', '02', 03N, 03S, 03W, '04', '05', '06', '07', '08', '09', 10L, 10U, '11', '12', '13', '14', '15', '16', '17', '18']
-      contribution:  {description: 'Contribution file to simulate instead of the datastream', default: ''}
+      contribution:  {description: 'Parameter contribution issue number to simulate instead of the datastream', default: ''}
       baseline_date: {description: 'Baseline YYYYMMDD (blank = yesterday)', default: ''}
       init:          {description: 'Short-range init cycle, 00-23', default: '00'}
 
-permissions: {contents: read, id-token: write, pull-requests: write}
+permissions: {contents: read, id-token: write, issues: read, pull-requests: write}
 
 env:
   DIFF: python .github/python/outputs_diff.py
@@ -35,10 +35,19 @@ jobs:
         with: {python-version: '3.12'}
       - id: t
         env:
+          GH_TOKEN: ${{ github.token }}
           DATASTREAM: ${{ inputs.datastream }}
           VPU: ${{ inputs.vpu }}
           CONTRIBUTION: ${{ inputs.contribution }}
         run: |
+          if [ -n "$CONTRIBUTION" ]; then
+            [[ $CONTRIBUTION =~ ^[0-9]+$ ]] || { echo "::error::contribution must be an issue number"; exit 1; }
+            # The issue must be an open parameter contribution.
+            WHY=$(gh api "repos/$GITHUB_REPOSITORY/issues/$CONTRIBUTION" --jq 'if .pull_request then "is a pull request"
+              elif .state != "open" then "is \(.state)" elif (.title | startswith("[Parameters]") | not)
+              then "is not a parameter contribution" else "" end') || WHY="does not exist"
+            [ -z "$WHY" ] || { echo "::error::Issue #$CONTRIBUTION $WHY"; exit 1; }
+          fi
           pip install -q boto3 pandas pyarrow
           T=$($DIFF targets --datastream "$DATASTREAM" --vpu "$VPU" --contribution "$CONTRIBUTION")
           echo "$T" && echo "targets=$T" >> "$GITHUB_OUTPUT"
