@@ -4,12 +4,17 @@
 does it change what the datastream simulates? It runs the change the way production
 does (short_range, init 00 by default) and compares the troute output with production's
 output for the same date and init. Then it comments **Same** or **Different** on the branch's open pull
-request. The check is informational and never fails.
+request. The check is informational: only an invalid input fails the run.
 
 ## When to run it
 
 Outputs Diff only runs manually: from the Actions tab, **Run workflow** on the branch
-simulates a chosen datastream and VPUs, or a contribution file.
+simulates a chosen datastream on one VPU or `all` of them, or a contribution file.
+
+| Input | Accepted |
+|---|---|
+| `datastream`, `vpu` | a VPU the datastream runs (its `config/` instance types), or `all` |
+| `baseline_date`, `init` | `YYYYMMDD` (blank = yesterday) and one of the datastream's short_range init cycles |
 
 `.github/workflows/outputs-diff-hint.yml` runs on pull requests and starts nothing on AWS.
 When a pull request changes one of these files under `infra/aws/terraform/services/nrds/`,

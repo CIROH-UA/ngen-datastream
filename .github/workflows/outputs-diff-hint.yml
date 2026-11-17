@@ -45,7 +45,7 @@ jobs:
             echo
             echo "$T" | jq -r --arg ref "$HEAD" '.[] | "- \(.label):\n  `gh workflow run outputs-diff.yml --ref \($ref) " +
               (if .contribution != "" then "-f contribution=\(.contribution)"
-               else "-f datastream=\(.datastream) -f vpus=\(.vpu)" end) + "`"'
+               else "-f datastream=\(.datastream) -f vpu=\(.vpu)" end) + "`"'
           } > comment.md
           cat comment.md >> "$GITHUB_STEP_SUMMARY"
           # One comment per pull request, updated on each push.

@@ -3,14 +3,18 @@ name: Outputs Diff
 # Runs a change to a datastream the way production runs it (short_range, at a chosen date
 # and init) and comments on the pull request whether its troute output matches production's
 # for the same run. A parameter contribution runs with its merged realization in place of the
-# live one. Informational: it never fails. Run manually; Outputs Diff Hint suggests a run
-# on pull requests that may change a datastream. See docs/nrds/OUTPUTS_DIFF.md.
+# live one. Informational: only an invalid input fails it. Run manually; Outputs Diff Hint
+# suggests a run on pull requests that may change a datastream. See docs/nrds/OUTPUTS_DIFF.md.
 
 on:
   workflow_dispatch:
     inputs:
       datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
-      vpus:          {description: Comma-separated VPUs, default: '01'}
+      vpu:
+        description: VPU (one the datastream runs)
+        type: choice
+        default: all
+        options: [all, '01', '02', 03N, 03S, 03W, '04', '05', '06', '07', '08', '09', 10L, 10U, '11', '12', '13', '14', '15', '16', '17', '18']
       contribution:  {description: 'Contribution file to simulate instead of the datastream', default: ''}
       baseline_date: {description: 'Baseline YYYYMMDD (blank = yesterday)', default: ''}
       init:          {description: 'Short-range init cycle, 00-23', default: '00'}
@@ -30,14 +34,13 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - id: t
-        continue-on-error: true
         env:
           DATASTREAM: ${{ inputs.datastream }}
-          VPUS: ${{ inputs.vpus }}
+          VPU: ${{ inputs.vpu }}
           CONTRIBUTION: ${{ inputs.contribution }}
         run: |
           pip install -q boto3 pandas pyarrow
-          T=$($DIFF targets --datastream "$DATASTREAM" --vpus "$VPUS" --contribution "$CONTRIBUTION")
+          T=$($DIFF targets --datastream "$DATASTREAM" --vpu "$VPU" --contribution "$CONTRIBUTION")
           echo "$T" && echo "targets=$T" >> "$GITHUB_OUTPUT"
 
   diff:

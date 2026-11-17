@@ -30,9 +30,13 @@ def target(ds, vpu="", label="", path=""):  # a manual run names one; a pull req
                 label=label or f"`{ds}` contribution `{os.path.basename(path)}`")
 
 def targets(a):
-    if a.contribution or a.datastream:
-        found = [target(a.contribution.split("/")[-3], path=a.contribution)] if a.contribution else \
-                [target(a.datastream, v.strip(), f"`{a.datastream}`") for v in a.vpus.split(",")]
+    if a.contribution:
+        found = [target(a.contribution.split("/")[-3], path=a.contribution)]
+    elif a.datastream:
+        vpus = list(config(a.datastream)["instance_types"])
+        if a.vpu != "all" and a.vpu not in vpus:
+            sys.exit(f"{a.datastream} has no VPU {a.vpu!r}; it runs {', '.join(vpus)}")
+        found = [target(a.datastream, v, f"`{a.datastream}`") for v in (vpus if a.vpu == "all" else [a.vpu])]
     else:
         files, changed, found = sh("git", "diff", "--name-only", "--diff-filter=d", f"{a.base}...HEAD").split(), {}, []
         for f in files:
@@ -118,7 +122,7 @@ def compare(a):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("cmd", choices=["targets", "run", "compare", "uris"])
-    for o in "base datastream vpus vpu contribution key label run-id date init realization".split():
+    for o in "base datastream vpu contribution key label run-id date init realization".split():
         p.add_argument(f"--{o}", default="")
     a = p.parse_args()
     globals()[a.cmd](a)
