@@ -75,9 +75,10 @@ def run(a):
     (cmd,) = ex["commands"]
     daily, live = re.search(r"--S3_PREFIX\s+([^\s']+)", cmd)[1], re.search(r" -R\s+([^\s']+)", cmd)[1]
     test = f"test/outputs_diff/{a.run_id}/{a.key}"
-    # With -s DAILY, datastreamcli reads -e as the run date. The forcing is pinned too: with no DAILY in the
-    # test prefix, streamcommander would fill the forcing's ngen.DAILY with the day the test runs.
-    cmd = re.sub(r"(-F\s+\S*)ngen\.DAILY", rf"\1ngen.{date}", cmd.replace("-s DAILY", f"-s DAILY -e {date}0000"))
+    # With -s DAILY, datastreamcli reads -e as the run date. Every other DAILY (forcing, restart) is pinned
+    # to the same date, as vpu_test.rewrite does.
+    cmd = re.sub(r"(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])", date, cmd.replace("-s DAILY", "-s @START@"))
+    cmd = cmd.replace("-s @START@", f"-s DAILY -e {date}0000")
     cmd = re.sub(r"--S3_PREFIX\s+[^\s']+", f"--S3_PREFIX {test}", cmd)
     info = dict(vpu=a.vpu, date=date, init=init, prod_prefix=daily.replace("DAILY", date), test_prefix=test)
     if a.realization:  # a contribution runs its merged realization in place of the live one
