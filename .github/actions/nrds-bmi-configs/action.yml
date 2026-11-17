@@ -48,7 +48,6 @@ runs:
       run: |
         set -euo pipefail
         PY=/datastreamcli/src/datastreamcli
-        PKL="noah-owp-modular-init.namelist.input.pkl"
 
         # The excludes of the version's own `tar ... > $NGENCON_TAR`.
         mapfile -t EXCLUDES < <(grep -m1 'tar -c.*NGENCON_TAR' "$WORKDIR/datastreamcli/scripts/datastream" \
@@ -79,9 +78,8 @@ runs:
           { sha256sum "$CONFIG/$GPKG" "$CONFIG/realization.json" | cut -d' ' -f1; echo "$IMAGE"; } \
             | sha256sum | cut -d' ' -f1 > "$OUT/VPU_$VPU/inputs.sha256"
 
-          gen "$PY/noahowp_pkl.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config
           gen "$PY/ngen_configs_gen.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config \
-            --pkl_file "/mounted_dir/config/$PKL" --realization /mounted_dir/config/realization.json \
+            --realization /mounted_dir/config/realization.json \
             --lstm_ensembles 0
 
           TARBALL="$OUT/VPU_$VPU/ngen-bmi-configs.tar.gz"
