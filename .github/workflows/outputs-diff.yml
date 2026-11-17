@@ -81,10 +81,15 @@ jobs:
 
       - name: Simulate
         id: run
+        env:
+          DATASTREAM: ${{ matrix.datastream }}
+          VPU: ${{ steps.build.outputs.vpu || matrix.vpu }}
+          DATE: ${{ inputs.baseline_date }}
+          INIT: ${{ inputs.init }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          $DIFF run --key "$KEY" --datastream '${{ matrix.datastream }}' \
-            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' --date '${{ inputs.baseline_date }}' --init '${{ inputs.init }}' \
-            --run-id '${{ github.run_id }}-${{ github.run_attempt }}' ${CONTRIBUTION:+--realization candidate.json}
+          $DIFF run --key "$KEY" --datastream "$DATASTREAM" --vpu "$VPU" --date "$DATE" --init "$INIT" \
+            --run-id "$RUN_ID" ${CONTRIBUTION:+--realization candidate.json}
 
       - name: Compare with production
         run: |
