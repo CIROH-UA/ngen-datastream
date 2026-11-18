@@ -27,6 +27,9 @@ on:
       geopackage_prefix:
         description: Prefix holding nextgen_VPU_XX.gpkg to build from (blank for the geopackages production runs)
         required: false
+      lstm_ensembles:
+        description: LSTM ensemble members as datastreamcli -L takes them, e.g. 45 (blank for the datastream's)
+        required: false
       test:
         description: Run the new configurations through the Datastream VPU Test
         type: boolean
@@ -51,6 +54,10 @@ on:
         type: string
         required: true
       geopackage_prefix:
+        type: string
+        default: ''
+      lstm_ensembles:
+        description: Blank for the datastream's
         type: string
         default: ''
       test:
@@ -111,6 +118,7 @@ jobs:
           S3_PREFIX: ${{ inputs.s3_prefix }}
           VPUS: ${{ inputs.vpus }}
           GPKG_PREFIX: ${{ inputs.geopackage_prefix }}
+          LSTM_ENSEMBLES: ${{ inputs.lstm_ensembles }}
         run: |
           set -euo pipefail
           uri() { local p="${1%/}"; [[ "$p" == s3://* ]] && echo "$p" || echo "s3://$BUCKET/${p#/}"; }
@@ -120,6 +128,7 @@ jobs:
           {
             echo "ds_tag=${DS_TAG:-$(setting ds_tag)}"
             echo "realization=$(setting realization)"
+            echo "lstm_ensembles=${LSTM_ENSEMBLES:-$(setting lstm_ensembles)}"
             echo "prefix=$(uri "$S3_PREFIX")"
           } >> "$GITHUB_OUTPUT"
           # shellcheck disable=SC2086  # VPUS is a list
@@ -174,6 +183,7 @@ jobs:
           geopackages: ${{ steps.inputs.outputs.geopackages }}
           realization: ${{ steps.inputs.outputs.realization }}
           ds-tag: ${{ steps.inputs.outputs.ds_tag }}
+          lstm-ensembles: ${{ steps.inputs.outputs.lstm_ensembles }}
           out: ${{ runner.temp }}/bmi_configs
 
       - name: Upload
@@ -184,6 +194,8 @@ jobs:
           GEOPACKAGES: ${{ steps.inputs.outputs.geopackages }}
           GPKG_PREFIX: ${{ inputs.geopackage_prefix }}
           OVERWRITE: ${{ inputs.overwrite }}
+          DS_TAG: ${{ steps.inputs.outputs.ds_tag }}
+          LSTM_ENSEMBLES: ${{ steps.inputs.outputs.lstm_ensembles }}
           OUT: ${{ runner.temp }}/bmi_configs
         run: |
           set -euo pipefail
@@ -227,7 +239,7 @@ jobs:
               echo "| $VPU | \`$GPKG\` | \`$PREFIX/VPU_$VPU/ngen-bmi-configs.tar.gz\` |"
             done <<< "$GEOPACKAGES"
             echo
-            echo "Built with datastreamcli ${{ steps.inputs.outputs.ds_tag }}. To deploy, point each VPU's"
+            echo "Built with datastreamcli $DS_TAG${LSTM_ENSEMBLES:+, LSTM ensemble members $LSTM_ENSEMBLES}. To deploy, point each VPU's"
             echo "\`bmi_configs\` in \`vpu_resource_overrides\` of \`datastreams/$DATASTREAM/main.tf\` at its tarball."
           } >> "$GITHUB_STEP_SUMMARY"
           # The VPU test swaps these in; geopackages only when they are not production's.
