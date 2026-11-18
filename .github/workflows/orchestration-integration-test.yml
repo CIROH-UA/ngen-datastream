@@ -7,6 +7,8 @@ on:
       - 'infra/aws/terraform/modules/orchestration/**'
       - 'infra/aws/terraform/services/nrds/iam_*.tf'
       - '.github/workflows/orchestration-integration-test.yml'
+      - '.github/orchestration-test/test-execution-payload.json'
+      - 'ami_version.yml'
   workflow_dispatch:
 
 concurrency:
@@ -100,17 +102,27 @@ jobs:
         run: |
           PAYLOAD="${{ github.workspace }}/${{ env.CI_CONFIG }}/test-execution-payload.json"
           PROD_VARS="${{ github.workspace }}/infra/aws/terraform/services/nrds/envs/prod.tfvars"
+          VERSION_FILE="${{ github.workspace }}/ami_version.yml"
+
           AMI=$(grep cfe_nom_ami_id "$PROD_VARS" | grep -o 'ami-[a-z0-9]*')
+          DS_TAG=$(grep '^DS_TAG:' "$VERSION_FILE" | cut -d '"' -f2)
+          NGIAB_TAG=$(grep '^NGIAB_TAG:' "$VERSION_FILE" | cut -d '"' -f2)
 
           jq \
             --arg PROFILE "${{ steps.deploy.outputs.profile }}" \
             --arg AMI "$AMI" \
+            --arg DS_TAG "$DS_TAG" \
+            --arg NGIAB_TAG "$NGIAB_TAG" \
             '
             .instance_parameters.IamInstanceProfile.Name = $PROFILE |
-            .instance_parameters.ImageId = $AMI
+            .instance_parameters.ImageId = $AMI |
+            .commands |= map(
+              gsub("DS_TAG=[^ ]+"; "DS_TAG=" + $DS_TAG) |
+              gsub("NGIAB_TAG=[^ ]+"; "NGIAB_TAG=" + $NGIAB_TAG)
+            )
             ' "$PAYLOAD" > /tmp/exec_input.json
 
-          echo "Payload built (AMI=$AMI):"
+          echo "Payload built (AMI=$AMI, DS_TAG=$DS_TAG, NGIAB_TAG=$NGIAB_TAG):"
           jq '.commands[0][:200]' /tmp/exec_input.json
 
       # ── Execute and monitor ────────────────────────────────────────
