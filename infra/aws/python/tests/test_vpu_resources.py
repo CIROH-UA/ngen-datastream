@@ -44,4 +44,11 @@ def test_settings():
     assert settings("cfe-nom", tpl) == {
         "ds_tag": "1.7.1",
         "realization": "https://ciroh-community-ngen-datastream.s3.amazonaws.com/realizations/cfe_nom/realization_VPU_${vpu}.json",
+        "lstm_ensembles": "",
     }
+
+
+def test_settings_lstm_ensembles():
+    # The members of production's lstm_0 tarballs (datastreamcli LSTM models 4 and 5).
+    assert settings("lstm_0")["lstm_ensembles"] == "45"
+    assert settings("cfe-nom")["lstm_ensembles"] == ""

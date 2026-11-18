@@ -17,6 +17,10 @@ inputs:
   ds-tag:
     description: datastreamcli version, e.g. 1.7.1; selects the awiciroh/datastream image and the tarball exclusions
     required: true
+  lstm-ensembles:
+    description: LSTM ensemble members as datastreamcli's -L takes them, e.g. 45; required when the realization runs LSTM
+    required: false
+    default: ''
   out:
     description: Directory the tarballs are written under
     required: true
@@ -45,10 +49,15 @@ runs:
         WORKDIR: ${{ inputs.workdir }}
         OUT: ${{ inputs.out }}
         IMAGE: awiciroh/datastream:${{ inputs.ds-tag }}
+        LSTM_ENSEMBLES: ${{ inputs.lstm-ensembles }}
       run: |
         set -euo pipefail
         PY=/datastreamcli/src/datastreamcli
         PKL="noah-owp-modular-init.namelist.input.pkl"
+        if [[ -n "$LSTM_ENSEMBLES" && ! "$LSTM_ENSEMBLES" =~ ^[0-9]+$ ]]; then
+          echo "::error::lstm-ensembles must be digits, e.g. 45; got '$LSTM_ENSEMBLES'"
+          exit 1
+        fi
 
         # The excludes of the version's own `tar ... > $NGENCON_TAR`.
         mapfile -t EXCLUDES < <(grep -m1 'tar -c.*NGENCON_TAR' "$WORKDIR/datastreamcli/scripts/datastream" \
@@ -75,14 +84,19 @@ runs:
           rm -rf "$RUN" && mkdir -p "$CONFIG" "$OUT/VPU_$VPU"
           fetch "$SOURCE" "$CONFIG/$GPKG"
           fetch "${REALIZATION//\$\{vpu\}/$VPU}" "$CONFIG/realization.json"
+          # datastreamcli otherwise falls back to member 0, a different model than production's.
+          if grep -q '"bmi_rust"' "$CONFIG/realization.json" && [[ -z "$LSTM_ENSEMBLES" ]]; then
+            echo "::error::The realization runs LSTM; set its ensemble members (lstm-ensembles)."
+            exit 1
+          fi
           # What the tarball is a function of; tar and gzip timestamps make the tarball itself differ.
-          { sha256sum "$CONFIG/$GPKG" "$CONFIG/realization.json" | cut -d' ' -f1; echo "$IMAGE"; } \
+          { sha256sum "$CONFIG/$GPKG" "$CONFIG/realization.json" | cut -d' ' -f1; echo "$IMAGE"; [[ -z "$LSTM_ENSEMBLES" ]] || echo "lstm $LSTM_ENSEMBLES"; } \
             | sha256sum | cut -d' ' -f1 > "$OUT/VPU_$VPU/inputs.sha256"
 
           gen "$PY/noahowp_pkl.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config
           gen "$PY/ngen_configs_gen.py" --hf_file "/mounted_dir/config/$GPKG" --outdir /mounted_dir/config \
             --pkl_file "/mounted_dir/config/$PKL" --realization /mounted_dir/config/realization.json \
-            --lstm_ensembles 0
+            ${LSTM_ENSEMBLES:+--lstm_ensembles "$LSTM_ENSEMBLES"}
 
           TARBALL="$OUT/VPU_$VPU/ngen-bmi-configs.tar.gz"
           tar -czf "$TARBALL" "${EXCLUDES[@]}" -C "$CONFIG" .
