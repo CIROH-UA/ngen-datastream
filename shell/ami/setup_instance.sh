@@ -7,14 +7,14 @@
 #   INCLUDE_FORCING_WEIGHTS  "true" to copy the v2.2 forcing weights to /home/ec2-user/hydrofabric/v2.2
 #
 # When it finishes, it prints "AMI_SETUP_RESULT=success" (or "failed ...") to the
-# EC2 console and powers the instance off. create_ami.sh waits for the instance
-# to stop, reads that line from the console, and only then creates the AMI.
+# EC2 console and leaves the instance running. create_ami.sh watches the console
+# for that line, and only on success creates the AMI from the instance.
 
 set -euo pipefail
 
 export HOME=/root
 
-report_result_and_power_off() {
+report_result() {
   exit_code=$?
   if [ "$exit_code" -eq 0 ]; then
     result="success"
@@ -22,9 +22,8 @@ report_result_and_power_off() {
     result="failed (exit code $exit_code)"
   fi
   echo "AMI_SETUP_RESULT=$result" | tee /dev/console || true
-  poweroff
 }
-trap report_result_and_power_off EXIT
+trap report_result EXIT
 
 # Fetches one commit or tag instead of cloning the whole history, so the AMI stays minimal
 clone_repo_at() {

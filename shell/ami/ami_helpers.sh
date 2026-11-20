@@ -28,54 +28,35 @@ write_user_data() {
   } > "$output_file"
 }
 
-# Usage: wait_for_instance_to_stop INSTANCE_ID TIMEOUT_MINUTES
-wait_for_instance_to_stop() {
-  instance_id=$1
-  timeout_minutes=$2
-  started_at=$(date +%s)
-  while true; do
-    state=$(aws ec2 describe-instances --instance-ids "$instance_id" \
-      --query 'Reservations[0].Instances[0].State.Name' --output text)
-    minutes_waited=$(( ($(date +%s) - started_at) / 60 ))
-    log "$instance_id is $state ($minutes_waited min)"
-
-    if [ "$state" = "stopped" ]; then
-      return 0
-    fi
-    if [ "$state" = "terminated" ] || [ "$state" = "shutting-down" ]; then
-      log "ERROR: $instance_id was terminated before it finished"
-      return 1
-    fi
-    if [ "$minutes_waited" -ge "$timeout_minutes" ]; then
-      log "ERROR: $instance_id did not stop within $timeout_minutes minutes"
-      return 1
-    fi
-    sleep 30
-  done
-}
-
 # Usage: get_console_output INSTANCE_ID
-# Prints what the instance wrote to its serial console 
+# Prints what the instance has written to its console so far.
 get_console_output() {
   aws ec2 get-console-output --instance-id "$1" --latest --query Output --output text | tr -d '\r'
 }
 
-# Usage: read_result_from_console INSTANCE_ID RESULT_NAME
-# Finds the last "RESULT_NAME=..." line in the console and prints the part after "=".
-# Prints "missing" if the line never shows up.
-read_result_from_console() {
+# Usage: wait_for_result_in_console INSTANCE_ID RESULT_NAME TIMEOUT_MINUTES
+# Checks the console every 30 seconds until a "RESULT_NAME=..." line appears and prints the log
+wait_for_result_in_console() {
   instance_id=$1
   result_name=$2
-  # The console can lag a little behind the instance, so try for a few minutes.
-  for attempt in 1 2 3 4 5 6; do
-    result_line=$(get_console_output "$instance_id" | grep -a -o "$result_name=.*" | tail -n 1 || true)
+  timeout_minutes=$3
+  started_at=$(date +%s)
+  while true; do
+    console_output=$(get_console_output "$instance_id") || return 1
+    result_line=$(echo "$console_output" | grep -a -o "$result_name=.*" | tail -n 1 || true)
     if [ -n "$result_line" ]; then
       echo "${result_line#*=}"
       return 0
     fi
+
+    minutes_waited=$(( ($(date +%s) - started_at) / 60 ))
+    if [ "$minutes_waited" -ge "$timeout_minutes" ]; then
+      echo "missing"
+      return 0
+    fi
+    log "$instance_id ($minutes_waited min): $(echo "$console_output" | tail -n 1)" >&2
     sleep 30
   done
-  echo "missing"
 }
 
 # Usage: terminate_instance INSTANCE_ID

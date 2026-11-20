@@ -3,9 +3,10 @@
 #
 #   1. Launch a temporary arm64 instance from the latest Amazon Linux 2023 image,
 #      with setup_instance.sh as its user data.
-#   2. setup_instance.sh installs everything and powers the instance off.
-#   3. Once the instance has stopped, check that setup_instance.sh reported
-#      success, then create the AMI from the stopped instance.
+#   2. setup_instance.sh installs everything, then prints its result to the
+#      instance's console.
+#   3. Watch the console until that result appears. On success, create the AMI
+#      from the instance (AWS restarts it to take a clean snapshot).
 #   4. Terminate the temporary instance (also on failure).
 #
 # Required environment variables:
@@ -63,7 +64,6 @@ build_instance_id=$(aws ec2 run-instances \
   --instance-type "$BUILD_INSTANCE_TYPE" \
   --security-group-ids "$SECURITY_GROUP_ID" \
   --user-data "file://$user_data_file" \
-  --instance-initiated-shutdown-behavior stop \
   --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":$ROOT_VOLUME_GB,\"VolumeType\":\"gp3\"}}]" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=ami-builder-$AMI_NAME},{Key=$WORKFLOW_RUN_TAG_KEY,Value=$WORKFLOW_RUN}]" \
   --query 'Instances[0].InstanceId' --output text)
@@ -72,10 +72,8 @@ log "Build instance: $build_instance_id"
 trap 'terminate_instance "$build_instance_id"' EXIT
 
 echo
-log "Step 3/5: Waiting for setup_instance.sh to finish and power the instance off"
-wait_for_instance_to_stop "$build_instance_id" "$SETUP_TIMEOUT_MINUTES"
-
-setup_result=$(read_result_from_console "$build_instance_id" AMI_SETUP_RESULT)
+log "Step 3/5: Waiting for setup_instance.sh to print its result on the console"
+setup_result=$(wait_for_result_in_console "$build_instance_id" AMI_SETUP_RESULT "$SETUP_TIMEOUT_MINUTES")
 log "setup_instance.sh result: $setup_result"
 if [ "$setup_result" != "success" ]; then
   log "ERROR: setup did not succeed. Last 100 lines of the instance console:"
@@ -84,7 +82,7 @@ if [ "$setup_result" != "success" ]; then
 fi
 
 echo
-log "Step 4/5: Creating the AMI from the stopped instance"
+log "Step 4/5: Creating the AMI from the build instance"
 # Tags record what went into the AMI, so anyone can look it up later.
 # AWS limits tag values to 256 characters.
 tags=$(jq -n -c \

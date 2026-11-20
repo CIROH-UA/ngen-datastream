@@ -77,4 +77,3 @@ else
   result="failed ($failed_checks checks failed)"
 fi
 echo "AMI_CHECK_RESULT=$result" | tee /dev/console
-poweroff

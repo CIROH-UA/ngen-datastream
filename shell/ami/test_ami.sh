@@ -3,7 +3,8 @@
 # Tests a newly built AMI.
 #
 #   1. Launch a small instance from the AMI, with check_instance.sh as its user data.
-#   2. check_instance.sh checks the images, repos and files on the test instance
+#   2. check_instance.sh checks the images, repos and files on the test instance,
+#      then prints its result to the console. Watch the console for that result.
 #   3. Print every PASS/FAIL line, and fail if any check failed.
 #   4. Terminate the test instance (also on failure).
 #
@@ -39,7 +40,6 @@ test_instance_id=$(aws ec2 run-instances \
   --instance-type "$TEST_INSTANCE_TYPE" \
   --security-group-ids "$SECURITY_GROUP_ID" \
   --user-data "file://$user_data_file" \
-  --instance-initiated-shutdown-behavior stop \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=ami-test-$AMI_ID},{Key=$WORKFLOW_RUN_TAG_KEY,Value=$WORKFLOW_RUN}]" \
   --query 'Instances[0].InstanceId' --output text)
 log "Test instance: $test_instance_id"
@@ -47,14 +47,11 @@ log "Test instance: $test_instance_id"
 trap 'terminate_instance "$test_instance_id"' EXIT
 
 echo
-log "Step 2/3: Waiting for check_instance.sh to finish and power the instance off"
-wait_for_instance_to_stop "$test_instance_id" "$CHECK_TIMEOUT_MINUTES"
+log "Step 2/3: Waiting for check_instance.sh to print its result on the console"
+check_result=$(wait_for_result_in_console "$test_instance_id" AMI_CHECK_RESULT "$CHECK_TIMEOUT_MINUTES")
 
 echo
-log "Step 3/3: Reading the results"
-check_result=$(read_result_from_console "$test_instance_id" AMI_CHECK_RESULT)
-
-echo "Checks run on the test instance:"
+log "Step 3/3: Checks run on the test instance:"
 get_console_output "$test_instance_id" | grep -a -o -E "(PASS|FAIL): .*" | awk '!seen[$0]++' || true
 echo
 
