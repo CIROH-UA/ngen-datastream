@@ -2,7 +2,7 @@ locals {
   init_cycles_config_forcing = jsondecode(file("${path.module}/config/execution_forecast_inputs_forcing.json"))
 
   fp_template_path = "${path.module}/templates/execution_forcing_template.json.tpl"
-  fp_vpu_list      = "01,02,03N,03S,03W,04,05,06,07,08,09,10L,10U,11,12,13,14,15,16,18"
+  fp_vpu_list      = "01,02,03N,03S,03W,04,05,06,07,08,09,10L,10U,11,12,13,14,15,16,17,18"
 
   short_range_forcing_config = {
     for init in local.init_cycles_config_forcing.short_range.init_cycles : init => {
