@@ -1,3 +1,9 @@
+data "archive_file" "python_lambda_forcing_checker" {
+  type        = "zip"
+  source_file = "${path.module}/lambdas/forcing_checker/lambda_function.py"
+  output_path = "${path.module}/lambdas/forcing_checker_lambda.zip"
+}
+
 data "archive_file" "python_lambda_starter" {
   type        = "zip"
   source_file = "${path.module}/lambdas/start_ami/lambda_function.py"
@@ -26,6 +32,16 @@ data "archive_file" "python_lambda_stopper" {
   type        = "zip"
   source_file = "${path.module}/lambdas/stopper/lambda_function.py"
   output_path = "${path.module}/lambdas/stopper_lambda.zip"
+}
+
+resource "aws_lambda_function" "forcing_checker_lambda" {
+  function_name    = var.forcing_checker_lambda_name
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/forcing_checker_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_forcing_checker.output_base64sha256
+  timeout          = 60
 }
 
 resource "aws_lambda_function" "starter_lambda" {

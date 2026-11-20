@@ -18,6 +18,7 @@ terraform {
 
 variable "region" {}
 variable "starter_lambda_name" {}
+variable "forcing_checker_lambda_name" {}
 variable "commander_lambda_name" {}
 variable "poller_lambda_name" {}
 variable "checker_lambda_name" {}
