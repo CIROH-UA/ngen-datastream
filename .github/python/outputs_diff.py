@@ -30,9 +30,16 @@ def target(ds, vpu="", label="", path=""):  # a manual run names one; a pull req
                 label=label or f"`{ds}` contribution `{os.path.basename(path)}`")
 
 def targets(a):
-    if a.contribution or a.datastream:
-        found = [target(a.contribution.split("/")[-3], path=a.contribution)] if a.contribution else \
-                [target(a.datastream, v.strip(), f"`{a.datastream}`") for v in a.vpus.split(",")]
+    if a.contribution:  # an issue number, resolved to the datastream's contribution file
+        paths = glob.glob(f"{NRDS}/datastreams/*/contributions/{a.contribution}.yml") if a.contribution.isdigit() else []
+        if len(paths) != 1:
+            sys.exit(f"contribution {a.contribution!r} must be the issue number of one datastreams/*/contributions/<issue>.yml")
+        found = [target(paths[0].split("/")[-3], path=paths[0])]
+    elif a.datastream:
+        vpus = list(config(a.datastream)["instance_types"])
+        if a.vpu != "all" and a.vpu not in vpus:
+            sys.exit(f"{a.datastream} has no VPU {a.vpu!r}; it runs {', '.join(vpus)}")
+        found = [target(a.datastream, v, f"`{a.datastream}`") for v in (vpus if a.vpu == "all" else [a.vpu])]
     else:
         files, changed, found = sh("git", "diff", "--name-only", "--diff-filter=d", f"{a.base}...HEAD").split(), {}, []
         for f in files:
@@ -75,9 +82,10 @@ def run(a):
     (cmd,) = ex["commands"]
     daily, live = re.search(r"--S3_PREFIX\s+([^\s']+)", cmd)[1], re.search(r" -R\s+([^\s']+)", cmd)[1]
     test = f"test/outputs_diff/{a.run_id}/{a.key}"
-    # With -s DAILY, datastreamcli reads -e as the run date. The forcing is pinned too: with no DAILY in the
-    # test prefix, streamcommander would fill the forcing's ngen.DAILY with the day the test runs.
-    cmd = re.sub(r"(-F\s+\S*)ngen\.DAILY", rf"\1ngen.{date}", cmd.replace("-s DAILY", f"-s DAILY -e {date}0000"))
+    # With -s DAILY, datastreamcli reads -e as the run date. Every other DAILY (forcing, restart) is pinned
+    # to the same date, as vpu_test.rewrite does.
+    cmd = re.sub(r"(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])", date, cmd.replace("-s DAILY", "-s @START@"))
+    cmd = cmd.replace("-s @START@", f"-s DAILY -e {date}0000")
     cmd = re.sub(r"--S3_PREFIX\s+[^\s']+", f"--S3_PREFIX {test}", cmd)
     info = dict(vpu=a.vpu, date=date, init=init, prod_prefix=daily.replace("DAILY", date), test_prefix=test)
     if a.realization:  # a contribution runs its merged realization in place of the live one
@@ -86,6 +94,8 @@ def run(a):
         # The divides whose entries the contribution changes; troute reports cat-N's flowpath as feature_id N.
         info["features"] = [int(k[4:]) for k, v in json.load(open(a.realization))["catchments"].items() if v != old.get(k)]
     ex["commands"] = [cmd]
+    # Retries wait hours for late forcings, which a past date never needs, and outlive the workflow's credentials.
+    ex["run_options"]["n_retries_allowed"] = 0
     ex["instance_parameters"]["TagSpecifications"][0]["Tags"][0]["Value"] = f"outputs_diff_{a.key}"  # the instance Name
     json.dump(info, open("run_info.json", "w"))
     sfn = boto3.client("stepfunctions")
@@ -115,7 +125,7 @@ def compare(a):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("cmd", choices=["targets", "run", "compare", "uris"])
-    for o in "base datastream vpus vpu contribution key label run-id date init realization".split():
+    for o in "base datastream vpu contribution key label run-id date init realization".split():
         p.add_argument(f"--{o}", default="")
     a = p.parse_args()
     globals()[a.cmd](a)
