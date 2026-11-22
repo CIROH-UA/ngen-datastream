@@ -8,6 +8,19 @@ terraform {
   }
 }
 
+locals {
+  vpu_resource_overrides = {
+    # "17" = {
+    #   geopackage = "resources/v2.2_hydrofabric/geopackages/VPU_17/nextgen_VPU_17_v2.gpkg"
+    # }
+  }
+  vpu_resources = {
+    for vpu in var.all_vpus : vpu => merge({
+      geopackage = "resources/v2.2_hydrofabric/geopackages/VPU_${vpu}/nextgen_VPU_${vpu}.gpkg"
+    }, try(local.vpu_resource_overrides[vpu], {}))
+  }
+}
+
 variable "region" {}
 
 variable "scheduler_role_arn" {
@@ -46,4 +59,9 @@ variable "environment_suffix" {
 variable "s3_bucket" {
   type    = string
   default = "ciroh-community-ngen-datastream"
+}
+
+variable "all_vpus" {
+  type        = list(string)
+  description = "All VPUs; this datastream deploys a subset of them"
 }

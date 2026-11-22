@@ -1,27 +1,34 @@
-name: Python
+name: Python Tests
 
 # Installs every Python package in the repo together and runs their tests, so a
 # move or rename that breaks an import fails here instead of in a deployment.
+# They also gate the contribution workflows' uploads, and vpu_resources reads the
+# datastreams' main.tf, so a change to the NRDS Terraform runs them too.
 
 on:
   pull_request:
     paths:
       - 'python/**'
       - 'infra/*/python/**'
-      - '.github/workflows/python.yml'
+      - 'infra/aws/terraform/services/nrds/**'
+      - '.github/workflows/python-tests.yml'
   push:
     branches: [main]
     paths:
       - 'python/**'
       - 'infra/*/python/**'
-      - '.github/workflows/python.yml'
+      - 'infra/aws/terraform/services/nrds/**'
+      - '.github/workflows/python-tests.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  pytest:
+    name: research_datastream
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -37,15 +44,17 @@ jobs:
 
       - name: Test
         run: |
-          pytest infra/common/python
-          pytest infra/lxd/python
-          pytest infra/aws/python
+          pytest -v python
+          pytest -v infra/common/python
+          pytest -v infra/lxd/python
+          pytest -v infra/aws/python
 
       - name: Import every CLI
         env:
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          for m in research_datastream.contribution_parameters research_datastream.nrds_run_health \
+          for m in research_datastream.contribution_parameters research_datastream.contribution_hydrofabric \
+                   research_datastream.vpu_resources research_datastream.nrds_run_health \
                    research_datastream.vpu_comparison_graphs research_datastream.s3mv \
                    research_datastream_aws.datastream_cost_nrds research_datastream_aws.vpu_test \
                    research_datastream_lxd; do

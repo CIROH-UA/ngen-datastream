@@ -14,16 +14,27 @@ datastream lives under `infra/`:
 ## Install
 
 ```bash
-pip install -e python            # contribution_parameters, s3mv
+pip install -e python            # contributions, vpu_resources, s3mv
 pip install -e "python[plots]"   # adds nrds_run_health, vpu_comparison_graphs
 ```
 
 ## What's here
 
 - `contribution_parameters` — validate (`check`) and deploy (`deploy`) a
-  community parameter contribution. Run by `.github/workflows/contribution.yml`.
+  community parameter contribution. Run by `.github/workflows/contribution_parameters.yml`.
   ```bash
   python -m research_datastream.contribution_parameters check <contribution.yml> --out cand.json
+  ```
+- `contribution_hydrofabric` — validate and deploy a community hydrofabric
+  contribution. Run by `.github/workflows/contribution_hydrofabric.yml`.
+  ```bash
+  python -m research_datastream.contribution_hydrofabric check <contribution.yml> [--vpu 17]
+  ```
+- `contribution_common` — checks and helpers shared by both contribution tools.
+- `vpu_resources` — per-VPU geopackage and BMI config paths read from the NRDS
+  datastreams' Terraform. Run by `.github/workflows/bmi_configs.yml`.
+  ```bash
+  python -m research_datastream.vpu_resources uris cfe-nom 16 17
   ```
 - `nrds_run_health` — check which runs landed in the public bucket over a date
   range and chart the results.

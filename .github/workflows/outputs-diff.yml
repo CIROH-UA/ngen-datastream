@@ -1,20 +1,25 @@
 name: Outputs Diff
 
-# Runs a change to a datastream the way production runs it (short_range, init 00) and
-# comments on the pull request whether its troute output matches production's for the
-# same date. A parameter contribution runs with its merged realization in place of the
-# live one. Informational: it never fails. Run manually; Outputs Diff Hint suggests a run
-# on pull requests that may change a datastream. See docs/nrds/OUTPUTS_DIFF.md.
+# Runs a change to a datastream the way production runs it (short_range, at a chosen date
+# and init) and comments on the pull request whether its troute output matches production's
+# for the same run. A parameter contribution runs with its merged realization in place of the
+# live one. Informational: only an invalid input fails it. Run manually; Outputs Diff Hint
+# suggests a run on pull requests that may change a datastream. See docs/nrds/OUTPUTS_DIFF.md.
 
 on:
   workflow_dispatch:
     inputs:
       datastream:    {description: Datastream, type: choice, default: lstm_0, options: [lstm_0, cfe-nom, routing-only]}
-      vpus:          {description: Comma-separated VPUs, default: '01'}
-      contribution:  {description: 'Contribution file to simulate instead of the datastream', default: ''}
+      vpu:
+        description: VPU (one the datastream runs)
+        type: choice
+        default: '01'
+        options: [all, '01', '02', 03N, 03S, 03W, '04', '05', '06', '07', '08', '09', 10L, 10U, '11', '12', '13', '14', '15', '16', '17', '18']
+      contribution:  {description: 'Parameter contribution issue number to simulate instead of the datastream', default: ''}
       baseline_date: {description: 'Baseline YYYYMMDD (blank = yesterday)', default: ''}
+      init:          {description: 'Short-range init cycle, 00-23', default: '00'}
 
-permissions: {contents: read, id-token: write, pull-requests: write}
+permissions: {contents: read, id-token: write, issues: read, pull-requests: write}
 
 env:
   DIFF: python .github/python/outputs_diff.py
@@ -29,14 +34,22 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - id: t
-        continue-on-error: true
         env:
+          GH_TOKEN: ${{ github.token }}
           DATASTREAM: ${{ inputs.datastream }}
-          VPUS: ${{ inputs.vpus }}
+          VPU: ${{ inputs.vpu }}
           CONTRIBUTION: ${{ inputs.contribution }}
         run: |
+          if [ -n "$CONTRIBUTION" ]; then
+            [[ $CONTRIBUTION =~ ^[0-9]+$ ]] || { echo "::error::contribution must be an issue number"; exit 1; }
+            # The issue must be an open parameter contribution.
+            WHY=$(gh api "repos/$GITHUB_REPOSITORY/issues/$CONTRIBUTION" --jq 'if .pull_request then "is a pull request"
+              elif .state != "open" then "is \(.state)" elif (.title | startswith("[Parameters]") | not)
+              then "is not a parameter contribution" else "" end') || WHY="does not exist"
+            [ -z "$WHY" ] || { echo "::error::Issue #$CONTRIBUTION $WHY"; exit 1; }
+          fi
           pip install -q boto3 pandas pyarrow
-          T=$($DIFF targets --datastream "$DATASTREAM" --vpus "$VPUS" --contribution "$CONTRIBUTION")
+          T=$($DIFF targets --datastream "$DATASTREAM" --vpu "$VPU" --contribution "$CONTRIBUTION")
           echo "$T" && echo "targets=$T" >> "$GITHUB_OUTPUT"
 
   diff:
@@ -67,7 +80,7 @@ jobs:
         if: matrix.contribution != ''
         run: |
           set -o pipefail
-          pip install -q -e infra/aws/python \
+          pip install -q -e python \
             'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
           python -m research_datastream.contribution_parameters check "$CONTRIBUTION" \
             --workdir "$RUNNER_TEMP/work" --out candidate.json --record spec.json | tee build.log
@@ -80,10 +93,15 @@ jobs:
 
       - name: Simulate
         id: run
+        env:
+          DATASTREAM: ${{ matrix.datastream }}
+          VPU: ${{ steps.build.outputs.vpu || matrix.vpu }}
+          DATE: ${{ inputs.baseline_date }}
+          INIT: ${{ inputs.init }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          $DIFF run --key "$KEY" --datastream '${{ matrix.datastream }}' \
-            --vpu '${{ steps.build.outputs.vpu || matrix.vpu }}' --date '${{ inputs.baseline_date }}' \
-            --run-id '${{ github.run_id }}-${{ github.run_attempt }}' ${CONTRIBUTION:+--realization candidate.json}
+          $DIFF run --key "$KEY" --datastream "$DATASTREAM" --vpu "$VPU" --date "$DATE" --init "$INIT" \
+            --run-id "$RUN_ID" ${CONTRIBUTION:+--realization candidate.json}
 
       - name: Compare with production
         run: |

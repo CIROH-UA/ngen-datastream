@@ -1,6 +1,6 @@
 # Contributing to the NRDS
 
-[BACKGROUND.md](BACKGROUND.md) covers what the NRDS is and where it stops. This page covers how to make a contribution to the system.
+[BACKGROUND.md](BACKGROUND.md) covers what the NRDS is. This page covers how to make a contribution to the system.
 
 ---
 
@@ -27,6 +27,7 @@ Every contribution starts with an issue.
 | Template                                                                                                                              | Use it for                                                                                                  | Repository       |
 | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------- |
 | [Contribute Calibrated Parameters](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=parameter_contribution.yml)        | Calibrated parameters for a deployed formulation, submitted as a data package                               | ngen-datastream  |
+| [Contribute a Hydrofabric Update](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=hydrofabric_contribution.yml)       | Corrected geopackages, one per whole VPU, hosted on HydroShare                                              | ngen-datastream  |
 | [Propose a New Datastream](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=new_datastream.yml)                        | Any new scheduled pipeline, whether or not it simulates with NextGen                                        | ngen-datastream  |
 | [Propose a Datastream Update](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=update_datastream.yml)                  | Realization files, new model code, hydrofabric-related changes                                              | ngen-datastream  |
 | [Propose a Forcing Processor Contribution](https://github.com/CIROH-UA/forcingprocessor/issues/new?template=forcing_contribution.yml) | New forcing sources, weight generation, averaging algorithms, output efficiency                             | forcingprocessor |
@@ -34,7 +35,7 @@ Every contribution starts with an issue.
 | [Suggest an Idea](https://github.com/CIROH-UA/ngen-datastream/issues/new?template=suggestion.yml)                                     | Something the NRDS should do that you are not in a position to contribute                                   | ngen-datastream  |
 | [Model Integration Checklist](https://github.com/CIROH-UA/NGIAB-CloudInfra/issues/new?template=model_integration_request.yml)         | Getting a NextGen model built into the NGIAB container, a prerequisite for deploying it in a new datastream | NGIAB-CloudInfra |
 
-Hydrofabric corrections go to [community.fabric](https://github.com/lynker-spatial/community.fabric/issues).
+Hydrofabric corrections for every user and future release go to [community.fabric](https://github.com/lynker-spatial/community.fabric/issues). Fixes the NRDS needs in its own copy of a VPU use *Contribute a Hydrofabric Update*.
 
 ---
 
@@ -93,7 +94,7 @@ Include a characterization of how the resulting forcings differ from current beh
 
 #### Support for additional forcing sources
 
-The Forcing Processor currently reads NWM operational gridded products. Each additional source becomes an axis of experimentation for every datastream in the system. A contribution here is a reader for the source format, the variable mapping to NextGen-expected fields, and the handling needed to produce compliant output.
+The Forcing Processor currently reads NWM operational gridded products. A contribution here is a reader for the source format, the variable mapping to NextGen-expected fields, and the handling needed to produce compliant output.
 
 Related: sources arriving at sub-hourly, three-hourly, or daily cadence need aggregation or disaggregation to align with the simulation timestep, and formulations with long warm-up requirements need extended-lookback handling. Grid geometries other than the current products need corresponding weight generation.
 

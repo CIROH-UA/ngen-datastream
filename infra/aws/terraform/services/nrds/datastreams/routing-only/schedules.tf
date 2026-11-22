@@ -70,6 +70,7 @@ resource "aws_scheduler_schedule" "datastream_schedule_short_range_routing_only"
     volume_size        = each.value.volume_size
     environment_suffix = var.environment_suffix
     s3_bucket          = var.s3_bucket
+    geopackage_s3_uri  = "s3://${var.s3_bucket}/${local.vpu_resources[each.value.vpu].geopackage}"
 }))}
 }
 EOT
