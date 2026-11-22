@@ -41,6 +41,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from research_datastream_core import extract_forcing_source, resolve_offset_tokens, run_init
+
 TEST_ROOT = "test/cicd/vpu-test"
 TEST_TAG = "nrds_vpu_test"
 
@@ -97,6 +99,7 @@ def rewrite(execution: dict, date: str, prefix_root: str) -> dict:
         cmd = PREFIX_RE.sub(lambda m: f"{m.group(1)}{prefix_root}/{m.group(2)}", cmd)
         if " -e " not in cmd:
             cmd = START_DAILY_RE.sub(rf"\g<1>DAILY -e {date}0000", cmd)
+        cmd = resolve_offset_tokens(cmd, run_init(date, extract_forcing_source([cmd])))
         cmd = START_DAILY_RE.sub(r"\g<1>__START__", cmd)
         cmd = DAILY_RE.sub(date, cmd).replace("__START__", "DAILY")
         commands.append(cmd)

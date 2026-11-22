@@ -38,6 +38,16 @@ def test_rewrite_pins_date_and_moves_output():
     assert cmd.count("DAILY") == 1
 
 
+def test_rewrite_resolves_restart_offset_from_pinned_date():
+    ex = {"commands": ["datastream -s DAILY -F s3://b/ngen.DAILY/forcing_analysis_assim_extend/16/f.nc "
+                       "--FORCING_SOURCE NWM_V3_ANALYSIS_ASSIM_EXTEND_16 "
+                       "-t s3://b/ngen.{DAILY-28h:YYYYMMDD}/{DAILY-28h:HH}/channel_restart_{DAILY-28h:YYYYMMDD}_{DAILY-28h:HH}0000.nc "
+                       "--S3_BUCKET b --S3_PREFIX out/ngen.DAILY/VPU_09"]}
+    cmd = rewrite(ex, "20261015", "test/1")["commands"][0]
+    assert "-t s3://b/ngen.20261014/12/channel_restart_20261014_120000.nc " in cmd
+    assert cmd.count("DAILY") == 1
+
+
 def test_rewrite_retags_and_leaves_input_alone():
     ex = json.loads(json.loads(schedule("00", "01")["target"][0]["input"])["Input"])
     out = rewrite(ex, "20261015", "t")

@@ -126,7 +126,7 @@ jobs:
       - name: Plan the datastream schedules
         working-directory: ${{ env.TF_DIR }}
         env:
-          PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src
+          PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src:${{ github.workspace }}/infra/common/python/src
         run: |
           set -euo pipefail
           T=$(python -m research_datastream_aws.vpu_test targets ${{ steps.ds.outputs.list }} --main-tf main.tf)
@@ -139,7 +139,7 @@ jobs:
       - name: Select one execution per VPU
         id: select
         env:
-          PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src
+          PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src:${{ github.workspace }}/infra/common/python/src
           OVERRIDES: ${{ inputs.overrides }}
         run: |
           set -euo pipefail

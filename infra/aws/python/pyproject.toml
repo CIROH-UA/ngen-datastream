@@ -12,6 +12,7 @@ license = { text = "GPL-3.0-or-later" }
 dependencies = [
     "boto3",
     "pandas",
+    "research_datastream_core",     # shared DAILY/command logic (infra/common/python)
 ]
 
 [project.optional-dependencies]

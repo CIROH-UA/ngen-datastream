@@ -102,10 +102,9 @@ locals {
         for vpu in local.vpus : {
           key  = "${init}_${vpu}"
           init = init
-          # Sim starts at init-27h (tm27); t-route needs state 1 h earlier (init-28h, previous day for init >= 4).
-          # Wall-clock "yesterday" holds while the run ends before 00:00 UTC, 8 h after the 16:00 fire.
-          restart_init  = format("%02d", (tonumber(init) + 20) % 24)
-          restart_date  = "$(date -u -d yesterday +%Y%m%d)"
+          # Sim starts at init-27h (tm27); t-route needs state 1 h earlier. Resolved from the run's init by core.
+          restart_init  = "{DAILY-28h:HH}"
+          restart_date  = "{DAILY-28h:YYYYMMDD}"
           vpu           = vpu
           instance_type = local.init_cycles_config_lstm_0.analysis_assim_extend.instance_types[vpu]
           volume_size   = local.init_cycles_config_lstm_0.analysis_assim_extend.volume_size

@@ -13,9 +13,12 @@ from research_datastream_core import (
     daily_fcst_cycle,
     extract_forcing_file,
     extract_forcing_source,
+    extract_restart_file,
     extract_s3_bucket,
     extract_s3_prefix,
     resolve_daily_date,
+    resolve_offset_tokens,
+    run_init,
     substitute_daily,
 )
 
@@ -108,15 +111,56 @@ def test_ngen_run_dates_prefix_and_forcing_file():
 def test_production_cfe_nom_command():
     # Shape of the AWS cfe-nom template; the expected prefix matches the
     # execution.json production wrote for ngen.20261019/short_range/06/VPU_01.
-    cmds = ["runuser -l ec2-user -c 'RESTART_DATE=DAILY && /home/ec2-user/datastreamcli/scripts/datastream "
+    cmds = ["runuser -l ec2-user -c '/home/ec2-user/datastreamcli/scripts/datastream "
             "-s DAILY -n 3 -F s3://bkt/forcings/v2.2_hydrofabric/ngen.DAILY/forcing_short_range/06/"
             "ngen.t06z.short_range.forcing.f001_f018.VPU_01.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_06 "
-            "-t s3://bkt/restarts/v2.2_hydrofabric/ngen.${RESTART_DATE}/06/channel_restart.nc "
+            "-t s3://bkt/restarts/v2.2_hydrofabric/ngen.DAILY/06/channel_restart_DAILY_060000.nc "
             "--S3_BUCKET bkt --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/short_range/06/VPU_01'"]
     out = substitute_daily(cmds, now=datetime(2026, 10, 19, 7, 5, tzinfo=UTC))[0]
     assert "--S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.20261019/short_range/06/VPU_01'" in out
     assert "/ngen.20261019/forcing_short_range/06/" in out
-    assert "RESTART_DATE=DAILY" in out   # left for datastreamcli, as in production
+    assert "-t s3://bkt/restarts/v2.2_hydrofabric/ngen.20261019/06/channel_restart_20261019_060000.nc " in out
+    assert out.count("DAILY") == 1   # only -s DAILY, left for datastreamcli
+
+
+AAE_CMD = ("datastream -s DAILY -F s3://b/ngen.DAILY/forcing_analysis_assim_extend/{init}/"
+           "ngen.t{init}z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc "
+           "--FORCING_SOURCE NWM_V3_ANALYSIS_ASSIM_EXTEND_{init} "
+           "-t s3://b/restarts/ngen.{{DAILY-28h:YYYYMMDD}}/{{DAILY-28h:HH}}/"
+           "channel_restart_{{DAILY-28h:YYYYMMDD}}_{{DAILY-28h:HH}}0000.nc "
+           "--S3_BUCKET b --S3_PREFIX out/ngen.DAILY/analysis_assim_extend/{init}/VPU_09")
+
+
+def test_analysis_assim_extend_restart_is_init_minus_28h():
+    # 16z init on 11/22 simulates from 11/21 13z; t-route starts from 11/21 12z.
+    out = substitute_daily([AAE_CMD.format(init="16")], now=datetime(2026, 11, 22, 19, 0, tzinfo=UTC))[0]
+    assert "-t s3://b/restarts/ngen.20261121/12/channel_restart_20261121_120000.nc " in out
+    assert "--S3_PREFIX out/ngen.20261122/analysis_assim_extend/16/VPU_09" in out
+
+
+def test_analysis_assim_extend_restart_follows_fold_back():
+    # Before the 16z cycle the run folds back to 11/21, so the restart is 11/20.
+    out = substitute_daily([AAE_CMD.format(init="16")], now=datetime(2026, 11, 22, 3, 0, tzinfo=UTC))[0]
+    assert "ngen.20261120/12/channel_restart_20261120_120000.nc" in out
+
+
+def test_offset_token_crosses_midnight():
+    # A 02z init minus 28h lands two days back, at 22z.
+    init = datetime(2026, 11, 22, 2, tzinfo=UTC)
+    assert resolve_offset_tokens("{DAILY-28h:YYYYMMDD}/{DAILY-28h:HH}", init) == "20261120/22"
+    assert resolve_offset_tokens("{DAILY:YYYYMMDD}{DAILY:HH} {DAILY+6h:HH}", init) == "2026112202 08"
+
+
+def test_offset_token_without_forcing_source():
+    # The standalone-DAILY pass must not reach inside the token; no source folds back to 06/30 00z.
+    cmds = ["run --S3_PREFIX p/DAILY -t s3://b/{DAILY-24h:YYYYMMDD}/r.nc"]
+    assert substitute_daily(cmds, now=NOON) == ["run --S3_PREFIX p/20260630 -t s3://b/20260629/r.nc"]
+
+
+def test_run_init_and_restart_extraction():
+    assert run_init("20261122", "NWM_V3_SHORT_RANGE_06") == datetime(2026, 11, 22, 6, tzinfo=UTC)
+    assert run_init("20261122", "NWM_V3_MEDIUM_RANGE_12_3") == datetime(2026, 11, 22, 12, tzinfo=UTC)
+    assert extract_restart_file(["datastream -t s3://b/r.nc -w s3://b/x.nc --troute_x y"]) == "s3://b/r.nc"
 
 
 def test_medium_range_shift_keeps_prefix_on_run_date():
