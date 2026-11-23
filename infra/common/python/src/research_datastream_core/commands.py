@@ -13,6 +13,7 @@ __all__ = [
     "extract_forcing_source",
     "extract_forcing_file",
     "extract_restart_file",
+    "required_inputs",
     "daily_fcst_cycle",
     "resolve_daily_date",
     "run_init",
@@ -56,6 +57,19 @@ def extract_forcing_file(commands: list[str]) -> str | None:
 def extract_restart_file(commands: list[str]) -> str | None:
     """Return the ``-t`` t-route restart path, or None if there is none."""
     return _last_match(commands, _RESTART_FILE_RE)
+
+
+def required_inputs(commands: list[str]) -> list[str]:
+    """The run's dynamic S3 inputs (``-F`` forcing, ``-t`` restart) that must
+    exist before launch. Call after ``substitute_daily``; raises on a path
+    that still holds an unresolved DAILY token.
+    """
+    paths = [p for p in (extract_forcing_file(commands), extract_restart_file(commands))
+             if p and p.startswith("s3://")]
+    unresolved = [p for p in paths if "DAILY" in p]
+    if unresolved:
+        raise ValueError(f"unresolved DAILY in {unresolved}")
+    return paths
 
 
 def _last_match(commands: list[str], pattern: re.Pattern[str]) -> str | None:

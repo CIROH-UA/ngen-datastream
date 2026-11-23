@@ -45,3 +45,45 @@ def test_forcing_checks_metadata_csv():
     _, key = _checked_key("forcing", "short_range", "06")
     assert "DAILY" not in key
     assert key.endswith("/metadata/forcings_metadata/metadata.csv")
+
+
+class FakeInputs:
+    def __init__(self, appear_after=None):
+        self.appear_after, self.calls = appear_after, 0
+
+    def exists(self, uri):
+        self.calls += 1
+        return self.appear_after is not None and self.calls > self.appear_after
+
+
+def _cfe_run(group="short_range", init="06", vpu="01"):
+    ds = load_datastream(DATASTREAMS / "cfe-nom", env=ENV)
+    return next(r for r in ds.runs if r.group == group and r.init == init and r.vpu == vpu)
+
+
+def test_prepare_resolves_daily_and_waits_for_inputs():
+    sleeps = []
+    ex = runner.prepare(_cfe_run(), FakeInputs(appear_after=3), sleep=sleeps.append)
+    assert ex["ii_inputs_ready"]
+    assert sleeps == [60, 120, 240]   # three misses, then the forcing file appears
+    assert "ngen.DAILY" not in " ".join(ex["commands"])
+
+
+def test_prepare_gives_up_at_timeout_and_run_skips_launch(monkeypatch):
+    clock = {"now": 0.0}
+    monkeypatch.setattr(runner.time, "time", lambda: clock["now"])
+    rs = _cfe_run()
+    rs.run_options["input_wait_timeout_s"] = 1000
+
+    def sleep(s):
+        clock["now"] += s
+
+    ex = runner.prepare(rs, FakeInputs(), sleep=sleep)
+    assert not ex["ii_inputs_ready"] and clock["now"] == 1000
+    assert runner._classify_failure(ex) == "no_input"
+    assert runner.run(rs, lxd_client=object(), execution=ex) is ex   # no launch attempted
+
+
+def test_prepare_without_input_check_skips_wait():
+    ex = runner.prepare(_cfe_run(), None, sleep=lambda s: (_ for _ in ()).throw(AssertionError))
+    assert ex["ii_inputs_ready"]

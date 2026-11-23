@@ -36,7 +36,7 @@ infra/aws/terraform/
 
 ## Architecture
 
-- **Orchestration** (instantiated once): AWS Step Functions state machine, 5 Lambda functions, IAM roles/policies. This is datastream-agnostic — it manages EC2 instance lifecycle for any execution.
+- **Orchestration** (instantiated once): AWS Step Functions state machine, 6 Lambda functions, IAM roles/policies. The first, `input_gate`, resolves `DAILY` and holds the launch until the run's forcing and restart files exist. This is datastream-agnostic — it manages EC2 instance lifecycle for any execution.
 - **Schedules** (per datastream): EventBridge Scheduler rules that trigger state machine executions on a cron. Each datastream module receives the shared `scheduler_role_arn` and `state_machine_arn`.
 - **Single Terraform state**: All resources live in one S3 backend (`nrds-prod/terraform.tfstate`).
 

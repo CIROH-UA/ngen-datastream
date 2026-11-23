@@ -16,6 +16,7 @@ from research_datastream_core import (
     extract_restart_file,
     extract_s3_bucket,
     extract_s3_prefix,
+    required_inputs,
     resolve_daily_date,
     resolve_offset_tokens,
     run_init,
@@ -207,3 +208,18 @@ def test_retry_attempt_returns_commands_unchanged():
     # The hour-shift isn't idempotent, so retries must reuse the resolved commands.
     cmds = ["echo DAILY"]
     assert substitute_daily(cmds, now=NOON, retry_attempt=1) == cmds
+
+
+def test_required_inputs_after_resolution():
+    out = substitute_daily([AAE_CMD.format(init="16")], now=datetime(2026, 11, 22, 19, 0, tzinfo=UTC))
+    assert required_inputs(out) == [
+        "s3://b/ngen.20261122/forcing_analysis_assim_extend/16/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc",
+        "s3://b/restarts/ngen.20261121/12/channel_restart_20261121_120000.nc",
+    ]
+
+
+def test_required_inputs_skips_non_s3_and_rejects_unresolved():
+    assert required_inputs(["datastream -F /local/f.nc -t https://x/r.nc"]) == []
+    assert required_inputs(["run --S3_PREFIX p"]) == []
+    with pytest.raises(ValueError):
+        required_inputs([AAE_CMD.format(init="16")])

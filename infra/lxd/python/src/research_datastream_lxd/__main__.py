@@ -50,6 +50,14 @@ def _build_output_check(kind: str | None) -> runner.OutputCheck | None:
     raise ValueError(f"unknown output check: {kind}")
 
 
+def _build_input_check(kind: str | None) -> runner.InputCheck | None:
+    if not kind or kind == "none":
+        return None
+    if kind == "s3":
+        return runner.S3InputCheck(region=os.environ.get("AWS_REGION", "us-east-1"))
+    raise ValueError(f"unknown input check: {kind}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research-datastream-lxd")
     parser.add_argument(
@@ -63,6 +71,13 @@ def main(argv: list[str] | None = None) -> int:
         choices=["none", "s3"],
         default=os.environ.get("RDS_LXD_OUTPUT_CHECK", "none"),
         help="Backend for verifying run outputs landed where expected.",
+    )
+    parser.add_argument(
+        "--input-check",
+        choices=["none", "s3"],
+        default=os.environ.get("RDS_LXD_INPUT_CHECK", "none"),
+        help="Backend for waiting on a run's forcing (-F) and restart (-t) files "
+        "before launch; tune with run_options input_wait_* (env RDS_LXD_INPUT_CHECK).",
     )
     parser.add_argument(
         "--once",
@@ -121,19 +136,21 @@ def main(argv: list[str] | None = None) -> int:
 
     _configure_logging(args.log_level, args.failure_log)
     output_check = _build_output_check(args.output_check)
+    input_check = _build_input_check(args.input_check)
 
     if args.once and args.fire_init:
         print("--once and --fire-init are mutually exclusive", file=sys.stderr)
         return 1
     if args.once:
-        return _run_once(args.datastreams_dir, args.once, output_check)
+        return _run_once(args.datastreams_dir, args.once, output_check, input_check)
     if args.fire_init:
         return _fire_init(args.datastreams_dir, args.fire_init, output_check,
-                          args.concurrency, args.stagger_s)
+                          args.concurrency, args.stagger_s, input_check)
 
     scheduler.run_forever(
         args.datastreams_dir,
         output_check=output_check,
+        input_check=input_check,
         core_budget=args.core_budget,
         mem_pct=args.memory_pct,
         stagger_s=args.stagger_s,
@@ -161,7 +178,7 @@ def _match_runs(datastreams_dir: Path, selector: str) -> tuple[str, list[Schedul
     return ds_name, matching
 
 
-def _run_once(datastreams_dir: Path, selector: str, output_check) -> int:
+def _run_once(datastreams_dir: Path, selector: str, output_check, input_check=None) -> int:
     _, matching = _match_runs(datastreams_dir, selector)
     if not matching:
         print(f"no runs matched {selector}", file=sys.stderr)
@@ -174,12 +191,12 @@ def _run_once(datastreams_dir: Path, selector: str, output_check) -> int:
             print(f"  {sel}", file=sys.stderr)
         return 1
 
-    result = runner.run(matching[0], output_check=output_check)
+    result = runner.run(matching[0], output_check=output_check, input_check=input_check)
     return 0 if result.get("ii_pass") else 2
 
 
 def _fire_init(datastreams_dir: Path, selector: str, output_check, concurrency: int,
-               stagger_s: float = 3.0) -> int:
+               stagger_s: float = 3.0, input_check=None) -> int:
     """
     Fire every run matched by `selector` concurrently — the scheduler's fan-out.
     """
@@ -204,7 +221,8 @@ def _fire_init(datastreams_dir: Path, selector: str, output_check, concurrency: 
             if 0 < i < workers and stagger_s > 0:
                 time.sleep(stagger_s)
             log.info("submitting %s (%d/%d)", rs.name, i + 1, len(matching))
-            futures[pool.submit(runner.run, rs, output_check=output_check)] = rs
+            futures[pool.submit(runner.run, rs, output_check=output_check,
+                                input_check=input_check)] = rs
         for fut in futures:
             rs = futures[fut]
             try:

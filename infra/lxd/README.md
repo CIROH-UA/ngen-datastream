@@ -1,6 +1,6 @@
 # NRDS on LXD
 
-LXD deployment of the NextGen Research DataStream (NRDS) on the UA Nextstream HPC. The sibling `infra/aws/` deployment uses EventBridge + Step Functions + five Lambdas to orchestrate ephemeral EC2 workers. This deployment collapses that
+LXD deployment of the NextGen Research DataStream (NRDS) on the UA Nextstream HPC. The sibling `infra/aws/` deployment uses EventBridge + Step Functions + six Lambdas to orchestrate ephemeral EC2 workers. This deployment collapses that
 architecture to one always-on LXD "controller" instance that hosts a
 Python process combining the scheduler and orchestrator. Ephemeral
 worker instances are still launched per run.
@@ -26,7 +26,8 @@ worker instances are still launched per run.
 ```
 infra/common/python/                  # shared, deployment-agnostic core logic
 └── src/research_datastream_core/
-    ├── commands.py                   # DAILY-token resolution (AWS + LXD share this logic)
+    ├── commands.py                   # DAILY-token resolution and required inputs (AWS + LXD share this logic)
+    ├── backoff.py                    # input-wait and retry timing
     └── outputs.py                    # completion marker the output check looks for
 
 infra/lxd/
@@ -35,7 +36,7 @@ infra/lxd/
 │       ├── __main__.py           # `python -m research_datastream_lxd`
 │       ├── config.py             # YAML loader → ScheduledRun objects
 │       ├── scheduler.py          # APScheduler; EventBridge replacement
-│       ├── runner.py             # launch → exec → check → teardown
+│       ├── runner.py             # prepare (wait for inputs) → launch → exec → check → teardown
 │       └── lxd.py                # pylxd wrapper
 │
 └── terraform/
@@ -54,8 +55,8 @@ infra/lxd/
 ```
 
 `research_datastream_core` holds logic both deployments must agree on: the
-`DAILY` → forecast-date rules and the S3 object that marks a finished run. The
-AWS `streamcommander` and `checker` lambdas use the same package, so fix shared
+`DAILY` → forecast-date rules, the inputs a run waits for and how long, and the
+S3 object that marks a finished run. The AWS lambdas use the same package, so fix shared
 behavior there, not here. See [its README](../common/python/README.md).
 
 ## What maps to what (AWS → LXD)
@@ -64,6 +65,7 @@ behavior there, not here. See [its README](../common/python/README.md).
 |---------------------------------------------------|-----------------------------------------------|
 | `aws_scheduler_schedule` (EventBridge)            | APScheduler jobs in `scheduler.py`            |
 | `aws_sfn_state_machine`                           | The `run()` function in `runner.py`           |
+| `input_gate` lambda                               | `runner.prepare` (e.g. `S3InputCheck`), before the scheduler reserves cores |
 | `start_ami` lambda                                | `runner._launch` + `lxd.launch_instance`      |
 | `streamcommander` + `poller` lambdas              | `runner._execute` + `lxd.execute`             |
 | `checker` lambda                                  | `runner.OutputCheck` (e.g. `S3OutputCheck`)   |
@@ -140,6 +142,8 @@ Set at minimum:
   `default` profile — the same NIC the workers get — so there's no network var.)
 - `environment_suffix` — e.g. `prod`, `dev`
 - `output_check` — `s3` if you want the S3 checker wired up, else `none`
+- `input_check` — `s3` to wait for each run's forcing and restart files before
+  launch (up to 24 h, see `input_wait_*` run options), else `none`
 - `package_ref` — git tag/branch/commit the controller installs from
 
 The trust token itself is sensitive and goes in an env var, not the

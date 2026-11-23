@@ -65,10 +65,20 @@ variable "output_check" {
   }
 }
 
+variable "input_check" {
+  type        = string
+  default     = "none"
+  description = "Backend for waiting on a run's forcing and restart files before launch. One of: none, s3."
+  validation {
+    condition     = contains(["none", "s3"], var.input_check)
+    error_message = "input_check must be 'none' or 's3'."
+  }
+}
+
 variable "aws_region" {
   type        = string
   default     = "us-east-1"
-  description = "Only used when output_check = 's3'."
+  description = "Only used when output_check or input_check = 's3'."
 }
 
 # ---- AWS credentials ----------------------------------------------------

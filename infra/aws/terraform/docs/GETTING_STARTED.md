@@ -124,6 +124,18 @@ If the `ii_check_s3` check fails (e.g. the source is not yet available) and `n_r
     "retry_backoff_rate"     : 2
 },
 ```
+Before launching, the state machine's input gate waits for the run's forcing (`-F`) and restart (`-t`) files to exist in S3, so a run whose upstream data is late waits instead of launching and failing. No instance runs while it waits. It checks with exponential backoff and fails the execution, without retrying, if the files have not appeared after `input_wait_timeout_s`:
+```
+  "run_options":{
+    "ii_wait_for_inputs"     : true,
+    "input_wait_base_s"      : 60,
+    "input_wait_rate"        : 2,
+    "input_wait_max_s"       : 900,
+    "input_wait_timeout_s"   : 86400
+},
+```
+The wait before check N (0 on the first) is `min(base * rate**N, max)`: 1, 2, 4, 8, then every 15 min, for up to 24 h. Set `ii_wait_for_inputs` to `false` to skip the check.
+
 `retry_backoff_base_s` (default 1800s / 30 min) is the base factor in the exponential backoff calculation: `wait_seconds = min(base * rate**(retry_attempt+1), max)` (where `retry_attempt` is 0 on the initial run). `retry_backoff_rate` (default 2) is the multiplier applied per additional retry, and `retry_backoff_max_s` (default 7200s / 2 hr) caps how long any single wait can be.
 
 Edit Instance Options

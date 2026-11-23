@@ -14,8 +14,69 @@ resource "aws_sfn_state_machine" "datastream_state_machine" {
   definition = <<EOF
 {
   "Comment": "The conductor of the daily ngen datastream",
-  "StartAt": "EC2StarterFromAMI",
+  "StartAt": "InputGate",
   "States": {
+    "InputGate": {
+      "Type": "Task",
+      "Comment": "Resolve DAILY and wait for the run's forcing and restart files before launching",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${aws_lambda_function.input_gate_lambda.arn}:$LATEST"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.TooManyRequestsException",
+          "States.Timeout"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 10,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "InputsReady",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Comment": "No instance launched yet, so nothing to stop",
+          "Next": "InputsUnavailable",
+          "ResultPath": "$.failedInput"
+        }
+      ]
+    },
+    "InputsReady": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.ii_inputs_ready",
+          "BooleanEquals": true,
+          "Next": "EC2StarterFromAMI"
+        },
+        {
+          "Variable": "$.ii_inputs_timed_out",
+          "BooleanEquals": true,
+          "Next": "InputsUnavailable"
+        }
+      ],
+      "Default": "InputWait"
+    },
+    "InputWait": {
+      "Type": "Wait",
+      "Comment": "Exponential backoff between input checks",
+      "SecondsPath": "$.input_wait_s",
+      "Next": "InputGate"
+    },
+    "InputsUnavailable": {
+      "Type": "Fail",
+      "Error": "InputsUnavailable",
+      "Cause": "Forcing or restart inputs never appeared, or the input check failed; no instance was launched"
+    },
     "EC2StarterFromAMI": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",

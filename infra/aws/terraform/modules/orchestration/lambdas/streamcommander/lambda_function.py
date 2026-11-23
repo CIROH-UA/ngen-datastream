@@ -1,13 +1,11 @@
 import boto3
 import time
 import json
-from datetime import datetime, timezone
 
 # Vendored into the lambda zip from infra/common/python (see lambda.tf).
 from research_datastream_core import (
     extract_s3_bucket,
     extract_s3_prefix,
-    substitute_daily,
 )
 
 
@@ -40,7 +38,6 @@ def lambda_handler(event, context):
     """
     global client_ssm, client_ec2
     client_ec2 = boto3.client("ec2", region_name=event["region"])
-    today = datetime.now(timezone.utc)
 
     instance_id = event["instance_parameters"]["InstanceId"]
 
@@ -65,9 +62,7 @@ def lambda_handler(event, context):
         event["commands"].append(command_str)
         event.pop("datastream_command_options")
 
-    event["commands"] = substitute_daily(
-        event["commands"], now=today, retry_attempt=event.get("retry_attempt", 0)
-    )
+    # DAILY was resolved by the input gate before launch.
     bucket = extract_s3_bucket(event["commands"])
     prefix = extract_s3_prefix(event["commands"])
 
