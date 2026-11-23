@@ -10,9 +10,9 @@ terraform {
 
 locals {
   vpu_resource_overrides = {
-    # "17" = {
-    #   geopackage = "resources/v2.2_hydrofabric/geopackages/VPU_17/nextgen_VPU_17_v2.gpkg"
-    # }
+    "17" = {
+      geopackage = "resources/v2.2_hydrofabric/geopackages/contributions/423/nextgen_VPU_17.gpkg"
+    }
   }
   vpu_resources = {
     for vpu in var.all_vpus : vpu => merge({
