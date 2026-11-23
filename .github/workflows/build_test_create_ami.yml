@@ -34,14 +34,16 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   AWS_REGION: us-east-1
+  AWS_ROLE: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
 
 jobs:
   build-and-test-ami:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 75
     env:
       # Tags every instance this run launches
       WORKFLOW_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
@@ -66,8 +68,7 @@ jobs:
         id: aws
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ env.AWS_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Build AMI
@@ -80,6 +81,14 @@ jobs:
           INCLUDE_FORCING_WEIGHTS: ${{ inputs.include_forcing_weights }}
           BUILT_BY: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: ./shell/ami/create_ami.sh
+
+      # Refreshes the AWS credentials after the build in case the build takes a longer time
+      - name: Refresh AWS credentials
+        if: always() && steps.aws.outcome == 'success'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Test AMI
         env:
