@@ -31,8 +31,8 @@ BUILT_BY="${BUILT_BY:-$(whoami) on $(hostname)}"
 BUILD_INSTANCE_TYPE="t4g.large"
 BASE_IMAGE_PARAMETER="/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
 ROOT_VOLUME_GB=32
-SETUP_TIMEOUT_MINUTES=45
-AMI_AVAILABLE_TIMEOUT_MINUTES=45
+SETUP_TIMEOUT_MINUTES=20
+AMI_AVAILABLE_TIMEOUT_MINUTES=30
 
 log "Building AMI $AMI_NAME"
 log "  datastreamcli tag:      $DATASTREAMCLI_TAG"

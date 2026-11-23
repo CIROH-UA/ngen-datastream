@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/ami_helpers.sh"
 
 TEST_INSTANCE_TYPE="t4g.medium"
-CHECK_TIMEOUT_MINUTES=20
+CHECK_TIMEOUT_MINUTES=10
 
 log "Testing AMI $AMI_ID"
 
