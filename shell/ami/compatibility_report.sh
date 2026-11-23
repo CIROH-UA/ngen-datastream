@@ -32,6 +32,9 @@ images_in_template() {
     grep -o -E 'awiciroh/[a-z0-9_.-]+:[A-Za-z0-9_.-]+' "$1" || true
     grep -o -E 'DS_TAG=[A-Za-z0-9_.-]+' "$1" | sed 's|DS_TAG=|awiciroh/datastream:|' || true
     grep -o -E 'NGIAB_TAG=[A-Za-z0-9_.-]+' "$1" | sed 's|NGIAB_TAG=|awiciroh/ciroh-ngen-image:|' || true
+    if grep -q 'datastreamcli/scripts/datastream' "$1"; then
+      echo "zwills/merkdir:latest"
+    fi
   } | sort -u
 }
 
