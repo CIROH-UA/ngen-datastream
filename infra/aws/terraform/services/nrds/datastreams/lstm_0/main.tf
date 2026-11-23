@@ -23,7 +23,7 @@ locals {
   vpu_resources = {
     for vpu in var.all_vpus : vpu => merge({
       geopackage  = "resources/v2.2_hydrofabric/geopackages/VPU_${vpu}/nextgen_VPU_${vpu}.gpkg"
-      bmi_configs = "resources/v2.2_hydrofabric/bmi_configs/lstm_0/VPU_${vpu}/ngen-bmi-configs.tar.gz"
+      bmi_configs = "resources/v2.2_hydrofabric/bmi_configs/lstm_0/contributions/409/VPU_${vpu}/ngen-bmi-configs.tar.gz"
     }, try(local.vpu_resource_overrides[vpu], {}))
   }
 }
