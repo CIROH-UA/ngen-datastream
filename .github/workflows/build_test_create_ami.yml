@@ -36,6 +36,10 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: build-datastream-ami
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-east-1
   AWS_ROLE: arn:aws:iam::879381264451:role/github-actions-terraform-oidc
