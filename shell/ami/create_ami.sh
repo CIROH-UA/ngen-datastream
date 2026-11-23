@@ -97,7 +97,8 @@ tags=$(jq -n -c \
     {Key: "datastreamcli-tag",      Value: $datastreamcli_tag},
     {Key: "ngen-datastream-commit", Value: $ngen_datastream_commit},
     {Key: "docker-images",          Value: $docker_images},
-    {Key: "forcing-weights",        Value: $forcing_weights}
+    {Key: "forcing-weights",        Value: $forcing_weights},
+    {Key: "built-by",               Value: $built_by}
   ]')
 tag_specifications=$(jq -n -c --argjson tags "$tags" \
   '[{ResourceType: "image", Tags: $tags}, {ResourceType: "snapshot", Tags: $tags}]')
