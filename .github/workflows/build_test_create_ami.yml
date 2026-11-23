@@ -90,7 +90,7 @@ jobs:
           INCLUDE_FORCING_WEIGHTS: ${{ inputs.include_forcing_weights }}
         run: ./shell/ami/test_ami.sh
 
-      - name: Print the AMI ID
+      - name: Print the AMI ID and which datastreams can use it
         env:
           AMI_ID: ${{ steps.build.outputs.ami_id }}
           AMI_NAME: ${{ steps.versions.outputs.ami_name }}
@@ -98,16 +98,7 @@ jobs:
           echo "::notice title=AMI ready::$AMI_ID ($AMI_NAME)"
           {
             echo "### AMI ready: \`$AMI_ID\`"
-            echo "To use it, set the AMI for each datastream that should move to it in"
-            echo "\`infra/aws/terraform/services/nrds/envs/prod.tfvars\` and open a pull request:"
-            echo '```hcl'
-            echo "cfe_nom_ami_id      = \"$AMI_ID\""
-            echo "routing_only_ami_id = \"$AMI_ID\""
-            echo "lstm_0_ami_id       = \"$AMI_ID\""
-            echo "restart_ami_id      = \"$AMI_ID\""
-            echo '```'
-            echo "Leave \`fp_ami_id\` alone for now: the forcing template still uses image tags"
-            echo "that are no longer on Docker Hub (see shell/ami/README.md)."
+            ./shell/ami/compatibility_report.sh "$AMI_ID"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Delete the AMI because the build or test failed
