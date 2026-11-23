@@ -55,8 +55,20 @@ data "archive_file" "python_lambda_checker" {
 
 data "archive_file" "python_lambda_stopper" {
   type        = "zip"
-  source_file = "${path.module}/lambdas/stopper/lambda_function.py"
   output_path = "${path.module}/lambdas/stopper_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/stopper/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 resource "aws_lambda_function" "starter_lambda" {

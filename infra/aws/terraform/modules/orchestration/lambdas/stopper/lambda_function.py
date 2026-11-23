@@ -1,34 +1,10 @@
 import boto3
 import time
 
+# Vendored into the lambda zip from infra/common/python (see lambda.tf).
+from research_datastream_core import retry_backoff_seconds
+
 client_ec2 = boto3.client("ec2")
-
-# Defaults used to space out retries when the upstream NWM forcings are not
-# yet available (see https://github.com/CIROH-UA/ngen-datastream/issues/391).
-#
-# `retry_attempt` is 0-indexed for the attempt that just finished.
-# The wait before the *next* attempt uses N = retry_attempt + 1:
-#   wait_seconds = min(base * (rate ** N), max)
-DEFAULT_RETRY_BACKOFF_BASE_S = 1800  # 30 minutes
-DEFAULT_RETRY_BACKOFF_MAX_S = 7200  # 2 hours
-DEFAULT_RETRY_BACKOFF_RATE = 2
-
-
-def compute_backoff_seconds(retry_attempt, run_options):
-    """
-    Exponential backoff for state machine retries triggered by a failed S3
-    object check (e.g. delayed upstream NWM forcings).
-
-    retry_attempt is 0-indexed for the attempt that just completed; the wait
-    before restarting the run uses N = retry_attempt + 1.
-    """
-    base = run_options.get("retry_backoff_base_s", DEFAULT_RETRY_BACKOFF_BASE_S)
-    max_wait = run_options.get("retry_backoff_max_s", DEFAULT_RETRY_BACKOFF_MAX_S)
-    rate = run_options.get("retry_backoff_rate", DEFAULT_RETRY_BACKOFF_RATE)
-
-    n = retry_attempt + 1
-    wait_seconds = base * (rate ** n)
-    return int(min(wait_seconds, max_wait))
 
 
 def confirm_detach(volume_id):
@@ -120,7 +96,7 @@ def lambda_handler(event, context):
             if "failedInput" in event:
                 del event["failedInput"]
 
-            event["wait_seconds"] = compute_backoff_seconds(
+            event["wait_seconds"] = retry_backoff_seconds(
                 event["retry_attempt"], event["run_options"]
             )
             print(
