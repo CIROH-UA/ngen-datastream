@@ -68,6 +68,11 @@ jobs:
           AMI_NAME: ${{ inputs.ami_name }}
         run: ./shell/ami/resolve_versions.sh
 
+      - name: Check every image is on Docker Hub with an arm64 build
+        env:
+          DOCKER_IMAGES: ${{ steps.versions.outputs.docker_images }}
+        run: ./shell/ami/check_images.sh
+
       - name: Configure AWS credentials
         id: aws
         uses: aws-actions/configure-aws-credentials@v4
