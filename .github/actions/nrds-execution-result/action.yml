@@ -1,0 +1,57 @@
+name: NRDS execution result
+description: >
+  Wait for a state machine execution to finish and fail if its job failed.
+  The state machine ends SUCCEEDED once it has cleaned up, even when the
+  commands on the instance failed, so the job result is read from the output:
+  failedInput is set when a step was caught, and ii_s3_object_checked is false
+  when ii_check_s3 was on and the expected object never appeared.
+
+inputs:
+  execution-arn:
+    description: ARN of the execution to wait on
+    required: true
+  poll-seconds:
+    description: Seconds between status checks
+    required: false
+    default: '30'
+
+outputs:
+  status:
+    description: Final execution status
+    value: ${{ steps.wait.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for the execution
+      id: wait
+      shell: bash
+      env:
+        EXECUTION_ARN: ${{ inputs.execution-arn }}
+        POLL_SECONDS: ${{ inputs.poll-seconds }}
+      run: |
+        while :; do
+          STATUS=$(aws stepfunctions describe-execution --execution-arn "$EXECUTION_ARN" --query status --output text)
+          echo "$(date -u +%H:%M:%S) $STATUS"
+          [ "$STATUS" = "RUNNING" ] || break
+          sleep "$POLL_SECONDS"
+        done
+        echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+        [ "$STATUS" = "SUCCEEDED" ] || { echo "::error::Execution $STATUS"; exit 1; }
+
+    - name: Check the job result
+      shell: bash
+      env:
+        EXECUTION_ARN: ${{ inputs.execution-arn }}
+      run: |
+        OUTPUT=$(aws stepfunctions describe-execution --execution-arn "$EXECUTION_ARN" --query output --output text)
+        if echo "$OUTPUT" | jq -e 'has("failedInput")' > /dev/null; then
+          echo "::error::Execution caught $(echo "$OUTPUT" | jq -r '.failedInput.Error')"
+          echo "$OUTPUT" | jq -r '.failedInput.Cause'
+          exit 1
+        fi
+        if echo "$OUTPUT" | jq -e '.run_options.ii_check_s3 == true and .ii_s3_object_checked != true' > /dev/null; then
+          echo "::error::ii_check_s3 was set but the expected S3 object wasn't found"
+          exit 1
+        fi
+        echo "Job succeeded"
