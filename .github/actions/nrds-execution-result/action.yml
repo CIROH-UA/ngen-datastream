@@ -16,9 +16,9 @@ inputs:
     default: '30'
 
 outputs:
-  status:
-    description: Final execution status
-    value: ${{ steps.wait.outputs.status }}
+  result:
+    description: SUCCEEDED if the job passed, JOB_FAILED if the execution succeeded but its job failed, otherwise the execution status
+    value: ${{ steps.check.outputs.result || steps.wait.outputs.status }}
 
 runs:
   using: composite
@@ -40,6 +40,7 @@ runs:
         [ "$STATUS" = "SUCCEEDED" ] || { echo "::error::Execution $STATUS"; exit 1; }
 
     - name: Check the job result
+      id: check
       shell: bash
       env:
         EXECUTION_ARN: ${{ inputs.execution-arn }}
@@ -48,10 +49,13 @@ runs:
         if echo "$OUTPUT" | jq -e 'has("failedInput")' > /dev/null; then
           echo "::error::Execution caught $(echo "$OUTPUT" | jq -r '.failedInput.Error')"
           echo "$OUTPUT" | jq -r '.failedInput.Cause'
-          exit 1
-        fi
-        if echo "$OUTPUT" | jq -e '.run_options.ii_check_s3 == true and .ii_s3_object_checked != true' > /dev/null; then
+          RESULT=JOB_FAILED
+        elif echo "$OUTPUT" | jq -e '.run_options.ii_check_s3 == true and .ii_s3_object_checked != true' > /dev/null; then
           echo "::error::ii_check_s3 was set but the expected S3 object wasn't found"
-          exit 1
+          RESULT=JOB_FAILED
+        else
+          echo "Job succeeded"
+          RESULT=SUCCEEDED
         fi
-        echo "Job succeeded"
+        echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+        [ "$RESULT" = "SUCCEEDED" ]
