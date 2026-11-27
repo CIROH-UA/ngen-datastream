@@ -183,6 +183,10 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions
+
       - uses: actions/download-artifact@v4
         with:
           name: vputest-executions
@@ -208,16 +212,9 @@ jobs:
       # The state machine enforces the execution's timeout_s and retries.
       - name: Wait for the execution
         id: wait
-        run: |
-          STATUS=RUNNING
-          while [ "$STATUS" = "RUNNING" ]; do
-            sleep 30
-            STATUS=$(aws stepfunctions describe-execution \
-              --execution-arn "${{ steps.start.outputs.arn }}" --query status --output text)
-            echo "$(date -u +%H:%M:%S) $STATUS"
-          done
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          [ "$STATUS" = "SUCCEEDED" ] || { echo "::error::Execution $STATUS"; exit 1; }
+        uses: ./.github/actions/nrds-execution-result
+        with:
+          execution-arn: ${{ steps.start.outputs.arn }}
 
       - name: Show the failure
         if: failure() && steps.start.outcome == 'success'
@@ -237,7 +234,7 @@ jobs:
         run: |
           mkdir -p result
           jq -n --arg ds "${{ matrix.datastream }}" --arg rt "${{ matrix.run_type }}" --arg vpu "${{ matrix.vpu }}" \
-                --arg status "${{ steps.wait.outputs.status || steps.start.outcome }}" \
+                --arg status "${{ steps.wait.outputs.result || steps.start.outcome }}" \
                 --arg arn "${{ steps.start.outputs.arn }}" \
                 '{datastream: $ds, run_type: $rt, vpu: $vpu, status: $status, arn: $arn}' > "result/${{ matrix.file }}"
 

@@ -126,8 +126,8 @@ jobs:
           jq '.commands[0][:200]' /tmp/exec_input.json
 
       # ── Execute and monitor ────────────────────────────────────────
-      - name: Start and monitor execution
-        id: monitor
+      - name: Start execution
+        id: start
         working-directory: .
         run: |
           EXEC_NAME="ci_test_pr${{ github.event.pull_request.number || 'manual' }}_$(date +%s)"
@@ -137,37 +137,29 @@ jobs:
             --input "file:///tmp/exec_input.json" \
             --query 'executionArn' --output text)
           echo "Started: $EXEC_ARN"
+          echo "arn=$EXEC_ARN" >> "$GITHUB_OUTPUT"
 
-          TIMEOUT=2400
-          ELAPSED=0
-          STATUS="RUNNING"
+      - name: Wait for execution result
+        id: wait
+        timeout-minutes: 40
+        uses: ./.github/actions/nrds-execution-result
+        with:
+          execution-arn: ${{ steps.start.outputs.arn }}
+          poll-seconds: '15'
 
-          while [ "$STATUS" = "RUNNING" ] && [ $ELAPSED -lt $TIMEOUT ]; do
-            STATUS=$(aws stepfunctions describe-execution \
-              --execution-arn "$EXEC_ARN" --query 'status' --output text)
-            echo "[$ELAPSED s] $STATUS"
-            if [ "$STATUS" = "RUNNING" ]; then
-              sleep 15
-              ELAPSED=$((ELAPSED + 15))
-            fi
-          done
-
-          # Capture execution history regardless of outcome
+      # Capture execution history regardless of outcome
+      - name: Record execution history and result
+        id: monitor
+        if: always() && steps.start.outcome == 'success'
+        env:
+          EXEC_ARN: ${{ steps.start.outputs.arn }}
+          RESULT: ${{ steps.wait.outputs.result || 'TIMEOUT' }}
+        run: |
           aws stepfunctions get-execution-history \
             --execution-arn "$EXEC_ARN" \
             --query "events[?type=='TaskStateEntered' || type=='TaskSucceeded' || type=='TaskFailed' || type=='LambdaFunctionFailed' || type=='LambdaFunctionScheduleFailed' || type=='ExecutionFailed']" \
             --output json | tee /tmp/history.json
-
-          if [ "$STATUS" = "SUCCEEDED" ]; then
-            echo "result=SUCCEEDED" >> "$GITHUB_OUTPUT"
-          elif [ "$STATUS" = "RUNNING" ]; then
-            echo "result=TIMEOUT" >> "$GITHUB_OUTPUT"
-            exit 1
-          else
-            echo "result=$STATUS" >> "$GITHUB_OUTPUT"
-            echo "::error::SM execution $STATUS. See history above."
-            exit 1
-          fi
+          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
 
       # ── Clean up test output on S3 ────────────────────────────────
       - name: Clean up test S3 output
