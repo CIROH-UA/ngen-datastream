@@ -8,7 +8,7 @@ name: Datastream VPU Test
 #
 # Other workflows call it to run inputs under test the way production would:
 # `overrides` swaps a candidate geopackage, BMI tarball or realization into the
-# executions (see research_datastream/vpu_test.py).
+# executions (see research_datastream_aws/vpu_test.py).
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ on:
       - 'infra/aws/terraform/services/nrds/datastreams/**'
       - '!infra/aws/terraform/services/nrds/datastreams/*/contributions/**'
       - '.github/workflows/datastream-vpu-test.yml'
-      - 'infra/aws/python/src/research_datastream/vpu_test.py'
+      - 'infra/aws/python/src/research_datastream_aws/vpu_test.py'
   workflow_dispatch:
     inputs:
       datastreams:
@@ -129,7 +129,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/infra/aws/python/src
         run: |
           set -euo pipefail
-          T=$(python -m research_datastream.vpu_test targets ${{ steps.ds.outputs.list }} --main-tf main.tf)
+          T=$(python -m research_datastream_aws.vpu_test targets ${{ steps.ds.outputs.list }} --main-tf main.tf)
           mapfile -t TARGETS <<< "$T"
           terraform init -input=false -backend-config="envs/prod.backend.hcl"
           terraform plan -input=false -lock=false -refresh=false \
@@ -145,7 +145,7 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$OVERRIDES" > "${{ runner.temp }}/overrides.txt"
           for DS in ${{ steps.ds.outputs.list }}; do
-            python -m research_datastream.vpu_test select "${{ runner.temp }}/plan.json" "$DS" \
+            python -m research_datastream_aws.vpu_test select "${{ runner.temp }}/plan.json" "$DS" \
               --main-tf "$TF_DIR/main.tf" \
               --out-dir "${{ runner.temp }}/executions" \
               --run-types '${{ inputs.run_types || 'short_range' }}' \

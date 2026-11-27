@@ -1,7 +1,6 @@
 """Resolve the literal ``DAILY`` token in datastream commands to a forecast
-date (``YYYYMMDD``). The rules differ for the forcing generator vs. ngen runs.
-Shared by the AWS streamcommander lambda and the LXD controller. Pure stdlib;
-``now`` is injectable for deterministic tests."""
+date (``YYYYMMDD``). Shared by the AWS streamcommander lambda and the LXD
+controller. Pure stdlib; ``now`` is injectable for deterministic tests."""
 
 from __future__ import annotations
 
@@ -9,6 +8,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 __all__ = [
+    "extract_s3_bucket",
     "extract_s3_prefix",
     "extract_forcing_source",
     "extract_forcing_file",
@@ -17,10 +17,16 @@ __all__ = [
     "substitute_daily",
 ]
 
+_S3_BUCKET_RE = re.compile(r"(?i)--s3_bucket[=\s']+([^\s']+)")
 _S3_PREFIX_RE = re.compile(r"(?i)--s3_prefix[=\s']+([^\s']+)")
 _FORCING_SOURCE_RE = re.compile(r"(?i)--forcing_source[=\s']+([^\s']+)")
 _FORCING_FILE_RE = re.compile(r"(?i)-F[=\s']+([^\s']+)")
 _STANDALONE_DAILY_RE = re.compile(r"(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])")
+
+
+def extract_s3_bucket(commands: list[str]) -> str | None:
+    """Return the last ``--s3_bucket`` value found across the commands."""
+    return _last_match(commands, _S3_BUCKET_RE)
 
 
 def extract_s3_prefix(commands: list[str]) -> str | None:
@@ -92,11 +98,12 @@ def substitute_daily(
 
     Behavior by command shape:
       * No ``--forcing_source``: resolve every standalone ``DAILY``.
-      * ``--s3_prefix`` without ``-F``: resolve ``DAILY`` in the prefix (forcing
-        generator). With ``-F`` present (ngen runs) leave it literal for
-        datastreamcli to expand.
+      * ``--s3_prefix``: resolve ``DAILY`` in the prefix wherever it appears.
+        Dating it here, not in datastreamcli, keeps the output prefix, the
+        output check and ``execution.json`` on the date resolved at launch.
       * ``-F`` forcing file: always resolve, applying the MEDIUM_RANGE ensemble
-        hour shift (6h per member beyond the first).
+        hour shift (6h per member beyond the first). Only the file shifts; the
+        output prefix keeps the run's date.
 
     First attempt only — the hour-shift isn't idempotent, so retries reuse the
     already-resolved commands.
@@ -113,13 +120,10 @@ def substitute_daily(
 
     # --- --s3_prefix DAILY handling -------------------------------------
     if prefix and "DAILY" in prefix:
+        prefix_dated = prefix.replace("DAILY", today)
+        out = [c.replace(prefix, prefix_dated) for c in out]
         if forcing_source is None:
             out = [_STANDALONE_DAILY_RE.sub(today, c) for c in out]
-        elif forcing_file is None:
-            # Forcing generator (no -F): date the output prefix in place.
-            prefix_dated = prefix.replace("DAILY", today)
-            out = [c.replace(prefix, prefix_dated) for c in out]
-        # else: -F present → leave the prefix's DAILY literal for datastreamcli.
 
     # --- -F forcing file DAILY handling + ensemble hour shift -----------
     if forcing_file is not None:

@@ -1,9 +1,8 @@
 """Tests for the shared DAILY-token resolution logic (research_datastream_core).
 
-These lock in parity with the AWS streamcommander lambda the logic was ported
-from: the forecast-cycle fold-back, the MEDIUM_RANGE ensemble hour-shift, and
-the rule that ngen runs (`-F` present) keep `--S3_PREFIX`'s DAILY literal for
-datastreamcli to expand while the `-F` path is resolved here.
+Both orchestrators call this, so these lock in what production AWS has always
+done: the forecast-cycle fold-back, the MEDIUM_RANGE ensemble hour-shift, and
+dating `--S3_PREFIX` for ngen runs at launch rather than in datastreamcli.
 """
 
 from datetime import datetime, timezone
@@ -14,6 +13,7 @@ from research_datastream_core import (
     daily_fcst_cycle,
     extract_forcing_file,
     extract_forcing_source,
+    extract_s3_bucket,
     extract_s3_prefix,
     resolve_daily_date,
     substitute_daily,
@@ -27,6 +27,11 @@ NOON = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
 
 def test_extract_last_match_wins():
     assert extract_s3_prefix(["--s3_prefix a/first", "--s3_prefix b/second"]) == "b/second"
+
+
+def test_extract_s3_bucket_case_insensitive():
+    assert extract_s3_bucket(["--S3_BUCKET my-bucket --S3_PREFIX p"]) == "my-bucket"
+    assert extract_s3_bucket(["no bucket here"]) is None
 
 
 def test_extract_forcing_source_keeps_member_suffix():
@@ -89,14 +94,40 @@ def test_forcing_generator_dates_prefix_in_place():
     assert "fc/ngen.20260701/forcing_short_range/00" in out
 
 
-def test_ngen_run_keeps_prefix_daily_literal_but_resolves_forcing_file():
+def test_ngen_run_dates_prefix_and_forcing_file():
     cmds = ["datastream -s DAILY -F s3://b/ngen.DAILY/forcing_short_range/06/"
             "ngen.t06z.short_range.forcing.f001_f018.VPU_01.nc "
             "--FORCING_SOURCE NWM_V3_SHORT_RANGE_06 "
             "--S3_BUCKET b --S3_PREFIX out/ngen.DAILY/short_range/06/VPU_01"]
     out = substitute_daily(cmds, now=NOON)[0]
-    assert "-F s3://b/ngen.20260701/forcing_short_range/06/" in out   # -F resolved
-    assert "--S3_PREFIX out/ngen.DAILY/short_range/06/VPU_01" in out   # prefix left literal
+    assert "-F s3://b/ngen.20260701/forcing_short_range/06/" in out
+    assert "--S3_PREFIX out/ngen.20260701/short_range/06/VPU_01" in out
+    assert "-s DAILY" in out   # datastreamcli resolves its own start date
+
+
+def test_production_cfe_nom_command():
+    # Shape of the AWS cfe-nom template; the expected prefix matches the
+    # execution.json production wrote for ngen.20261019/short_range/06/VPU_01.
+    cmds = ["runuser -l ec2-user -c 'RESTART_DATE=DAILY && /home/ec2-user/datastreamcli/scripts/datastream "
+            "-s DAILY -n 3 -F s3://bkt/forcings/v2.2_hydrofabric/ngen.DAILY/forcing_short_range/06/"
+            "ngen.t06z.short_range.forcing.f001_f018.VPU_01.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_06 "
+            "-t s3://bkt/restarts/v2.2_hydrofabric/ngen.${RESTART_DATE}/06/channel_restart.nc "
+            "--S3_BUCKET bkt --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/short_range/06/VPU_01'"]
+    out = substitute_daily(cmds, now=datetime(2026, 10, 19, 7, 5, tzinfo=UTC))[0]
+    assert "--S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.20261019/short_range/06/VPU_01'" in out
+    assert "/ngen.20261019/forcing_short_range/06/" in out
+    assert "RESTART_DATE=DAILY" in out   # left for datastreamcli, as in production
+
+
+def test_medium_range_shift_keeps_prefix_on_run_date():
+    # The ensemble shift moves the forcing file to yesterday 18z; the output
+    # prefix stays on the run's date.
+    cmds = ["datastream -s DAILY -F s3://b/ngen.DAILY/forcing_medium_range/00/"
+            "ngen.t00z.medium_range.forcing.f001_f240.VPU_01.nc "
+            "--FORCING_SOURCE NWM_V3_MEDIUM_RANGE_00_2 --S3_BUCKET b --S3_PREFIX p/ngen.DAILY/00/2"]
+    out = substitute_daily(cmds, now=NOON)[0]
+    assert "-F s3://b/ngen.20260630/forcing_medium_range/18/" in out
+    assert "--S3_PREFIX p/ngen.20260701/00/2" in out
 
 
 def test_medium_range_ensemble_hour_shift():

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from research_datastream.vpu_test import load_overrides, module_addresses, override, pick, rewrite
+from research_datastream_aws.vpu_test import load_overrides, module_addresses, override, pick, rewrite
 
 CMD = (
     "runuser -l ec2-user -c 'export DS_TAG=1.7.1 && /home/ec2-user/datastreamcli/scripts/datastream "

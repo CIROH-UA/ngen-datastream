@@ -3,8 +3,8 @@
 Build one test execution per run type and VPU for an NRDS datastream, from the executions
 Terraform would schedule in production.
 
-    python -m research_datastream.vpu_test targets cfe-nom lstm_0 --main-tf main.tf
-    python -m research_datastream.vpu_test select plan.json cfe-nom --main-tf main.tf --out-dir execs \
+    python -m research_datastream_aws.vpu_test targets cfe-nom lstm_0 --main-tf main.tf
+    python -m research_datastream_aws.vpu_test select plan.json cfe-nom --main-tf main.tf --out-dir execs \
         [--overrides overrides.txt]
 
 `targets` prints the Terraform module address of each datastream directory.

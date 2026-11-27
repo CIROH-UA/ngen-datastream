@@ -100,7 +100,7 @@ jobs:
           TEST_PREFIX: test/cicd/contribution-inputs/${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          pip install -e infra/aws/python
+          pip install -e python
           P=$(python -m research_datastream.contribution_hydrofabric paths "${{ steps.file.outputs.path }}")
           if [[ "${{ github.event_name }}" == push ]]; then
             GPKG=$(jq -r .geopackage_prefix <<< "$P")
@@ -152,7 +152,7 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -e infra/aws/python boto3
+        run: pip install -e python boto3
 
       - name: Check the geopackages
         id: check
@@ -339,7 +339,7 @@ jobs:
       - name: Print the vpu_resource_overrides entries
         run: |
           set -euo pipefail
-          pip install -e infra/aws/python
+          pip install -e python
           {
             echo "### Deployed ${{ needs.plan.outputs.path }}"
             echo

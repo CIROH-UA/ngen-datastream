@@ -102,7 +102,7 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -e infra/aws/python
+        run: pip install -e python
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

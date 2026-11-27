@@ -1,8 +1,14 @@
 import boto3
 import time
-import re
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+
+# Vendored into the lambda zip from infra/common/python (see lambda.tf).
+from research_datastream_core import (
+    extract_s3_bucket,
+    extract_s3_prefix,
+    substitute_daily,
+)
 
 
 def wait_for_command_response(response, instance_id):
@@ -59,131 +65,11 @@ def lambda_handler(event, context):
         event["commands"].append(command_str)
         event.pop("datastream_command_options")
 
-    forcing_file = None
-    forcing_source = None
-    for jcmd in event["commands"]:
-        bucket_pattern = r"(?i)--s3_bucket[=\s']+([^\s']+)"
-        match = re.search(bucket_pattern, jcmd)
-        if match:
-            bucket = match.group(1)
-        prefix_pattern = r"(?i)--s3_prefix[=\s']+([^\s']+)"
-        match = re.search(prefix_pattern, jcmd)
-        if match:
-            prefix = match.group(1)
-        forcing_source_pattern = r"(?i)--forcing_source[=\s']+([^\s']+)"
-        match = re.search(forcing_source_pattern, jcmd)
-        if match:
-            forcing_source = match.group(1)
-
-        forcing_file_pattern = r"(?i)-F[=\s']+([^\s']+)"
-        match = re.search(forcing_file_pattern, jcmd)
-        if match:
-            forcing_file = match.group(1)
-
-    if event.get("retry_attempt", 0) == 0:
-        if "DAILY" in prefix:
-            # Create s3 path with DAILY replaced
-            prefix_daily = prefix
-            fcst_cycle = 16  # for analysis assim extend
-            if forcing_source:
-                if "SHORT_RANGE" in forcing_source:
-                    fcst_cycle = int(forcing_source[-2:])
-                elif "MEDIUM_RANGE" in forcing_source:
-                    fcst_cycle = int(forcing_source[-4:-2])
-                elif "ANALYSIS_ASSIM_RESTART_CHRT" in forcing_source:
-                    fcst_cycle = int(forcing_source[-2:])
-            else:
-                fcst_cycle = 24
-            if today.hour < fcst_cycle:
-                today = today - timedelta(days=1)
-            today = today.strftime("%Y%m%d")
-            prefix = re.sub(r"\DAILY", today, prefix)
-            escaped_path = re.escape(prefix_daily)
-            prefix_daily_pattern = escaped_path.replace("DAILY", r"(?P<date>DAILY)")
-
-            for j, jcmd in enumerate(event["commands"]):
-                match = re.search(prefix_daily_pattern, jcmd)
-                replacement = prefix_daily.replace("DAILY", today)
-                if match:
-                    new_str = re.sub(prefix_daily_pattern, replacement, jcmd)
-                    event["commands"][j] = re.sub(
-                        prefix_daily_pattern, replacement, jcmd
-                    )
-                if forcing_source is None:
-                    event["commands"][j] = re.sub(
-                        r"(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])",
-                        today,
-                        event["commands"][j],
-                    )
-
-        if forcing_file is not None:
-            # Shifting forcing file times based on ensemble member
-            escaped = re.escape(forcing_file)
-
-            # Make DAILY replaceable whether or not MEDIUM_RANGE is found
-            escaped = escaped.replace("DAILY", r"(?P<date>DAILY)")
-
-            shifted_forcing = forcing_file  # default, if no shift occurs
-
-            if forcing_source and "MEDIUM_RANGE" in forcing_source:
-                ensemble_member = int(forcing_source[-1])
-                nhrs_shift = 6 * (ensemble_member - 1)
-                m = re.search(r"/(\d{2})/.*?t(\d{2})z", forcing_file)
-
-                if m and nhrs_shift:
-                    hh_folder = int(m.group(1))
-                    shifted_raw = hh_folder - nhrs_shift
-                    new_hour = shifted_raw % 24
-
-                    if shifted_raw < 0:
-                        today = (
-                            datetime.strptime(today + m.group(1) + "00", "%Y%m%d%H%M")
-                            - timedelta(hours=nhrs_shift)
-                        ).strftime("%Y%m%d")
-
-                    shifted_forcing = forcing_file
-                    shifted_forcing = re.sub(
-                        r"/\d{2}/", f"/{new_hour:02d}/", shifted_forcing, count=1
-                    )
-                    shifted_forcing = re.sub(
-                        r"t\d{2}z", f"t{new_hour:02d}z", shifted_forcing, count=1
-                    )
-
-                    # Adjust regex pattern to allow shifted values
-                    escaped = escaped.replace(
-                        re.escape(f"/{int(m.group(1)):02d}/"), r"/\d{2}/", 1
-                    )
-                    escaped = escaped.replace(
-                        re.escape(f"t{int(m.group(2)):02d}z"), r"t\d{2}z", 1
-                    )
-
-            # Compile regex for matching in command string
-            forcing_pattern = re.compile(escaped)
-
-            # Always replace DAILY with `today` in the final replacement string
-            if type(today) != str:
-                today = today.strftime("%Y%m%d")
-            replacement = shifted_forcing.replace("DAILY", today)
-
-            for j, jcmd in enumerate(event["commands"]):
-                # Replace in -F argument (forcing file path)
-                if "-F" in jcmd:
-                    forcing_pattern = re.compile(
-                        re.escape(forcing_file).replace("DAILY", r"(?P<date>DAILY)")
-                    )
-                    replacement = shifted_forcing.replace("DAILY", today)
-                    jcmd = forcing_pattern.sub(replacement, jcmd, count=1)
-
-                # Replace in --S3_PREFIX argument, but keep DAILY in it
-                if "--S3_PREFIX" in jcmd:
-                    if "DAILY" in prefix:
-                        prefix_pattern = re.compile(
-                            re.escape(prefix_daily).replace("DAILY", r"(?P<date>DAILY)")
-                        )
-                        replacement = prefix_daily.replace("DAILY", today)
-                        jcmd = prefix_pattern.sub(prefix_daily, jcmd, count=1)
-
-                event["commands"][j] = jcmd
+    event["commands"] = substitute_daily(
+        event["commands"], now=today, retry_attempt=event.get("retry_attempt", 0)
+    )
+    bucket = extract_s3_bucket(event["commands"])
+    prefix = extract_s3_prefix(event["commands"])
 
     if not prefix is None and not bucket is None:
         client_s3 = boto3.client("s3", region_name=event["region"])

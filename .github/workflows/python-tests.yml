@@ -1,19 +1,22 @@
 name: Python Tests
 
-# Runs the research_datastream tests. They gate the contribution workflows'
-# uploads, and vpu_resources reads the datastreams' main.tf, so a change to
-# either the package or the NRDS Terraform runs them.
+# Installs every Python package in the repo together and runs their tests, so a
+# move or rename that breaks an import fails here instead of in a deployment.
+# They also gate the contribution workflows' uploads, and vpu_resources reads the
+# datastreams' main.tf, so a change to the NRDS Terraform runs them too.
 
 on:
   pull_request:
     paths:
-      - 'infra/aws/python/**'
+      - 'python/**'
+      - 'infra/*/python/**'
       - 'infra/aws/terraform/services/nrds/**'
       - '.github/workflows/python-tests.yml'
   push:
     branches: [main]
     paths:
-      - 'infra/aws/python/**'
+      - 'python/**'
+      - 'infra/*/python/**'
       - 'infra/aws/terraform/services/nrds/**'
       - '.github/workflows/python-tests.yml'
   workflow_dispatch:
@@ -35,8 +38,25 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -e 'infra/aws/python[develop]'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e infra/common/python -e "python[plots]" -e infra/aws/python -e infra/lxd/python pytest
 
       - name: Test
-        working-directory: infra/aws/python
-        run: python -m pytest -v
+        run: |
+          pytest -v python
+          pytest -v infra/common/python
+          pytest -v infra/lxd/python
+          pytest -v infra/aws/python
+
+      - name: Import every CLI
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          for m in research_datastream.contribution_parameters research_datastream.contribution_hydrofabric \
+                   research_datastream.vpu_resources research_datastream.nrds_run_health \
+                   research_datastream.vpu_comparison_graphs research_datastream.s3mv \
+                   research_datastream_aws.datastream_cost_nrds research_datastream_aws.vpu_test \
+                   research_datastream_lxd; do
+            python -m "$m" --help > /dev/null
+          done
