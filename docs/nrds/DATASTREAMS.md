@@ -138,11 +138,12 @@ live in this repo):
 | `zwills/merkdir` | [makew0rld/merkdir](https://github.com/makew0rld/merkdir) | (untagged) | output-tree checksum utility |
 
 ³ Image tags are **pinned per datastream** in the execution template
-(`templates/*.tpl`), not globally — this is why streams can run different versions. The
-repository default is in [`ami_version.yml`](../../ami_version.yml): `DS_TAG 1.7.1`,
-`FP_TAG 2.2.1`, `NGIAB_TAG v1.8.0`, AMI `1.7.1`. Docker tags follow `MAJOR.MINOR.PATCH` and
-are traceable to GitHub commits, so any run is reconstructable from its metadata. **Note:**
-`cfe-nom` and `forcing` currently pin older tags than the repo default — worth reconciling.
+(`templates/*.tpl`), not globally — this is why streams can run different versions. Each
+datastream also pins its own AMI in
+[`prod.tfvars`](../../infra/aws/terraform/services/nrds/envs/prod.tfvars).
+New AMIs built by the [AMI workflow](../../.github/workflows/build_test_create_ami.yml) record
+what they contain in their tags (`docker-images`, `datastreamcli-tag`, `ngen-datastream-commit`), and each run's summary shows which datastreams can run on the new AMI. Docker tags follow `MAJOR.MINOR.PATCH`
+and are traceable to GitHub commits, so any run is reconstructable from its metadata.
 
 ---
 
