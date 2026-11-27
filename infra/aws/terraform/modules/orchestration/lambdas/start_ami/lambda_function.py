@@ -5,6 +5,13 @@ import time, os, json
 global client_ec2
 client_ec2 = boto3.client("ec2", region_name=os.environ["AWS_REGION"])
 
+# a second EC2 client with boto3's automatic retries turned off for spot requests
+client_ec2_no_retry = boto3.client(
+    "ec2",
+    region_name=os.environ["AWS_REGION"],
+    config=botocore.config.Config(retries={"total_max_attempts": 1}),
+)
+
 REGION_NAME_MAP = {
     "us-east-1": "US East (N. Virginia)",
     "us-east-2": "US East (Ohio)",
@@ -75,7 +82,30 @@ CAPACITY_ERROR_CODES = {
     "InsufficientHostCapacity",
     "InsufficientReservedInstanceCapacity",
     "Unsupported",
+    "SpotMaxPriceTooLow"
 }
+
+# Graviton instance families to try for spot in order of preference.
+SPOT_FAMILIES = ["m8g", "m7g", "m6g", "r8g", "r7g"]
+
+
+def get_spot_instance_types(instance_type):
+    """
+   returns the instance types to try for spot, same size, requested type first.
+
+    Example: "m8g.2xlarge" -> ["m8g.2xlarge", "m7g.2xlarge", "m6g.2xlarge",
+                               "r8g.2xlarge", "r7g.2xlarge"]
+    handles instances outside SPOT_FAMILIES: "t4g.small" -> ["t4g.small"]
+    """
+    family, size = instance_type.split(".", 1)
+    if family not in SPOT_FAMILIES:
+        return [instance_type]
+
+    instance_types = [instance_type]
+    for other_family in SPOT_FAMILIES:
+        if other_family != family:
+            instance_types.append(other_family + "." + size)
+    return instance_types
 
 
 def get_default_subnets():
@@ -119,6 +149,41 @@ def launch_with_capacity_fallbacks(params, original_error):
     raise Exception(
         f"No capacity in any of {len(subnets)} availability zones tried. Original error: {original_error}"
     )
+
+
+def launch_spot_in_other_azs_and_families(params):
+    """
+    tries spot for every instance type from get_spot_instance_types() in every AZ.
+
+    Order: m8g in AZ a, b, c, ... then m7g in AZ a, b, c, ... and so on.
+    Returns the run_instances response for the first launch that works, or None if
+    nothing had spot capacity. On None, the caller falls back to on-demand (same as before).
+
+    Replaces the old spot fallback, which only tried other AZs for the same instance type.
+    """
+    subnets = get_default_subnets()
+    instance_types = get_spot_instance_types(params["InstanceType"])
+
+    for instance_type in instance_types:
+        for subnet in subnets:
+            attempt = dict(params)
+            attempt["InstanceType"] = instance_type
+            attempt["SubnetId"] = subnet
+
+            print(f"Trying spot: {instance_type} in {subnet}")
+            try:
+                return client_ec2_no_retry.run_instances(**attempt)
+            except botocore.exceptions.ClientError as e:
+                error_code = e.response["Error"]["Code"]
+                if error_code in CAPACITY_ERROR_CODES:
+                    print(f"No spot instances available: {error_code}, trying the next one")
+                    continue
+
+                print(f"  stopping spot search: {error_code}")
+                return None
+
+    print("No spot capacity for any instance type in any AZ")
+    return None
 
 
 def wait_for_instance_running(instance_id, timeout=300):
@@ -181,8 +246,15 @@ def lambda_handler(event, context):
     event["instance_parameters"]["MaxCount"] = 1
     event["instance_parameters"]["MinCount"] = 1
     params = event["instance_parameters"]
+
+    # a spot request uses the no-retry client with a single attempt
+    if params.get("InstanceMarketOptions"):
+        first_client = client_ec2_no_retry
+    else:
+        first_client = client_ec2
+
     try:
-        response = client_ec2.run_instances(**params)
+        response = first_client.run_instances(**params)
     except botocore.exceptions.ClientError as e:
         error_msg = e.response["Error"]["Message"]
         error_code = e.response["Error"]["Code"]
@@ -192,9 +264,11 @@ def lambda_handler(event, context):
             response = None
             # Try launching spot instances in other AZs before falling back to on-demand
             if error_code in CAPACITY_ERROR_CODES:
-                print("No spot capacity in default AZ, trying spot in other AZs")
+                print(
+                    "No spot capacity in default AZ, trying spot in other AZs and instance families"
+                )
                 try:
-                    response = launch_with_capacity_fallbacks(params, error_msg)
+                    response = launch_spot_in_other_azs_and_families(params)
                 except Exception as e_spot:
                     print(f"Spot AZ fallback failed: {e_spot}")
             if response is None:
