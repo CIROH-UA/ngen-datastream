@@ -45,11 +45,11 @@ REALIZATION = "realizations/{datastream}/realization_VPU_{vpu}.json"
 ARCHIVE = "realizations/{datastream}/archive/VPU_{vpu}/{stamp}.{commit}.json"
 PROVENANCE = "parameters/{datastream}/{issue}.json"
 
-# VPUs each datastream runs. cfe_nom omits 17, per issue #199.
+# VPUs each datastream runs.
 DATASTREAM_VPUS = {
     "cfe_nom": {
         "01", "02", "03N", "03S", "03W", "04", "05", "06", "07", "08", "09",
-        "10L", "10U", "11", "12", "13", "14", "15", "16", "18",
+        "10L", "10U", "11", "12", "13", "14", "15", "16", "17", "18",
     }
 }
 

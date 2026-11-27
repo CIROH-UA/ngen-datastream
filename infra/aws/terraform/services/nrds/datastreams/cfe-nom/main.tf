@@ -13,12 +13,13 @@ locals {
     "01", "02", "03N", "03S", "03W", "04",
     "05", "06", "07", "08", "09", "10L",
     "10U", "11", "12", "13", "14", "15",
-    "16", "18"
+    "16", "17", "18"
   ]
   vpu_resource_overrides = {
-    # "17" = {
-    #   geopackage = "resources/v2.2_hydrofabric/geopackages/VPU_17/nextgen_VPU_17_v2.gpkg"
-    # }
+    "17" = {
+      geopackage  = "resources/v2.2_hydrofabric/geopackages/contributions/423/nextgen_VPU_17.gpkg"
+      bmi_configs = "resources/v2.2_hydrofabric/bmi_configs/cfe_nom/contributions/423/VPU_17/ngen-bmi-configs.tar.gz"
+    }
   }
   vpu_resources = {
     for vpu in var.all_vpus : vpu => merge({

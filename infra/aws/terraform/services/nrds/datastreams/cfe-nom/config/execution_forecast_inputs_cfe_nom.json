@@ -26,6 +26,7 @@
       "14": "m8g.xlarge",
       "15": "m8g.xlarge",
       "16": "m8g.xlarge",
+      "17": "m8g.2xlarge",
       "18": "m8g.xlarge"
     },
     "volume_size": 64
@@ -53,6 +54,7 @@
       "14": "m8g.2xlarge",
       "15": "m8g.2xlarge",
       "16": "m8g.2xlarge",
+      "17": "m8g.4xlarge",
       "18": "m8g.2xlarge"
     },
     "volume_size": 64
@@ -79,6 +81,7 @@
       "14": "m8g.xlarge",
       "15": "m8g.xlarge",
       "16": "m8g.xlarge",
+      "17": "m8g.2xlarge",
       "18": "m8g.xlarge"
     },
     "volume_size": 64
