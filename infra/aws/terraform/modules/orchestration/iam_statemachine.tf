@@ -22,6 +22,8 @@ resource "aws_iam_policy" "lambda_invoke_policy" {
       Effect = "Allow",
       Action = "lambda:InvokeFunction",
       Resource = [
+        "${aws_lambda_function.input_gate_lambda.arn}:*",
+        aws_lambda_function.input_gate_lambda.arn,
         "${aws_lambda_function.starter_lambda.arn}:*",
         aws_lambda_function.starter_lambda.arn,
         "${aws_lambda_function.commander_lambda.arn}:*",

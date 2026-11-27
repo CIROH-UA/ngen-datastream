@@ -37,6 +37,7 @@ locals {
   controller_user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
     package_ref     = var.package_ref
     output_check    = var.output_check
+    input_check     = var.input_check
     log_level       = var.log_level
     aws_region      = var.aws_region
     datastreams_dir = "/etc/research-datastream-lxd/datastreams"

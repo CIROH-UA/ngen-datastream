@@ -1,9 +1,8 @@
 """Tests for the shared DAILY-token resolution logic (research_datastream_core).
 
-These lock in parity with the AWS streamcommander lambda the logic was ported
-from: the forecast-cycle fold-back, the MEDIUM_RANGE ensemble hour-shift, and
-the rule that ngen runs (`-F` present) keep `--S3_PREFIX`'s DAILY literal for
-datastreamcli to expand while the `-F` path is resolved here.
+Both orchestrators call this, so these lock in what production AWS has always
+done: the forecast-cycle fold-back, the MEDIUM_RANGE ensemble hour-shift, and
+dating `--S3_PREFIX` for ngen runs at launch rather than in datastreamcli.
 """
 
 from datetime import datetime, timezone
@@ -14,8 +13,13 @@ from research_datastream_core import (
     daily_fcst_cycle,
     extract_forcing_file,
     extract_forcing_source,
+    extract_restart_file,
+    extract_s3_bucket,
     extract_s3_prefix,
+    required_inputs,
     resolve_daily_date,
+    resolve_offset_tokens,
+    run_init,
     substitute_daily,
 )
 
@@ -27,6 +31,11 @@ NOON = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
 
 def test_extract_last_match_wins():
     assert extract_s3_prefix(["--s3_prefix a/first", "--s3_prefix b/second"]) == "b/second"
+
+
+def test_extract_s3_bucket_case_insensitive():
+    assert extract_s3_bucket(["--S3_BUCKET my-bucket --S3_PREFIX p"]) == "my-bucket"
+    assert extract_s3_bucket(["no bucket here"]) is None
 
 
 def test_extract_forcing_source_keeps_member_suffix():
@@ -89,14 +98,81 @@ def test_forcing_generator_dates_prefix_in_place():
     assert "fc/ngen.20260701/forcing_short_range/00" in out
 
 
-def test_ngen_run_keeps_prefix_daily_literal_but_resolves_forcing_file():
+def test_ngen_run_dates_prefix_and_forcing_file():
     cmds = ["datastream -s DAILY -F s3://b/ngen.DAILY/forcing_short_range/06/"
             "ngen.t06z.short_range.forcing.f001_f018.VPU_01.nc "
             "--FORCING_SOURCE NWM_V3_SHORT_RANGE_06 "
             "--S3_BUCKET b --S3_PREFIX out/ngen.DAILY/short_range/06/VPU_01"]
     out = substitute_daily(cmds, now=NOON)[0]
-    assert "-F s3://b/ngen.20260701/forcing_short_range/06/" in out   # -F resolved
-    assert "--S3_PREFIX out/ngen.DAILY/short_range/06/VPU_01" in out   # prefix left literal
+    assert "-F s3://b/ngen.20260701/forcing_short_range/06/" in out
+    assert "--S3_PREFIX out/ngen.20260701/short_range/06/VPU_01" in out
+    assert "-s DAILY" in out   # datastreamcli resolves its own start date
+
+
+def test_production_cfe_nom_command():
+    # Shape of the AWS cfe-nom template; the expected prefix matches the
+    # execution.json production wrote for ngen.20261019/short_range/06/VPU_01.
+    cmds = ["runuser -l ec2-user -c '/home/ec2-user/datastreamcli/scripts/datastream "
+            "-s DAILY -n 3 -F s3://bkt/forcings/v2.2_hydrofabric/ngen.DAILY/forcing_short_range/06/"
+            "ngen.t06z.short_range.forcing.f001_f018.VPU_01.nc --FORCING_SOURCE NWM_V3_SHORT_RANGE_06 "
+            "-t s3://bkt/restarts/v2.2_hydrofabric/ngen.DAILY/06/channel_restart_DAILY_060000.nc "
+            "--S3_BUCKET bkt --S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.DAILY/short_range/06/VPU_01'"]
+    out = substitute_daily(cmds, now=datetime(2026, 10, 19, 7, 5, tzinfo=UTC))[0]
+    assert "--S3_PREFIX outputs/cfe_nom/v2.2_hydrofabric/ngen.20261019/short_range/06/VPU_01'" in out
+    assert "/ngen.20261019/forcing_short_range/06/" in out
+    assert "-t s3://bkt/restarts/v2.2_hydrofabric/ngen.20261019/06/channel_restart_20261019_060000.nc " in out
+    assert out.count("DAILY") == 1   # only -s DAILY, left for datastreamcli
+
+
+AAE_CMD = ("datastream -s DAILY -F s3://b/ngen.DAILY/forcing_analysis_assim_extend/{init}/"
+           "ngen.t{init}z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc "
+           "--FORCING_SOURCE NWM_V3_ANALYSIS_ASSIM_EXTEND_{init} "
+           "-t s3://b/restarts/ngen.{{DAILY-28h:YYYYMMDD}}/{{DAILY-28h:HH}}/"
+           "channel_restart_{{DAILY-28h:YYYYMMDD}}_{{DAILY-28h:HH}}0000.nc "
+           "--S3_BUCKET b --S3_PREFIX out/ngen.DAILY/analysis_assim_extend/{init}/VPU_09")
+
+
+def test_analysis_assim_extend_restart_is_init_minus_28h():
+    # 16z init on 11/22 simulates from 11/21 13z; t-route starts from 11/21 12z.
+    out = substitute_daily([AAE_CMD.format(init="16")], now=datetime(2026, 11, 22, 19, 0, tzinfo=UTC))[0]
+    assert "-t s3://b/restarts/ngen.20261121/12/channel_restart_20261121_120000.nc " in out
+    assert "--S3_PREFIX out/ngen.20261122/analysis_assim_extend/16/VPU_09" in out
+
+
+def test_analysis_assim_extend_restart_follows_fold_back():
+    # Before the 16z cycle the run folds back to 11/21, so the restart is 11/20.
+    out = substitute_daily([AAE_CMD.format(init="16")], now=datetime(2026, 11, 22, 3, 0, tzinfo=UTC))[0]
+    assert "ngen.20261120/12/channel_restart_20261120_120000.nc" in out
+
+
+def test_offset_token_crosses_midnight():
+    # A 02z init minus 28h lands two days back, at 22z.
+    init = datetime(2026, 11, 22, 2, tzinfo=UTC)
+    assert resolve_offset_tokens("{DAILY-28h:YYYYMMDD}/{DAILY-28h:HH}", init) == "20261120/22"
+    assert resolve_offset_tokens("{DAILY:YYYYMMDD}{DAILY:HH} {DAILY+6h:HH}", init) == "2026112202 08"
+
+
+def test_offset_token_without_forcing_source():
+    # The standalone-DAILY pass must not reach inside the token; no source folds back to 06/30 00z.
+    cmds = ["run --S3_PREFIX p/DAILY -t s3://b/{DAILY-24h:YYYYMMDD}/r.nc"]
+    assert substitute_daily(cmds, now=NOON) == ["run --S3_PREFIX p/20260630 -t s3://b/20260629/r.nc"]
+
+
+def test_run_init_and_restart_extraction():
+    assert run_init("20261122", "NWM_V3_SHORT_RANGE_06") == datetime(2026, 11, 22, 6, tzinfo=UTC)
+    assert run_init("20261122", "NWM_V3_MEDIUM_RANGE_12_3") == datetime(2026, 11, 22, 12, tzinfo=UTC)
+    assert extract_restart_file(["datastream -t s3://b/r.nc -w s3://b/x.nc --troute_x y"]) == "s3://b/r.nc"
+
+
+def test_medium_range_shift_keeps_prefix_on_run_date():
+    # The ensemble shift moves the forcing file to yesterday 18z; the output
+    # prefix stays on the run's date.
+    cmds = ["datastream -s DAILY -F s3://b/ngen.DAILY/forcing_medium_range/00/"
+            "ngen.t00z.medium_range.forcing.f001_f240.VPU_01.nc "
+            "--FORCING_SOURCE NWM_V3_MEDIUM_RANGE_00_2 --S3_BUCKET b --S3_PREFIX p/ngen.DAILY/00/2"]
+    out = substitute_daily(cmds, now=NOON)[0]
+    assert "-F s3://b/ngen.20260630/forcing_medium_range/18/" in out
+    assert "--S3_PREFIX p/ngen.20260701/00/2" in out
 
 
 def test_medium_range_ensemble_hour_shift():
@@ -132,3 +208,18 @@ def test_retry_attempt_returns_commands_unchanged():
     # The hour-shift isn't idempotent, so retries must reuse the resolved commands.
     cmds = ["echo DAILY"]
     assert substitute_daily(cmds, now=NOON, retry_attempt=1) == cmds
+
+
+def test_required_inputs_after_resolution():
+    out = substitute_daily([AAE_CMD.format(init="16")], now=datetime(2026, 11, 22, 19, 0, tzinfo=UTC))
+    assert required_inputs(out) == [
+        "s3://b/ngen.20261122/forcing_analysis_assim_extend/16/ngen.t16z.analysis_assim_extend.forcing.tm27_tm00.VPU_09.nc",
+        "s3://b/restarts/ngen.20261121/12/channel_restart_20261121_120000.nc",
+    ]
+
+
+def test_required_inputs_skips_non_s3_and_rejects_unresolved():
+    assert required_inputs(["datastream -F /local/f.nc -t https://x/r.nc"]) == []
+    assert required_inputs(["run --S3_PREFIX p"]) == []
+    with pytest.raises(ValueError):
+        required_inputs([AAE_CMD.format(init="16")])

@@ -1,9 +1,11 @@
 import boto3
 import time
-import re
 import datetime
 from datetime import timezone
 import json
+
+# Vendored into the lambda zip from infra/common/python (see lambda.tf).
+from research_datastream_core import output_marker
 
 client_s3 = boto3.client("s3")
 
@@ -24,36 +26,13 @@ def wait_for_object_existence(bucket_name, prefix):
 
 def lambda_handler(event, context):
 
-    bucket = None
-    prefix = None
-    ii_ds_cmd = False
     if event["run_options"]["ii_check_s3"]:
-        if not "datastream_command_options" in event:
-            for jcmd in event["commands"]:
-                bucket_pattern = r"(?i)--s3_bucket[=\s']+([^\s']+)"
-                match = re.search(bucket_pattern, jcmd)
-                if match:
-                    bucket = match.group(1)
-                prefix_pattern = r"(?i)--s3_prefix[=\s']+([^\s']+)"
-                match = re.search(prefix_pattern, jcmd)
-                if match:
-                    prefix = match.group(1)
-                bucket_pattern = r"(?i)/scripts/datastream[=\s']+([^\s']+)"
-                match = re.search(bucket_pattern, jcmd)
-                if match:
-                    ii_ds_cmd = True
-        else:
-            bucket = event["datastream_command_options"]["s3_bucket"]
-            prefix = event["datastream_command_options"]["s3_prefix"]
-        if bucket is None or prefix is None:
+        marker = output_marker(event["commands"])
+        if marker is None:
             raise Exception(
                 f"User specified ii_check_s3, but no s3_bucket or s3_prefix were not found in commands"
             )
-
-        if ii_ds_cmd:
-            prefix += "/merkdir.file"
-        else:
-            prefix += "/metadata/forcings_metadata/metadata.csv"
+        bucket, prefix = marker
         print(f"Checking if any objects with prefix {prefix} exists in {bucket}")
         if not wait_for_object_existence(bucket, prefix):
             store_failed_execution(event, bucket)

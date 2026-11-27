@@ -1,7 +1,6 @@
 """Resolve the literal ``DAILY`` token in datastream commands to a forecast
-date (``YYYYMMDD``). The rules differ for the forcing generator vs. ngen runs.
-Shared by the AWS streamcommander lambda and the LXD controller. Pure stdlib;
-``now`` is injectable for deterministic tests."""
+date (``YYYYMMDD``). Shared by the AWS streamcommander lambda and the LXD
+controller. Pure stdlib; ``now`` is injectable for deterministic tests."""
 
 from __future__ import annotations
 
@@ -9,18 +8,31 @@ import re
 from datetime import datetime, timedelta, timezone
 
 __all__ = [
+    "extract_s3_bucket",
     "extract_s3_prefix",
     "extract_forcing_source",
     "extract_forcing_file",
+    "extract_restart_file",
+    "required_inputs",
     "daily_fcst_cycle",
     "resolve_daily_date",
+    "run_init",
+    "resolve_offset_tokens",
     "substitute_daily",
 ]
 
+_S3_BUCKET_RE = re.compile(r"(?i)--s3_bucket[=\s']+([^\s']+)")
 _S3_PREFIX_RE = re.compile(r"(?i)--s3_prefix[=\s']+([^\s']+)")
 _FORCING_SOURCE_RE = re.compile(r"(?i)--forcing_source[=\s']+([^\s']+)")
 _FORCING_FILE_RE = re.compile(r"(?i)-F[=\s']+([^\s']+)")
+_RESTART_FILE_RE = re.compile(r"(?<!\S)-t[=\s']+([^\s']+)")
 _STANDALONE_DAILY_RE = re.compile(r"(?<![A-Za-z0-9])DAILY(?![A-Za-z0-9])")
+_OFFSET_TOKEN_RE = re.compile(r"\{DAILY(?:([+-]\d+)h)?:(YYYYMMDD|HH)\}")
+
+
+def extract_s3_bucket(commands: list[str]) -> str | None:
+    """Return the last ``--s3_bucket`` value found across the commands."""
+    return _last_match(commands, _S3_BUCKET_RE)
 
 
 def extract_s3_prefix(commands: list[str]) -> str | None:
@@ -40,6 +52,24 @@ def extract_forcing_source(commands: list[str]) -> str | None:
 def extract_forcing_file(commands: list[str]) -> str | None:
     """Return the ``-F`` forcing-file path, or None if no ngen run is present."""
     return _last_match(commands, _FORCING_FILE_RE)
+
+
+def extract_restart_file(commands: list[str]) -> str | None:
+    """Return the ``-t`` t-route restart path, or None if there is none."""
+    return _last_match(commands, _RESTART_FILE_RE)
+
+
+def required_inputs(commands: list[str]) -> list[str]:
+    """The run's dynamic S3 inputs (``-F`` forcing, ``-t`` restart) that must
+    exist before launch. Call after ``substitute_daily``; raises on a path
+    that still holds an unresolved DAILY token.
+    """
+    paths = [p for p in (extract_forcing_file(commands), extract_restart_file(commands))
+             if p and p.startswith("s3://")]
+    unresolved = [p for p in paths if "DAILY" in p]
+    if unresolved:
+        raise ValueError(f"unresolved DAILY in {unresolved}")
+    return paths
 
 
 def _last_match(commands: list[str], pattern: re.Pattern[str]) -> str | None:
@@ -83,6 +113,26 @@ def resolve_daily_date(forcing_source: str | None, now: datetime | None = None) 
     return now.strftime("%Y%m%d")
 
 
+def run_init(date: str, forcing_source: str | None) -> datetime:
+    """The run's init time: ``date`` (``YYYYMMDD``) at its forecast cycle hour."""
+    day = datetime.strptime(date, "%Y%m%d").replace(tzinfo=timezone.utc)
+    return day + timedelta(hours=daily_fcst_cycle(forcing_source) % 24)
+
+
+def resolve_offset_tokens(text: str, init: datetime) -> str:
+    """Resolve ``{DAILY[+-Nh]:YYYYMMDD}`` and ``{DAILY[+-Nh]:HH}`` to ``init``
+    shifted by N hours, e.g. ``{DAILY-28h:HH}`` is the hour 28 h before init.
+
+    Date and hour come from one shifted time, so an offset that crosses
+    midnight moves the date with it.
+    """
+    def sub(m: re.Match[str]) -> str:
+        t = init + timedelta(hours=int(m.group(1) or 0))
+        return t.strftime("%Y%m%d" if m.group(2) == "YYYYMMDD" else "%H")
+
+    return _OFFSET_TOKEN_RE.sub(sub, text)
+
+
 def substitute_daily(
     commands: list[str],
     now: datetime | None = None,
@@ -91,12 +141,16 @@ def substitute_daily(
     """Resolve the literal ``DAILY`` token in a command list to a date.
 
     Behavior by command shape:
+      * ``{DAILY[+-Nh]:FMT}``: resolve from the run's init time, offset by N
+        hours (see ``resolve_offset_tokens``).
       * No ``--forcing_source``: resolve every standalone ``DAILY``.
-      * ``--s3_prefix`` without ``-F``: resolve ``DAILY`` in the prefix (forcing
-        generator). With ``-F`` present (ngen runs) leave it literal for
-        datastreamcli to expand.
+      * ``--s3_prefix``: resolve ``DAILY`` in the prefix wherever it appears.
+        Dating it here, not in datastreamcli, keeps the output prefix, the
+        output check and ``execution.json`` on the date resolved at launch.
       * ``-F`` forcing file: always resolve, applying the MEDIUM_RANGE ensemble
-        hour shift (6h per member beyond the first).
+        hour shift (6h per member beyond the first). Only the file shifts; the
+        output prefix keeps the run's date.
+      * ``-t`` restart file: resolve ``DAILY`` to the run's date.
 
     First attempt only — the hour-shift isn't idempotent, so retries reuse the
     already-resolved commands.
@@ -109,17 +163,21 @@ def substitute_daily(
     forcing_file = extract_forcing_file(commands)
     today = resolve_daily_date(forcing_source, now=now)
 
-    out = list(commands)
+    # Offset tokens first: the standalone DAILY pattern also matches inside them.
+    init = run_init(today, forcing_source)
+    out = [resolve_offset_tokens(c, init) for c in commands]
+
+    # --- -t restart file DAILY handling ---------------------------------
+    restart_file = extract_restart_file(out)
+    if restart_file and "DAILY" in restart_file:
+        out = [c.replace(restart_file, restart_file.replace("DAILY", today)) for c in out]
 
     # --- --s3_prefix DAILY handling -------------------------------------
     if prefix and "DAILY" in prefix:
+        prefix_dated = prefix.replace("DAILY", today)
+        out = [c.replace(prefix, prefix_dated) for c in out]
         if forcing_source is None:
             out = [_STANDALONE_DAILY_RE.sub(today, c) for c in out]
-        elif forcing_file is None:
-            # Forcing generator (no -F): date the output prefix in place.
-            prefix_dated = prefix.replace("DAILY", today)
-            out = [c.replace(prefix, prefix_dated) for c in out]
-        # else: -F present → leave the prefix's DAILY literal for datastreamcli.
 
     # --- -F forcing file DAILY handling + ensemble hour shift -----------
     if forcing_file is not None:

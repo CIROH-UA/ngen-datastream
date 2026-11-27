@@ -26,7 +26,7 @@ from typing import Dict, Optional
 
 from research_datastream.contribution_common import BUCKET
 
-NRDS = Path(__file__).resolve().parents[3] / "terraform/services/nrds"
+NRDS = Path(__file__).resolve().parents[3] / "infra/aws/terraform/services/nrds"
 
 BLOCK = r'\{((?:\s*\w+\s*=\s*"[^"]*")*)\s*\}'
 

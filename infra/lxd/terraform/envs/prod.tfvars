@@ -13,6 +13,7 @@ controller_memory = "4GiB"
 package_ref = "nrds_lxd"
 
 output_check = "s3"
+input_check  = "s3"
 aws_region   = "us-east-1"
 
 # Controller -> LXD API client cert/key (trust it on the server once). If the

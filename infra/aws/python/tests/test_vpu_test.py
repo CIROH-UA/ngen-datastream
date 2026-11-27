@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from research_datastream.vpu_test import load_overrides, module_addresses, override, pick, rewrite
+from research_datastream_aws.vpu_test import load_overrides, module_addresses, override, pick, rewrite
 
 CMD = (
     "runuser -l ec2-user -c 'export DS_TAG=1.7.1 && /home/ec2-user/datastreamcli/scripts/datastream "
@@ -35,6 +35,16 @@ def test_rewrite_pins_date_and_moves_output():
     assert "-s DAILY -e 202610150000" in cmd
     assert "ngen.20261015/forcing_short_range/05/" in cmd
     assert "--S3_PREFIX test/cicd/vpu-test/1/outputs/cfe_nom/v2.2_hydrofabric/ngen.20261015/" in cmd
+    assert cmd.count("DAILY") == 1
+
+
+def test_rewrite_resolves_restart_offset_from_pinned_date():
+    ex = {"commands": ["datastream -s DAILY -F s3://b/ngen.DAILY/forcing_analysis_assim_extend/16/f.nc "
+                       "--FORCING_SOURCE NWM_V3_ANALYSIS_ASSIM_EXTEND_16 "
+                       "-t s3://b/ngen.{DAILY-28h:YYYYMMDD}/{DAILY-28h:HH}/channel_restart_{DAILY-28h:YYYYMMDD}_{DAILY-28h:HH}0000.nc "
+                       "--S3_BUCKET b --S3_PREFIX out/ngen.DAILY/VPU_09"]}
+    cmd = rewrite(ex, "20261015", "test/1")["commands"][0]
+    assert "-t s3://b/ngen.20261014/12/channel_restart_20261014_120000.nc " in cmd
     assert cmd.count("DAILY") == 1
 
 

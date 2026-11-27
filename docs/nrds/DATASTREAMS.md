@@ -203,9 +203,9 @@ model data assimilation. These are candidate additions — each would be a new d
 
 ### How does it run — is there a scheduler / HPC cluster?
 On AWS, an **EventBridge Scheduler** cron triggers a **Step
-Functions state machine** per VPU per cycle; five Lambdas
-(`EC2StarterFromAMI → Commander → EC2Poller → RunChecker → EC2Stopper`) launch an EC2
-instance from an AMI, run the datastreamcli command, verify the S3 output exists, then
+Functions state machine** per VPU per cycle; six Lambdas
+(`InputGate → EC2StarterFromAMI → Commander → EC2Poller → RunChecker → EC2Stopper`) wait
+for the run's forcing and restart files, launch an EC2 instance from an AMI, run the datastreamcli command, verify the S3 output exists, then
 terminate the instance and detach the volume. See
 [ARCHITECTURE.md](../../infra/aws/terraform/docs/ARCHITECTURE.md). An **LXD-based HPC** port
 (UA "Nextstream") replaces the scheduler + state machine with an always-on controller

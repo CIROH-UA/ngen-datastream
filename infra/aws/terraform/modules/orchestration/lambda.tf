@@ -1,3 +1,10 @@
+# Lambdas that share logic with the LXD orchestrator get research_datastream_core
+# (infra/common/python, stdlib only) copied into their zip beside the handler.
+locals {
+  core_src   = "${path.module}/../../../../common/python/src"
+  core_files = fileset(local.core_src, "research_datastream_core/*.py")
+}
+
 data "archive_file" "python_lambda_starter" {
   type        = "zip"
   source_file = "${path.module}/lambdas/start_ami/lambda_function.py"
@@ -6,8 +13,38 @@ data "archive_file" "python_lambda_starter" {
 
 data "archive_file" "python_lambda_commander" {
   type        = "zip"
-  source_file = "${path.module}/lambdas/streamcommander/lambda_function.py"
   output_path = "${path.module}/lambdas/commander_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/streamcommander/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
+}
+
+data "archive_file" "python_lambda_input_gate" {
+  type        = "zip"
+  output_path = "${path.module}/lambdas/input_gate_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/input_gate/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 data "archive_file" "python_lambda_poller" {
@@ -18,14 +55,38 @@ data "archive_file" "python_lambda_poller" {
 
 data "archive_file" "python_lambda_checker" {
   type        = "zip"
-  source_file = "${path.module}/lambdas/checker/lambda_function.py"
   output_path = "${path.module}/lambdas/checker_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/checker/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 data "archive_file" "python_lambda_stopper" {
   type        = "zip"
-  source_file = "${path.module}/lambdas/stopper/lambda_function.py"
   output_path = "${path.module}/lambdas/stopper_lambda.zip"
+
+  source {
+    content  = file("${path.module}/lambdas/stopper/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+
+  dynamic "source" {
+    for_each = local.core_files
+    content {
+      content  = file("${local.core_src}/${source.value}")
+      filename = source.value
+    }
+  }
 }
 
 resource "aws_lambda_function" "starter_lambda" {
@@ -46,6 +107,16 @@ resource "aws_lambda_function" "commander_lambda" {
   filename         = "${path.module}/lambdas/commander_lambda.zip"
   source_code_hash = data.archive_file.python_lambda_commander.output_base64sha256
   timeout          = 600
+}
+
+resource "aws_lambda_function" "input_gate_lambda" {
+  function_name    = "${var.resource_prefix}_input_gate"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  filename         = "${path.module}/lambdas/input_gate_lambda.zip"
+  source_code_hash = data.archive_file.python_lambda_input_gate.output_base64sha256
+  timeout          = 60
 }
 
 resource "aws_lambda_function" "poller_lambda" {

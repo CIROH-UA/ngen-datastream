@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'infra/aws/terraform/**'
+      - 'infra/common/python/src/**'   # vendored into the lambda zips
       # Contribution manifests live under terraform but are not terraform.
       # Merging one must not fire an apply; the contribution_*.yml workflows own them.
       - '!infra/aws/terraform/services/nrds/datastreams/*/contributions/**'

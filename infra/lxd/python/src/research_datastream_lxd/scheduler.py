@@ -279,6 +279,7 @@ def build_scheduler(
     mem_pct: float | None = DEFAULT_MEMORY_PCT,
     stagger_s: float = DEFAULT_STAGGER_S,
     max_workers: int | None = None,
+    input_check: runner.InputCheck | None = None,
     monitor_interval_s: float = DEFAULT_MEM_MONITOR_INTERVAL_S,
 ) -> BlockingScheduler:
     """Build (but don't start) a scheduler with all runs registered. The
@@ -310,7 +311,7 @@ def build_scheduler(
 
     for ds in datastreams:
         for rs in ds.runs:
-            _register(sched, rs, lxd_client, output_check, limiter)
+            _register(sched, rs, lxd_client, output_check, limiter, input_check)
             log.info("registered %s [%s %s]", rs.name, rs.cron, rs.timezone)
 
     log.info(
@@ -328,6 +329,7 @@ def _register(
     lxd_client: LXDClient,
     output_check: runner.OutputCheck | None,
     limiter: ResourceLimiter,
+    input_check: runner.InputCheck | None = None,
 ) -> None:
     trigger = CronTrigger.from_crontab(run_spec.cron, timezone=run_spec.timezone)
     cores = int(run_spec.resources.get("cpu", 1) or 1)
@@ -336,11 +338,16 @@ def _register(
     def _job(rs: ScheduledRun = run_spec, cores: int = cores, mem_gib: float = mem_gib) -> None:
         log.info("firing %s (requesting %d cores / %.0f GiB)", rs.name, cores, mem_gib)
         try:
+            # Wait for inputs before reserving, so a late forcing holds no cores.
+            execution = runner.prepare(rs, input_check)
+            if not execution["ii_inputs_ready"]:
+                return
             # Block until a member has room, then pin the run there for its whole
             # lifetime so the node's reservation reflects real load.
             with limiter.reserve(cores, mem_gib) as target:
                 log.info("starting %s on %s", rs.name, target if target is not None else "auto")
-                runner.run(rs, lxd_client=lxd_client, output_check=output_check, target=target)
+                runner.run(rs, lxd_client=lxd_client, output_check=output_check, target=target,
+                           execution=execution)
         except Exception:
             log.exception("unhandled error in run %s", rs.name)
 
@@ -354,6 +361,7 @@ def run_forever(
     core_budget: int = DEFAULT_CORE_BUDGET,
     mem_pct: float | None = DEFAULT_MEMORY_PCT,
     stagger_s: float = DEFAULT_STAGGER_S,
+    input_check: runner.InputCheck | None = None,
 ) -> None:
     """Load configs, start the scheduler, handle SIGTERM cleanly."""
     datastreams = load_all(datastreams_dir, env=env)
@@ -370,6 +378,7 @@ def run_forever(
         core_budget=core_budget,
         mem_pct=mem_pct,
         stagger_s=stagger_s,
+        input_check=input_check,
     )
 
     def _handle(signum, _frame):

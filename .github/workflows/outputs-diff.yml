@@ -80,7 +80,7 @@ jobs:
         if: matrix.contribution != ''
         run: |
           set -o pipefail
-          pip install -q -e infra/aws/python \
+          pip install -q -e python \
             'ngen_config[all] @ git+https://github.com/ciroh-ua/ngen-cal@master#egg=ngen_config&subdirectory=python/ngen_conf'
           python -m research_datastream.contribution_parameters check "$CONTRIBUTION" \
             --workdir "$RUNNER_TEMP/work" --out candidate.json --record spec.json | tee build.log

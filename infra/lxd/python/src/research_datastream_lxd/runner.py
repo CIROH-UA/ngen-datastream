@@ -1,5 +1,6 @@
-"""Orchestrate one scheduled run start-to-finish: launch → execute → check
-output → teardown, with retries. Teardown always runs, even on failure.
+"""Orchestrate one scheduled run start-to-finish: prepare (resolve DAILY, wait
+for inputs) → launch → execute → check output → teardown, with retries.
+Teardown always runs, even on failure.
 
 The AWS deployment splits this across five Lambdas (start_ami, streamcommander,
 poller, checker, stopper) driven by Step Functions; here it is one function."""
@@ -17,6 +18,11 @@ from typing import Any
 
 from research_datastream_core import (
     extract_forcing_source,
+    extract_s3_bucket,
+    extract_s3_prefix,
+    input_wait,
+    output_marker,
+    required_inputs,
     resolve_daily_date,
     substitute_daily,
 )
@@ -144,19 +150,17 @@ def _substitute_tf_vars(raw: str, context: dict[str, Any]) -> str:
     return _TF_VAR.sub(repl, raw)
 
 
-def run(
+def prepare(
     run_spec: ScheduledRun,
-    lxd_client: LXDClient | None = None,
-    output_check: "OutputCheck | None" = None,
-    target: str | None = None,
+    input_check: "InputCheck | None" = None,
+    sleep=time.sleep,
 ) -> dict[str, Any]:
     """
-    Execute one scheduled datastream run end-to-end.
-
-    `target` pins every launch attempt to a specific cluster member (chosen by
-    the scheduler's memory-aware placement); None lets LXD place it.
+    Render the run's execution, resolve DAILY once and wait for its forcing and
+    restart inputs (the AWS input gate). Holds no LXD resources, so the
+    scheduler calls it before reserving any. `ii_inputs_ready` is False if the
+    inputs never appeared; the failure is already recorded.
     """
-    lxd_client = lxd_client or LXDClient()
     execution = _render_template(run_spec.template_path, run_spec.context)
 
     # Prepended once here (not per-attempt) so retries don't stack duplicates.
@@ -167,6 +171,57 @@ def run(
     execution["ii_pass"] = False
     execution["ii_s3_object_checked"] = False
     execution["retry_attempt"] = 0
+
+    # Once, before any attempt: the MEDIUM_RANGE hour shift isn't idempotent.
+    execution["commands"] = substitute_daily(execution["commands"])
+
+    missing = _wait_for_inputs(execution, input_check, sleep)
+    execution["ii_inputs_ready"] = not missing
+    if missing:
+        execution["failedInput"] = {"error": f"inputs unavailable: {missing}", "attempt": 0}
+        log.error("=== %s FAILED: inputs never appeared: %s ===", run_spec.name, missing)
+        _record_failure(run_spec, execution, 0)
+    return execution
+
+
+def _wait_for_inputs(execution: dict, input_check: "InputCheck | None", sleep) -> list[str]:
+    """Poll with core's backoff until every input exists; return those still
+    missing at the timeout."""
+    run_options = execution["run_options"]
+    if input_check is None or not run_options.get("ii_wait_for_inputs", True):
+        return []
+    inputs = required_inputs(execution["commands"])
+    started, n_checks = time.time(), 0
+    while missing := [uri for uri in inputs if not input_check.exists(uri)]:
+        wait_s, timed_out = input_wait(run_options, n_checks, time.time() - started)
+        if timed_out:
+            return missing
+        log.info("%d input(s) missing, next check in %ds: %s", len(missing), wait_s, missing)
+        sleep(wait_s)
+        n_checks += 1
+    return []
+
+
+def run(
+    run_spec: ScheduledRun,
+    lxd_client: LXDClient | None = None,
+    output_check: "OutputCheck | None" = None,
+    target: str | None = None,
+    input_check: "InputCheck | None" = None,
+    execution: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Execute one scheduled datastream run end-to-end.
+
+    `target` pins every launch attempt to a specific cluster member (chosen by
+    the scheduler's memory-aware placement); None lets LXD place it.
+    `execution` is a `prepare` result; without one, `run` prepares its own.
+    """
+    lxd_client = lxd_client or LXDClient()
+    if execution is None:
+        execution = prepare(run_spec, input_check)
+    if not execution["ii_inputs_ready"]:
+        return execution
 
     n_retries = int(execution["run_options"].get("n_retries_allowed", 0))
     timeout_s = int(execution["run_options"].get("timeout_s", 3600))
@@ -206,6 +261,8 @@ def _classify_failure(execution: dict) -> str:
     """Bucket a terminal failure: no_output (exec ok but objects missing),
     exec_failed (command returned non-zero), or error (anything else)."""
     error = execution.get("failedInput", {}).get("error", "")
+    if error.startswith("inputs unavailable"):
+        return "no_input"
     if "output objects not found" in error:
         return "no_output"
     if error.startswith("exec rc="):
@@ -223,8 +280,9 @@ def _record_failure(run_spec: ScheduledRun, execution: dict, attempts: int) -> N
     """
     error = execution.get("failedInput", {}).get("error", "unknown")
     commands = execution.get("commands", [])
-    bucket, prefix = _extract_bucket_prefix(commands)
-    # Resolve DAILY (left literal by cfe-nom) so failures are attributable to a date.
+    bucket = extract_s3_bucket(commands)
+    prefix = extract_s3_prefix(commands)
+    # A run that failed before exec still has DAILY in its commands.
     date = _forecast_date(commands, execution.get("t0"))
     if prefix and "DAILY" in prefix:
         prefix = prefix.replace("DAILY", date)
@@ -272,9 +330,6 @@ def _execute(lxd: LXDClient, instance: Any, execution: dict, timeout_s: int) -> 
     if not commands:
         raise DatastreamFailure("no commands to execute")
 
-    commands = substitute_daily(commands, retry_attempt=execution.get("retry_attempt", 0))
-    execution["commands"] = commands
-
     environment = _build_environment(execution)
     result = lxd.execute(instance, commands, timeout_s=timeout_s, environment=environment)
     if not result.succeeded:
@@ -301,6 +356,30 @@ class OutputCheck:
         raise NotImplementedError
 
 
+class InputCheck:
+    """Protocol: `exists(uri) -> bool`. Default impl below."""
+    def exists(self, uri: str) -> bool:  # pragma: no cover
+        raise NotImplementedError
+
+
+class S3InputCheck(InputCheck):
+    """HeadObject check for the input gate. Imports boto3 lazily."""
+    def __init__(self, region: str = "us-east-1") -> None:
+        import boto3  # noqa: PLC0415
+        self._s3 = boto3.client("s3", region_name=region)
+
+    def exists(self, uri: str) -> bool:
+        from botocore.exceptions import ClientError  # noqa: PLC0415
+        bucket, key = uri[len("s3://"):].split("/", 1)
+        try:
+            self._s3.head_object(Bucket=bucket, Key=key)
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+                return False
+            raise
+
+
 class S3OutputCheck(OutputCheck):
     """Port of checker.lambda_handler — check an S3 prefix appeared.
 
@@ -311,16 +390,11 @@ class S3OutputCheck(OutputCheck):
         self._s3 = boto3.client("s3", region_name=region)
 
     def verify(self, execution: dict) -> bool:
-        bucket, prefix = _extract_bucket_prefix(execution.get("commands", []))
-        if not bucket or not prefix:
+        marker = output_marker(execution.get("commands", []))
+        if marker is None:
             log.warning("no bucket/prefix in commands; skipping output check")
             return False
-        # forcing writes metadata.csv; ngen-run writes ngen-run.tar.gz
-        key = (
-            f"{prefix}/ngen-run.tar.gz"
-            if any("/scripts/datastream" in c for c in execution["commands"])
-            else f"{prefix}/metadata/forcings_metadata/metadata.csv"
-        )
+        bucket, key = marker
         log.info("checking s3://%s/%s", bucket, key)
         for _ in range(10):
             resp = self._s3.list_objects_v2(Bucket=bucket, Prefix=key)
@@ -328,15 +402,3 @@ class S3OutputCheck(OutputCheck):
                 return True
             time.sleep(1)
         return False
-
-
-def _extract_bucket_prefix(commands: list[str]) -> tuple[str | None, str | None]:
-    bucket = prefix = None
-    for c in commands:
-        m = re.search(r"(?i)--s3_bucket[=\s']+([^\s']+)", c)
-        if m:
-            bucket = m.group(1)
-        m = re.search(r"(?i)--s3_prefix[=\s']+([^\s']+)", c)
-        if m:
-            prefix = m.group(1)
-    return bucket, prefix
